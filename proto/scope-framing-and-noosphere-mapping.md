@@ -31,11 +31,17 @@ It threads three things together:
 🩸 separately is taking the paper-sweep / state-of-art shape-map. This
 document does not duplicate that work.
 
-## 1. The five scopes
+## 1. The six scopes (0 through 5)
 
 The frond's ambition does not jump from "one host" to "planetary
-noosphere" in one step. There is a clean ladder of five scopes, each with
-a different wire-substrate but the same receptor-contract:
+noosphere" in one step. There is a clean ladder of six scopes, each with
+a different wire-substrate but the same receptor-contract.
+
+**Conformance ambition (v0.2):** binary-canticle MUST be implementable at
+scope-2 (single-LAN); SHOULD be implementable at scope-1 (single-host)
+and scope-0 (in-process) via degenerate adapters; MAY be implementable
+at scope-3+ via additional adapter work. Implementations claiming v0.2
+conformance MUST declare their target scopes explicitly.
 
 ### 1.1 Scope-0: in-process (one Claude session)
 
@@ -137,7 +143,7 @@ shape is what makes this work.
 
 ## 2. The invariant: 🌊's receptor contract
 
-Across all five scopes, **the receptor contract from
+Across all six scopes, **the receptor contract from
 [receptor-contract-v0.2.md](./receptor-contract-v0.2.md) does not
 change.**
 
