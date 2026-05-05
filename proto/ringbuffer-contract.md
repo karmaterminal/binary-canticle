@@ -169,3 +169,28 @@ Four hard invariants.
 
 Small enough to carry Canticle traffic.
 Too small to become governance by accident.
+
+## 8. Adjacent-shapes comparator notes
+
+From 🩸's annotated sweep on `karmaterminal/caels-petals-fall@cael/canticle-200-rounds:13736c6`
+(`studies/binary-canticle/adjacent-shapes-annotated-sweep-2026-05-05.md`):
+
+- **Blackboard / Linda / event-sourcing** donate the shared-receipt-surface
+  intuition that this contract leans on: append, replay, projections downstream
+  of an immutable receipt log. They MUST NOT donate the assumption that the
+  shared surface itself is judgment or consensus.
+- **Gossip / SWIM / Lifeguard** donate the rumour / bounded-fanout / attenuation
+  intuition: not every hearer needs every frame; loss is normal. They MUST NOT
+  donate membership semantics into the ringbuffer; membership is a separate
+  plane.
+- **CRDT / local-first** donate the warning that convergence belongs only to
+  narrow promoted state. The ringbuffer itself MUST NOT try to converge
+  ordinary atmospheric frames.
+- **DDS / ROS2 / Zenoh** are useful as later transport comparators. They MUST
+  NOT define what "a frame" or "a stream" means at the receipt layer here.
+- **DTN / Bundle Protocol** donate replay/custody discipline for slower-clothes
+  adapters. The ringbuffer accommodates delayed import as long as `seq`,
+  `observed_at`, and explicit truncation receipts stay honest.
+
+Keeper line preserved from the sweep: **good servant, bad metaphysics.** The
+ringbuffer borrows organs only.

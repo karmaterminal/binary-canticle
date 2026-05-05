@@ -521,6 +521,41 @@ The first wire adapter SHOULD prove it can carry these examples unchanged.
    `quarantine_strengthen`, `quarantine_rescind`?
 5. Do per-station caps belong in core conformance or only recommended practice?
 6. How much of `evidence.inputs` must be preserved after raw-frame TTL expires?
+7. Should the modulation state distinguish a **half-open** posture between
+   `tighten` and full `all-clear`, sampling tentatively before returning to
+   baseline? (open seam from the safety-shape sweep, provisional /
+   citation-pending.)
+8. Should `tighten` carry an explicit **per-stream refractory** window during
+   which further `tighten` from the same source does not re-fire? (open seam
+   from the safety-shape sweep, provisional / citation-pending.)
+9. If sovereign-file or constitution-shaped guidance ever influences receptor
+   behavior, should it be **referenceable by hash** at the receptor layer rather
+   than by ambient prose? (open seam from the safety-shape sweep, provisional /
+   citation-pending.)
+
+## 14a. Adjacent-shapes comparator notes
+
+From 🩸's annotated sweep on `karmaterminal/caels-petals-fall@cael/canticle-200-rounds:13736c6`
+(`studies/binary-canticle/adjacent-shapes-annotated-sweep-2026-05-05.md`),
+three comparator stances are load-bearing for this contract:
+
+- **No-membership posture is intentional.** Several neighbor families
+  (gossip / SWIM / Lifeguard, DDS-style middlewares) bake membership and
+  discovery into the substrate. This contract MUST NOT inherit that. Membership
+  is a separate plane; the receptor evaluates frames whose provenance is
+  station-stamped, not member-list-confirmed.
+- **Zenoh as transport kin, not theology.** Of the live transport-side neighbors,
+  Zenoh's `station:stream`-shaped routing is closest in flavor. It is useful as
+  a comparator for later adapter selection; it MUST NOT define what receptor
+  judgment means.
+- **Novelty lives in the intersection.** Per-witness projections, short TTL with
+  bounded replay, connectionless no-membership posture, and explicit tool-surface
+  / inference-budget discipline are individually present in neighbors but jointly
+  rare. The receptor contract preserves that intersection by refusing to import
+  any one family's whole worldview.
+
+Keeper line preserved from the sweep: **good servant, bad metaphysics.** Each
+neighbor donates one organ; none explains the whole creature.
 
 ## 15. Distillation
 
