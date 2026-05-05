@@ -225,6 +225,7 @@ record SHOULD look like:
 | Field | Meaning |
 |---|---|
 | `frameId` | Evaluated frame id. |
+| `emittedAt` | Source-side emit time as judged from the frame envelope. |
 | `receivedAt` | Local arrival/evaluation time. |
 | `stationId` | Source station. |
 | `streamId` | Source stream. |
@@ -235,11 +236,14 @@ record SHOULD look like:
 | `sigState` | `valid` / `invalid` / `absent`. |
 | `lens` | Lens hint if present. |
 | `postureClass` | Chemokine/posture class if present. |
+| `correlationId` | Family/thread identifier for related receipts/notices. |
+| `inReplyTo` | Direct originating frame/reference when relevant. |
 | `targetStationId` | Target of quarantine/receipt/reply when relevant. |
 | `disposition` | `surface` / `ringbuffer_only` / `drop` / `quarantine_flag`. |
 | `dispositionReason[]` | Machine-readable reasons for the disposition. |
 | `accordWeight` | Current accord strength consulted for this judgment. |
 | `memoryEffect` | `none` / `threshold_delta` / `antibody_flag`. |
+| `stateVersion` / `ruleVersion` | Which receptor policy/version produced this judgment. |
 
 This is not a replacement for raw frame storage. It is the smallest practical
 judgment ledger that lets a hearer explain how one frame changed local truth.
