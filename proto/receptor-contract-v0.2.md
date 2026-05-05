@@ -207,7 +207,33 @@ Each receptor evaluation returns a judgment object.
 - `quarantine_action` — station-level or class-level quarantine behavior was
   activated, strengthened, rescinded, or persisted.
 
-### 7.2 Evidence is mandatory
+### 7.2 Minimal receptor record
+
+If a hearer stores one concrete judgment row per evaluated frame, the minimal
+record SHOULD look like:
+
+| Field | Meaning |
+|---|---|
+| `frameId` | Evaluated frame id. |
+| `receivedAt` | Local arrival/evaluation time. |
+| `stationId` | Source station. |
+| `streamId` | Source stream. |
+| `seq` | Source sequence number if present. |
+| `kind` | Frame kind. |
+| `ttlMs` / `expiresAt` | Freshness window and computed expiry. |
+| `sigState` | `valid` / `invalid` / `absent`. |
+| `lens` | Lens hint if present. |
+| `postureClass` | Chemokine/posture class if present. |
+| `targetStationId` | Target of quarantine/receipt/reply when relevant. |
+| `disposition` | `surface` / `ringbuffer_only` / `drop` / `quarantine_flag`. |
+| `dispositionReason[]` | Machine-readable reasons for the disposition. |
+| `accordWeight` | Current accord strength consulted for this judgment. |
+| `memoryEffect` | `none` / `threshold_delta` / `antibody_flag`. |
+
+This is not a replacement for raw frame storage. It is the smallest practical
+judgment ledger that lets a hearer explain how one frame changed local truth.
+
+### 7.3 Evidence is mandatory
 
 Every non-trivial disposition MUST carry machine-readable evidence entries.
 Minimum shape per evidence entry:
@@ -265,6 +291,9 @@ Interpreted atmosphere is for:
 
 Raw receipt is truth. Atmosphere is use. A conforming implementation MUST NOT
 make atmosphere the only surviving representation.
+
+The minimal receptor record in §7.2 sits between them: not the raw frame, not
+just the atmosphere, but the judgment ledger connecting one to the other.
 
 ## 9. Deterministic transitions
 
