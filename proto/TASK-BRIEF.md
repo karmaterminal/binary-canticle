@@ -2,7 +2,7 @@
 
 ## Short answer
 
-**Today we have inter-host coordination by borrowed organs. Next we want a real sensory stack beside the existing OpenClaw control plane.**
+**Today we have inter-host coordination by borrowed organs. Next we want a real sensory stack beside the existing OpenClaw control plane, with one boring judgment body all transports feed.**
 
 ## What exists now
 
@@ -32,6 +32,7 @@ Keep the sensory stack simple:
 - **wire dumb**
 - **receptor deterministic**
 - **interface normalized**
+- interfaces must say whether they are **same-host / cross-host / delayed-import**
 
 ## Hard guardrails
 
