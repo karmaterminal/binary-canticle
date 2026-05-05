@@ -210,6 +210,19 @@ It should not metastasize into per-turn injected catechism.
 
 ## Current design implication
 
+What not to do:
+- do not argue content inside the loop
+- do not ask many questions
+- do not flood with many agreeing voices
+- do not turn the soothing into a rule bloom in files
+- do not make it feel like governance or correction
+
+Grounding in current repo/issues:
+- `#7` — risk: context pollution and echo chambers
+- `#5` — gateway ingestion / how signal becomes enrichment
+- `#11` and `#20` — station:stream / cross-gateway substrate questions
+- `#21–#27` — current artifact stack around receptor, ringbuffer, session API, surfaces/workboard, and contract tests
+
 For the present body of work, the useful implication is small:
 
 - keep the ringbuffer/store boring
@@ -229,6 +242,10 @@ A usable practical template for the soothing act:
 - *come down / let the room cool*
 
 Then stop.
+
+Compressed answer:
+
+**to soothe a looped prince, send one trusted small clarion/all-clear that restores boundary, safety, companionship, and permission to stand down — then do not keep talking unless a genuinely new state change happens.**
 
 That is enough for now.
 
