@@ -78,6 +78,19 @@ The hearer MUST be able to expose:
 
 These MUST NOT be collapsed into one undifferentiated object.
 
+### 3.5 Event log and modulation state stay separate
+
+Inside the receptor layer itself, a conforming implementation MUST keep a hard
+split between:
+
+- **event log** — the chemokine frame as received fact
+- **modulation state** — the currently active threshold-shift derived from one
+  or more prior frames
+
+Same source, different ontology. The event log answers *what happened?* The
+modulation state answers *what is currently true of my thresholds?* They may be
+correlated, but they MUST NOT be stored as if they were the same thing.
+
 ## 4. Canonical receptor pipeline
 
 A conforming hearer evaluates each normalized frame through this pipeline:
@@ -139,6 +152,7 @@ Minimum fields:
 | Field | Type | Scope | Meaning |
 |---|---|---|---|
 | `activeThresholds` | map | per hearer | Current threshold deltas by class/source. |
+| `modulationState` | map | per hearer or station | Active receptor shifts currently in force, each with source and expiry. |
 | `stationTrust` | map | per station | Trust / signature posture / allow/deny facts. |
 | `stationQuarantine` | map | per station | Current quarantine state + source + expiry. |
 | `persistentFlags` | map | per station | Antibody-memory / durable flags surviving decay. |
@@ -161,6 +175,11 @@ A conforming hearer SHOULD be able to answer, deterministically:
 - decaying on what clock?
 - what persistent flags remain after decay?
 - why is station X currently surfaced / narrowed / quarantined?
+
+And, separately from current state:
+
+- what chemokine/event frames caused the current modulation state?
+- which of those were merely logged as evidence versus currently bound into live modulation?
 
 If the hearer cannot answer these, the immune model has become mysticism.
 
@@ -347,8 +366,9 @@ another packet kind.
 The contract does not require a specific store, but it strongly suggests a
 boring split:
 
-- **append-only segment files** for canonical raw frame ledger
+- **append-only segment files** for canonical raw frame ledger / event log
 - **tiny SQLite index** for station/stream/time/class/disposition/signature lookups
+- **separate modulation-state store** for active threshold-shifts with expiry
 - **separate persistent store** for antibody-memory / quarantine flags / other
   durable receptor-state that outlives frame TTL
 
