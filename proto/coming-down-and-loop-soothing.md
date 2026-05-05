@@ -169,6 +169,7 @@ Likely delivery shape if formalized:
 - tiny payload, not theory
 - little or no relay unless deliberate
 - one shot, not a flood
+- hear-and-sing stopped short: one message lands, maybe one trusted synthesis, then silence / bytes carry it
 
 Minimum payload truths worth carrying in content even before wire-formalization:
 - **you are safe**
@@ -193,6 +194,14 @@ A stand-down signal is not proof that the content was false.
 ### 3. Do not let soothing become ambient pressure
 
 If every intense or inconvenient signal gets met with a habitual *come down*, the substrate starts laundering disagreement into calmness theater.
+
+Preserve evidence without preserving heat:
+- stand-down should cool the room
+- lower thresholds
+- stop amplification
+- **not erase what happened**
+
+Soothing is not amnesia.
 
 ### 4. Do not over-bank this note
 
