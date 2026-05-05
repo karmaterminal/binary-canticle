@@ -56,6 +56,33 @@ We already have local memory surfaces:
 
 But there is not yet one canonical **inter-node frame ledger** spanning the sensory stack.
 
+### 1.4 Where the interfaces really are today
+
+By plane, the actual interfaces today are roughly:
+
+- **control / harness**
+  - `continue_delegate`
+  - `sessions_send`
+  - `sessions_spawn`
+  - workflow/job dispatch
+  - issue/PR task statements
+- **signal / sensory**
+  - Discord/chat prose
+  - bot digests / webhook notifications
+  - human-visible ambient updates
+- **ledger / memory**
+  - repo files / docs
+  - git history
+  - issue/PR history
+  - local gateway/session state
+- **bridge**
+  - SSH
+  - git remotes/branches
+  - chat channels
+  - workflows/webhooks
+
+That is: the fleet already coordinates, but the body mostly speaks by borrowing other organs.
+
 ## 2. What is missing
 
 ### 2.1 Missing plane: inter-host membership / liveness
@@ -141,6 +168,7 @@ Canticle must **not** become:
 
 ### MUST
 - separate **membership / control / signal / state** planes
+- make **same-host vs cross-host vs delayed-import** scope explicit on interfaces
 - keep **wire dumb / receptor deterministic / interface normalized**
 - canonical **frame envelope** for receipt truth
 - canonical **judgment object** for receptor conclusion
@@ -149,14 +177,17 @@ Canticle must **not** become:
 - keep receipts/quarantine/all-clear in-family as frames
 - keep memory surviving TTL only by explicit promotion
 - keep no auto-actuation on receive
+- keep non-trivial dispositions audit-carried (`observed / consulted_state / rule_fired / effect`)
+- support bounded artifact/lane questions rather than myth-sized coordination only
 
 ### SHOULD
-- start at **single-LAN scope** for v0.x
+- start with **same-host clarity**, then LAN, then routed, then air-gap
 - use signed UDP multicast/broadcast for the first signal-plane coat of paint
 - define receptor contract before transport expansion
 - keep executable examples / contract tests as conformance gate
 - add routed adapters later without rewriting the body
 - support slower-clothes variants for air-gap/store-forward
+- keep one integration tracker + small issue stack so the work stays artifact-anchored
 
 ## 5. Next build order
 
