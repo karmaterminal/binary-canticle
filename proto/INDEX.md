@@ -48,6 +48,15 @@ And it is the place to turn the myth into bounded agent prompts, e.g.:
 - compare Zenoh/DDS/DTN only for scope-3 bridge-plane concerns
 - prospect sqlite schema for `frames` / `quarantine_flags` / `receptor_events` without inventing second truth-source
 
+A fast anti-amorphous checklist for any row/section:
+- `we have docs for this`
+- `we have examples/tests`
+- `we have an implementation sketch`
+- `we have prior-art citations`
+- `we have a named blocker`
+
+The gaps show up quickly when one of those is missing or fake.
+
 ## Immediate build order
 
 1. Keep `proto/receptor-contract-v0.2.md` stable enough for pressure-testing.
