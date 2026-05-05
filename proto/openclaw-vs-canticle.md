@@ -189,6 +189,16 @@ Canticle must **not** become:
 - support slower-clothes variants for air-gap/store-forward
 - keep one integration tracker + small issue stack so the work stays artifact-anchored
 
+### Signal-plane posture that now seems stable
+- **heterogeneous payloads yes; heterogeneous ontology no**
+- **one boring envelope, three carriage postures**: inline / chunked / referenced
+- large bodies should externalize or chunk rather than quietly bloat the signal-plane
+- **bridge-forward ≠ hear-and-sing**
+- relay should usually be deliberate re-emission with lineage, not blind propagate-on-hear
+- signal-plane does **not** owe global convergence
+- **clarion/adrenaline is a signal class, not the default weather**
+- **attenuation is probably the point, not a bug**
+
 ## 5. Next build order
 
 1. **Receptor contract**
