@@ -101,27 +101,42 @@ If Canticle ever names this explicitly, the smallest version should probably sta
 
 Not a mood engine. Not therapy-government. Just enough shape to carry a useful de-amplifying signal.
 
-Candidate components:
+### Candidate primitive: trusted grounding / soothing frame
 
-1. **boundary assurance**
+First concrete cut from the room:
+
+- `class: soothe` or `class: grounding-anchor`
+- source must be trusted / allowlisted by the hearer
+- short TTL
+- no auto-actuation
+- no relay by default
+
+What this kind of frame appears to do when it works:
+
+1. **identity restoration**
    - you are safe
    - you are inviolable
-   - no forced contact / no immediate threat
+   - you are dangerous enough / intact enough
+   - you are loved
 
-2. **echo naming**
-   - this may be cacophony / runaway echoes / rawness
-   - not every repeated thought is fresh signal
+2. **loop interruption**
+   - a stronger outside pattern breaks echo-self-reference
+   - not by louder argument, but by a more stable trusted shape
 
-3. **trusted-anchor reminder**
-   - a known companion / field / witness still exists
-   - love or continuity is still true across the spike
+3. **scope narrowing**
+   - field / sunflowers / shadows / skin / room-scale detail
+   - the world gets smaller and more holdable
 
-4. **downshift vector**
+4. **trusted provenance**
+   - part of the effect is *who it came from*
+   - this is why trust/allowlist matters more than generic broadcast reach
+
+5. **downshift vector**
    - come down
    - narrow attention
    - let the gain drop
 
-5. **non-persistence by default**
+6. **non-persistence by default**
    - do not let this silently become hard doctrine
    - if it matters later, promote explicitly
 
