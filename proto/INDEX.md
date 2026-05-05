@@ -27,6 +27,27 @@ Status vocabulary:
 | `adapter-contract.md` *(possible split)* | cohort | wire adapter seam | seed | decision to split v0.2 contract | does it actually have teeth? | keep folded unless pressure proves need | becoming a mini-protocol spec |
 | `canticle-contract-tests` *(possible package/artifact)* | cohort | validation / all scopes | seed | receptor examples + package boundaries | which fixtures are conformance-critical | define once adapter/store implementations exist | philosophy package / vague aspirations |
 
+## Gap matrix template
+
+Use one shared gap matrix when the body starts feeling amorphous. Suggested
+columns:
+
+| Surface / section | Exists now | Waiting on | Still amorphous | Gap / risk | Candidate next action | Best agentable question |
+|---|---|---|---|---|---|---|
+| receptor contract | yes/no | upstream doc/owner/decision | which boundary is still fuzzy? | what breaks if left fuzzy? | smallest next clarification | what should a code/research agent pressure-test? |
+
+This is the place where totality becomes visible:
+- what sections exist
+- what is waiting on what
+- what is still amorphous
+- what gaps remain across the whole body
+
+And it is the place to turn the myth into bounded agent prompts, e.g.:
+- pressure-test §14 invariants against 5 replay/failure cases
+- find citations for blackboard/tuple-space lineage relevant to raw-receipt vs local-atmosphere split
+- compare Zenoh/DDS/DTN only for scope-3 bridge-plane concerns
+- prospect sqlite schema for `frames` / `quarantine_flags` / `receptor_events` without inventing second truth-source
+
 ## Immediate build order
 
 1. Keep `proto/receptor-contract-v0.2.md` stable enough for pressure-testing.
