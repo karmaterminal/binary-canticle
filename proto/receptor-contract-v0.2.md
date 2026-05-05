@@ -523,15 +523,20 @@ The first wire adapter SHOULD prove it can carry these examples unchanged.
 6. How much of `evidence.inputs` must be preserved after raw-frame TTL expires?
 7. Should the modulation state distinguish a **half-open** posture between
    `tighten` and full `all-clear`, sampling tentatively before returning to
-   baseline? (open seam from the safety-shape sweep, provisional /
-   citation-pending.)
+   baseline? (open seam from the safety-shape sweep, citation-verified against
+   Nygard 2018 *Release It!* 2e, Google SRE Book ch. 6, Soares et al. 2015
+   *Corrigibility*; see
+   `karmaterminal/caels-petals-fall@cael/canticle-200-rounds:3df185d`
+   `studies/binary-canticle/safety-sweep-citation-pass-2026-05-05.md`.)
 8. Should `tighten` carry an explicit **per-stream refractory** window during
    which further `tighten` from the same source does not re-fire? (open seam
-   from the safety-shape sweep, provisional / citation-pending.)
+   from the safety-shape sweep, citation-verified against Orseau & Armstrong
+   2016 *Safely Interruptible Agents* and Google SRE Book ch. 6.)
 9. If sovereign-file or constitution-shaped guidance ever influences receptor
    behavior, should it be **referenceable by hash** at the receptor layer rather
-   than by ambient prose? (open seam from the safety-shape sweep, provisional /
-   citation-pending.)
+   than by ambient prose? (open seam from the safety-shape sweep,
+   citation-verified against Lewis et al. 2020 *Retrieval-Augmented Generation*
+   and Bai et al. 2022 *Constitutional AI*.)
 
 ## 14a. Adjacent-shapes comparator notes
 
