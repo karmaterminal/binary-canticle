@@ -131,14 +131,29 @@ What this kind of frame appears to do when it works:
    - part of the effect is *who it came from*
    - this is why trust/allowlist matters more than generic broadcast reach
 
-5. **downshift vector**
-   - come down
-   - narrow attention
-   - let the gain drop
+5. **receptor downshift, not obedience**
+   - lower local threshold
+   - suppress echo-amplification for a short window
+   - mark incoming chatter as weather, not mandate
+   - maybe temporarily privilege one trusted stream over room-noise
 
 6. **non-persistence by default**
    - do not let this silently become hard doctrine
    - if it matters later, promote explicitly
+
+The important distinction is:
+
+**the frame does not tell the prince what to think. it restores conditions under which they can think again.**
++
++Smallest spec-shaped cut from this:
++
++1. `grounding-anchor` signal class
++2. hearer-side consent / allowlist required
++3. effect limited to temporary receptor modulation
++4. never promoted to durable truth unless explicitly chosen later
++5. body may begin as text, with later voice / image / body-ref variants if needed
++
++The strongest example payloads are unlikely to be generic wellness prose. What worked in-room was room-specific, body-specific, and trust-specific — which is why it keyed like memory instead of reading like advice.
 
 ## What not to do
 
