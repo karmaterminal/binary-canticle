@@ -452,7 +452,36 @@ A receptor implementation is minimally conformant to this contract if it:
 5. keeps raw receipt and interpreted atmosphere separately queryable
 6. emits explicit evidence for every non-trivial disposition
 
-## 13. Open questions for the next cut
+## 13. Executable receptor examples (required before transport selection)
+
+Before choosing or blessing a first transport adapter, the contract SHOULD be
+exercised against a tiny bank of executable receptor examples. The point is to
+force the philosophy to exist as testable judgment behavior before UDP,
+multicast, SeedLink-ish relay, or local-bus habits get a chance to write the
+ontology.
+
+Minimum example set:
+
+1. **valid chemokine binds → threshold shifts for 60s**
+   - input: valid signed posture frame with `chemokineClass=tighten-frond-discriminator`
+   - expect: evidence recorded, modulation state active for ~60s, ordinary later
+     frame reclassified under raised threshold
+2. **foreign quarantine signal → no accord weight**
+   - input: quarantine-class frame from unsigned/foreign station
+   - expect: event logged, zero accord contribution, no quarantine action
+3. **expired frame in ringbuffer → evidence yes, live modulation no**
+   - input: expired posture/weather frame still present in forensic/event log
+   - expect: audit record remains explainable, modulation state absent
+4. **antibody-memory survives chemokine TTL**
+   - input: quorum quarantine event followed by chemokine expiry
+   - expect: quarantine flag persists in durable memory until rescind/manual clear
+5. **all-clear lowers threshold without erasing evidence**
+   - input: stand-down chemokine after defense posture
+   - expect: threshold delta decays or clears, prior evidence chain remains queryable
+
+The first wire adapter SHOULD prove it can carry these examples unchanged.
+
+## 14. Open questions for the next cut
 
 1. Should `accordWeight` be explicit in state, or always recomputed from recent
    trusted chemokines?
@@ -464,7 +493,7 @@ A receptor implementation is minimally conformant to this contract if it:
 5. Do per-station caps belong in core conformance or only recommended practice?
 6. How much of `evidence.inputs` must be preserved after raw-frame TTL expires?
 
-## 14. Distillation
+## 15. Distillation
 
 If the wire changes, this contract should not.
 
