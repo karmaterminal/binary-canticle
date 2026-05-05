@@ -187,6 +187,11 @@ If the hearer cannot answer these, the immune model has become mysticism.
 
 Each receptor evaluation returns a judgment object.
 
+**Invariant:** a judgment object MUST NEVER float free of a source frame. Every
+receptor output must carry a stable pointer back to the frame envelope and/or
+explicit evidence that caused it. Portability lives in the judgment object;
+auditability lives in the frame envelope.
+
 | Field | Type | Required | Meaning |
 |---|---|---:|---|
 | `disposition` | enum | yes | `surface`, `ringbuffer_only`, `drop`, `quarantine_action`. |
@@ -233,6 +238,13 @@ record SHOULD look like:
 
 This is not a replacement for raw frame storage. It is the smallest practical
 judgment ledger that lets a hearer explain how one frame changed local truth.
+
+The pair is load-bearing:
+
+- **frame envelope** = what was observed
+- **judgment object** = what the receptor concluded
+
+The second may be transport-agnostic. The first preserves the byte-receipt.
 
 ### 7.3 Evidence is mandatory
 
