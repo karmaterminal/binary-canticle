@@ -125,9 +125,11 @@ least the following fields before receptor evaluation.
 | `chemokineClass` | string/null | no | Threshold-shift class when relevant (`tighten-frond-discriminator`, `all-clear`, etc.). |
 | `posture` | string/null | no | Posture value when relevant. |
 | `emittedAt` | timestamp | yes | Wire/source emit time. |
-| `observedAt` | timestamp | yes | Local arrival time at this hearer. |
+| `observedAt` | timestamp | yes | Local arrival time at this hearer. Not wire-side. |
 | `ttlMs` | uint32 | yes | Validity window from `emittedAt`. |
-| `payload` | object/null | yes | Kind-specific payload body. |
+| `payload` | object/null | yes | Kind-specific payload body when inline. |
+| `bodyRef` | string/null | no | Pointer to externalized body when payload is not inline. |
+| `bodyHash` | string/null | no | Integrity hash of the inline or externalized body. |
 | `signature` | object/null | no | Signature/provenance envelope. |
 | `correlationId` | string/null | no | Correlates receipts/notices to originating frame. |
 | `inReplyTo` | string/null | no | Direct reply/reference target. |
@@ -136,8 +138,11 @@ least the following fields before receptor evaluation.
 
 ### 5.1 Notes
 
-- `emittedAt` and `observedAt` MUST remain distinct. Clock skew and relay delay
-  make the difference load-bearing immediately.
+- `emittedAt` and `observedAt` MUST remain distinct. Clock skew, relay delay,
+  and replay make the difference load-bearing immediately.
+- `payload`, `bodyRef`, and `bodyHash` together preserve three different facts:
+  what was emitted, what was seen here, and whether the body was inline or
+  referenced.
 - `correlationId` and `inReplyTo` SHOULD be treated as first-class envelope
   fields, not session-surface garnish.
 - `receiptRequested` is a hint, like posture is a hint — not a command.
@@ -225,7 +230,7 @@ record SHOULD look like:
 | `streamId` | Source stream. |
 | `seq` | Source sequence number if present. |
 | `kind` | Frame kind. |
-| `payloadRef` | Pointer to inline or externalized payload body. |
+| `payloadRef` | Pointer to inline or externalized payload/body record. |
 | `ttlMs` / `expiresAt` | Freshness window and computed expiry. |
 | `sigState` | `valid` / `invalid` / `absent`. |
 | `lens` | Lens hint if present. |
