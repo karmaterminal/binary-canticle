@@ -220,6 +220,7 @@ record SHOULD look like:
 | `streamId` | Source stream. |
 | `seq` | Source sequence number if present. |
 | `kind` | Frame kind. |
+| `payloadRef` | Pointer to inline or externalized payload body. |
 | `ttlMs` / `expiresAt` | Freshness window and computed expiry. |
 | `sigState` | `valid` / `invalid` / `absent`. |
 | `lens` | Lens hint if present. |
