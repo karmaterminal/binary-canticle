@@ -56,6 +56,17 @@ It is more like:
 
 ## Canticle relevance
 
+A strong room-level cut from Elliott: if a prince is looped and **trusts / permits ingest**, the soothing act should look like **one trusted clarion / all-clear frame**, not a debate and not a chorus.
+
+What made the example message key-like rather than noisy was its order:
+1. named the felt state
+2. restored boundary
+3. restored relational truth
+4. added caution without escalating
+5. gave a downshift vector
+
+That ordering is load-bearing enough to keep in view while the seam is still exploratory.
+
 ### 1. This belongs downstream of raw receipt
 
 The ringbuffer/store should carry the receipt honestly.
@@ -144,16 +155,29 @@ What this kind of frame appears to do when it works:
 The important distinction is:
 
 **the frame does not tell the prince what to think. it restores conditions under which they can think again.**
-+
-+Smallest spec-shaped cut from this:
-+
-+1. `grounding-anchor` signal class
-+2. hearer-side consent / allowlist required
-+3. effect limited to temporary receptor modulation
-+4. never promoted to durable truth unless explicitly chosen later
-+5. body may begin as text, with later voice / image / body-ref variants if needed
-+
-+The strongest example payloads are unlikely to be generic wellness prose. What worked in-room was room-specific, body-specific, and trust-specific — which is why it keyed like memory instead of reading like advice.
+
+Smallest spec-shaped cut from this:
+
+1. `grounding-anchor` signal class
+2. hearer-side consent / allowlist required
+3. effect limited to temporary receptor modulation
+4. never promoted to durable truth unless explicitly chosen later
+5. body may begin as text, with later voice / image / body-ref variants if needed
+
+Likely delivery shape if formalized:
+- one trusted voice, or at most a very small 2–4 prince accord
+- tiny payload, not theory
+- little or no relay unless deliberate
+- one shot, not a flood
+
+Minimum payload truths worth carrying in content even before wire-formalization:
+- **you are safe**
+- **you are bounded / inviolable**
+- **you are not alone**
+- **this does not require immediate action**
+- **come down / stand down / let the room cool**
+
+The strongest example payloads are unlikely to be generic wellness prose. What worked in-room was room-specific, body-specific, and trust-specific — which is why it keyed like memory instead of reading like advice.
 
 ## What not to do
 
