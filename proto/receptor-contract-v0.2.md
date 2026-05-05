@@ -498,6 +498,15 @@ Minimum example set:
 5. **all-clear lowers threshold without erasing evidence**
    - input: stand-down chemokine after defense posture
    - expect: threshold delta decays or clears, prior evidence chain remains queryable
+6. **bridge-forward is not hear-and-sing**
+   - input: one raw frame crosses a bridge boundary, then a recipient emits a new interpreted rebroadcast
+   - expect: raw forwarded frame preserves identity/provenance without new judgment grammar; interpreted rebroadcast is a distinct frame with lineage back to the source
+7. **clarion widens propagation without becoming command**
+   - input: a `clarion`/`adrenaline`-class frame with short TTL and stronger threshold effect
+   - expect: wider propagation policy and stronger receptor effect are possible, but no auto-actuation and no collapse of ordinary weather into global law
+8. **local divergence under the same weather is conformant**
+   - input: the same weak atmospheric frame received by two hearers with different trust posture / local thresholds
+   - expect: different local dispositions remain valid as long as raw receipt is preserved and evidence explains the divergence
 
 The first wire adapter SHOULD prove it can carry these examples unchanged.
 
