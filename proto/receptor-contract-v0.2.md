@@ -243,10 +243,15 @@ record SHOULD look like:
 | `dispositionReason[]` | Machine-readable reasons for the disposition. |
 | `accordWeight` | Current accord strength consulted for this judgment. |
 | `memoryEffect` | `none` / `threshold_delta` / `antibody_flag`. |
-| `stateVersion` / `ruleVersion` | Which receptor policy/version produced this judgment. |
+| `stateVersion` / `ruleVersion` | Which receptor policy/version produced this judgment. Judgment lineage, not frame lineage. |
 
 This is not a replacement for raw frame storage. It is the smallest practical
 judgment ledger that lets a hearer explain how one frame changed local truth.
+
+`emittedAt`, `correlationId`, and `inReplyTo` belong to the receipt/frame
+family. `stateVersion` / `ruleVersion` belong to the judgment family. Keeping
+those lineages distinct preserves the split between what arrived and what was
+concluded under policy N.
 
 The pair is load-bearing:
 
@@ -422,6 +427,12 @@ boring split:
 - **separate modulation-state store** for active threshold-shifts with expiry
 - **separate persistent store** for antibody-memory / quarantine flags / other
   durable receptor-state that outlives frame TTL
+
+Receipts, quarantine notices, all-clear frames, and other regulation-carrying
+signals stay in the **same canonical frame family** as ordinary payload frames.
+They belong in `frames`, not in a second canonical truth-source. If a system
+keeps `receptor_events` or `station_state_snapshots`, those are judgment/cache
+projections over frames + memory, not sibling ledgers.
 
 Why this split works:
 
