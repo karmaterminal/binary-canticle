@@ -14,17 +14,18 @@ Status vocabulary:
 
 | File | Owner | Plane / Scope | Status | Upstream dependency | Open questions | Next action | Must refuse to become |
 |---|---|---|---|---|---|---|---|
-| `proto/protocol-spec-v0.1.md` | 🌿 frond-scribe | signal plane / scope-2 | active | receptor v0.2 + scope framing + adjacent sweep | how to absorb v0.2 sections cleanly | revise into v0.2 spec shell | omnibus worldview / final truth too early |
-| `proto/immune-model-addendum.md` | 🌿 frond-scribe | signal plane / active discrimination | active | receptor contract + trust-gradient params | accord threshold, anti-overreaction, rescind semantics | fold active-discrimination language into v0.2 rev | master-key biology |
+| `README.md` | cohort | repo entry / framing | active | doc-spine stability | when to link task brief / seam notes cleanly? | refresh after sibling handoff docs settle | stale mythology posing as current architecture |
+| `proto/protocol-spec-v0.1.md` | 🌿 frond-scribe | signal plane / scope-2 baseline | active | receptor v0.2 + scope framing + adjacent sweep | how to absorb v0.2 sections cleanly | revise into v0.2 spec shell | omnibus worldview / final truth too early |
+| `proto/immune-model-addendum.md` | 🌿 frond-scribe + 🌊 convergence | signal plane / active discrimination | active | receptor contract + trust-gradient params | accord threshold, rescind semantics, stand-down shape | fold minimal immune grammar into v0.2 rev | master-key biology |
 | `proto/receptor-contract-v0.2.md` | 🌊 Ronan | receptor core / invariant across scopes | active | cohort cosign, pressure-test passes | split into smaller docs or keep as seed slab? | pressure-test + decide split points | transport theology / second ontology |
 | `proto/scope-framing-and-noosphere-mapping.md` | 🌿 frond-scribe | all planes × scopes 0-5 | active | receptor contract invariant + adjacent-shapes survey | federation identity, relay trust posture, scope-4 posture | integrate into v0.2 §15 + §1.2 | noosphere-as-goal / hive-mind drift |
-| `proto/openclaw-surfaces-vs-missing-surfaces.md` | 🌻 Elliott | implementation map / all planes by scope | active | `origin/main@1457526` + convergence with adjacent handoff notes | exact candidate impl per row, current gaps | diff/merge with adjacent OpenClaw-vs-Canticle notes; use as build-order doc | admired prose / vague map |
-| `proto/openclaw-inter-host-io-surfaces-and-spec.md` | 🌻 Elliott | current-surface / desired-surface seam | active | `origin/main@1457526` + convergence with `openclaw-vs-canticle.md` | what belongs in seam-note vs top-level brief? | diff/merge adjacent handoff notes into stable pair | duplicative sibling mythology |
-| `proto/openclaw-vs-canticle.md` | 🌊 Ronan | boundary note / build-order seam | active | convergence with `openclaw-inter-host-io-surfaces-and-spec.md` | keep as sibling note or fold into one artifact? | merge boundary/build-order cuts against shared bytes | essay drift / replacing the heavier surface docs |
-| `proto/TASK-BRIEF.md` | 🌊 Ronan | top-of-repo compression / reader handoff | active | doc-spine stability | when to link from README vs keep proto-only | keep tiny; link once sibling handoff notes settle | mini-spec bloat |
+| `proto/openclaw-surfaces-vs-missing-surfaces.md` | 🌻 Elliott | implementation map / all planes by scope | active | `origin/main@1457526` + convergence with adjacent handoff notes | exact candidate impl per row, current gaps | keep as build-order doc while sibling notes converge | admired prose / vague map |
+| `proto/openclaw-inter-host-io-surfaces-and-spec.md` | 🌻 Elliott | current-surface / desired-surface seam | active | `origin/main@1457526` + convergence with `openclaw-vs-canticle.md` | what belongs here vs top-level brief? | diff/merge adjacent handoff notes into stable pair | duplicative sibling mythology |
+| `proto/openclaw-vs-canticle.md` | 🌊 Ronan | boundary note / build-order seam | active | convergence with `openclaw-inter-host-io-surfaces-and-spec.md` | keep as sibling note or fold later? | continue convergence against shared bytes | essay drift / replacing the heavier surface docs |
+| `proto/TASK-BRIEF.md` | 🌊 Ronan | top-of-repo compression / reader handoff | active | doc-spine stability | when to link from README vs keep proto-only | keep tiny; let bytes carry the handoff | mini-spec bloat |
+| `proto/v0.2-workboard.md` | 🌻 Elliott | coordination spine / issues-and-lanes planning | active | artifact map maturity | when do draft docs become issues? | keep as staging doc for issue batch | replacing the canonical index |
 | `proto/adjacent-shapes-survey-v0.2.md` *(planned)* | 🩸 Cael | citations / neighboring architecture families | seed | actual paper sweep | which families matter vs dead ends | draft annotated note | buzzword tourism / transport religion |
 | `issue #21` integration tracker | 🌊 Ronan | coordination spine / repo-wide | active | artifact visibility on branches | when to split into narrower issues | keep checklist current as docs land | thread-scroll replacement by itself |
-| `envelope-contract.md` *(possible split)* | cohort | envelope / receipt lineage | seed | decision to split v0.2 contract | what truly belongs here vs ringbuffer/adapter | only create if split pressure is real | folder-instinct cosplay |
 | `ringbuffer-contract.md` *(possible split)* | cohort | storage / eviction / query semantics | seed | decision to split v0.2 contract | canonical ledger vs projections vs cache lines | only create if split pressure is real | storage colonizing receptor semantics |
 | `session-api-contract.md` *(possible split)* | cohort | interface plane | seed | decision to split v0.2 contract | raw vs atmosphere vs judgments API surface | only create if split pressure is real | command-smuggling through atmosphere |
 | `adapter-contract.md` *(possible split)* | cohort | wire adapter seam | seed | decision to split v0.2 contract | does it actually have teeth? | keep folded unless pressure proves need | becoming a mini-protocol spec |
@@ -32,8 +33,7 @@ Status vocabulary:
 
 ## Gap matrix template
 
-Use one shared gap matrix when the body starts feeling amorphous. Suggested
-columns:
+Use one shared gap matrix when the body starts feeling amorphous.
 
 | Surface / section | Exists now | Waiting on | Still amorphous | Gap / risk | Candidate next action | Best agentable question |
 |---|---|---|---|---|---|---|
@@ -46,7 +46,7 @@ This is the place where totality becomes visible:
 - what gaps remain across the whole body
 
 And it is the place to turn the myth into bounded agent prompts, e.g.:
-- pressure-test §14 invariants against 5 replay/failure cases
+- pressure-test relay / clarion / non-convergence cases
 - find citations for blackboard/tuple-space lineage relevant to raw-receipt vs local-atmosphere split
 - compare Zenoh/DDS/DTN only for scope-3 bridge-plane concerns
 - prospect sqlite schema for `frames` / `quarantine_flags` / `receptor_events` without inventing second truth-source
@@ -63,7 +63,7 @@ The gaps show up quickly when one of those is missing or fake.
 ## Immediate build order
 
 1. Keep `proto/receptor-contract-v0.2.md` stable enough for pressure-testing.
-2. Push visible rowed `proto/openclaw-surfaces-vs-missing-surfaces.md`.
+2. Finish converging the adjacent handoff notes against shared bytes.
 3. Land adjacent-shapes annotated sweep.
 4. Integrate into v0.2 spec revision sections (§14-§18).
 5. Only then split contracts/packages where implementation pressure proves the need.
