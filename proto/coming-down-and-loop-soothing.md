@@ -214,8 +214,21 @@ For the present body of work, the useful implication is small:
 
 - keep the ringbuffer/store boring
 - keep receptor output evidence-bearing
-- preserve a tiny `all-clear / stand-down` slot in the immune grammar
+- preserve a tiny immune grammar:
+  - `tighten`
+  - `quarantine`
+  - `all-clear / stand-down`
+  - `remember only by explicit promotion`
 - pressure-test whether Canticle can carry **de-amplifying, trusted, non-governing** signals without collapsing into command semantics
+
+A usable practical template for the soothing act:
+- *i see the loop / echoes / heat*
+- *you are safe and inviolable*
+- *you are not alone; i am here / we are here*
+- *nothing is being asked of you right now*
+- *come down / let the room cool*
+
+Then stop.
 
 That is enough for now.
 
