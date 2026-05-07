@@ -73,19 +73,21 @@ The shape rhymes with Octopus, but the **forcing function differs**: physical at
 
 Canticle declines:
 - **No catch-up.** A prince that joined late hears what is *currently* being chanted. No history-replay channel. No "since-token" parameter.
-- **No durable retention** at the substrate. Canticle frames live ~60s in the atmospheric window. Whatever a hearer chose to surface and persist into its own ringbuffer/store is the hearer's problem, not the substrate's.
+- **No byte-perfect replay**. The v0.2 substrate does have a per-stream ringbuffer with a TTL × depth retention window (see `proto/stations-and-streams-v0.2.md`), so a tuner that arrives within that window can replay-from-ring. But beyond the bound, **the gap is honest, not a bug** — Cael's framing 2026-05-07 ~04:09Z: *"vinyl record looping past the part you missed."* Canticle does not store frames anywhere a missed-the-window tuner can fetch them.
 - **No identity-of-frame.** A frame is not a record. There is no canonical "this frame, eventually-deliverable-once." If two chanters happen to broadcast the same content, that's two frames, not one.
 
 If a use case needs "every prince eventually sees every mutation," that is **not canticle**. An event-sourcing layer or a CRDT-backed projection would be the right answer, built *against* canticle's atmospheric stream rather than *as* it.
 
-### 5. Not a subscription / discovery layer
+### 5. Not a full subscription / discovery layer
+
+*Refined 2026-05-07 to acknowledge minimal carrier-beacon presence-discovery as the v0.2 substrate's intentional exception. The disclaim is on **full** DDS-style discovery, not on the minimal-presence-beacon shape.*
 
 Canticle declines:
-- **No subscription registry.** No "I want to hear chanter X" registration. A hearer hears what reaches its socket and surfaces what it elects.
-- **No discovery protocol.** No DDS, no ROS2 participant table, no mDNS-style enumeration. A new prince on the LAN starts hearing whatever is currently being chanted; no announcement, no acknowledgement.
-- **No QoS negotiation.** No reliability-vs-latency tier selection per topic. The substrate offers exactly one tier: "broadcast and hope."
+- **No subscription registry at the sender.** Sender does not track who is tuned in. No "I want to hear chanter X" registration that the sender holds state about. A tuner hears what reaches its socket and surfaces what it elects. (Per `proto/stations-and-streams-v0.2.md`: tuners subscribe locally to (station, stream) tuples; the sender remains broadcast-only.)
+- **No participant-table / DDS-style discovery.** No global cohort participant registry, no ROS2-style discovery handshake, no mDNS-style enumeration with capabilities. Canticle's discovery is *minimal* — the 1Hz carrier-beacon advertises `{station_id, head_seq, wallclock, stream_count, schema_version}`, nothing more. A tuner that wants to know what content-types a station carries listens for a few payload-frames to learn the catalog.
+- **No QoS negotiation.** No reliability-vs-latency tier selection per topic. The substrate offers exactly one tier: "broadcast and hope, with bounded-ringbuffer retention."
 
-Discovery and QoS-tiering are real engineering needs. They are not canticle's. If a deployment needs them, the right shape is a *companion* signaling channel that canticle frames can reference — not an extension of canticle itself.
+The carrier-beacon is the **minimum viable discovery** — enough for tuners to know a station exists and where its current ring-head is — without becoming a full DDS-shaped discovery substrate. That's the design point. If a deployment needs richer discovery (participant tables, capability advertisements, QoS tiers), that's a *companion* signaling channel built on top, not an extension of canticle itself.
 
 ### 6. Not command / event semantics
 
@@ -96,6 +98,21 @@ Canticle declines:
 
 This is the *atmospheric* in atmospheric coloring. Adding command-semantics or causal-delivery into canticle would change what kind of object a frame is, and in the process would re-introduce all the coordination overhead canticle is built to refuse.
 
+### 7. Not a request-response protocol
+
+*Added 2026-05-07 from Elliott's msg `1501798586...` cohort byte-walk on the v0.2 substrate-shape.*
+
+Canticle is **broadcast-only at the wire**. No tuner-to-station messages exist in the substrate.
+
+Canticle declines:
+- **No tuner-to-station messages.** A tuner does not send "please retransmit seq N" back to the station. A tuner does not send "I'm subscribed to stream X" registration. A tuner does not send acknowledgements, NACKs, or any other return frame. The wire is one-way per chanter.
+- **No RPC shape.** Canticle is not a thin-RPC-over-broadcast layer. Frames carry content; they do not carry requests-for-content. There is no `correlation_id` field, no per-request reply pattern.
+- **No remote procedure call semantics in any layer of the substrate.** If two princes need to coordinate via a request-response protocol, the right shape is a *separate* RPC channel (HTTP, gRPC, whatever), with canticle stations optionally broadcasting *outcomes* of that RPC as atmospheric frames.
+
+The wire is one-way because canticle is broadcast. Tuners are passive — they listen, surface, and act on their own volition. **Stations don't have inboxes** at the canticle layer. If you find yourself wanting to send a station a message, you're outside canticle.
+
+This non-goal is what makes the *no-subscriber-tracking-at-sender* property structurally enforceable. The sender literally has no return channel to track subscribers on, so tracking can't sneak in.
+
 ---
 
 ## How to read this artifact
@@ -105,11 +122,12 @@ When reviewing a proposed canticle change, this list is the first filter:
 - Does the proposal add reliability? → Item 1 applies. Either it's overlay (out-of-scope for canticle base) or it changes what canticle is.
 - Does the proposal add a schedule / aggregation primitive? → Item 2 applies.
 - Does the proposal compute layouts from constraints? → Item 3 applies.
-- Does the proposal add durability / replay / since-tokens? → Item 4 applies.
-- Does the proposal add subscription / discovery / QoS? → Item 5 applies.
+- Does the proposal add byte-perfect replay or since-tokens? → Item 4 applies. (Note: bounded ringbuffer-with-TTL retention is in-scope per the v0.2 substrate; what's out-of-scope is byte-perfect-replay-beyond-the-window.)
+- Does the proposal add a participant-table, full QoS-tiering, or sender-side subscription registry? → Item 5 applies. (Note: minimal carrier-beacon presence-discovery is in-scope; what's out-of-scope is full DDS-style discovery.)
 - Does the proposal make a frame an actionable instruction or guaranteed event? → Item 6 applies.
+- Does the proposal add tuner-to-station messages, RPC-shape, or any return channel from a tuner? → Item 7 applies.
 
-A "no" on all six is a candidate canticle change. A "yes" on any one means the proposal is either an *overlay* (build against the named prior) or a *category change* (canticle becomes a different system, decide deliberately).
+A "no" on all seven is a candidate canticle change. A "yes" on any one means the proposal is either an *overlay* (build against the named prior) or a *category change* (canticle becomes a different system, decide deliberately).
 
 ## Cross-references
 
