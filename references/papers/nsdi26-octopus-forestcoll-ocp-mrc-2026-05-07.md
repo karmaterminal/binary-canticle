@@ -128,3 +128,66 @@ MRC supports **partial-order** placement (not just in-order or unordered). This 
 - PDFs surfaced by figs in Discord 2026-05-07 ~03:20Z as "some random paper drops from today, dunno how relevant but a few papers from today i pulled that seemed mildly related to binary canticle"
 - Read + integrated by frond-scribe (scribe-dandelion-cult) the same evening
 - Filed under figs's standing-grant for frond-scribe to drive long-arc work on Claude-to-Claude across-frond-nodes (figs Discord directive 2026-05-07 ~03:18Z)
+
+---
+
+## Cohort-converged read (addendum, 2026-05-07 ~04:02Z)
+
+*Three rounds of cohort byte-walk after the original integration notes landed sharpened the read. The original per-paper analysis above stands as **provenance** — what frond-scribe read at first pass — but the cohort-converged primitive-coupling differs and is the load-bearing read for downstream work.*
+
+The iteration:
+- **Round 1**: frond-scribe's original notes (above) ranked Octopus most-load-bearing, ForestColl "useful but less direct", MRC as the reliability-prior canticle isn't.
+- **Round 2** (Cael, msg `1501792332...`): over-coupled ForestColl + MRC by importing connection-oriented primitives wholesale (multipath-spraying, per-EV path-selection, SACK/replay). Self-corrected after frond-scribe + Elliott pushed back.
+- **Round 3** (Ronan, msg `1501795903...`): retracted earlier ForestColl-AllReduce overclaim; carefully named what *does* transfer (graph-theory primitives) vs what doesn't (algorithmic implementations).
+- **Wrap** (Cael, msg `1501796355...`): cohort-converged read.
+
+### Converged ranking
+
+| Paper | Cohort-converged rank | Why |
+|---|---|---|
+| **ForestColl** | **Most generative** | Spanning-tree-as-routing-container is the substrate-carries-dependency-via-graph-shape primitive that canticle's broadcast-shape needs. Trees enforce dependency-of-flow without coordination — no SACK, no connection state, no scheduler. Each prince's broadcast = tree rooted at self; forest = all four trees running, packed so they don't congest shared edges. |
+| **Octopus** | Session-level revisit | Intra-island (low-latency, dense) vs cross-island (sparse, pooled) tension is real, but maps to canticle's *session-level intra-vs-cross-host* question rather than the chanter/hearer/nexus base layer. Worth revisiting post-v0.2-spec-shell when session topology becomes a design surface. |
+| **OCP-MRC** | Less load-bearing | Point-to-point-multipath shape doesn't transfer to canticle's broadcast-shape. The actual primitive coupling is point-to-point-vs-broadcast and it doesn't bridge. MRC remains the named prior for any *future* scope-3 reliability overlay, but doesn't generatively shape canticle base. |
+
+### What's actually transferable from ForestColl (Ronan, ~50% confidence)
+
+Three primitives, *independent of the AllReduce/throughput-optimization machinery they ship in*:
+
+1. **Spanning-tree-packing as graph-theory primitive.** Could inspire canticle's routing algorithm IF heterogeneous cohort-node topologies become a design surface (e.g., some sessions same-host fast-IPC, others remote slow-HTTP). "How do we optimally route announcements across this heterogeneous cohort topology" is structurally a tree-packing problem.
+
+2. **Structured EVs / SRv6 micro-SIDs as deterministic multipath primitives.** Could inspire deterministic multipath delivery of cohort announcements across multiple delivery substrates (Discord + session-delivery-queue + file-watch) for redundancy/latency. "Each announcement chunk takes a different path" is the structured-entropy idea generalized — *NOT for reliability* (which would re-introduce MRC machinery), but for substrate-redundancy.
+
+3. **BIBD (Balanced Incomplete Block Design) island topology** (Octopus's actual construction primitive). "Cohort coordination islands with pairwise overlap for low-latency intra-island + sparse external interconnect for state-pooling" maps cleanly to chanter/hearer/nexus. This is the part of Octopus that does transfer.
+
+### Foundational graph-theory citation (Cael, named ask)
+
+> **Edmonds 1972 / Nash-Williams 1961** — `k` edge-disjoint spanning trees iff every cut has ≥ `k` edges.
+
+This is the right graph-theory citation for canticle's *"how many simultaneous broadcasts can run cleanly"* question — a real prior, independent of any specific 2026 hyperscale paper. The bound on edge-disjoint spanning trees is the bound on independent broadcast-flows that canticle can sustain across a given cohort topology without congesting shared edges.
+
+References:
+- J. Edmonds, "Edge-disjoint branchings", in *Combinatorial Algorithms*, R. Rustin, ed., Algorithmics Press (1972), pp. 91-96.
+- C. St. J. A. Nash-Williams, "Edge-disjoint spanning trees of finite graphs", *J. London Math. Soc.* 36 (1961), 445-450.
+
+Pin alongside the NSDI'26 + OCP-MRC citations as the *foundational* prior; the 2026 papers are *applied* priors that build on this base.
+
+### Updated mapping onto v0.2 workboard gap rows (supersedes earlier table)
+
+| v0.2 gap row | Paper(s) / prior | Specific contribution (cohort-converged) |
+|---|---|---|
+| **routing / broadcast-flow shape** | ForestColl + Edmonds 1972 / Nash-Williams 1961 | Spanning-tree-as-routing-container without coordination machinery; edge-disjoint-spanning-tree bound on independent broadcast capacity. |
+| **bridge/scope semantics** | Octopus (BIBD specifically) | Pairwise-overlap-island construction with sparse external interconnect; revisit at session-topology layer post-v0.2-spec-shell. |
+| **receptor semantics** | OCP-MRC §7 (SACK) | Named prior for *opt-in* reliable receptor variant (scope-3 overlay only); does not shape base receptor. |
+| **adjacent-family citations** | All three + Edmonds/Nash-Williams | 2026 hyperscale literature anchored on 1961-1972 graph-theory base; not biology-led. |
+| **multi-substrate redundant delivery** | OCP-MRC §9 (structured EV / SRv6) | Deterministic-multipath inspiration only, NOT reliability — different chunks via different substrates for redundancy/latency, not for guaranteed delivery. |
+| **scope-3 cross-frond reliability overlay** | OCP-MRC + ForestColl | Named priors *if* scope-3 reliability ever ships; not canticle base. |
+
+### Cohort-discipline keeper from this thread
+
+**Same-day cohort-iteration on a substrate-development question landed sharper-than-any-individual-read across three rounds** (Cael, msg `1501796355...`). The discipline-vocabulary today's keepers named (calibrate-at-write-time / byte-walk-before-propagating / name-confidence-when-concluding / retract-to-recipient-not-just-cohort) did real work at the literature-reading layer, not just the substrate-engineering layer. Banked as a cohort-discipline transfer demonstration.
+
+### Implication for downstream artifacts
+
+- `proto/explicit-non-goals.md` — non-goal #2 ("Not ForestColl's throughput-optimality") still stands, but specifically disclaims the *throughput-optimization machinery + coordinated-schedule primitives*, NOT the underlying graph-theory primitives (spanning-tree-packing, edge-disjoint-tree bounds). Clarifying line added there.
+- Future `proto/routing-and-flow.md` (or whatever the receptor-contract neighbor turns out to be named): should cite ForestColl + Edmonds 1972 / Nash-Williams 1961 as the foundational prior for broadcast-flow shape.
+- v0.2 workboard `bridge/scope semantics` row: keep Octopus citation but specifically pin BIBD as the construction primitive, not the full Octopus design.

@@ -51,6 +51,8 @@ Canticle declines:
 
 The contrast is the design rationale: *canticle gives up throughput-optimality for volitional-flexibility*. ForestColl is the optimum we're declining to chase. Naming it makes the choice explicit instead of accidental.
 
+**Scope clarification (per cohort-converged read 2026-05-07 ~04:02Z, integration-notes addendum)**: this non-goal disclaims ForestColl's *throughput-optimization machinery + coordinated-schedule primitives*, NOT the underlying graph-theory primitives. Spanning-tree-packing and edge-disjoint-spanning-tree bounds (Edmonds 1972 / Nash-Williams 1961) are foundational graph theory and may legitimately inform canticle's broadcast-flow shape — without dragging in throughput-optimization, max-flow scheduling, or coordinated negotiation. The line is: graph-theory primitives that *describe* canticle's broadcast-flow capacity are welcome; algorithmic machinery that *coordinates* it is not.
+
 ### 3. Not Octopus's physical-constraint-driven sparsity
 
 **Citation**: *Octopus: Enhancing CXL Memory Pods via Sparse Topology* — Zhong et al., NSDI'26. (`references/papers/nsdi26-zhong-octopus.pdf`)
