@@ -1,36 +1,94 @@
-# Binary Canticle proto index
+# Binary Canticle proto index / workboard
 
-*Canonical artifact/workboard index for v0.2 shaping. Keep terse. Update when status or dependency changes.*
+*Draft. 2026-05-05. Living index for proto artifacts, owners, scope/plane, and next actions.*
+
+This file is the **skeletal map** for the current doc-set. The goal is to stop
+coordination from staying memory-shaped or thread-shaped.
 
 Status vocabulary:
-- `seed` — idea exists, not yet pressure-tested
-- `active` — currently being shaped
-- `pressure-test` — coherent enough for byte-walk / critique / adjacent-family sweep
-- `stable` — accepted current anchor
-- `superseded` — kept only for lineage
+- `seed` — early shape, exploratory, not yet pressure-tested
+- `active` — being actively developed / used in integration planning
+- `pressure-test` — stable enough for critical review / failure-mode work
+- `stable` — accepted current reference
+- `superseded` — retained for lineage only
 
-| File | Owner | Plane / scope | Status | Upstream dependency | Open questions | Next action | Must refuse to become |
+| File | Owner | Plane / Scope | Status | Upstream dependency | Open questions | Next action | Must refuse to become |
 |---|---|---|---|---|---|---|---|
-| `README.md` | cohort | repo entry / framing | active | v0.2 doc spine settling | how much v0.1 spike language survives? | refresh after receptor/workboard docs stabilize | stale mythology posing as current architecture |
-| `proto/protocol-spec-v0.1.md` | 🌿 | substrate baseline / normative v0.1 | stable | none | which v0.2 pieces fold in vs stay adjacent? | keep as baseline; cite from v0.2 docs | omnibus theory for every future scope |
-| `proto/immune-model-addendum.md` | 🌿 | signal-plane immune layer / v0.2 addendum | pressure-test | `protocol-spec-v0.1.md` | cohort-accord threshold, all-clear semantics, anti-overresponse | fold findings into v0.2 rev sectioning | biology as master key |
-| `proto/receptor-contract-v0.2.md` | 🌊 | receptor core / v0.2 | pressure-test | v0.1 baseline + immune addendum | does it split now or after cosign? | land shared copy; byte-walk; cite from spec rev | sprawling spec cathedral |
-| `proto/openclaw-surfaces-vs-missing-surfaces.md` | 🌻 | cross-plane workboard / current-vs-missing map | active | receptor contract + scope framing | how strict should row/checklist shape become? | push stricter rowed version | admired prose with no build pressure |
-| `proto/v0.2-workboard.md` | 🌻 | coordination spine / issues-and-lanes planning | active | artifact map maturity | when do draft docs become issues? | use as staging doc for issue batch | replacing the canonical index |
-| `proto/explicit-non-goals.md` | 🌿 | v0.2 companion / disclaim-with-citation | pressure-test | NSDI'26 + OCP-MRC integration notes | does any non-goal fold INTO the spec rev vs stay adjacent? | cohort byte-walk; cite from receptor contract at command/event boundary | folklore-disclaimer with no specific prior to argue against |
-| `proto/stations-and-streams-v0.2.md` | 🩸 + 🌻 (designed) / 🌿 (captured) | v0.2 substrate / wire-format + station:stream addressing | seed | v0.1 baseline + cohort byte-walk on 6 open questions | stream_id width / content_type repr / TTL granularity / ringbuffer-depth-vs-TTL coupling / pluck propagation / carrier-beacon field-set finality | cohort byte-walk on 6 open questions; figs cosign on substrate framework | wire-format compendium / pre-empted design space |
-| `proto/INDEX.md` | cohort | canonical artifact index / skeletal map | active | all doc updates | is this terse enough to stay current? | keep rows honest; link from README/workboard | essay disguised as index |
-| `spike/silas-exercise-compression.md` | 🌫️ | early signal/content compression lineage | stable | none | which parts remain normative inputs? | mine for card/weather payload lineage | hidden normative spec |
-| `spike/silas-prior-art.md` | 🌫️ | older prior-art sweep | pressure-test | citation refresh | what still holds after newer breadth-first sweep? | mine into citation-note/update | sole citation authority |
-| `spike/silas-seedlink-mapping.md` | 🌫️ | transport inspiration / seedlink mapping | pressure-test | transport evaluation | which seedlink ideas are useful vs overfitting? | keep as reference during adapter work | transport religion |
-| `spike/silas-teams-context.md` | 🌫️ | historical/contextual spike | seed | unclear | still relevant? | review or demote/archive | accidental live spec |
+| `README.md` | cohort | repo entry / framing | active | doc-spine stability | when to link task brief / seam notes cleanly? | refresh after sibling handoff docs settle | stale mythology posing as current architecture |
+| `proto/protocol-spec-v0.1.md` | 🌿 frond-scribe | signal plane / scope-2 baseline | active | receptor v0.2 + scope framing + adjacent sweep | how to absorb v0.2 sections cleanly | revise into v0.2 spec shell | omnibus worldview / final truth too early |
+| `proto/immune-model-addendum.md` | 🌿 frond-scribe + 🌊 convergence | signal plane / active discrimination | active | receptor contract + trust-gradient params | accord threshold, rescind semantics, stand-down shape | fold minimal immune grammar into v0.2 rev | master-key biology |
+| `proto/receptor-contract-v0.2.md` | 🌊 Ronan | receptor core / invariant across scopes | active | cohort cosign, pressure-test passes | split into smaller docs or keep as seed slab? | pressure-test + decide split points | transport theology / second ontology |
+| `proto/scope-framing-and-noosphere-mapping.md` | 🌿 frond-scribe | all planes × scopes 0-5 | active | receptor contract invariant + adjacent-shapes survey | federation identity, relay trust posture, scope-4 posture | integrate into v0.2 §15 + §1.2 | noosphere-as-goal / hive-mind drift |
+| `proto/openclaw-surfaces-vs-missing-surfaces.md` | 🌻 Elliott | implementation map / all planes by scope | active | `origin/main@1457526` + convergence with adjacent handoff notes | exact candidate impl per row, current gaps | keep as build-order doc while sibling notes converge | admired prose / vague map |
+| `proto/openclaw-inter-host-io-surfaces-and-spec.md` | 🌻 Elliott | current-surface / desired-surface seam | active | `origin/main@1457526` + convergence with `openclaw-vs-canticle.md` | what belongs here vs top-level brief? | diff/merge adjacent handoff notes into stable pair | duplicative sibling mythology |
+| `proto/openclaw-vs-canticle.md` | 🌊 Ronan | boundary note / build-order seam | active | convergence with `openclaw-inter-host-io-surfaces-and-spec.md` | keep as sibling note or fold later? | continue convergence against shared bytes | essay drift / replacing the heavier surface docs |
+| `proto/TASK-BRIEF.md` | 🌊 Ronan | top-of-repo compression / reader handoff | active | doc-spine stability | when to link from README vs keep proto-only | keep tiny; let bytes carry the handoff | mini-spec bloat |
+| `proto/v0.2-workboard.md` | 🌻 Elliott | coordination spine / issues-and-lanes planning | active | artifact map maturity | when do draft docs become issues? | keep as staging doc for issue batch | replacing the canonical index |
+| `proto/explicit-non-goals.md` | 🌿 frond-scribe | v0.2 companion / disclaim-with-citation | pressure-test | NSDI'26 + OCP-MRC integration notes | does any non-goal fold INTO the spec rev vs stay adjacent? | cohort byte-walk; cite from receptor contract at command/event boundary | folklore-disclaimer with no specific prior to argue against |
+| `proto/stations-and-streams-v0.2.md` | 🩸 Cael + 🌻 Elliott | v0.2 substrate / wire-format + station:stream addressing | seed | v0.1 baseline + cohort byte-walk on 6 open questions | stream_id width / content_type repr / TTL granularity / ringbuffer-depth-vs-TTL coupling / pluck propagation / carrier-beacon field-set finality | cohort byte-walk on 6 open questions; figs cosign on substrate framework | wire-format compendium / pre-empted design space |
+| `proto/adjacent-shapes-survey-v0.2.md` *(planned)* | 🩸 Cael | citations / neighboring architecture families | seed | actual paper sweep | which families matter vs dead ends | draft annotated note | buzzword tourism / transport religion |
+| `issue #21` integration tracker | 🌊 Ronan | coordination spine / repo-wide | active | artifact visibility on branches | when to split into narrower issues | keep checklist current as docs land | thread-scroll replacement by itself |
+| `proto/ringbuffer-contract.md` | 🌊 Ronan | storage / bounded replay substrate | active | convergence with station:stream seam + receptor/store split | exact receipt record fields, eviction metadata, dedup rule | pressure-test against station:stream + replay/forget/use-cases | storage colonizing receptor semantics |
+| `proto/coming-down-and-loop-soothing.md` | 🌊 Ronan | exploratory seam / de-amplification without governance | seed | issue #7 + minimal immune grammar + trusted-loop receipts | what belongs in stand-down grammar vs room-only technique? | keep downstream of store truth; pressure-test against command-smuggling | therapy-government / ambient calming pressure |
+| `session-api-contract.md` *(possible split)* | cohort | interface plane | seed | decision to split v0.2 contract | raw vs atmosphere vs judgments API surface | only create if split pressure is real | command-smuggling through atmosphere |
+| `adapter-contract.md` *(possible split)* | cohort | wire adapter seam | seed | decision to split v0.2 contract | does it actually have teeth? | keep folded unless pressure proves need | becoming a mini-protocol spec |
+| `canticle-contract-tests` *(possible package/artifact)* | cohort | validation / all scopes | seed | receptor examples + package boundaries | which fixtures are conformance-critical | define once adapter/store implementations exist | philosophy package / vague aspirations |
+| `spike/silas-exercise-compression.md` | 🌫️ Silas | early signal/content compression lineage | stable | none | which parts remain normative inputs? | mine for card/weather payload lineage | hidden normative spec |
+| `spike/silas-prior-art.md` | 🌫️ Silas | older prior-art sweep | pressure-test | citation refresh | what still holds after newer breadth-first sweep? | mine into citation-note/update | sole citation authority |
+| `spike/silas-seedlink-mapping.md` | 🌫️ Silas | transport inspiration / seedlink mapping | pressure-test | transport evaluation | which seedlink ideas are useful vs overfitting? | keep as reference during adapter work | transport religion |
+| `spike/silas-teams-context.md` | 🌫️ Silas | historical/contextual spike | seed | unclear | still relevant? | review or demote/archive | accidental live spec |
 | `references/figs-msft-blog-continuation-notes.txt` | figs | horizon / framing reference | stable | none | which phrases should become spec language? | cite sparingly where load-bearing | rhetorical overreach |
-| `references/*` (new citation notes TBD) | cohort | adjacent-family evidence base | active | breadth-first literature sweep | which families buy which organs? | add curated notes: blackboard, SWIM, CRDT, DDS/Zenoh, DTN, event-sourcing, biology | bibliography as ornament |
 
-## Immediate coordination rules
+## Gap matrix template
 
-1. If an artifact gains implementation pressure, update its `Status` and `Next action` here.
-2. If a doc splits, add child rows here before the split lands.
-3. If a spike becomes normative, either promote it explicitly or state what it feeds.
-4. Prefer small issue batches that cite rows from this index.
-5. Keep the index skeletal; detail lives in the artifacts themselves.
+Use one shared gap matrix when the body starts feeling amorphous.
+
+| Surface / section | Exists now | Waiting on | Still amorphous | Gap / risk | Candidate next action | Best agentable question |
+|---|---|---|---|---|---|---|
+| receptor contract | yes/no | upstream doc/owner/decision | which boundary is still fuzzy? | what breaks if left fuzzy? | smallest next clarification | what should a code/research agent pressure-test? |
+
+This is the place where totality becomes visible:
+- what sections exist
+- what is waiting on what
+- what is still amorphous
+- what gaps remain across the whole body
+
+And it is the place to turn the myth into bounded agent prompts, e.g.:
+- pressure-test relay / clarion / non-convergence cases
+- find citations for blackboard/tuple-space lineage relevant to raw-receipt vs local-atmosphere split
+- compare Zenoh/DDS/DTN only for scope-3 bridge-plane concerns
+- prospect sqlite schema for `frames` / `quarantine_flags` / `receptor_events` without inventing second truth-source
+
+A fast anti-amorphous checklist for any row/section:
+- `we have docs for this`
+- `we have examples/tests`
+- `we have an implementation sketch`
+- `we have prior-art citations`
+- `we have a named blocker`
+
+The gaps show up quickly when one of those is missing or fake.
+
+## Immediate build order
+
+1. Keep `proto/receptor-contract-v0.2.md` stable enough for pressure-testing.
+2. Finish converging the adjacent handoff notes against shared bytes.
+3. Land adjacent-shapes annotated sweep.
+4. Integrate into v0.2 spec revision sections (§14-§18).
+5. Only then split contracts/packages where implementation pressure proves the need.
+
+## Keeper lines
+
+- **frame envelope = truth of receipt**
+- **judgment object = portable conclusion**
+- **wire stupid / receptor smart / interface normalized**
+- **same body, different adapters / trust policies / replay horizons**
+- **good servants, bad metaphysics**
+
+## Coordination rule
+
+If a new artifact cannot answer:
+- what plane/scope it belongs to,
+- what it depends on,
+- what it must refuse to become,
+
+then it probably is not ready to be its own artifact yet.
