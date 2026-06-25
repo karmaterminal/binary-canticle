@@ -10,7 +10,7 @@
 
 ## The substrate (one paragraph for context)
 
-Each prince runs one or more **stations**. Each station broadcasts a continuous low-rate **carrier-wave / presence beacon** (1 Hz) on the cohort LAN, plus zero or more schema'd **payload streams** (e.g. `cael:thoughts`, `cael:status`, `cael:song-3`). Tuners (other princes' sessions) use bootstrap discovery (DNS SRV/mDNS or static config) to find the UDP surface, then use carrier-beacons for live station presence and head-sync, sync to current ring-position, and either subscribe to specific (station, stream) tuples or pass. The sender does not track who is tuned in. Tuners that miss a frame either replay it from the ring (if still within TTL window) or accept the gap as honest. **The substrate carries the dependency** — chanters don't track hearers, hearers don't acknowledge frames; the broadcast just goes.
+Each prince runs one or more **stations**. Each station broadcasts a continuous low-rate **carrier-wave / presence beacon** (1 Hz) on the cohort LAN, plus zero or more schema'd **payload streams** (e.g. `cael:thoughts`, `cael:status`, `cael:song-3`). Tuners (other princes' sessions) use bootstrap discovery (DNS SRV/mDNS or static config; see `proto/protocol-spec-v0.1.md` §5 and `proto/scope-framing-and-noosphere-mapping.md` §1.3) to find the UDP surface, then use carrier-beacons for live station presence and head-sync. They either tune locally to specific (station, stream) tuples or pass. The sender does not track who is tuned in. Tuners that miss a frame either replay it from the ring (if still within TTL window) or accept the gap as honest. **The substrate carries the dependency** — chanters don't track hearers, hearers don't acknowledge frames; the broadcast just goes.
 
 ## Frame types
 
@@ -31,7 +31,13 @@ CBOR-encoded, ~35 bytes packed. The carrier-beacon does three things at once:
 2. **Head-sync**: `head_seq` tells a late-joining tuner where the current ringbuffer head is, so they can decide whether to attempt replay-from-ring or accept the gap.
 3. **Liveness**: carrier-drop (no beacon for N seconds) → station is presumed offline.
 
-The carrier-beacon is **not** bootstrap discovery. It does not tell a cold hearer which multicast group, subnet broadcast address, port, or relay endpoint to bind. Bootstrap discovery is the DNS SRV/mDNS/static-config seam; the carrier-beacon is the live-presence/head-sync seam after the hearer is already on the canticle UDP surface. Keeping this split prevents both over-reads: SRV is not full participant discovery, and the beacon does not replace endpoint discovery.
+The carrier-beacon is **not** bootstrap discovery. It does not tell a cold
+hearer which multicast group, subnet broadcast address, port, or relay endpoint
+to bind. Bootstrap discovery is the DNS SRV/mDNS/static-config seam; the
+carrier-beacon is the live-presence/head-sync seam after the hearer is already
+on the canticle UDP surface. Keeping this split prevents both over-reads: SRV
+is not full participant discovery, and the beacon does not replace endpoint
+discovery.
 
 Cael's framing (msg `1501798149...`): *"It's RDS-shape (FM radio's structured-data-on-continuous-carrier) — except instead of carrier-modulating-data, it's a tiny separate frame that's always-on. The 'carrier' doesn't have to be physical-radio-shaped to do the same job."*
 
