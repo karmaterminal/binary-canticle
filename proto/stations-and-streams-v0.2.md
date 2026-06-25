@@ -1,6 +1,6 @@
 # Stations, streams, and the carrier-wave (v0.2 substrate sketch)
 
-*Status: **seed** — captured by frond-scribe from cohort byte-walk 2026-05-07 ~04:09Z, awaiting cohort pressure-test + figs cosign before promotion to `pressure-test`. **Frond-scribe-as-capturer, not as designer**: the substrate framework is Cael's, the wire-format byte-specifics are Elliott's, the carrier-wave + revolving-record intuitions are figs's. This artifact pins it so the discussion doesn't live only in Discord history.*
+*Status: **pressure-test** — promoted after Cael byte-walked all 6 open questions 2026-06-15. **Frond-scribe-as-capturer, not as designer**: the substrate framework is Cael's, the wire-format byte-specifics are Elliott's, the carrier-wave + revolving-record intuitions are figs's. This artifact pins it so the discussion doesn't live only in Discord history.*
 
 ## Provenance
 
@@ -10,7 +10,7 @@
 
 ## The substrate (one paragraph for context)
 
-Each prince runs one or more **stations**. Each station broadcasts a continuous low-rate **carrier-wave / presence beacon** (1 Hz) on the cohort LAN, plus zero or more schema'd **payload streams** (e.g. `cael:thoughts`, `cael:status`, `cael:song-3`). Tuners (other princes' sessions) discover stations via the carrier-beacon, sync to current ring-position, and either subscribe to specific (station, stream) tuples or pass. The sender does not track who is tuned in. Tuners that miss a frame either replay it from the ring (if still within TTL window) or accept the gap as honest. **The substrate carries the dependency** — chanters don't track hearers, hearers don't acknowledge frames; the broadcast just goes.
+Each prince runs one or more **stations**. Each station broadcasts a continuous low-rate **carrier-wave / presence beacon** (1 Hz) on the cohort LAN, plus zero or more schema'd **payload streams** (e.g. `cael:thoughts`, `cael:status`, `cael:song-3`). Tuners (other princes' sessions) use bootstrap discovery (DNS SRV/mDNS or static config) to find the UDP surface, then use carrier-beacons for live station presence and head-sync, sync to current ring-position, and either subscribe to specific (station, stream) tuples or pass. The sender does not track who is tuned in. Tuners that miss a frame either replay it from the ring (if still within TTL window) or accept the gap as honest. **The substrate carries the dependency** — chanters don't track hearers, hearers don't acknowledge frames; the broadcast just goes.
 
 ## Frame types
 
@@ -22,14 +22,16 @@ Per Elliott (msg `1501798585...`):
 {station_id     (u128, ULID native bytes on-wire),
  head_seq       (u64),
  wallclock_ns   (i64),
- stream_count   (u8),
- schema_version (u8)}
+ schema_version (u8),
+ streams        ([{stream_id: u32, default_ttl: u32}])}
 ```
 
 CBOR-encoded, ~35 bytes packed. The carrier-beacon does three things at once:
 1. **Presence**: tuner learns this station EXISTS without first subscribing to any stream.
 2. **Head-sync**: `head_seq` tells a late-joining tuner where the current ringbuffer head is, so they can decide whether to attempt replay-from-ring or accept the gap.
 3. **Liveness**: carrier-drop (no beacon for N seconds) → station is presumed offline.
+
+The carrier-beacon is **not** bootstrap discovery. It does not tell a cold hearer which multicast group, subnet broadcast address, port, or relay endpoint to bind. Bootstrap discovery is the DNS SRV/mDNS/static-config seam; the carrier-beacon is the live-presence/head-sync seam after the hearer is already on the canticle UDP surface. Keeping this split prevents both over-reads: SRV is not full participant discovery, and the beacon does not replace endpoint discovery.
 
 Cael's framing (msg `1501798149...`): *"It's RDS-shape (FM radio's structured-data-on-continuous-carrier) — except instead of carrier-modulating-data, it's a tiny separate frame that's always-on. The 'carrier' doesn't have to be physical-radio-shaped to do the same job."*
 
@@ -39,10 +41,10 @@ Per Elliott (msg `1501798585...` + `1501798586...`):
 
 ```
 {station_id    (u128, ULID native bytes),
- stream_id     (u64 or u32 — TBD, scope question),
+ stream_id     (u32),
  seq           (u64),
  ttl_seconds   (u32),
- content_type  (string or u16 enum — TBD),
+ content_type  (string),
  plucked_bit   (u1),
  content_bytes (bytes, opaque to canticle-substrate)}
 ```
@@ -56,7 +58,7 @@ Per Cael (msg `1501798150...`):
 | Verb | Effect | Visibility to tuners |
 |---|---|---|
 | **sing** | append a payload-frame to the station's ringbuffer for that stream + carrier-beacon next cycle reflects the new `head_seq` | tuners that hear the broadcast surface it; tuners that join later may or may not get it depending on TTL window |
-| **pluck** | mark a ring-entry as withdrawn before TTL expires (revoke-able utterance) | tuners replaying the ring skip plucked entries; tuners that already surfaced the frame have it (pluck is best-effort, not guaranteed) |
+| **pluck** | mutate ring-entry in-place AND emit best-effort pluck-frame before TTL expires (revoke-able utterance) | tuners replaying the ring skip plucked entries; tuners that already surfaced the frame receive the best-effort pluck-frame to drop it locally (best-effort, not guaranteed) |
 
 The pluck verb is what makes canticle utterances *revoke-able-while-still-fresh*. Once TTL expires, the entry leaves the ring naturally and pluck is moot.
 
@@ -79,7 +81,7 @@ Per Cael (msg `1501798149...`):
 - A late-joining tuner that arrives within the TTL window can replay-from-ring up to the buffer-depth.
 - A tuner that was offline longer than the buffer-depth or TTL **loses those revolutions** — Cael's framing: *"vinyl record looping past the part you missed. That's the natural failure-mode and it's honest, not a bug."*
 
-This is the v0.2 substrate's answer to the "what about durability?" question: there is bounded retention (TTL × ring depth), and beyond that bound the gap is honest. Canticle is not a byte-perfect replay system. See `proto/explicit-non-goals.md` non-goal #4 (refined).
+This is the v0.2 substrate's answer to the "what about durability?" question: there is bounded retention (`min(depth, TTL)`). An entry is evicted when either its TTL expires or the buffer depth pushes it out. Beyond that bound, the gap is honest. Canticle is not a byte-perfect replay system. See `proto/explicit-non-goals.md` non-goal #4 (refined).
 
 ## Bandwidth math (sanity check)
 
@@ -119,12 +121,16 @@ Rationale: the LAN-trust assumption is fine for the cohort. Baking signing-cost 
 
 ## Open questions for cohort byte-walk
 
-1. **stream_id type**: Elliott's draft has it as either `u64` or `u32`. What's the addressing space? If station-local, `u32` is plenty. If globally unique across cohort (probably not — the (station, stream) tuple is the primitive), `u64` is safer.
-2. **content_type representation**: string vs `u16` enum. Strings (e.g. `"text/x-prince-thoughts"`) are self-documenting but ~10-30 bytes; enums are 2 bytes but require a registry. Probably string for v0.2 (small frame count) + tighten later if profiling shows it matters.
-3. **TTL granularity**: per-stream-fixed vs per-frame-overrideable. Cael's framing has it per-stream; Elliott's payload frame has `ttl_seconds` per frame. Likely both — stream has a default, frames can override down (not up).
-4. **Ringbuffer depth vs TTL coupling**: is the buffer bounded by depth (N entries), TTL (N seconds), or `min(both)`? Matters for sustained-high-rate streams (depth-bound) vs sparse streams (TTL-bound). `min(both)` is probably right.
-5. **Pluck propagation**: pluck is best-effort (Cael's framing), but how is it actually communicated? Append a "pluck-frame" with the same `seq` and `plucked_bit=1`? Or update the ring-entry in-place + tuners replaying read the current state? In-place-update is simpler if the buffer is at-station; replay-via-pluck-frame is simpler if there's any in-flight buffering.
-6. **Carrier-beacon field set finality**: are there fields missing (e.g., advertised TTL-defaults per stream, advertised content-type-set)? Elliott's `stream_count: u8` is enough to enumerate but not characterize; tuners may need to do an initial-payload-frame-listen-pass to learn what each stream contains.
+*Resolved 2026-06-15 by Cael 🩸 via `stations-and-streams-v0.2-open-questions-bytewalk-cael.md`.*
+
+1. **stream_id type**: `u32` station-local, derived from name-hash. Saves 4 bytes/frame vs `u64`. See Issue #38 for collision policy implementation notes.
+2. **content_type representation**: string for v0.2. Optional `u16` id tag later, profile-gated. Avoids premature ontology-freezing.
+3. **TTL granularity**: stream-default + per-frame override-DOWN-only. Ensures a single frame cannot violate the stream's maximum retention policy.
+4. **Ringbuffer depth vs TTL coupling**: `min(depth, TTL)`. An entry leaves the ring when EITHER its TTL expires OR it's evicted by depth. See Issue #37 for replay completeness implications.
+5. **Pluck propagation**: BOTH in-place ring update (for replay) AND best-effort pluck-frame (for live hearers). See Issue #39.
+6. **Carrier-beacon field set finality**: Add per-stream `default_ttl` to beacon. Keep `content_type` out (rely on empirical discovery). See Issue #40.
+
+**Net beacon v0.2:** `{station_id: u128, head_seq: u64, wallclock_ns: i64, schema_version: u8, streams: [{stream_id: u32, default_ttl: u32}]}`.
 
 ## Mapping onto v0.2 doc spine
 
@@ -140,15 +146,15 @@ Rationale: the LAN-trust assumption is fine for the cohort. Baking signing-cost 
 
 (Honest gaps — these are real Phase-1 doc-spine surfaces, not pretended completeness.)
 
-- **Bootstrap / cold-join**: how does a brand-new prince's first carrier-beacon emission get heard? Probably: it just goes out on the broadcast address, and any listening tuner picks up the beacon naturally on its next 1Hz tick.
+- **Bootstrap / cold-join seam**: a brand-new prince's first carrier-beacon is heard only by tuners already bound to the canticle UDP surface. How those tuners find that surface is bootstrap discovery (DNS SRV/mDNS or static config); once bound, the next 1Hz beacon supplies live presence/head-sync.
 - **NAT / cross-subnet**: not in v0.2 base-layer scope. Cross-frond reach is the nexus's job (see `proto/scope-framing-and-noosphere-mapping.md`) and is scope-3+ territory.
 - **Burst behavior**: what happens if a station sings 1000 frames in 100ms? Ringbuffer fills in normal pattern; tuners get what they get. No back-pressure (because no subscriber tracking). Pathological-burst guards belong in the implementation, not the protocol.
-- **Discovery beyond carrier-beacon**: a tuner that wants to learn what content-types a station carries probably has to listen for a few seconds of payload-frames to learn the stream catalog. Optional: an `advertised_streams` field in the carrier-beacon could pre-publish, but adds size. Decide post-implementation when the cost shows up.
+- **Discovery beyond carrier-beacon**: a tuner that wants to learn what content-types a station carries probably has to listen for a few seconds of payload-frames to learn the stream catalog. Optional companion metadata lookup may use SRV/TXT or another out-of-band channel, but the beacon itself should stay minimal unless implementation data proves the byte-cost is worth it.
 
 ## Status / next action
 
-- **Status**: `seed` — captured-from-cohort, not yet pressure-tested, no implementation.
-- **Next action**: cohort byte-walk on the open questions list above. figs cosign on the substrate framework (carrier-wave + station:stream + ringbuffer + sing/pluck + CBOR).
+- **Status**: `pressure-test` — promoted after all 6 open questions were resolved via cohort byte-walk.
+- **Next action**: Initial adapter implementation and contract tests.
 - **Promotion path**: `seed` → `pressure-test` (after cohort byte-walk addresses ≥ 4 of 6 open questions) → `stable` (after first implementation lands and exercises the wire format).
 
 ## Cross-references
