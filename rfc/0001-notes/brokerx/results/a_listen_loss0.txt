@@ -1,0 +1,1 @@
+{"backend": "udp", "n": 50, "loss": 0.0, "pid": 25693, "items_heard_mean": 20, "first_hear_p50_s": 0.3, "first_hear_p95_s": 0.946, "all_items_heard_max_s": 0.971, "dups_per_ear": 281, "bad": 0}

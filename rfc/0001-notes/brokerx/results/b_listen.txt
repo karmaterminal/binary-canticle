@@ -1,0 +1,1 @@
+{"backend": "nats", "n": 50, "loss": 0.0, "pid": 25722, "items_heard_mean": 20, "first_hear_p50_s": 0.589, "first_hear_p95_s": 0.944, "all_items_heard_max_s": 1.024, "dups_per_ear": 279.46, "bad": 0}
