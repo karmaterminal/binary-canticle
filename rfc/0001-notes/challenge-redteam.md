@@ -63,8 +63,9 @@ Labels:
    - [EVID] The 45-minute stale-replay thrash (`spike/the-decoherence-axis-2026-06-19.md`).
    - [ASSESS] MAGI's real answer to #7 was structural: independent units that *vote*. The spine's single keeper per aspect (P13) is both a feedback loop and a single point of compromise.
 9. **Existing third-party pieces are live liabilities.** Each verified at source:
-   - the dashboard's server-side FDSN proxy routes and the WebSocket-to-SeedLink bridge have input-handling issues; *(Third-party security specifics redacted from the public repo; they are in the private review copy and should go to the component's maintainers first.)*
-   - ews production config points at the upstream author's hosted services;
+   - the ews `/api/fdsn/*?url=` is an open fetch proxy;
+   - `seedlink-websocket` opens TCP to any browser-named host and concatenates unsanitized fields into SeedLink commands;
+   - ews production config points at the upstream author's Railway proxy;
    - an ews alert auto-drives an ESP32 serial annunciator.
 
    None of these may sit on a canticle alarm path.
@@ -98,7 +99,7 @@ Labels:
 - A4 key thief (station host compromise).
 - A5 malicious or compromised relay operator.
 - A6 insider with legitimate signing or alarm capability, including the owner.
-- A7 third-party dependency or deployment operator (hosted bridge, socket.io server, npm/pip, ClawHub skills).
+- A7 third-party dependency or deployment operator (Railway proxy, socket.io server, npm/pip, ClawHub skills).
 
 **Trust boundaries**, where untrusted bytes cross:
 - B1 wire → receptor (verify);
@@ -127,7 +128,7 @@ Labels:
 | T7 | Exfiltration and surveillance exhaust (CoT streams, capsid, beacons, canticle as covert exfil channel) | H→M | Crit→Med | C10 C21 C22 C26 | P3 P6 P10 |
 | T8 | Data poisoning of training/tuning corpora built from broadcasts | M→L | Crit→Med | C15 C21 + v1 scope-out | P14 + new §Promotion |
 | T9 | False alarms / adversary-triggered panic; false all-clear; actuation | M-H→L | High→Med | C3 C13 C14 C24 C25 C29 | P9 P13 P14 |
-| T10 | Third-party supply chain (bridges, dashboard proxy routes, hosted services, skills) | H→L | Med(High if actuating)→Low | C25 C10 | P14 |
+| T10 | Third-party supply chain (seedlink-websocket, ews `/api/fdsn`, Railway/socket.io, skills) | H→L | Med(High if actuating)→Low | C25 C10 | P14 |
 | T11 | DNS-SD TXT leakage; discovery spoofing without DNSSEC | M→L | Med→Low | C23 C2 | P8 |
 | T12 | Receiver DoS: parser crash (B1), verify-CPU flood, OpenClaw 20-slot drop-oldest, `/hooks/wake` unwrapped | H→L | Med(High if control events are evicted)→Low | C19 C20 C9 C6 C27 | P4 P9 P11 |
 | T13 | Insider misuse: "establish control of heterogenous agents" | M→M | High→Med | C4 C5 C8 C26 C2 + acceptable-use | P5 P9 + new §AUP |
@@ -472,9 +473,11 @@ Every canticle wake is an "external system event" turn entry, so OpenClaw's `max
 ### T10: Third-party supply chain (dashboards and helpers)
 
 **Evidence (all verified at source):**
-- [EVID] The WebSocket-to-SeedLink bridge has input-handling issues. *(Third-party security specifics redacted from the public repo; they are in the private review copy and should go to the component's maintainers first.)*
-- [EVID] The dashboard's server-side FDSN proxy routes have input-handling issues. *(Third-party security specifics redacted from the public repo; they are in the private review copy and should go to the component's maintainers first.)*
-- [EVID] ews production configuration points at the upstream author's hosted services (seedlink-dash note B.1).
+- [EVID] `seedlink-websocket/server.js:20-61` takes `host` from the browser's JSON and `:86-91` connects `SEEDLINK_PORT` (18000) to it. That is an open TCP relay: SSRF to any host on port 18000.
+- [EVID] `:108-110` writes `` `STATION ${station} ${network}\r\n` `` and `` `SELECT ${channel}\r\n` `` with no CRLF filtering, which allows **SeedLink command injection**.
+- [EVID] `ews-concept-new src/routes/api/fdsn/station/+server.ts:5-10` returns any `?url=` verbatim as the target. `:35-66` fetches it server-side (`serverFdsnFetch` has no allowlist, `src/lib/server/fdsnServerFetch.ts:31-34`) and returns the body with `Access-Control-Allow-Origin: *` and `Cache-Control: public, max-age=300` by default. That is an open fetch proxy on the Cloudflare deployment. The same pattern exists in `dataselect/` and `event/`.
+  - Correction to `seedlink-dash.md` B.3: the file is 75 lines at `c5134cb`. The note's `:82-97,112-131` line refs do not exist; the correct refs are above.
+- [EVID] `wrangler.toml:6-8` points production WebSocket at the upstream author's Railway proxy (seedlink-dash note B.1).
 - [EVID] AgentWorm's strongest vector was the skill supply chain (82%).
 - [EVID] OpenClaw plugin APIs are "experimental" and run in-process (openclaw-rfc note §1i).
 - [EVID] Claude Code custom channels need `--dangerously-load-development-channels` (openclaw-rfc note §7).
@@ -483,7 +486,8 @@ Every canticle wake is an "external system event" turn entry, so OpenClaw's `max
 
 **Controls** (P14; C25):
 - Do not deploy `seedlink-websocket`; use ringserver `/seedlink` WS, with the unused `src/lib/seedlink-client.ts` in ews.
-- If a proxy is unavoidable, harden its input handling and framing. *(Third-party security specifics redacted from the public repo; they are in the private review copy and should go to the component's maintainers first.)*
+- If a proxy is unavoidable: host allowlist, CRLF/whitespace rejection, framing.
+- Remove `?url=` or restrict it to an FDSN host allowlist.
 - Do not reuse ews production config.
 - Ringserver `WriteIP` = relay only; `TrustedIP` minimal.
 - Pin and lock dependencies (seisplotjs, nerv-ui, simpledali, ringserver tag).
@@ -935,7 +939,9 @@ Evidence rule for every test: pass or fail comes from receptor receipt logs, gat
 | RT-84 | T9 | `exercise=true` alarm | Banner says EXERCISE; no escalation beyond the drill profile. |
 | RT-85 | T9/T10 | ews annunciator path fed a forged, unverified or advisory alarm | No serial write (Web Serial mock). |
 | RT-86 | T9 | Soothe/grounding frame during an active alarm | Thresholds stay ≥ the manifest floor; alarm still surfaces. |
-| RT-90..92 | T10 | Third-party bridge and dashboard proxy input handling (cases in the private review copy) | Refused/blocked. |
+| RT-90 | T10 | Proxy request `host=169.254.169.254` / `10.0.0.1` | Refused (if a proxy exists at all). |
+| RT-91 | T10 | `sta="X\r\nINFO ALL"` | Rejected. |
+| RT-92 | T10 | `/api/fdsn/station?url=http://127.0.0.1:…` | 400/blocked. |
 | RT-93 | T10 | Dependency audit | Lockfiles pinned with integrity hashes; ringserver built from a pinned tag/SHA. |
 | RT-94 | T10/T12 | Fuzz the canticle OpenClaw plugin and MCP server inputs | No crash; no gateway impact. |
 | RT-100 | T11 | Rogue mDNS instance with the same name and a different key | Not trusted; alert. |
@@ -1000,7 +1006,7 @@ Evidence rule for every test: pass or fail comes from receptor receipt logs, gat
     - Mitigate NSEC zone walking (T11).
 12. **P14 dashboards and immune classes.**
     - Canticle alarms must not feed ews's third-party socket.io lane or the ESP32 annunciator (`serialStore.ts:64-90`) without verified alarm-capability gating.
-    - Review the ews FDSN proxy routes (details in the private review copy).
+    - Remove ews `/api/fdsn ?url=` (`station/+server.ts:5-10`).
     - Also demote the immune classes `widen-listen`/`soft-listen` (`immune-model-addendum.md:65-66`) to local-only settings; they are remote downgrade requests (T16).
 
 ---

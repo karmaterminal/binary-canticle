@@ -21,7 +21,7 @@ Scratch evidence for this reader lives in `scratchpad/sdash/`. Paths below are r
 - **[IMPL]** SvelteKit 2 / Svelte 5 app deployed with `@sveltejs/adapter-cloudflare` (`svelte.config.js:2,11`; `wrangler.toml`). It is MIT licensed (`package.json:7`, `LICENSE`).
 - **[IMPL]** The miniSEED parser is **`seisplotjs` ^3.2.7** (`package.json:36`; lock resolves 3.2.7). seisplotjs is MIT (`sdash/package/package.json:105`). `WaveformService.init()` imports it dynamically (`src/lib/services/WaveformService.ts:12-16`).
 - **[IMPL]** Upstream is `bagusindrayana/ews-concept-new`: README "Support me" and links; `src/routes/+page.svelte:2282` links to `github.com/bagusindrayana/ews-concept-new`. The karmaterminal repo is a fork or copy.
-- **[IMPL]** Hygiene: `wrangler.toml:6-8` commits a public Mapbox `pk.` token plus production URLs. These are `PUBLIC_WEBSOCKET_URL` (the upstream author's hosted bridge) and `PUBLIC_SOCKET_DATA_URL`. The same keys also appear in `.dev.vars` (values not reproduced here).
+- **[IMPL]** Hygiene: `wrangler.toml:6-8` commits a public Mapbox `pk.` token plus production URLs. These are `PUBLIC_WEBSOCKET_URL = wss://seedlink-websocket-production.up.railway.app` (the upstream author's Railway deploy) and `PUBLIC_SOCKET_DATA_URL`. The same keys also appear in `.dev.vars` (values not reproduced here).
 
 ### B.2 How the browser reaches SeedLink (the live path)
 
@@ -29,7 +29,7 @@ A browser cannot open raw TCP, so ews uses a **WebSocket-to-TCP proxy**. The cha
 
 ```
 browser (realtime/+page.svelte)
-   └─ ws(s):// PUBLIC_WEBSOCKET_URL  (default ws://localhost:8080; prod: the upstream author's hosted bridge)
+   └─ ws(s):// PUBLIC_WEBSOCKET_URL  (default ws://localhost:8080; prod wss://seedlink-websocket-production.up.railway.app)
         └─ bagusindrayana/seedlink-websocket server.js  (Node, ws + net)
              └─ TCP <host>:18000  SeedLink v3 (HELLO / STATION / SELECT / DATA / END)
 ```
@@ -111,7 +111,7 @@ browser (realtime/+page.svelte)
      - Also clear the buffer on channel switch (`+page.svelte:799-823`) and pass the location code.
 - **[ASSESS] Secondary bugs noticed.**
   - `DATA ALL <start> <end>` in `server.js:101-105` is v4 syntax (ISO times) used on a v3 session (no `SLPROTO 4.0`). v3 is `TIME <y,m,d,h,m,s> [<end>]` or `DATA [hexseq [y,m,d,h,m,s]]` (see A.2).
-  - The `/api/fdsn/{station,dataselect,event}` proxy routes have an input-handling issue. *(Third-party security specifics redacted from the public repo; they are in the private review copy and should go to the component's maintainers first.)*
+  - `/api/fdsn/{station,dataselect,event}` accept any `?url=` http(s) target (`src/routes/api/fdsn/station/+server.ts:82-97,112-131`). That is an open proxy / SSRF surface on the Cloudflare deployment.
 
 ### B.4 Other ews paths the task asked about
 
@@ -462,7 +462,7 @@ ring-1.<zone>. TXT "v=1" "sl=4.0,3.1" "fmt=2D,3D,J" "ws=wss://ring-1.<zone>/seed
 
 ### R3. What not to do
 
-- Do not ship `bagusindrayana/seedlink-websocket` as the bridge. It has no framing, hard-codes port 18000, and has input-handling issues. *(Third-party security specifics redacted from the public repo; they are in the private review copy and should go to the component's maintainers first.)*
+- Do not ship `bagusindrayana/seedlink-websocket` as the bridge. It has no framing, hard-codes port 18000 and opens a TCP connection to **any host a browser names** (`server.js:24-61,89`). That is an open TCP relay, i.e. SSRF.
 - Do not put canticle JSON on SeedLink v3 expecting ews to cope. ringserver sends ms3 to v3 clients unconverted and ews breaks (B.5).
 - Do not treat ringserver eviction as TTL. Ring eviction is size-based. Use the end time = expiry convention (A.6) or client-side filtering on DataLink `hpdataend`.
 
@@ -475,7 +475,7 @@ ring-1.<zone>. TXT "v=1" "sl=4.0,3.1" "fmt=2D,3D,J" "ws=wss://ring-1.<zone>/seed
 3. **Sample-rate semantics mismatch.** TTL items are discrete. SeedLink/miniSEED are time series. The A.6 span-equals-TTL trick and the `I` (irregular) band are workable but unconventional. Waveform dashboards need numeric channels, not items.
 4. **Network code.** `XX` is test-only by FDSN rule. A real temporary code needs an FDSN request.
 5. **nerv-ui is React.** ews is Svelte and OpenClaw's UI is Lit. Picking one console stack is an open decision.
-6. **ews production config points at the upstream author's hosted bridge** (`PUBLIC_WEBSOCKET_URL`), and the `/api/fdsn/*` proxy routes need review. *(Third-party security specifics redacted from the public repo; they are in the private review copy and should go to the component's maintainers first.)* Both need attention before any canticle deployment reuses ews.
+6. **ews production config points at a third-party Railway proxy** (`wrangler.toml` `PUBLIC_WEBSOCKET_URL`), and `/api/fdsn/*` is an open fetch proxy. Both need attention before any canticle deployment reuses ews.
 7. **Earthworm and Raspberry Shake facts** come from search snippets, not fetched pages (egress blocked). rsudp code was read directly.
 
 ## Scratch artifacts and cleanup
