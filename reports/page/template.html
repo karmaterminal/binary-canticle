@@ -1,0 +1,356 @@
+<title>Binary Canticle Survey</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+  :root {
+    --paper: #eef1eb;
+    --paper-2: #e3e8e1;
+    --paper-3: #d8dfd7;
+    --ink: #1a1f1c;
+    --ink-2: #4b5650;
+    --rule: #c5cfc6;
+    --grid: #d3dbd3;
+    --amber: #9a4a00;
+    --amber-soft: #f3dfc0;
+    --signal: #b42318;
+    --signal-soft: #f6d6d2;
+    --trace: #23704a;
+    --trace-soft: #d3e8da;
+    --focus: #9a4a00;
+    --display: "Chakra Petch", "Bahnschrift", "DIN Alternate", "Arial Narrow", sans-serif;
+    --sans: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #0d100f;
+      --paper-2: #151a18;
+      --paper-3: #1d2421;
+      --ink: #e2e7e3;
+      --ink-2: #9aa79f;
+      --rule: #2a332e;
+      --grid: #1c2420;
+      --amber: #f2a33a;
+      --amber-soft: #3a2711;
+      --signal: #ff6b5e;
+      --signal-soft: #3d1715;
+      --trace: #5cc98a;
+      --trace-soft: #15301f;
+      --focus: #f2a33a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #0d100f;
+    --paper-2: #151a18;
+    --paper-3: #1d2421;
+    --ink: #e2e7e3;
+    --ink-2: #9aa79f;
+    --rule: #2a332e;
+    --grid: #1c2420;
+    --amber: #f2a33a;
+    --amber-soft: #3a2711;
+    --signal: #ff6b5e;
+    --signal-soft: #3d1715;
+    --trace: #5cc98a;
+    --trace-soft: #15301f;
+    --focus: #f2a33a;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    padding-inline: 16px;
+    -webkit-text-size-adjust: 100%;
+  }
+  a { color: var(--amber); text-underline-offset: 2px; text-decoration-thickness: 1px; }
+  a:hover { text-decoration-thickness: 2px; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
+
+  /* masthead */
+  .masthead { max-width: 1280px; margin-inline: auto; padding-block: 28px 8px; display: grid; gap: 14px; }
+  .eyebrow { margin: 0; font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+  .masthead h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: clamp(2.2rem, 6vw, 3.6rem); line-height: 1; letter-spacing: .01em; text-wrap: balance; }
+  .masthead .sub { margin: 0; font-size: 1.15rem; color: var(--ink-2); max-width: 60ch; text-wrap: balance; }
+  .trace { border: 1px solid var(--rule); background: var(--paper-2); border-radius: 4px; overflow: hidden; }
+  .trace canvas { display: block; width: 100%; height: 84px; }
+  .trace-cap { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 6px 10px; border-top: 1px solid var(--rule); font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+  .trace-cap .k { display: inline-flex; align-items: center; gap: 6px; }
+  .trace-cap .sw { width: 14px; height: 2px; background: var(--trace); display: inline-block; }
+  .trace-cap .sw.amber { background: var(--amber); height: 8px; width: 2px; }
+  .docs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .docs a { font-family: var(--mono); font-size: 13px; padding: 5px 10px; border: 1px solid var(--rule); border-radius: 3px; text-decoration: none; color: var(--ink); background: var(--paper); }
+  .docs a:hover { border-color: var(--amber); color: var(--amber); }
+  .docs a b { color: var(--amber); font-weight: 500; }
+
+  /* layout */
+  .wrap { max-width: 1280px; margin-inline: auto; display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 48px; padding-block: 24px 64px; }
+  nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; max-height: calc(100vh - 32px); overflow: auto; font-size: 14px; }
+  nav.toc h2 { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 8px; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+  nav.toc a { display: grid; grid-template-columns: 2.2em 1fr; padding: 4px 8px; border-left: 2px solid transparent; color: var(--ink-2); text-decoration: none; line-height: 1.35; }
+  nav.toc a .n { font-family: var(--mono); font-size: 12px; color: var(--ink-2); padding-top: 1px; }
+  nav.toc a:hover { color: var(--ink); background: var(--paper-2); }
+  nav.toc a.on { border-left-color: var(--amber); color: var(--ink); background: var(--paper-2); }
+  nav.toc a.on .n { color: var(--amber); }
+  details.toc-m { display: none; }
+
+  main { min-width: 0; }
+  .preamble { border: 1px solid var(--rule); background: var(--paper-2); border-radius: 4px; padding: 4px 18px; font-size: 14.5px; }
+  .preamble p { max-width: none; }
+
+  main h2 { font-family: var(--display); font-weight: 600; font-size: 1.75rem; line-height: 1.15; letter-spacing: .01em; margin: 56px 0 14px; padding-top: 18px; border-top: 1px solid var(--rule); text-wrap: balance; scroll-margin-top: 16px; }
+  main h3 { font-weight: 600; font-size: 1.12rem; line-height: 1.3; margin: 32px 0 8px; text-wrap: balance; scroll-margin-top: 16px; }
+  main h4 { font-weight: 600; font-size: 1rem; margin: 22px 0 6px; }
+  main p, main li { max-width: 74ch; }
+  main ul, main ol { padding-left: 1.3em; }
+  main li { margin: 3px 0; }
+  main li > p { margin: 4px 0; }
+  main hr { border: 0; border-top: 1px solid var(--rule); margin: 32px 0; }
+  main strong { font-weight: 600; }
+  blockquote { margin: 16px 0; padding: 4px 16px; border-left: 3px solid var(--amber); color: var(--ink-2); }
+  code { font-family: var(--mono); font-size: .86em; background: var(--paper-2); border: 1px solid var(--rule); border-radius: 3px; padding: 0 .28em; overflow-wrap: anywhere; }
+  pre { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 4px; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+  pre code { background: none; border: 0; padding: 0; overflow-wrap: normal; }
+  a.cite { text-decoration: none; }
+  a.cite code { border-color: color-mix(in srgb, var(--amber) 35%, var(--rule)); }
+  a.cite:hover code { border-color: var(--amber); color: var(--amber); }
+  a.iss { font-family: var(--mono); font-size: .92em; }
+
+  .lbl { display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 500; line-height: 1; padding: 3px 4px 2px; border-radius: 2px; vertical-align: 2px; letter-spacing: .02em; border: 1px solid transparent; }
+  .lbl-V { background: var(--trace-soft); color: var(--trace); border-color: color-mix(in srgb, var(--trace) 40%, transparent); }
+  .lbl-I { color: var(--ink-2); border-color: var(--rule); }
+  .lbl-R { background: var(--amber-soft); color: var(--amber); border-color: color-mix(in srgb, var(--amber) 40%, transparent); }
+  .lbl-S { color: var(--ink-2); border: 1px dashed var(--ink-2); }
+
+  .tbl { overflow-x: auto; margin: 14px 0 20px; border: 1px solid var(--rule); border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 1.45; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--rule); }
+  th { background: var(--paper-2); font-weight: 600; font-size: 12.5px; letter-spacing: .02em; position: sticky; top: 0; }
+  tr:last-child td { border-bottom: 0; }
+  td + td, th + th { border-left: 1px solid var(--rule); }
+  td { min-width: 7ch; }
+  td.rec { font-weight: 500; }
+  td.rec::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: var(--ink-2); }
+  td.rec-close::before { background: var(--ink-2); }
+  td.rec-merge::before, td.rec-keep::before { background: var(--trace); }
+  td.rec-change::before, td.rec-reopen::before { background: var(--amber); }
+  td.rec-fold::before, td.rec-transfer::before, td.rec-relabel::before { background: var(--amber); opacity: .6; }
+  tr[hidden] { display: none; }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+  .filters button { font: 500 12.5px var(--mono); padding: 5px 10px; border-radius: 3px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink-2); cursor: pointer; }
+  .filters button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .filters button:hover { border-color: var(--amber); }
+
+  footer { max-width: 1280px; margin-inline: auto; padding-block: 24px 40px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink-2); }
+
+  @media (max-width: 960px) {
+    .wrap { grid-template-columns: minmax(0, 1fr); gap: 0; padding-block-start: 12px; }
+    nav.toc { display: none; }
+    details.toc-m { display: block; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper-2); margin-bottom: 16px; }
+    details.toc-m summary { cursor: pointer; padding: 10px 14px; font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+    details.toc-m ol { list-style: none; margin: 0; padding: 0 8px 10px; display: grid; gap: 1px; }
+    details.toc-m a { display: grid; grid-template-columns: 2.2em 1fr; padding: 5px 8px; color: var(--ink); text-decoration: none; }
+    details.toc-m a .n { font-family: var(--mono); font-size: 12px; color: var(--amber); }
+    main h2 { font-size: 1.45rem; margin-top: 40px; }
+    table { font-size: 13px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<header class="masthead">
+  <p class="eyebrow">karmaterminal/binary-canticle · review of main @ b46a45a · 2026-09-27</p>
+  <h1>Binary Canticle</h1>
+  <p class="sub">State of the repo, adversarial review, and the path to RFC-0001</p>
+  <div class="trace" aria-label="Illustration: a carrier-beacon pulse every second, with signed items re-sent on a loop until they expire">
+    <canvas id="carrier" height="84"></canvas>
+    <div class="trace-cap">
+      <span class="k"><span class="sw"></span>carrier-beacon · 1 Hz</span>
+      <span class="k"><span class="sw amber"></span>item copy · carousel until expires_at</span>
+      <span class="k">illustration, not data</span>
+    </div>
+  </div>
+  <nav class="docs" aria-label="Documents on the branch">
+    <a href="{{REPO}}/blob/{{BRANCH}}/rfc/0001-binary-canticle.md"><b>RFC-0001</b> draft</a>
+    <a href="{{REPO}}/pull/52">PR #52</a>
+    <a href="{{REPO}}/tree/{{BRANCH}}/prototype/canticle-station">canticle-station spike</a>
+    <a href="{{REPO}}/tree/{{BRANCH}}/prototype/ringserver-proofs">ringserver proofs</a>
+    <a href="{{REPO}}/tree/{{BRANCH}}/rfc/0001-notes">evidence notes</a>
+    <a href="{{REPO}}/blob/{{BRANCH}}/{{SOURCE}}">report (markdown)</a>
+  </nav>
+</header>
+
+<div class="wrap">
+  <nav class="toc" aria-label="Sections">
+    <h2>Sections</h2>
+    <ol>
+{{TOC}}
+    </ol>
+  </nav>
+  <main>
+    <details class="toc-m"><summary>Sections</summary><ol>
+{{TOC}}
+    </ol></details>
+    <section class="preamble">
+{{PREAMBLE}}
+    </section>
+{{BODY}}
+  </main>
+</div>
+<footer>
+  Rendered from <code>{{SOURCE}}</code> on <code>{{BRANCH}}</code> by <code>reports/page/build.py</code>. PR and issue comments in §4 are drafts and were not posted. Labels: <span class="lbl lbl-V">V</span> verified · <span class="lbl lbl-I">I</span> inferred · <span class="lbl lbl-R">R</span> recommendation · <span class="lbl lbl-S">S</span> search excerpt only.
+</footer>
+
+<script>
+(function () {
+  // ---- carrier trace (illustrative) ----
+  var cv = document.getElementById("carrier");
+  var ctx = cv.getContext("2d");
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var pxPerSec = 46, t0 = 0, running = false, visible = true;
+  // three items looping with different periods and lifetimes (seconds)
+  var items = [
+    { start: -30, period: 4, ttl: 60, amp: 0.62 },
+    { start: -12, period: 6, ttl: 48, amp: 0.8 },
+    { start: -4, period: 9, ttl: 90, amp: 0.5 }
+  ];
+  function tok(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function size() {
+    var dpr = window.devicePixelRatio || 1;
+    var w = cv.clientWidth || cv.parentNode.clientWidth;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(84 * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function noise(x) { return Math.sin(x * 12.9898) * 43758.5453 % 1; }
+  function draw(now) {
+    var w = cv.clientWidth, h = 84, mid = h / 2;
+    var grid = tok("--grid"), trace = tok("--trace"), amber = tok("--amber"), bg = tok("--paper-2");
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    var tEnd = now, tStart = now - w / pxPerSec;
+    ctx.strokeStyle = grid; ctx.lineWidth = 1;
+    for (var s = Math.ceil(tStart); s <= tEnd; s++) {
+      var gx = (s - tStart) * pxPerSec;
+      ctx.beginPath(); ctx.moveTo(gx + .5, 0); ctx.lineTo(gx + .5, h); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(0, mid + .5); ctx.lineTo(w, mid + .5); ctx.stroke();
+    // item copy ticks
+    var copies = [];
+    items.forEach(function (it) {
+      for (var k = Math.ceil((tStart - it.start) / it.period); ; k++) {
+        var tc = it.start + k * it.period;
+        if (tc > tEnd) break;
+        if (tc < it.start || tc > it.start + it.ttl) continue;
+        copies.push({ t: tc, amp: it.amp });
+      }
+    });
+    ctx.fillStyle = amber;
+    copies.forEach(function (c) {
+      var x = (c.t - tStart) * pxPerSec;
+      ctx.fillRect(Math.round(x), 4, 2, 7);
+    });
+    // trace: carrier pulse each second + item excursions + low noise
+    ctx.strokeStyle = trace; ctx.lineWidth = 1.4; ctx.beginPath();
+    for (var px = 0; px <= w; px++) {
+      var t = tStart + px / pxPerSec;
+      var ph = t - Math.floor(t);
+      var y = 0;
+      if (ph < 0.12) y += Math.sin(ph / 0.12 * Math.PI * 2) * 5;
+      for (var i = 0; i < copies.length; i++) {
+        var d = t - copies[i].t;
+        if (d >= 0 && d < 0.5) y += Math.sin(d * 28) * Math.exp(-d * 7) * copies[i].amp * (mid - 6);
+      }
+      y += (noise(Math.floor(t * 40)) - 0.5) * 1.6;
+      if (px === 0) ctx.moveTo(px, mid - y); else ctx.lineTo(px, mid - y);
+    }
+    ctx.stroke();
+  }
+  function frame(ts) {
+    if (!running) return;
+    draw(t0 + ts / 1000);
+    requestAnimationFrame(frame);
+  }
+  function start() {
+    size();
+    t0 = 20;
+    draw(t0);
+    if (!reduce.matches && visible && !running) { running = true; requestAnimationFrame(frame); }
+  }
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(function (es) {
+      visible = es[0].isIntersecting;
+      if (!visible) running = false;
+      else if (!running && !reduce.matches) { running = true; requestAnimationFrame(frame); }
+    }).observe(cv);
+  }
+  window.addEventListener("resize", function () { size(); if (!running) draw(t0); });
+  try {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (!running) draw(t0); });
+    new MutationObserver(function () { if (!running) draw(t0); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  } catch (e) {}
+  start();
+
+  // ---- recommendation cells ----
+  var recWords = [
+    ["request changes", "change"], ["close", "close"], ["merge", "merge"], ["keep", "keep"],
+    ["fold", "fold"], ["supersede", "fold"], ["reopen", "reopen"], ["re-scope", "reopen"],
+    ["transfer", "transfer"], ["relabel", "relabel"], ["move", "transfer"], ["open", "keep"]
+  ];
+  function classify(txt) {
+    var s = txt.trim().toLowerCase().replace(/^[*_\s]+/, "");
+    for (var i = 0; i < recWords.length; i++) if (s.indexOf(recWords[i][0]) === 0) return recWords[i][1];
+    return null;
+  }
+  document.querySelectorAll("main table").forEach(function (tb) {
+    var heads = Array.prototype.map.call(tb.querySelectorAll("thead th"), function (th) { return th.textContent.toLowerCase(); });
+    var col = heads.findIndex(function (h) { return /recommend|disposition|action/.test(h); });
+    if (col < 0) return;
+    var cats = {};
+    tb.querySelectorAll("tbody tr").forEach(function (tr) {
+      var td = tr.children[col]; if (!td) return;
+      var c = classify(td.textContent);
+      if (c) { td.classList.add("rec", "rec-" + c); tr.dataset.rec = c; cats[c] = (cats[c] || 0) + 1; }
+      else tr.dataset.rec = "other";
+    });
+    var rows = tb.querySelectorAll("tbody tr");
+    if (rows.length < 12) return;
+    // filter chips for long tables (the issue triage)
+    var box = document.createElement("div"); box.className = "filters"; box.setAttribute("role", "group"); box.setAttribute("aria-label", "Filter by recommendation");
+    var names = { close: "Close", merge: "Merge", keep: "Keep", change: "Request changes", fold: "Fold", reopen: "Reopen / re-scope", transfer: "Transfer / move", relabel: "Relabel", other: "Other" };
+    function mk(key, label) {
+      var b = document.createElement("button"); b.type = "button"; b.textContent = label; b.setAttribute("aria-pressed", key === "all" ? "true" : "false");
+      b.addEventListener("click", function () {
+        box.querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", "false"); });
+        b.setAttribute("aria-pressed", "true");
+        rows.forEach(function (tr) { tr.hidden = !(key === "all" || tr.dataset.rec === key); });
+      });
+      box.appendChild(b);
+    }
+    mk("all", "All " + rows.length);
+    var other = 0; rows.forEach(function (tr) { if (tr.dataset.rec === "other") other++; });
+    Object.keys(cats).sort(function (a, b) { return cats[b] - cats[a]; }).forEach(function (k) { mk(k, (names[k] || k) + " " + cats[k]); });
+    if (other) mk("other", "Other " + other);
+    tb.parentNode.parentNode.insertBefore(box, tb.parentNode);
+  });
+
+  // ---- toc highlight ----
+  var links = document.querySelectorAll("nav.toc a");
+  var map = {}; links.forEach(function (a) { map[a.getAttribute("href").slice(1)] = a; });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        if (e.isIntersecting) {
+          links.forEach(function (a) { a.classList.remove("on"); });
+          var a = map[e.target.id]; if (a) a.classList.add("on");
+        }
+      });
+    }, { rootMargin: "0px 0px -75% 0px" });
+    document.querySelectorAll("main h2[id]").forEach(function (h) { io.observe(h); });
+  }
+})();
+</script>
