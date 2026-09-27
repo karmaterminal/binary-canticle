@@ -1,0 +1,522 @@
+{
+ "experiment": "e4_late_joiner",
+ "conditions": [
+  {
+   "experiment": "e4_late_joiner",
+   "loss_permille": 0,
+   "duration_s": 600.0,
+   "items": 20,
+   "slots_per_arm": 10,
+   "frame_bytes": 327,
+   "sing": {
+    "slow": {
+     "stream": "lens.state",
+     "seq": 1,
+     "epoch": 1790532338,
+     "issued_at": 1790532338346,
+     "expires_at": 1790533238346,
+     "ttl_s": 900.0,
+     "loop_ms": 5000,
+     "clamp": "none",
+     "size": 327,
+     "kind": "item"
+    },
+    "fast": {
+     "stream": "ctl.state",
+     "seq": 1,
+     "epoch": 1790532338,
+     "issued_at": 1790532338348,
+     "expires_at": 1790533238348,
+     "ttl_s": 900.0,
+     "loop_ms": 1000,
+     "clamp": "none",
+     "size": 327,
+     "kind": "item"
+    }
+   },
+   "loop_ms": {
+    "slow": [
+     13080
+    ],
+    "fast": [
+     1000
+    ]
+   },
+   "relay_snapshots": 1375,
+   "granted_bps": 32000,
+   "nft": {
+    "offered": 274024,
+    "dropped_loss": 0,
+    "measured_loss": 0.0
+   },
+   "arms": {
+    "carousel-4kbps": {
+     "trials": 345,
+     "timeouts": 0,
+     "t_full_ms": {
+      "n": 345,
+      "unit": "ms",
+      "mean": 14283.8,
+      "median": 14391.7,
+      "p90": 16151.6,
+      "p95": 16608.9,
+      "p99": 16925.2,
+      "p99.9": 17159.0,
+      "max": 17259.9,
+      "min": 8206.0
+     }
+    },
+    "carousel-1s": {
+     "trials": 1543,
+     "timeouts": 0,
+     "t_full_ms": {
+      "n": 1543,
+      "unit": "ms",
+      "mean": 1111.8,
+      "median": 1122.3,
+      "p90": 1254.7,
+      "p95": 1278.0,
+      "p99": 1311.4,
+      "p99.9": 1328.4,
+      "max": 1330.0,
+      "min": 734.8
+     }
+    },
+    "tcp-snapshot": {
+     "trials": 2130,
+     "timeouts": 0,
+     "t_full_ms": {
+      "n": 2130,
+      "unit": "ms",
+      "mean": 0.6,
+      "median": 0.4,
+      "p90": 0.8,
+      "p95": 1.1,
+      "p99": 2.5,
+      "p99.9": 5.3,
+      "max": 10.8,
+      "min": 0.3
+     },
+     "connect_ms": {
+      "n": 2130,
+      "unit": "ms",
+      "mean": 0.6,
+      "median": 0.5,
+      "p90": 0.8,
+      "p95": 1.1,
+      "p99": 2.6,
+      "p99.9": 5.4,
+      "max": 10.8,
+      "min": 0.3
+     },
+     "errors": []
+    },
+    "lease-snapshot": {
+     "trials": 1375,
+     "timeouts": 0,
+     "t_full_ms": {
+      "n": 1375,
+      "unit": "ms",
+      "mean": 1557.3,
+      "median": 1569.1,
+      "p90": 1574.4,
+      "p95": 1576.3,
+      "p99": 1583.0,
+      "p99.9": 1625.1,
+      "max": 1636.4,
+      "min": 1318.9
+     },
+     "handshake_ms": {
+      "n": 1375,
+      "unit": "ms",
+      "mean": 0.4,
+      "median": 0.3,
+      "p90": 0.5,
+      "p95": 0.9,
+      "p99": 4.4,
+      "p99.9": 8.0,
+      "max": 13.8,
+      "min": 0.1
+     },
+     "hello_sent": {
+      "n": 1375,
+      "unit": "datagrams",
+      "mean": 1.0,
+      "median": 1.0,
+      "p90": 1.0,
+      "p95": 1.0,
+      "p99": 1.0,
+      "p99.9": 1.0,
+      "max": 1.0,
+      "min": 1.0
+     },
+     "timeout_stages": []
+    }
+   },
+   "env": {
+    "kernel": "6.18.44-fc-v37",
+    "cpus": 4,
+    "python": "3.11.15",
+    "hz": 250,
+    "tcp_retries2": "15",
+    "tcp_congestion_control_ns": "bbr",
+    "tcp_rmem": "4096\t131072\t33554432",
+    "tcp_wmem": "4096\t16384\t4194304",
+    "rmem_max": "4194304",
+    "date": "2026-09-27T18:15:44Z"
+   }
+  },
+  {
+   "experiment": "e4_late_joiner",
+   "loss_permille": 50,
+   "duration_s": 600.0,
+   "items": 20,
+   "slots_per_arm": 10,
+   "frame_bytes": 327,
+   "sing": {
+    "slow": {
+     "stream": "lens.state",
+     "seq": 1,
+     "epoch": 1790532338,
+     "issued_at": 1790532338354,
+     "expires_at": 1790533238354,
+     "ttl_s": 900.0,
+     "loop_ms": 5000,
+     "clamp": "none",
+     "size": 327,
+     "kind": "item"
+    },
+    "fast": {
+     "stream": "ctl.state",
+     "seq": 1,
+     "epoch": 1790532338,
+     "issued_at": 1790532338355,
+     "expires_at": 1790533238355,
+     "ttl_s": 900.0,
+     "loop_ms": 1000,
+     "clamp": "none",
+     "size": 327,
+     "kind": "item"
+    }
+   },
+   "loop_ms": {
+    "slow": [
+     13080
+    ],
+    "fast": [
+     1000
+    ]
+   },
+   "relay_snapshots": 560,
+   "granted_bps": 32000,
+   "nft": {
+    "offered": 254856,
+    "dropped_loss": 12722,
+    "measured_loss": 0.04992
+   },
+   "arms": {
+    "carousel-4kbps": {
+     "trials": 265,
+     "timeouts": 0,
+     "t_full_ms": {
+      "n": 265,
+      "unit": "ms",
+      "mean": 19382.7,
+      "median": 17392.9,
+      "p90": 27469.2,
+      "p95": 29957.4,
+      "p99": 35314.9,
+      "p99.9": 40690.1,
+      "max": 41635.1,
+      "min": 8996.7
+     }
+    },
+    "carousel-1s": {
+     "trials": 1399,
+     "timeouts": 0,
+     "t_full_ms": {
+      "n": 1399,
+      "unit": "ms",
+      "mean": 1482.1,
+      "median": 1311.5,
+      "p90": 2130.8,
+      "p95": 2346.5,
+      "p99": 3049.2,
+      "p99.9": 3970.9,
+      "max": 4287.3,
+      "min": 734.5
+     }
+    },
+    "tcp-snapshot": {
+     "trials": 2006,
+     "timeouts": 0,
+     "t_full_ms": {
+      "n": 2006,
+      "unit": "ms",
+      "mean": 206.7,
+      "median": 0.5,
+      "p90": 1019.0,
+      "p95": 1031.9,
+      "p99": 2034.8,
+      "p99.9": 3859.5,
+      "max": 8403.7,
+      "min": 0.3
+     },
+     "connect_ms": {
+      "n": 2006,
+      "unit": "ms",
+      "mean": 111.2,
+      "median": 0.5,
+      "p90": 504.8,
+      "p95": 1020.7,
+      "p99": 1034.0,
+      "p99.9": 2052.9,
+      "max": 2054.4,
+      "min": 0.1
+     },
+     "errors": []
+    },
+    "lease-snapshot": {
+     "trials": 591,
+     "timeouts": 0,
+     "t_full_ms": {
+      "n": 591,
+      "unit": "ms",
+      "mean": 7108.7,
+      "median": 5547.9,
+      "p90": 14650.9,
+      "p95": 19206.2,
+      "p99": 25948.1,
+      "p99.9": 29938.2,
+      "max": 31564.3,
+      "min": 1406.9
+     },
+     "handshake_ms": {
+      "n": 591,
+      "unit": "ms",
+      "mean": 264.6,
+      "median": 0.3,
+      "p90": 1001.4,
+      "p95": 1001.9,
+      "p99": 3002.5,
+      "p99.9": 7002.3,
+      "max": 7003.2,
+      "min": 0.1
+     },
+     "hello_sent": {
+      "n": 591,
+      "unit": "datagrams",
+      "mean": 1.1,
+      "median": 1.0,
+      "p90": 2.0,
+      "p95": 2.0,
+      "p99": 2.1,
+      "p99.9": 3.4,
+      "max": 4.0,
+      "min": 1.0
+     },
+     "timeout_stages": []
+    }
+   },
+   "env": {
+    "kernel": "6.18.44-fc-v37",
+    "cpus": 4,
+    "python": "3.11.15",
+    "hz": 250,
+    "tcp_retries2": "15",
+    "tcp_congestion_control_ns": "bbr",
+    "tcp_rmem": "4096\t131072\t33554432",
+    "tcp_wmem": "4096\t16384\t4194304",
+    "rmem_max": "4194304",
+    "date": "2026-09-27T18:15:44Z"
+   }
+  },
+  {
+   "experiment": "e4_late_joiner",
+   "loss_permille": 300,
+   "duration_s": 600.0,
+   "items": 20,
+   "slots_per_arm": 10,
+   "frame_bytes": 327,
+   "sing": {
+    "slow": {
+     "stream": "lens.state",
+     "seq": 1,
+     "epoch": 1790532338,
+     "issued_at": 1790532338330,
+     "expires_at": 1790533238330,
+     "ttl_s": 900.0,
+     "loop_ms": 5000,
+     "clamp": "none",
+     "size": 327,
+     "kind": "item"
+    },
+    "fast": {
+     "stream": "ctl.state",
+     "seq": 1,
+     "epoch": 1790532338,
+     "issued_at": 1790532338331,
+     "expires_at": 1790533238331,
+     "ttl_s": 900.0,
+     "loop_ms": 1000,
+     "clamp": "none",
+     "size": 327,
+     "kind": "item"
+    }
+   },
+   "loop_ms": {
+    "slow": [
+     13080
+    ],
+    "fast": [
+     1000
+    ]
+   },
+   "relay_snapshots": 117,
+   "granted_bps": 32000,
+   "nft": {
+    "offered": 170811,
+    "dropped_loss": 50318,
+    "measured_loss": 0.29458
+   },
+   "arms": {
+    "carousel-4kbps": {
+     "trials": 137,
+     "timeouts": 0,
+     "t_full_ms": {
+      "n": 137,
+      "unit": "ms",
+      "mean": 39524.7,
+      "median": 37920.7,
+      "p90": 55375.4,
+      "p95": 59397.9,
+      "p99": 79532.7,
+      "p99.9": 87581.8,
+      "max": 88845.8,
+      "min": 17059.6
+     }
+    },
+    "carousel-1s": {
+     "trials": 1011,
+     "timeouts": 0,
+     "t_full_ms": {
+      "n": 1011,
+      "unit": "ms",
+      "mean": 3145.5,
+      "median": 3026.6,
+      "p90": 4457.0,
+      "p95": 5017.3,
+      "p99": 6024.5,
+      "p99.9": 7135.0,
+      "max": 7656.9,
+      "min": 1133.3
+     }
+    },
+    "tcp-snapshot": {
+     "trials": 292,
+     "timeouts": 19,
+     "t_full_ms": {
+      "n": 273,
+      "unit": "ms",
+      "mean": 8608.9,
+      "median": 2053.4,
+      "p90": 23928.4,
+      "p95": 47931.1,
+      "p99": 95863.6,
+      "p99.9": 104680.3,
+      "max": 105090.3,
+      "min": 0.5
+     },
+     "connect_ms": {
+      "n": 273,
+      "unit": "ms",
+      "mean": 863.6,
+      "median": 1007.0,
+      "p90": 2051.9,
+      "p95": 3059.3,
+      "p99": 4382.4,
+      "p99.9": 5126.8,
+      "max": 5131.2,
+      "min": 0.2
+     },
+     "errors": [
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError",
+      "TimeoutError"
+     ]
+    },
+    "lease-snapshot": {
+     "trials": 160,
+     "timeouts": 1,
+     "t_full_ms": {
+      "n": 159,
+      "unit": "ms",
+      "mean": 32371.1,
+      "median": 32305.4,
+      "p90": 50141.6,
+      "p95": 55301.3,
+      "p99": 62380.2,
+      "p99.9": 66879.2,
+      "max": 67303.2,
+      "min": 7152.8
+     },
+     "handshake_ms": {
+      "n": 159,
+      "unit": "ms",
+      "mean": 5820.1,
+      "median": 1001.4,
+      "p90": 18005.1,
+      "p95": 24005.2,
+      "p99": 47426.8,
+      "p99.9": 59802.1,
+      "max": 62015.6,
+      "min": 0.2
+     },
+     "hello_sent": {
+      "n": 160,
+      "unit": "datagrams",
+      "mean": 1.9,
+      "median": 1.0,
+      "p90": 4.0,
+      "p95": 5.0,
+      "p99": 6.0,
+      "p99.9": 8.5,
+      "max": 9.0,
+      "min": 1.0
+     },
+     "timeout_stages": [
+      "items"
+     ]
+    }
+   },
+   "env": {
+    "kernel": "6.18.44-fc-v37",
+    "cpus": 4,
+    "python": "3.11.15",
+    "hz": 250,
+    "tcp_retries2": "15",
+    "tcp_congestion_control_ns": "bbr",
+    "tcp_rmem": "4096\t131072\t33554432",
+    "tcp_wmem": "4096\t16384\t4194304",
+    "rmem_max": "4194304",
+    "date": "2026-09-27T18:15:44Z"
+   }
+  }
+ ]
+}

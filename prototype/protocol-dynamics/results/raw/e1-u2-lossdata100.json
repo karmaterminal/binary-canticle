@@ -1,0 +1,509 @@
+{
+ "experiment": "e1_freshness",
+ "update_s": 2.0,
+ "loss_permille": 100,
+ "loss_direction": "data-only",
+ "outage_s": 0,
+ "duration_s": 900.0,
+ "receivers": 20,
+ "body_bytes": 200,
+ "frame_bytes": 329,
+ "warmup_s": 5,
+ "drain_s": 20,
+ "outages": [],
+ "nft": {
+  "offered": 111153,
+  "dropped_loss": 9177,
+  "eligible": 93033,
+  "measured_loss": 0.09864
+ },
+ "snmp": {
+  "Tcp.OutSegs": 36120,
+  "Tcp.InSegs": 36120,
+  "Tcp.RetransSegs": 1913,
+  "Tcp.OutRsts": 0,
+  "Tcp.EstabResets": 0,
+  "Udp.OutDatagrams": 73120,
+  "Udp.InDatagrams": 65856,
+  "Udp.RcvbufErrors": 0,
+  "Udp.InErrors": 0,
+  "TcpExt.TCPTimeouts": 333,
+  "TcpExt.TCPLossProbes": 1580,
+  "TcpExt.TCPLossProbeRecovery": 1273,
+  "TcpExt.TCPFastRetrans": 0,
+  "TcpExt.TCPSlowStartRetrans": 0,
+  "TcpExt.TCPSpuriousRTOs": 0,
+  "TcpExt.TCPAbortOnTimeout": 0,
+  "TcpExt.TCPRetransFail": 0
+ },
+ "arms": {
+  "udp-live": {
+   "updates_measured": 447,
+   "samples": 8940,
+   "update_latency_ms": {
+    "n": 8940,
+    "unit": "ms",
+    "mean": 112.0,
+    "median": 1.2,
+    "p90": 7.0,
+    "p95": 1002.2,
+    "p99": 1999.9,
+    "p99.9": 2003.7,
+    "max": 3018.5,
+    "min": 0.2
+   },
+   "exact_hold_latency_ms": {
+    "n": 8842,
+    "unit": "ms",
+    "mean": 90.3,
+    "median": 1.1,
+    "p90": 2.7,
+    "p95": 1001.8,
+    "p99": 1005.6,
+    "p99.9": 1009.2,
+    "max": 2002.6,
+    "min": 0.2
+   },
+   "skipped_updates": 98,
+   "censored": 0,
+   "stale_time_fraction": 0.055504,
+   "staleness_ms_time_weighted": {
+    "p50": 0.0,
+    "p95": 101.9,
+    "p99": 918.3,
+    "p99.9": 1890.5,
+    "max": 3018.0
+   },
+   "arrivals": 8902,
+   "superseded_deliveries": 0,
+   "superseded_delivery_fraction": 0.0,
+   "sender": {
+    "datagrams": 36460,
+    "item_datagrams": 18120,
+    "bytes": 8757840,
+    "errors": 0,
+    "sing": [
+     {
+      "stream": "lens.state",
+      "seq": 1,
+      "epoch": 1790532102,
+      "issued_at": 1790532104000,
+      "expires_at": 1790532284000,
+      "ttl_s": 180.0,
+      "loop_ms": 5000,
+      "clamp": "none",
+      "size": 327,
+      "kind": "item"
+     }
+    ]
+   },
+   "receiver": {
+    "datagrams": 32834,
+    "evidence": {}
+   }
+  },
+  "udp-ctl": {
+   "updates_measured": 447,
+   "samples": 8940,
+   "update_latency_ms": {
+    "n": 8940,
+    "unit": "ms",
+    "mean": 113.1,
+    "median": 1.2,
+    "p90": 999.9,
+    "p95": 1002.2,
+    "p99": 1999.7,
+    "p99.9": 2003.2,
+    "max": 3004.9,
+    "min": 0.3
+   },
+   "exact_hold_latency_ms": {
+    "n": 8842,
+    "unit": "ms",
+    "mean": 91.6,
+    "median": 1.2,
+    "p90": 2.7,
+    "p95": 1001.9,
+    "p99": 1005.4,
+    "p99.9": 1007.2,
+    "max": 1019.9,
+    "min": 0.3
+   },
+   "skipped_updates": 98,
+   "censored": 0,
+   "stale_time_fraction": 0.056241,
+   "staleness_ms_time_weighted": {
+    "p50": 0.0,
+    "p95": 114.7,
+    "p99": 917.5,
+    "p99.9": 1869.9,
+    "max": 3002.5
+   },
+   "arrivals": 8902,
+   "superseded_deliveries": 0,
+   "superseded_delivery_fraction": 0.0,
+   "sender": {
+    "datagrams": 36660,
+    "item_datagrams": 18360,
+    "bytes": 8848980,
+    "errors": 0,
+    "sing": [
+     {
+      "stream": "ctl.state",
+      "seq": 1,
+      "epoch": 1790532102,
+      "issued_at": 1790532104002,
+      "expires_at": 1790532404002,
+      "ttl_s": 300.0,
+      "loop_ms": 1000,
+      "clamp": "none",
+      "size": 327,
+      "kind": "item"
+     }
+    ]
+   },
+   "receiver": {
+    "datagrams": 33022,
+    "evidence": {}
+   }
+  },
+  "tcp-stream": {
+   "updates_measured": 447,
+   "samples": 8940,
+   "update_latency_ms": {
+    "n": 8940,
+    "unit": "ms",
+    "mean": 24.1,
+    "median": 1.1,
+    "p90": 4.7,
+    "p95": 208.2,
+    "p99": 220.0,
+    "p99.9": 847.2,
+    "max": 1472.4,
+    "min": 0.2
+   },
+   "exact_hold_latency_ms": {
+    "n": 8940,
+    "unit": "ms",
+    "mean": 24.1,
+    "median": 1.1,
+    "p90": 4.7,
+    "p95": 208.2,
+    "p99": 220.0,
+    "p99.9": 847.2,
+    "max": 1472.4,
+    "min": 0.2
+   },
+   "skipped_updates": 0,
+   "censored": 0,
+   "stale_time_fraction": 0.012107,
+   "staleness_ms_time_weighted": {
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 32.4,
+    "p99.9": 287.6,
+    "max": 1471.3
+   },
+   "arrivals": 9000,
+   "superseded_deliveries": 0,
+   "superseded_delivery_fraction": 0.0,
+   "tcp": {
+    "total_retrans": [
+     51,
+     58,
+     39,
+     51,
+     51,
+     38,
+     47,
+     58,
+     39,
+     50,
+     48,
+     43,
+     57,
+     61,
+     48,
+     56,
+     59,
+     39,
+     35,
+     44
+    ],
+    "frames_written": null,
+    "coalesced": null,
+    "sender_errors": [],
+    "receiver_errors": [],
+    "rejected_on_arrival": {},
+    "loss_episodes": {
+     "count": 15,
+     "duration_ms": {
+      "n": 15,
+      "unit": "ms",
+      "mean": 541.3,
+      "median": 433.2,
+      "p90": 929.8,
+      "p95": 1257.2,
+      "p99": 1257.7,
+      "p99.9": 1257.8,
+      "max": 1257.8,
+      "min": 412.0
+     },
+     "max_backoff_hist": {
+      "1": 13,
+      "2": 2
+     },
+     "longest": [
+      {
+       "dur_ms": 1257.8,
+       "max_backoff": 2,
+       "max_rto_ms": 816.0,
+       "start": 86.225
+      },
+      {
+       "dur_ms": 1257.0,
+       "max_backoff": 2,
+       "max_rto_ms": 816.0,
+       "start": 362.223
+      },
+      {
+       "dur_ms": 438.9,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 612.428
+      },
+      {
+       "dur_ms": 434.2,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 832.427
+      },
+      {
+       "dur_ms": 433.8,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 22.226
+      }
+     ]
+    }
+   },
+   "tcp_info_trace_conn0": [
+    {
+     "t": -0.999,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 86.225,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 86.655,
+     "rto_ms": 816.0,
+     "backoff": 2,
+     "retransmits": 2,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 87.483,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    }
+   ]
+  },
+  "tcp-latest": {
+   "updates_measured": 447,
+   "samples": 8940,
+   "update_latency_ms": {
+    "n": 8940,
+    "unit": "ms",
+    "mean": 23.1,
+    "median": 1.1,
+    "p90": 3.4,
+    "p95": 208.2,
+    "p99": 414.8,
+    "p99.9": 639.6,
+    "max": 848.2,
+    "min": 0.2
+   },
+   "exact_hold_latency_ms": {
+    "n": 8940,
+    "unit": "ms",
+    "mean": 23.1,
+    "median": 1.1,
+    "p90": 3.4,
+    "p95": 208.2,
+    "p99": 414.8,
+    "p99.9": 639.6,
+    "max": 848.2,
+    "min": 0.2
+   },
+   "skipped_updates": 0,
+   "censored": 0,
+   "stale_time_fraction": 0.011536,
+   "staleness_ms_time_weighted": {
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 22.5,
+    "p99.9": 256.2,
+    "max": 846.8
+   },
+   "arrivals": 9000,
+   "superseded_deliveries": 0,
+   "superseded_delivery_fraction": 0.0,
+   "tcp": {
+    "total_retrans": [
+     55,
+     52,
+     40,
+     49,
+     51,
+     41,
+     51,
+     46,
+     43,
+     60,
+     45,
+     54,
+     43,
+     44,
+     41,
+     47,
+     37,
+     49,
+     47,
+     46
+    ],
+    "frames_written": 9000,
+    "coalesced": 0,
+    "sender_errors": [],
+    "receiver_errors": [],
+    "rejected_on_arrival": {},
+    "loss_episodes": {
+     "count": 10,
+     "duration_ms": {
+      "n": 10,
+      "unit": "ms",
+      "mean": 430.4,
+      "median": 431.1,
+      "p90": 451.1,
+      "p95": 451.1,
+      "p99": 451.1,
+      "p99.9": 451.1,
+      "max": 451.1,
+      "min": 411.8
+     },
+     "max_backoff_hist": {
+      "1": 10
+     },
+     "longest": [
+      {
+       "dur_ms": 451.1,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 264.225
+      },
+      {
+       "dur_ms": 451.1,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 264.225
+      },
+      {
+       "dur_ms": 434.1,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 768.429
+      },
+      {
+       "dur_ms": 432.0,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 542.229
+      },
+      {
+       "dur_ms": 431.8,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 580.227
+      }
+     ]
+    }
+   },
+   "tcp_info_trace_conn0": [
+    {
+     "t": -0.999,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 264.225,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 264.676,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 502.228,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 502.659,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    }
+   ]
+  }
+ },
+ "env": {
+  "kernel": "6.18.44-fc-v37",
+  "cpus": 4,
+  "python": "3.11.15",
+  "hz": 250,
+  "tcp_retries2": "15",
+  "tcp_congestion_control_ns": "bbr",
+  "tcp_rmem": "4096\t131072\t33554432",
+  "tcp_wmem": "4096\t16384\t4194304",
+  "rmem_max": "4194304",
+  "date": "2026-09-27T18:17:23Z"
+ }
+}

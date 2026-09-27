@@ -2,7 +2,7 @@
 
 **For:** figs (owner) and the cohort: Silas, Cael, Elliott, Ronan, frond-scribe, Emeric.
 **Companion draft:** RFC-0001 at `rfc/0001-binary-canticle.md`, drafted in parallel from the same decision spine.
-**Nothing was posted to GitHub.** Every PR/issue comment below is a draft to paste.
+**Posted since first publication:** binary-canticle PRs #52 (this branch: RFC-0001, spikes, proofs, this report) and #53 (the orphan landing-drafts branch, as lineage); [ews-concept-new#1](https://github.com/karmaterminal/ews-concept-new/pull/1) (the SeedLink framing fix, N16). Every other PR or issue comment below is still a draft to paste. §15 (protocol dynamics) was added after the first publication.
 
 | Repo | Ref read | Notes |
 |---|---|---|
@@ -26,11 +26,11 @@
 3. **Trust is split four ways** (shared HMAC, trust-of-LAN, Ed25519 as a "v0.3 overlay", Ed25519 fail-closed in the prototype), and #48 has been open since 2026-07-24 [V]. Recommendation: Ed25519 per frame, with allowlists derived from a **signed fleet manifest** carrying per-key capability classes (D4, D15) [R].
 4. **Owner intent contradicts a MUST.** "Receiving a frame MUST NOT trigger a Claude turn" (`protocol-spec-v0.1.md:469`), but the owner wants listeners that notify and enrich other sessions. Resolution: silent landing by default; wake only for alarm frames, by receiver-local, budgeted, opt-in policy; never sender-forced (D1) [R].
 5. **Reality checks.** SeedLink is TCP-only; ringserver has no UDP ingest; community HAProxy has no generic UDP, so #30's premise is false; LAN multicast works on wired L2 but not on L3 overlays, and is degraded on Wi-Fi [V]; it is also unavailable in clouds and default Kubernetes [S]. Internet listeners therefore need **relay-held leases** behind a cookie handshake [R]. The native ringserver/DataLink proof that #49 lists as missing now passes and is landed at `prototype/ringserver-proofs/` (all six proofs re-run on 2026-09-27) [V].
-6. **The ews "need 47, found 6" error** comes from the third-party `seedlink-websocket` proxy forwarding raw TCP chunks into a miniSEED2 parser (reproduced from real ringserver packets; the live GEOFON chunk was not observed, so which split occurred there is [I]). Fix: point ews at ringserver's own `/seedlink` WebSocket using ews's unused `src/lib/seedlink-client.ts` [V]. That proxy is also an open TCP relay, and ews's `/api/fdsn/*?url=` is an open fetch proxy [V].
+6. **The ews "need 47, found 6" error** comes from the third-party `seedlink-websocket` proxy forwarding raw TCP chunks into a miniSEED2 parser (reproduced from real ringserver packets; the live GEOFON chunk was not observed, so which split occurred there is [I]). Fix: point ews at ringserver's own `/seedlink` WebSocket using ews's unused `src/lib/seedlink-client.ts` [V]. Until that lands, [ews-concept-new#1](https://github.com/karmaterminal/ews-concept-new/pull/1) reassembles whole SeedLink packets before parsing, which removes the error with the current proxy. That proxy is also an open TCP relay, and ews's `/api/fdsn/*?url=` is an open fetch proxy [V].
 7. **Brokers (adversarial).** At the wire canticle is a *profile* of known mechanisms (SAP, FLUTE, SAME/CAP, MQTT-SN ADVERTISE, mDNS goodbye). Keep the edge raw UDP; a single relay needs no backbone, simple relay-to-relay forwarding serves cohort scale, and beyond that relays borrow a NATS backbone (Zenoh alternate), as spike S4a decides (D10). Per-frame signatures and absolute `expires_at` must stay in the frame: NATS TTL restarted at a relay hop in a measured test [V]. The novel core is the receptor, the landing into agent context, regulation and the harness bindings.
 8. **Red team.** The main fleet risk is *legitimately signed* harmful content: a listener that heard injected text and re-sings it with its own valid key. Such a worm manufactures "distinct-key accord" as it spreads. Five additions are designed to stop it (untested until the S5 worm range): manifest capability classes, tool-stamped hop/lineage, taint after hearing, no post-compaction landing of heard content (D13), and a sandbox for any wake-enabled session (D16). Alarms may only tighten each receiver's own filters [R].
 9. **Biology → mechanism.** Loop rate controls *availability* (how soon a copy arrives), never *strength* (how much it counts). Strength counts distinct principals and lineage roots, saturated per principal; repeats add zero. Loop rate is a SAP-style fair share of a fixed per-stream budget. MAGI = three lenses (threat, healing, purpose; D11) whose posture votes combine by weighted median (2-of-3); aspect streams are not wake-eligible in v1 [R].
-10. **Housekeeping.** Close PRs #50, #32, #29 (already landed or superseded); merge #34 (it fixes a dangling link on `main`); request changes on #44; fold the orphan branch `ronan/20260614/send-receive-threshold-landing`, the only receive-side landing design, into RFC-0001. Of 42 issues: 5 close-as-done, 4 close-as-obsolete, 3 merge, 3 reopen/re-scope, 1 transfer; 16 new issues proposed (§5.2) [R].
+10. **Housekeeping.** Close PRs #50, #32, #29 (already landed or superseded); merge #34 (it fixes a dangling link on `main`); request changes on #44; fold the orphan branch `ronan/20260614/send-receive-threshold-landing`, the only receive-side landing design, into RFC-0001 (opened as draft PR #53 for lineage). Of 42 issues: 5 close-as-done, 4 close-as-obsolete, 3 merge, 3 reopen/re-scope, 1 transfer; 16 new issues proposed (§5.2) [R].
 
 **What to do this week**
 
@@ -710,7 +710,65 @@ Ids and defaults follow RFC-0001 §23.1, the canonical list of D1-D24. The six d
 
 ---
 
-## 15. Appendix
+## 15. Protocol dynamics: UDP or TCP?
+
+*Added after the first publication, from a follow-up spike on figs's questions of 2026-09-27: what UDP buys with many listeners, and whether canticle should adopt TCP because "a chemokine binding a cell is far more like TCP". Full write-up: `spike/protocol-dynamics-udp-vs-tcp-2026-09-27.md`. Harness, raw results and method: `prototype/protocol-dynamics` (`prototype/protocol-dynamics/SUMMARY.md`). Literature notes, each claim tagged verified-at-source, measured or search excerpt: `rfc/0001-notes/proto-dynamics-research.md`.*
+
+**Answer: pick the transport per plane, not per project.** The broadcast edge stays a UDP carousel. Links where one healthy connection must carry each item once and in order use TCP or QUIC. [R]
+
+### 15.1 What was measured
+
+Real Linux TCP (cubic, `TCP_NODELAY`) was run against the unmodified `canticle-station` Station and Listener, in network namespaces with nftables loss at the input hook. There was no RTT emulation (RTT ≈ 0.1 ms), so internet RTTs add to every TCP repair. [V]
+
+@@FIGURE:e1-p99@@
+
+| Experiment | Finding [V] |
+|---|---|
+| **E1 freshness** (900 s per condition, 20 receivers per arm) | TCP is fresher up to about 10% loss: one retransmission timeout repairs a lost update (205-212 ms here). At U = 10 s and 5% loss, p99 is 212 ms for TCP against about 1 s for the carousel. At 20-30% loss both ways, TCP's backoff and head-of-line blocking stalled for up to 697 s; at U = 0.5 s and 30% loss, receivers held a superseded value 89% of the time and TCP delivered 2 690 frames after their signed expiry. The carousel's worst case under the same loss was 4 s. |
+| **E1 outages** | After a 10 s outage, TCP resumed in p95 3.9-6.1 s (RTO doubling 408 ms → 6.5 s); the carousel in 0.48-0.91 s with frequent updates. |
+| **E2 fan-out** (up to 5 000 listeners) | Per listener·frame: TCP 11.6-12.0 µs, UDP `sendmmsg` 4.2-4.4 µs, multicast flat. TCP doubles the packets (ACKs) and needs one socket and one queue per listener. Below about 1 000 listeners the cost difference is noise. |
+| **E3 slow and dead listeners** | One stopped TCP reader stalled a blocking writer, and so all 100 listeners, after 29 s. With autotuned receive buffers the sender never noticed; the stopped reader held 4.1 MB of ten-minute-old data. A silently vanished TCP peer took 938 s to detect (30.4 s with `TCP_USER_TIMEOUT`). A dead UDP lease lapsed in 54-74 s and cost the sender nothing meanwhile. |
+| **E4 late joiner** | A TCP snapshot takes 0.4 ms with no loss but p99 96 s at 30% (lost SYNs). The default 4 kbit/s stream budget gives a 13 s fair-share loop and 14.4 s catch-up with no loss: the budget, not the protocol, decides catch-up time. |
+| **E5 relay restart** (1 000 listeners) | TCP with a 4 096 backlog re-served everyone in 0.3 s. UDP leases took 13.2 s, because a restarted relay can't validate old cookies and listeners wait out three missed beacons. |
+
+### 15.2 SeedLink and its UDP relatives
+
+SeedLink is TCP-only (§7). Of the five claims pasted into the discussion about seismic UDP feeds, two are essentially right (Raspberry Shake DATACAST; SeedLink as usually deployed is client-initiated, so it struggles behind CGNAT). Three need correcting: Nanometrics NP repairs gaps from the digitiser's disk on request; RefTek RTP is reliable UDP with acknowledgements, not lossy; and SeedLink carries other record lengths and, in v4, miniSEED 3, JSON or XML. Twenty-five years of seismic telemetry settled on **UDP push plus receiver-requested repair from the sender's buffer** (Nanometrics NMX/NP, NIED WIN, Güralp SCREAM) wherever links were bad. Canticle should borrow that design at the relay, never at the station (A2). [V except where the spike marks search excerpts]
+
+### 15.3 The chemokine question
+
+The binding *event* is TCP-like: specific, one-to-one, state-changing. The chemokine *system* is open-loop broadcast: the secreting cell gets no acknowledgement and never retransmits to a receiver; all adaptation happens at the receiver. That is the carousel plus the receptor. The immune system's genuinely TCP-like channel is the **immunological synapse**: addressed, sustained and bidirectional. Canticle should put TCP-like channels in the same places: addressed control, relay links and the guardian's doubt channel (§15.4). Two receptor borrowings follow: **kinetic proofreading** (a heard item must persist across *k* loop revolutions, or be backed by independent principals, before it can wake anything) and integration windows sized to the stream's advertised loop (Mora–Nemenman). [I]
+
+### 15.4 Contagion and guardian sessions
+
+The cohort has already seen the failure mode §9 warns about, over Discord and with no new transport. One prince's "nah, tomorrow" at 2 pm spread to the others almost at once, even mid-activity; figs's "goodnight princes" halted every prince hard. **The poison is channel-independent.** Canticle can make it faster and wider, but TCP delivers a bad cue as reliably as a good one and UDP drops it as often. The defences belong at the receiver (A11) [R]:
+
+- **Election to listen**: nothing lands on a session that hasn't tuned the stream.
+- **Turn-boundary and desynchronised landing** for behavioural cues, so a fleet can't flip in lock-step and nobody is interrupted mid-step (except the gated `alarm` class).
+- **Stance first**: record the current intent before landing; the per-session flip rate after landing is a susceptibility measure.
+- **Typed control, not tone**: halt, defer and "goodnight" are signed `control` or `advisory` items from human-held keys; behaviour change carried only by the tone of chatter is flagged, not obeyed.
+- **Hop count and taint** (already in RFC-0001 §14.11-§14.12), so a follower's "ya" can't spread as fresh evidence.
+
+**Guardian sessions** (A12), from the cohort's own design: a guardian is authorised in the fleet manifest to read a ward's transcript for bad chain-of-thought steering and to send the ward *doubts*. The doubt channel is addressed, durable and acknowledged, never broadcast. A doubt makes the ward pause the flagged line of action and re-examine it; the ward may continue after stating why. A doubt cannot command, carry a task or wake anyone, and is never re-sung. Guardians should differ from their wards in model family and principal, hold no tools toward the ward, be rate-limited and logged, and be rotated. This is the regulatory T-cell and checkpoint (PD-1, CTLA-4) role: a brake applied by contact, one to one.
+
+### 15.5 Decision by plane and proposed amendments
+
+| Plane | Transport |
+|---|---|
+| Broadcast edge (station or relay → listeners) | **UDP carousel**: unicast leases, LAN multicast, QUIC DATAGRAM / WebTransport for browsers |
+| Relay ↔ relay backbone | **TCP or QUIC** (NATS beyond cohort scale, D10): latest-only per key, bounded drop-oldest queues, `TCP_USER_TIMEOUT` ≤ 30 s, receiver-side `expires_at` check |
+| Late-join snapshot, dashboards, replay | **TCP** (ringserver, §7) on good paths; carousel as the fallback |
+| Ledger (findings, promotion) | **TCP** |
+| Addressed control; guardian doubts | **TCP/QUIC or the harness's durable queue** |
+| Membership (beacons, presence) | **UDP** |
+
+The spike proposes thirteen RFC-0001 amendments, A1-A13 (`spike/protocol-dynamics-udp-vs-tcp-2026-09-27.md` §7). The load-bearing ones are A1 (`trail_seq`, the oldest live sequence, in each beacon), A2 (lease-scoped relay REPAIR with NORM discipline, which needs a scoped exception to non-goal 1), A3 (receiver reports on RENEW and a circuit breaker), A6 (backbone TCP rules), A9 (kinetic proofreading), A11 (contagion controls) and A12 (guardian role and doubt channel). None is applied to RFC-0001 yet; they are for the cohort to accept, amend or reject.
+
+**Limitations.** No RTT emulation; Bernoulli loss on one host; the ≥ 20% loss tails rest on a few long episodes per run (read them as orders of magnitude); QUIC was not measured.
+
+---
+
+## 16. Appendix
 
 ### A. Evidence index
 
