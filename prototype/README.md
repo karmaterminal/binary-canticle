@@ -12,3 +12,8 @@ claiming protocol or production status.
   WebSocket, and a reproduction of the ews-concept-new `need 47, found 6`
   parser error. Evidence for RFC-0001 §18; closes the proof gap in
   [#49](https://github.com/karmaterminal/binary-canticle/issues/49).
+- [`canticle-station/`](./canticle-station/) is a spike of RFC-0001 S1/S2. It
+  has a frame v2 codec with candidate conformance vectors, a looping station
+  (carousel, regulator, pluck, supersede, carrier-beacon) and a listener
+  (dedup, sticky-pluck, presence), plus a `canticle` CLI over UDP unicast or
+  multicast.

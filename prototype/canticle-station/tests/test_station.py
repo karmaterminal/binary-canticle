@@ -1,0 +1,174 @@
+import random
+import unittest
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from canticle import cbor, vectors, wire
+from canticle.ids import stream_id
+from canticle.listener import Listener
+from canticle.manifest import Manifest, StationEntry
+from canticle.station import Station, StreamConfig
+
+T0 = 1_790_000_000_000
+SK = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(vectors.TEST1))
+PK = SK.public_key()
+
+
+def station(*streams, **kw) -> Station:
+    streams = streams or (StreamConfig("chatter"), StreamConfig("lens.threat", cls="live-state"), StreamConfig("root", cls="root"))
+    return Station(SK, streams, epoch=7, rng=random.Random(3), now_ms=T0, **kw)
+
+
+def run(st: Station, start: int, end: int, step: int = 50) -> list[tuple[int, bytes]]:
+    """Poll the station on a virtual clock and collect (time, frame) pairs."""
+    out = []
+    for t in range(start, end, step):
+        out.extend((t, f) for f in st.poll(t))
+    return out
+
+
+def items(sent, seq=None, kind=wire.KIND_ITEM):
+    return [(t, f) for t, f in sent if f[3] == kind and (seq is None or wire.parse(f, lambda k: PK).body.seq == seq)]
+
+
+class CarouselTest(unittest.TestCase):
+    def test_burst_then_loop_byte_identical_until_expiry(self):
+        st = station()
+        r = st.sing(T0, "chatter", text="port-scan burst from 10.0.0.7", ttl_s=60)
+        self.assertEqual((r.seq, r.ttl_s, r.loop_ms, r.clamp), (1, 60.0, 10_000, "none"))  # normal = 2 x 5 s floor
+        sent = items(run(st, T0, T0 + 70_000))
+        times = [t - T0 for t, _ in sent]
+        self.assertEqual(times[:4], [0, 1_000, 2_000, 4_000])                   # burst (§7.6)
+        self.assertEqual(len({f for _, f in sent}), 1)                          # signed once, byte-identical (§7.2)
+        gaps = [b - a for a, b in zip(times[3:], times[4:])]
+        self.assertTrue(all(10_000 * 2 / 3 - 50 <= g <= 10_000 * 4 / 3 + 50 for g in gaps), gaps)  # U(2/3, 4/3)
+        self.assertLess(times[-1], 60_000 - 100 + 50)                           # stop before expiry (§7.3)
+        self.assertGreater(times[-1], 60_000 - 10_000 * 4 / 3 - 100)            # ...but keep looping to the end
+        self.assertEqual(wire.parse(sent[-1][1], lambda k: PK).body.expires_at, T0 + 60_000)  # absolute, unchanged
+
+    def test_regulator_fair_share_and_class_floor(self):
+        st = station(StreamConfig("chatter", default_ttl_s=300, max_ttl_s=300))
+        for i in range(12):
+            r = st.sing(T0, "chatter", body=b"x" * 530, ctype=2, loop="fast")
+        # 12 items of ~600 B in a 4 kbit/s stream: fair share ~14.4 s beats a 5 s 'fast' request (RFC-0001 §7.5 table)
+        self.assertEqual(r.clamp, "fair_share")
+        self.assertAlmostEqual(r.loop_ms, 1000 * 8 * r.size * 12 / 4000, delta=1)
+        one = station().sing(T0, "lens.threat", text="threat: low", state_key="now", loop="fast")
+        self.assertEqual((one.loop_ms, one.clamp), (5_000, "none"))  # fast == the live-state floor
+        slow_req = station().sing(T0, "lens.threat", text="x", state_key="now", loop=1_000)
+        self.assertEqual((slow_req.loop_ms, slow_req.clamp), (5_000, "class_min"))
+
+    def test_ttl_is_capped_by_stream_default(self):
+        st = station(StreamConfig("chatter"))  # chatter default 60 s
+        self.assertEqual(st.sing(T0, "chatter", text="x", ttl_s=10_000).ttl_s, 60.0)
+        self.assertEqual(st.sing(T0, "chatter", text="x", ttl_s=5).ttl_s, 5.0)
+
+    def test_supersede_stops_the_old_loop(self):
+        st = station()
+        a = st.sing(T0, "lens.threat", text="threat: low", state_key="now")
+        run(st, T0, T0 + 5_000)
+        b = st.sing(T0 + 5_000, "lens.threat", text="threat: high", state_key="now")
+        self.assertEqual(b.superseded_seq, a.seq)
+        later = run(st, T0 + 5_000, T0 + 60_000)
+        self.assertFalse(items(later, seq=a.seq))
+        self.assertTrue(items(later, seq=b.seq))
+
+    def test_pluck_stops_target_and_loops_until_target_expiry(self):
+        st = station()
+        a = st.sing(T0, "chatter", text="oops", ttl_s=60)
+        run(st, T0, T0 + 3_000)
+        p = st.hush(T0 + 3_000, "chatter", a.seq)
+        self.assertEqual((p.kind, p.seq, p.expires_at), ("pluck", 2, a.expires_at))
+        later = run(st, T0 + 3_000, T0 + 70_000)
+        self.assertFalse(items(later, seq=a.seq))
+        plucks = items(later, kind=wire.KIND_PLUCK)
+        self.assertGreater(len(plucks), 4)
+        self.assertLess(plucks[-1][0], a.expires_at)
+        self.assertEqual(wire.parse(plucks[0][1], lambda k: PK).body.target_seq, a.seq)
+
+    def test_late_pluck_is_never_shed(self):
+        st = station()
+        a = st.sing(T0, "chatter", text="oops", ttl_s=60)
+        run(st, T0, T0 + 40_000)
+        st.hush(T0 + 40_000, "chatter", a.seq)  # 20 s left: fewer than k_avail loops remain
+        plucks = items(run(st, T0 + 40_000, T0 + 70_000), kind=wire.KIND_PLUCK)
+        self.assertGreater(len(plucks), 4)  # more than the burst
+        self.assertGreater(plucks[-1][0], a.expires_at - 10_000 * 4 / 3 - 100)
+
+    def test_degraded_chatter_is_shed_after_its_burst(self):
+        st = station(StreamConfig("chatter"))
+        for i in range(100):
+            r = st.sing(T0, "chatter", body=b"x" * 530, ctype=2)
+        self.assertEqual(r.clamp, "degraded")  # §7.5 table: 100 x 600 B chatter exceeds hi = TTL/3
+        sent = items(run(st, T0, T0 + 60_000), seq=r.seq)
+        self.assertEqual([t - T0 for t, _ in sent], [0, 1_000, 2_000, 4_000])
+
+    def test_refresh_reissue_keeps_a_keyed_item_on_air(self):
+        st = station()
+        r = st.sing(T0, "root", body=cbor.encode({1: "tend the garden"}), ctype=7, state_key="root",
+                    ttl_s=90, keep_on_air_s=300)
+        sent = items(run(st, T0, T0 + 300_000, step=250))
+        seqs = sorted({wire.parse(f, lambda k: PK).body.seq for _, f in sent})
+        self.assertGreaterEqual(len(seqs), 4)                    # re-issued every ~2/3 TTL
+        refreshed = [wire.parse(f, lambda k: PK).body for _, f in sent if wire.parse(f, lambda k: PK).body.seq > r.seq]
+        self.assertTrue(all(b.flags & wire.Item.REFRESH and b.state_key == "root" for b in refreshed))
+        self.assertLessEqual(max(b.issued_at for b in refreshed), T0 + 300_000)
+
+    def test_depth_pushes_out_oldest(self):
+        st = station(depth=3)
+        for i in range(5):
+            st.sing(T0, "chatter", text=f"m{i}")
+        self.assertEqual([x["seq"] for x in st.status(T0)["streams"]["chatter"]["on_air"]], [3, 4, 5])
+
+    def test_stream_id_collision_is_refused(self):
+        import canticle.ids as ids
+        real = ids.stream_id
+        try:
+            ids.stream_id = lambda name: 42
+            with self.assertRaises(ValueError):
+                ids.stream_ids(["a", "b"])
+        finally:
+            ids.stream_id = real
+
+    def test_beacon_contents_and_goodbye(self):
+        st = station()
+        st.sing(T0, "chatter", text="x")
+        b = wire.parse(run(st, T0, T0 + 50)[0][1], lambda k: PK).body
+        self.assertIsInstance(b, wire.Beacon)
+        self.assertEqual((b.epoch, b.bseq, b.profile), (7, 1, "canticle-regulation/1"))
+        self.assertTrue(900 <= b.next_beacon_ms <= 1100)
+        entry = {e.stream_id: e for e in b.streams}[stream_id("chatter")]
+        self.assertEqual((entry.head_seq, entry.live, entry.loop_ms, entry.default_ttl_s), (1, 1, 10_000, 60))
+        bye = wire.parse(st.goodbye(T0 + 100), lambda k: PK).body
+        self.assertEqual(bye.next_beacon_ms, 0)
+
+    def test_beacon_pages_rotate_with_a_catalog_digest(self):
+        st = station(*[StreamConfig(f"s{i}", b_stream=500) for i in range(30)], b_station=16_000)
+        pages = [wire.parse(st._beacon(T0 + i), lambda k: PK).body for i in range(2)]
+        self.assertEqual([p.page for p in pages], [(0, 2), (1, 2)])
+        self.assertEqual(pages[0].catalog_digest, pages[1].catalog_digest)
+        self.assertEqual(sum(len(p.streams) for p in pages), 30)
+        self.assertTrue(all(len(st._beacon(T0)) <= wire.MAX_FRAME for _ in range(2)))
+
+
+class LateJoinerTest(unittest.TestCase):
+    def test_late_listener_hears_every_live_item_within_one_loop(self):
+        st = station(StreamConfig("chatter", default_ttl_s=300, max_ttl_s=300))
+        for i in range(5):
+            st.sing(T0, "chatter", text=f"item {i}", ttl_s=300)
+        run(st, T0, T0 + 30_000)
+        m = Manifest([StationEntry("test1", wire.public_key_bytes(SK), frozenset({1}), ("chatter",))])
+        lst = Listener(m)
+        heard, first = set(), None
+        for t, f in run(st, T0 + 30_000, T0 + 60_000):
+            for ev in lst.hear(f, t):
+                if ev.kind == "item":
+                    heard.add(ev.seq)
+                    if len(heard) == 5 and first is None:
+                        first = t - (T0 + 30_000)
+        self.assertEqual(heard, {1, 2, 3, 4, 5})
+        self.assertLessEqual(first, 10_000 * 4 / 3 + 100)  # within loop_ms x 4/3 (§7.10)
+
+
+if __name__ == "__main__":
+    unittest.main()
