@@ -25,14 +25,14 @@ class UdpEndToEndTest(unittest.TestCase):
         sk = Ed25519PrivateKey.generate()
         m = Manifest([StationEntry("cael", wire.public_key_bytes(sk), frozenset({1, 3}), ("chatter", "lens.threat"))])
         st = Station(sk, [StreamConfig("chatter"), StreamConfig("lens.threat", cls="live-state")], epoch=1,
-                     now_ms=runner.now_ms())
+                     now_ms=runner.now_ms(), grant=m.entry(wire.key_id(wire.public_key_bytes(sk))))
         port = free_port()
         control = os.path.join(tempfile.mkdtemp(), "station.sock")
         events = []
 
         async def scenario():
             stop_listener, stop_station = asyncio.Event(), asyncio.Event()
-            lst_task = asyncio.create_task(runner.run_listener(Listener(m), ("127.0.0.1", port), events.append, stop=stop_listener))
+            lst_task = asyncio.create_task(runner.run_listener(Listener(m, warmup=False), ("127.0.0.1", port), events.append, stop=stop_listener))
             st_task = asyncio.create_task(runner.run_station(st, [("127.0.0.1", port)], control, stop_station))
             while not os.path.exists(control):
                 await asyncio.sleep(0.02)

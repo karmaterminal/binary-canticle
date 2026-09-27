@@ -6,10 +6,12 @@ asyncio runner in ``runner.py`` drives it with the real clock.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import os
 import random
 import statistics
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -105,30 +107,53 @@ def next_epoch(path, now_s: Optional[int] = None) -> int:
     """
     p = Path(path)
     now_s = int(time.time()) if now_s is None else now_s
-    prev = int(p.read_text()) if p.exists() else 0
-    n = max(prev + 1, now_s)
-    if n > 2**32 - 1:
-        raise ValueError("epoch space exhausted (u32, §5.2)")
-    tmp = p.with_name(p.name + ".tmp")
-    with open(tmp, "w") as f:
-        f.write(f"{n}\n")
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, p)
-    dfd = os.open(p.parent, os.O_RDONLY)
-    try:
-        os.fsync(dfd)
-    finally:
-        os.close(dfd)
+    # One lock across read, increment and durable replace: two concurrent starts must never
+    # read the same previous value. The temporary file is unique per call.
+    with open(p.with_name(p.name + ".lock"), "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        prev = int(p.read_text()) if p.exists() else 0
+        n = max(prev + 1, now_s)
+        if n > 2**32 - 1:
+            raise ValueError("epoch space exhausted (u32, §5.2)")
+        fd, tmp = tempfile.mkstemp(dir=p.parent or ".", prefix=p.name + ".", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(f"{n}\n")
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, p)
+        except BaseException:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+            raise
+        dfd = os.open(p.parent, os.O_RDONLY)
+        try:
+            os.fsync(dfd)
+        finally:
+            os.close(dfd)
     return n
+
+
+class NotGranted(ValueError):
+    """The station's manifest entry does not grant this class, scope or stream (§10.4)."""
 
 
 class Station:
     def __init__(self, sk: Ed25519PrivateKey, streams, *, epoch: Optional[int] = None,
                  b_station: int = DEFAULT_B_STATION, beacon_period_ms: int = 1_000,
-                 depth: int = DEFAULT_DEPTH, rng: Optional[random.Random] = None, now_ms: Optional[int] = None):
+                 depth: int = DEFAULT_DEPTH, rng: Optional[random.Random] = None, now_ms: Optional[int] = None,
+                 grant=None, host_binding: bool = False):
         self.sk = sk
         self.key_id = key_id(wire.public_key_bytes(sk))
+        # grant: this key's manifest entry (manifest.StationEntry). When set, sing() refuses any
+        # class, scope or stream it does not grant, before a seq is allocated or anything signed.
+        # A station behind an agent-facing socket must have one (runner.run_station checks).
+        if grant is not None and grant.key_id != self.key_id:
+            raise ValueError("grant is for a different key")
+        self.grant = grant
+        # host_binding: whether this station has a host-local binding (§11.1). Without one it only
+        # speaks UDP, and a host-scoped frame must never leave the host (§4.3), so sing() refuses it.
+        self.host_binding = host_binding
         # epoch=None falls back to floor(unix seconds): only safe if starts are >= 1 s apart and the
         # clock never steps back. Anything that can restart should pass next_epoch(path) (§5.2).
         self.epoch = int(time.time()) if epoch is None else epoch
@@ -216,6 +241,17 @@ class Station:
         """Accept an item: assign epoch/seq/times, sign once, schedule burst and loop (§7.2)."""
         st = self._stream(stream)
         spec = CLASS_BY_NAME[cls or st.cfg.cls]
+        if scope not in SCOPES:
+            raise ValueError(f"unknown scope {scope!r}")
+        if self.grant is not None:
+            if spec.code not in self.grant.classes:
+                raise NotGranted(f"class {spec.name} is not granted to this key (§10.4)")
+            if SCOPES[scope] not in self.grant.scopes:
+                raise NotGranted(f"scope {scope} is not granted to this key (§4.3)")
+            if self.grant.streams and stream not in self.grant.streams:
+                raise NotGranted(f"stream {stream} is not granted to this key (§10.3)")
+        if scope == "host" and not self.host_binding:
+            raise ValueError("host scope needs a host-local binding; this station only sends UDP (§4.3)")
         if text is not None:
             body, ctype = text.encode("utf-8"), CTYPES["text/plain; charset=utf-8"] if ctype is None else ctype
         if body is None and body_ref is None:

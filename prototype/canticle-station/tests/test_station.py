@@ -5,11 +5,11 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from canticle import cbor, vectors, wire
+from canticle import cbor, runner, vectors, wire
 from canticle.ids import stream_id
 from canticle.listener import Listener
 from canticle.manifest import Manifest, StationEntry
-from canticle.station import Station, StreamConfig, next_epoch
+from canticle.station import NotGranted, Station, StreamConfig, next_epoch
 
 T0 = 1_790_000_000_000
 SK = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(vectors.TEST1))
@@ -220,7 +220,7 @@ class EpochTest(unittest.TestCase):
             self.assertEqual(next_epoch(path, now_s=now - 3600), now + 2)  # clock stepped back
             self.assertEqual(next_epoch(path, now_s=now + 60), now + 60)
             self.assertEqual(path.read_text(), f"{now + 60}\n")
-            self.assertFalse(path.with_name("k.epoch.tmp").exists())
+            self.assertEqual(sorted(x.name for x in Path(d).iterdir()), ["k.epoch", "k.epoch.lock"])
 
     def test_unreadable_counter_refuses(self):
         with tempfile.TemporaryDirectory() as d:
@@ -231,6 +231,62 @@ class EpochTest(unittest.TestCase):
             path.write_text(f"{2**32 - 1}\n")
             with self.assertRaises(ValueError):
                 next_epoch(path, now_s=1)
+
+
+class GrantTest(unittest.TestCase):
+    def granted(self, classes=frozenset({1}), scopes=frozenset({1}), streams=("chatter",)):
+        entry = StationEntry("cael", wire.public_key_bytes(SK), classes, streams, scopes=scopes)
+        return Station(SK, (StreamConfig("chatter"), StreamConfig("root", cls="root")), epoch=7,
+                       rng=random.Random(3), now_ms=T0, grant=entry)
+
+    def test_ungranted_class_scope_or_stream_is_refused_before_signing(self):
+        st = self.granted()
+        s = st.streams["chatter"]
+        for kw in ({"cls": "control", "state_key": "k"}, {"scope": "public"}, {"scope": "fleet"}):
+            with self.assertRaises(NotGranted):
+                st.sing(T0, "chatter", text="x", **kw)
+        with self.assertRaises(NotGranted):
+            st.sing(T0, "root", body=cbor.encode({1: "x"}), ctype=7, state_key="root")  # stream not granted
+        self.assertEqual((s.head_seq, dict(s.ring)), (0, {}))
+        self.assertEqual(st.sing(T0, "chatter", text="ok").seq, 1)
+
+    def test_host_scope_never_goes_to_udp(self):
+        st = self.granted(scopes=frozenset({0, 1}))
+        with self.assertRaises(ValueError):
+            st.sing(T0, "chatter", text="stay home", scope="host")
+        self.assertEqual(st.streams["chatter"].head_seq, 0)
+
+    def test_run_station_needs_a_grant_and_no_host_binding(self):
+        import asyncio
+        bare = station()
+        with self.assertRaises(ValueError):
+            asyncio.run(runner.run_station(bare, []))
+        hosted = Station(SK, (StreamConfig("chatter"),), epoch=7, now_ms=T0, host_binding=True,
+                         grant=StationEntry("cael", wire.public_key_bytes(SK), frozenset({1}), ("chatter",)))
+        with self.assertRaises(ValueError):
+            asyncio.run(runner.run_station(hosted, []))
+
+
+def _next_epoch_worker(args):
+    path, barrier_path, now_s = args
+    import time as _t
+    while not Path(barrier_path).exists():
+        _t.sleep(0.001)
+    return next_epoch(path, now_s=now_s)
+
+
+class EpochConcurrencyTest(unittest.TestCase):
+    def test_concurrent_starts_get_distinct_epochs(self):
+        import multiprocessing as mp
+        with tempfile.TemporaryDirectory() as d:
+            path, barrier = str(Path(d) / "k.epoch"), str(Path(d) / "go")
+            with mp.get_context("fork").Pool(8) as pool:
+                res = pool.map_async(_next_epoch_worker, [(path, barrier, 1_000)] * 16)
+                Path(barrier).touch()
+                epochs = res.get(timeout=30)
+            self.assertEqual(sorted(epochs), list(range(1_000, 1_016)))
+            self.assertEqual(Path(path).read_text(), "1015\n")
+            self.assertFalse([x for x in Path(d).iterdir() if x.suffix == ".tmp"])
 
 
 if __name__ == "__main__":

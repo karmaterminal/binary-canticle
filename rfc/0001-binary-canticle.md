@@ -435,7 +435,7 @@ Every transmission of the item MUST carry exactly the same bytes. A station MUST
 - A frame whose local expiry (§14.6.3) has passed is dropped as `expired`. This is what a real replay attack looks like, and it needs no replay table.
 - Dedup entries MUST be retained until local expiry plus 5 s skew and then evicted, and MUST NOT be evicted earlier under capacity pressure: a live entry holds the equivocation evidence (§10.8) and the record that stops a repeat from counting as new or waking again. The same holds for sticky-pluck and supersession marks.
 - Capacity is enforced per key, at admission, instead. When a key's share of the store is full, new tuples from that key are refused with evidence `over-quota` (never landed, never wake-eligible) until its own entries expire. The store never fails closed as a whole: a flooding key locks out only itself. The prototype's 24-hour, global, fail-closed replay table (bug B4: full after about 13 s at 783 accepts/s, locked out for about 25 h, `review/prototype §6`) is the failure this prevents.
-- Capacity [PROPOSED DEFAULT]: size the store at `Σ(rate × TTL)` over tuned streams, with a per-key quota of 4 × the live count that key's beacon advertises.
+- Capacity [PROPOSED DEFAULT]: size the store at `Σ(rate × TTL)` over tuned streams, with a per-key quota of max(256, 4 × the live count that key's beacon advertises). The floor lets a key that is idle, or has not beaconed yet, land its first items; the spike gives each manifest key an equal share of the store.
 
 ### 7.5 The loop-rate regulator
 

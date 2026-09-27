@@ -149,7 +149,9 @@ def run_parse_case(case: dict, m: Manifest) -> str:
 
 
 def run_sequence_case(case: dict, m: Manifest) -> list[str]:
-    lst = Listener(m)
+    # Sequence vectors check wire semantics (dedup, pluck, supersession) at one instant, so the
+    # receiver-local warm-up hold (§7.8 rule 4, a timing policy) is off here.
+    lst = Listener(m, warmup=False)
     out = []
     for d in case["datagrams_hex"]:
         for ev in lst.hear(bytes.fromhex(d), case["now_ms"]):

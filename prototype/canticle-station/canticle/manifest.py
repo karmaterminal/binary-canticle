@@ -15,8 +15,11 @@ from typing import Optional
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-from .ids import CLASS_BY_NAME, check_stream_name, key_id, stream_ids
+from .ids import CLASS_BY_NAME, SCOPES, check_stream_name, key_id, stream_ids
 from .wire import Reject
+
+
+DEFAULT_SCOPES = frozenset({SCOPES["host"], SCOPES["lan"]})
 
 
 @dataclass(frozen=True)
@@ -26,6 +29,7 @@ class StationEntry:
     classes: frozenset          # class codes this key may sign (§10.4)
     streams: tuple = ()         # stream names, so listeners can map ids to names (§5.4)
     revoked: bool = False
+    scopes: frozenset = DEFAULT_SCOPES  # scope codes this key may sign (§4.3, §10.3 `scopes`)
     key_id: bytes = field(init=False)
     stream_names: dict = field(init=False)
 
@@ -36,7 +40,8 @@ class StationEntry:
     def to_json(self) -> dict:
         names = {c.code: c.name for c in CLASS_BY_NAME.values()}
         out = {"name": self.name, "public_key": self.public_key.hex(),
-               "classes": sorted(names[c] for c in self.classes), "streams": list(self.streams)}
+               "classes": sorted(names[c] for c in self.classes), "streams": list(self.streams),
+               "scopes": [s for s, c in sorted(SCOPES.items(), key=lambda kv: kv[1]) if c in self.scopes]}
         if self.revoked:
             out["revoked"] = True
         return out
@@ -78,7 +83,8 @@ class Manifest:
             entries.append(StationEntry(
                 name=s["name"], public_key=bytes.fromhex(s["public_key"]),
                 classes=frozenset(CLASS_BY_NAME[c].code for c in s.get("classes", [])),
-                streams=tuple(s.get("streams", [])), revoked=bool(s.get("revoked", False))))
+                streams=tuple(s.get("streams", [])), revoked=bool(s.get("revoked", False)),
+                scopes=frozenset(SCOPES[x] for x in s["scopes"]) if "scopes" in s else DEFAULT_SCOPES))
         return cls(entries)
 
     def to_json(self) -> dict:

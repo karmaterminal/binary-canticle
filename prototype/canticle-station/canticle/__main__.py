@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import fcntl
 import json
 import os
 import signal
@@ -20,7 +21,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from . import runner, wire
-from .ids import CLASS_BY_NAME
+from .ids import CLASS_BY_NAME, SCOPES
 from .listener import Listener
 from .manifest import Manifest, StationEntry
 from .station import Station, StreamConfig, next_epoch
@@ -56,7 +57,8 @@ def cmd_keygen(a) -> int:
         m = Manifest.load(path) if path.exists() else Manifest()
         m.add(StationEntry(name=a.name, public_key=pub,
                            classes=frozenset(CLASS_BY_NAME[c].code for c in a.classes.split(",") if c),
-                           streams=tuple(s for s in a.streams.split(",") if s)))
+                           streams=tuple(s for s in a.streams.split(",") if s),
+                           scopes=frozenset(SCOPES[s] for s in a.scopes.split(",") if s)))
         m.save(path)
         info["manifest"] = str(path)
     print(json.dumps(info))
@@ -71,8 +73,21 @@ def _stream_config(spec: str) -> StreamConfig:
 
 def cmd_station(a) -> int:
     sk = _load_key(a.key)
+    kid = wire.key_id(wire.public_key_bytes(sk))
+    grant = Manifest.load(a.manifest).entry(kid)
+    if grant is None or grant.revoked:
+        print(f"key {kid.hex()} is not in {a.manifest} (or is revoked); refusing to sign", file=sys.stderr)
+        return 1
+    # One key is one station (§5.1): hold an exclusive lease on the key for the process lifetime,
+    # so a second station cannot run with the same key and equivocate.
+    lease = open(a.key + ".lease", "a")
+    try:
+        fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print(f"another station holds {a.key}; refusing to start", file=sys.stderr)
+        return 1
     st = Station(sk, [_stream_config(s) for s in a.stream], epoch=next_epoch(a.epoch_file or a.key + ".epoch"),
-                 beacon_period_ms=a.beacon_ms, now_ms=runner.now_ms())
+                 beacon_period_ms=a.beacon_ms, now_ms=runner.now_ms(), grant=grant)
     dests = [runner.parse_addr(d) for d in (a.to or [])]
     if a.multicast:
         dests.append((runner.MCAST_GROUP, a.port))
@@ -132,7 +147,7 @@ def cmd_status(a) -> int:
 
 
 def cmd_listen(a) -> int:
-    lst = Listener(Manifest.load(a.manifest), tuned=set(a.stream) if a.stream else None)
+    lst = Listener(Manifest.load(a.manifest), tuned=set(a.stream) if a.stream else None, state_path=a.state)
     bind = runner.parse_addr(a.bind)
 
     def on_event(ev):
@@ -168,10 +183,12 @@ def main(argv=None) -> int:
     k.add_argument("--name")
     k.add_argument("--classes", default="chatter,ambient,live-state,root")
     k.add_argument("--streams", default="chatter,root")
+    k.add_argument("--scopes", default="host,lan", help="scopes the key may sign (§4.3)")
     k.set_defaults(fn=cmd_keygen)
 
     s = sub.add_parser("station", help="run a looping station")
     s.add_argument("--key", required=True)
+    s.add_argument("--manifest", required=True, help="fleet manifest; the station signs only what its entry grants")
     s.add_argument("--stream", action="append", required=True, help="name[:class[:default_ttl_s]]")
     s.add_argument("--to", action="append", help="host:port destination (repeatable)")
     s.add_argument("--multicast", action="store_true", help=f"also send to {runner.MCAST_GROUP}")
@@ -214,6 +231,8 @@ def main(argv=None) -> int:
     l.add_argument("--multicast", action="store_true")
     l.add_argument("--stream", action="append", help="only surface these stream names")
     l.add_argument("--evidence", action="store_true", help="also print rejected datagrams and other evidence")
+    l.add_argument("--state", help="file for the safety state kept across restarts (dedup, plucks, "
+                   "supersession, epochs; §7.4-§7.8). Without it a restarted listener can surface stale items")
     l.set_defaults(fn=cmd_listen)
 
     v = sub.add_parser("vectors", help="regenerate the candidate conformance vectors")

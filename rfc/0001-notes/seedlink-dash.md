@@ -351,7 +351,7 @@ The coherent shape is **two tiers joined at a ring**:
   - browser access (WS);
   - ACLs and auth;
   - PROXYv2 behind HAProxy.
-  
+
   It is also the only thing the existing dashboards can consume.
 - **Why not SeedLink over UDP.** SeedLink's resume semantics assume an ordered byte stream. Its v3 framing has no length field: the record length sits in blockette 1000 inside the payload. Its commands are request/response. Faking it over UDP would just re-invent TCP badly. Earthworm's UDP ring replication "gappiness" is the cautionary precedent.
 - **LAN multicast practicality** (brief; network readers own this):
@@ -417,7 +417,7 @@ The coherent shape is **two tiers joined at a ring**:
    - **(a) the carrier** as a **miniSEED 2** numeric channel (512-B records, int32, 1 sps) so v3 dashboards (ews) render a live heartbeat;
    - **(b) TTL items** as **miniSEED 3 text** (encoding 0, JSON payload, `{"BC":{ttl,lens,loop_hz,item_id}}` extra headers, record span = TTL per A.6) on an `L_O_G`-style channel for v4 clients;
    - **(c)** optionally the raw canticle JSON as `…/JSON` DataLink packets for browser consoles via `/datalink`.
-   
+
    The existing prototype's private DataLink publisher seam (`binary-canticle/prototype/ringserver-udp-cue/`, other reader's `dlproof/proof.py`) is the start of (c).
 3. **Carrier wave as a miniSEED channel** (answers "existing dashboards show a live heartbeat trace"):
    - SID `FDSN:<NET>_<STA>__L_E_C` (SEED `LEC`): L band ≈ 1 sps matches the 1 Hz beacon (`stations-and-streams-v0.2.md:17`); source E = test-point/health (`fdsn-sid/channel-codes.rst:291-308`).

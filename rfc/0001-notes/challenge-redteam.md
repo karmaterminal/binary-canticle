@@ -202,7 +202,7 @@ With a stolen key (A4), steps 1-4 are skipped and the attacker can also forge ho
   - skill/plugin installs;
   - outbound messaging to non-local targets;
   - `canticle_sing` for wake-eligible or control classes.
-  
+
   Require `agents.defaults.sandbox` on for any wake-enabled OpenClaw agent.
 - **C7 Hop + lineage and C11 re-sing rules** (P10):
   - The *tool* (not the agent) stamps `hop = 1 + max(hop of heard items since reset)` and `derived_from = [identity tuples]`.

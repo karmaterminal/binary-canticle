@@ -174,6 +174,99 @@ class AdmissionTest(unittest.TestCase):
         self.assertEqual(lst.dedup_per_key, {loud.key_id: 0, quiet.key_id: 0})
 
 
+class ScopeAndHopTest(unittest.TestCase):
+    def test_host_frame_over_udp_is_a_state_neutral_scope_violation(self):
+        _, lst = setup()
+        st = Station(SK, [StreamConfig("chatter")], epoch=5, rng=random.Random(1), now_ms=T0, host_binding=True)
+        st.sing(T0, "chatter", text="stay home", scope="host")
+        frames = [f for f in st.poll(T0) if wire.parse(f, lst.manifest.resolve, T0).kind == wire.KIND_ITEM]
+        evs = [e for f in frames for e in lst.hear(f, T0)]
+        self.assertEqual({e.data["reason"] for e in evs}, {"scope-violation"})
+        self.assertEqual((lst.stations, lst.dedup), ({}, {}))
+
+    def test_scope_must_be_granted(self):
+        m = Manifest([StationEntry("cael", wire.public_key_bytes(SK), frozenset({1}), ("chatter",), scopes=frozenset({1}))])
+        lst = Listener(m)
+        st = Station(SK, [StreamConfig("chatter")], epoch=5, rng=random.Random(1), now_ms=T0)
+        st.sing(T0, "chatter", text="to everyone", scope="public")
+        evs = [e for f in st.poll(T0) for e in lst.hear(f, T0) if e.kind == "evidence"]
+        self.assertEqual([e.data["reason"] for e in evs], ["scope-violation"])
+
+    def test_hop_limit_boundaries(self):
+        m = Manifest([StationEntry("cael", wire.public_key_bytes(SK), frozenset({1, 7}), ("chatter", "alarm"))])
+        lst = Listener(m)
+        st = Station(SK, [StreamConfig("chatter"), StreamConfig("alarm", cls="alarm")], epoch=5,
+                     rng=random.Random(1), now_ms=T0)
+        st.sing(T0, "chatter", text="hop 2", hop=2)            # chatter allows 2
+        st.sing(T0, "chatter", text="hop 3", hop=3)
+        st.sing(T0, "alarm", text="relayed alarm", state_key="a", hop=1)  # alarm allows 0
+        evs = [e for f in st.poll(T0) for e in lst.hear(f, T0) if e.kind in ("item", "evidence")]
+        self.assertEqual([(e.kind, e.seq if e.kind == "item" else e.data["reason"]) for e in evs],
+                         [("item", 1), ("evidence", "hop-limit"), ("evidence", "hop-limit")])
+        self.assertEqual(len(lst.dedup), 1)                     # rejected frames left no dedup state
+
+
+class PersistenceTest(unittest.TestCase):
+    def keyed(self, st, t, text):
+        return st.sing(t, "root", body=cbor.encode({1: text}), ctype=7, state_key="root", ttl_s=600)
+
+    def test_restart_keeps_supersession_pluck_and_epoch(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "listener.json"
+            st, _ = setup()
+            lst = Listener(setup()[1].manifest, state_path=path)
+            old = self.keyed(st, T0, "old")
+            old_frames = st.poll(T0)
+            for f in old_frames:
+                lst.hear(f, T0)
+            self.keyed(st, T0 + 1_000, "new")
+            chat = st.sing(T0 + 1_000, "chatter", text="withdrawn later", ttl_s=60)
+            later = st.poll(T0 + 1_000)
+            for f in later:
+                lst.hear(f, T0 + 1_000)
+            st.hush(T0 + 2_000, "chatter", chat.seq)
+            for f in st.poll(T0 + 2_000):
+                lst.hear(f, T0 + 2_000)
+
+            fresh = Listener(lst.manifest, state_path=path)          # restart
+            evs = [e for f in old_frames for e in fresh.hear(f, T0 + 3_000)]
+            self.assertNotIn("item", [e.kind for e in evs])            # the stale value does not come back
+            evs = [e for f in later for e in fresh.hear(f, T0 + 3_000)]
+            items = [(e.stream, e.seq) for e in evs if e.kind == "item"]
+            self.assertEqual(items, [("root", old.seq + 1)])           # current value re-surfaces; plucked one does not
+            self.assertEqual(fresh.stations[st.key_id].epoch_hwm, 1)
+            again = [e for f in later for e in fresh.hear(f, T0 + 3_100)]
+            self.assertNotIn("item", [e.kind for e in again])          # and only once
+
+    def test_live_state_waits_for_warm_up(self):
+        m = Manifest([StationEntry("cael", wire.public_key_bytes(SK), frozenset({3}), ("lens.threat",))])
+        lst = Listener(m)
+        st = Station(SK, [StreamConfig("lens.threat", cls="live-state")], epoch=1, rng=random.Random(1), now_ms=T0)
+        st.sing(T0, "lens.threat", text="elevated", state_key="now", ttl_s=120)
+        evs = []
+        for t in range(T0, T0 + 30_000, 100):
+            for f in st.poll(t):
+                evs.extend((t, e) for e in lst.hear(f, t))
+            evs.extend((t, e) for e in lst.tick(t))
+        items = [(t, e) for t, e in evs if e.kind == "item"]
+        self.assertEqual(len(items), 1)
+        loop = lst.stations[st.key_id].stream_loop_max[st.streams["lens.threat"].sid]
+        self.assertGreaterEqual(items[0][0], T0 + loop)                # not before one advertised loop
+
+    def test_warm_up_never_lands_an_older_value(self):
+        m = Manifest([StationEntry("cael", wire.public_key_bytes(SK), frozenset({3}), ("lens.threat",))])
+        lst = Listener(m)
+        st = Station(SK, [StreamConfig("lens.threat", cls="live-state")], epoch=1, rng=random.Random(1), now_ms=T0)
+        st.sing(T0, "lens.threat", text="old", state_key="now", ttl_s=120)
+        old = st.poll(T0)
+        st.sing(T0 + 500, "lens.threat", text="new", state_key="now", ttl_s=120)
+        new = st.poll(T0 + 500)
+        for f in new + old:                                             # newer first, then the stale copy
+            lst.hear(f, T0 + 600)
+        evs = [e for t in range(T0 + 600, T0 + 30_000, 250) for e in lst.tick(t)]
+        self.assertEqual([e.data.get("text") for e in evs if e.kind == "item"], ["new"])
+
+
 class RobustnessTest(unittest.TestCase):
     def test_garbage_never_escapes(self):
         _, lst = setup()

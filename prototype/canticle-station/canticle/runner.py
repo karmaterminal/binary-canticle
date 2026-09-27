@@ -73,6 +73,10 @@ def _dispatch(station: Station, req: dict) -> dict:
 
 async def run_station(station: Station, dests: list[tuple[str, int]], control_path: Optional[str] = None,
                       stop: Optional[asyncio.Event] = None, log: Callable[[str], None] = lambda s: None) -> None:
+    if station.grant is None:
+        raise ValueError("a station behind a control socket needs its manifest grant (§10.4)")
+    if station.host_binding:
+        raise ValueError("run_station only sends UDP; it cannot carry host-scoped frames (§4.3)")
     stop = stop or asyncio.Event()
     wake = asyncio.Event()
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
