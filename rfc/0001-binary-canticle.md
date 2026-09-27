@@ -2196,9 +2196,9 @@ The SeedLink v4 `DATA` time filter is `packet.end_time > start_time` (`protocol.
 For `karmaterminal/ews-concept-new` @ `c5134cb` (`review/seedlink-dash Part B`; `review/challenge-redteam T10`):
 
 1. Connect `/realtime` to ringserver's `/seedlink` WebSocket using the repository's existing, unused `src/lib/seedlink-client.ts` (478 lines; `SeedLink3.1` subprotocol; waits for each `OK`/`ERROR`; one record per message).
-2. Stop using `bagusindrayana/seedlink-websocket`. It forwards raw TCP chunks as WebSocket messages without SeedLink framing and never consumes command replies (`server.js:93-121`), which produces "Not enought bytes for header, need 47, found 6" (reproduced by feeding ews's parsing path a 526-byte chunk built from real ringserver packets — one packet plus the first 6 bytes of the next — and a 14-byte `ERROR\r\nERROR\r\n`; through the live proxy the same framing fault gave "found 4" and a `RangeError`; thrown at seisplotjs `miniseed.mts:64-68`). It also opens TCP to any host the browser names on port 18000 (`server.js:20-61`, `:89`) and writes unsanitized fields into SeedLink commands (`:108-109`): an open relay, SSRF and command injection.
-3. Remove, or restrict to an FDSN host allowlist, the `?url=` parameter of `/api/fdsn/*` — an open fetch proxy (`src/routes/api/fdsn/station/+server.ts:5-10`, `:35-66`; same pattern in `dataselect/` and `event/`).
-4. Do not reuse the production configuration, which points at the upstream author's Railway proxy (`wrangler.toml:6-8`).
+2. Stop using `bagusindrayana/seedlink-websocket`. It forwards raw TCP chunks as WebSocket messages without SeedLink framing and never consumes command replies (`server.js:93-121`), which produces "Not enought bytes for header, need 47, found 6" (reproduced by feeding ews's parsing path a 526-byte chunk built from real ringserver packets — one packet plus the first 6 bytes of the next — and a 14-byte `ERROR\r\nERROR\r\n`; through the live proxy the same framing fault gave "found 4" and a `RangeError`; thrown at seisplotjs `miniseed.mts:64-68`). It also has input-handling problems that make it unsuitable to deploy. *(Third-party security specifics redacted from the public repo; they are in the private review copy and should go to the component's maintainers first.)*
+3. Review the dashboard's server-side FDSN proxy routes before any canticle deployment reuses ews. *(Third-party security specifics redacted from the public repo; they are in the private review copy and should go to the component's maintainers first.)*
+4. Do not reuse the upstream production configuration; point the dashboard at infrastructure the operator runs.
 5. Clear the waveform buffer on channel switch and send the location code (`src/routes/realtime/+page.svelte:799-823`).
 6. Add a SeedLink v4 + miniSEED 3 path (seisplotjs `seedlink4` and `mseed3`) that renders text channels in a log pane, never through the waveform parser.
 7. Canticle alarms MUST NOT drive the ESP32 serial annunciator (`src/lib/stores/serialStore.ts:64-90`) or the third-party socket.io alert lane unless they are verified alarm-capability frames delivered from the operator's own server (§19.3, Never 14).
@@ -2264,7 +2264,7 @@ L = likelihood, I = impact, inherent → residual (with the controls). Full evid
 | T7 | Exfiltration; surveillance exhaust (CoT, capsid, beacons, lease tables) | H → M | Crit → Med | §8.7, §11.3.6-§11.3.7, §14.12, §15.4 |
 | T8 | Poisoning training or tuning corpora built from broadcasts | M → L | Crit → Med | §6.4, §21 |
 | T9 | False alarms, adversary-triggered panic, false all-clear, actuation | M-H → L | High → Med | §10.4, §10.6, §14.7.2, §14.7.6, §18.6 |
-| T10 | Third-party components (seedlink-websocket, ews `?url=`, Railway/socket.io, skills) | H → L | Med (High if actuating) → Low | §18.6 |
+| T10 | Third-party components (bridges, dashboard proxy routes, hosted services, skills) | H → L | Med (High if actuating) → Low | §18.6 |
 | T11 | DNS-SD TXT leakage; discovery spoofing without DNSSEC | M → L | Med → Low | §5.3, §13.4 |
 | T12 | Receiver DoS: parser crash, verify-CPU flood, host queue eviction, unwrapped `/hooks/wake` | H → L | Med (High if control is evicted) → Low | §9.4, §14.1, §14.14, §16.2 |
 | T13 | Insider misuse ("establish control of heterogenous agents") | M → M | High → Med | §19.5, §14.9-§14.10, §10.3 |

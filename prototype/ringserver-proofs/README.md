@@ -1,8 +1,8 @@
 # ringserver proofs
 
 Runnable evidence for the SeedLink/ringserver tier discussed in
-[`rfc/0001-binary-canticle.md`](../../rfc/0001-binary-canticle.md) and
-[`reports/2026-09-27-survey-and-path.md`](../../reports/2026-09-27-survey-and-path.md).
+[`rfc/0001-binary-canticle.md`](../../rfc/0001-binary-canticle.md) and its review notes in
+[`rfc/0001-notes/`](../../rfc/0001-notes/).
 These are proofs, not product code: each script answers one question against a
 real [EarthScope ringserver](https://github.com/EarthScope/ringserver) v4.5.4
 built from source.

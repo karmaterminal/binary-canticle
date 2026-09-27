@@ -1,7 +1,9 @@
 # RFC-0001 review notes
 
-Evidence behind [`../0001-binary-canticle.md`](../0001-binary-canticle.md) and
-[`../../reports/2026-09-27-survey-and-path.md`](../../reports/2026-09-27-survey-and-path.md).
+Evidence behind [`../0001-binary-canticle.md`](../0001-binary-canticle.md) and the
+2026-09-27 survey report. The report is kept in a private repository because it
+names unfixed security issues in third-party components; the notes here are
+otherwise complete, with those specifics redacted.
 RFC-0001 cites these as `review/<note> §x`.
 
 These are working notes from the 2026-09-27 review, kept as written. They carry
@@ -51,7 +53,6 @@ landed as [`prototype/ringserver-proofs/`](../../prototype/ringserver-proofs/).
 ## Errata (found by the fact-check passes; the RFC and report carry the corrections)
 
 - `openclaw-rfc.md` §S2: `POST /hooks/wake` with `mode:"next-heartbeat"` plus a caller-chosen `sessionKey` is **not** a silent landing. A `sessionKey` requires `mode:"now"`, which always wakes (`src/gateway/hooks.ts:290-291` on the gates branch, `:282-283` on `main`). `next-heartbeat` lands only in the agent's main session.
-- `seedlink-dash.md`: the ews open-proxy citation `src/routes/api/fdsn/station/+server.ts:82-97,112-131` is wrong at `c5134cb`; the file is about 70 lines and the correct range is `:5-10,35-66`.
 - `seedlink-dash.md`, `prototype.md`: "ringserver sends miniSEED3 unconverted to SeedLink 3.x clients" holds for 4.5.4 only. From 4.5.5 ringserver skips miniSEED3 records for 3.x clients (ChangeLog v4.5.5).
 - `seedlink-dash.md`: the exact `need 47, found 6` string was reproduced from synthetic 526-byte and 14-byte messages built from real packets. The live proxy run produced `found 4` and a RangeError (see proof 06).
 - `spine.md` P3: the "beacon overflow above ~180 streams" figure assumed v0.2's 8-byte entries. With frame-v2 stream entries, rotation starts at about 26-27 streams (RFC-0001 §8.4).
