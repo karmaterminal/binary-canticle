@@ -112,6 +112,10 @@ Measured on 2026-09-27:
 - **Python harness.** The canticle arms verify an Ed25519 signature on every
   datagram in Python. Medians around 1 ms at 0% loss are harness time (four
   arms publish in turn, in random order), not network time.
+- **E5 lease keying.** E5's `udp_relay` still keys leases by source address,
+  which E4's relay no longer does (a lost BYE there hid the next session's
+  snapshot). It cannot trigger in E5, which has no loss and one session per
+  listener per relay, but key by session nonce before E5 is extended.
 - **E5.** Python relays and 1 000 Python clients in one process each: the
   kernel effects (listen-queue overflow, SYN retransmission at 1 s, SYN-cookie
   half-open connections, beacon timeouts) carry over, but absolute recovery
