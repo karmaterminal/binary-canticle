@@ -45,6 +45,23 @@ class CborTest(unittest.TestCase):
                 self.assertEqual(cm.exception.reason, reason)
 
 
+    def test_map_keys_in_rfc8949_core_deterministic_order(self):
+        # Reference bytes from an independent encoder: fxamacker/cbor v2.7.0 CoreDetEncOptions()
+        # (RFC 8949 §4.2.1, bytewise lexicographic order of encoded keys). Its CanonicalEncOptions()
+        # (RFC 7049 §3.9, length-first) gives the second value, which this codec must reject.
+        cases = [
+            ({-1: 0, 24: 0}, "a21818002000", "a22000181800"),
+            ({10: 0, 100: 0, -1: 0, "z": 0, "aa": 0}, "a50a001864002000617a0062616100",
+             "a50a002000186400617a0062616100"),
+        ]
+        for obj, core, length_first in cases:
+            self.assertEqual(cbor.encode(obj).hex(), core)
+            self.assertEqual(cbor.decode(bytes.fromhex(core)), obj)
+            with self.assertRaises(cbor.CborError) as e:
+                cbor.decode(bytes.fromhex(length_first))
+            self.assertEqual(str(e.exception), "map-key-order")
+
+
 class WireTest(unittest.TestCase):
     def test_rfc_vectors_byte_exact(self):
         v1 = wire.encode_item(SK, wire.Item(epoch=1, stream=1, seq=1, issued_at=1790000000000, expires_at=1790000060000,

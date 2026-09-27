@@ -88,6 +88,18 @@ class CarouselTest(unittest.TestCase):
         self.assertLess(plucks[-1][0], a.expires_at)
         self.assertEqual(wire.parse(plucks[0][1], lambda k: PK).body.target_seq, a.seq)
 
+    def test_refused_hush_leaves_the_carousel_unchanged(self):
+        st = station()
+        a = st.sing(T0, "chatter", text="oops", ttl_s=60)
+        s = st.streams["chatter"]
+        before = (dict(s.ring), s.head_seq)
+        with self.assertRaises(ValueError):
+            st.hush(a.expires_at - 50, "chatter", a.seq)  # inside the stop-before-expiry margin
+        self.assertEqual((dict(s.ring), s.head_seq), before)
+        with self.assertRaises(ValueError):
+            st.hush(T0 + 1_000, "chatter", a.seq + 5)  # no such item
+        self.assertEqual((dict(s.ring), s.head_seq), before)
+
     def test_late_pluck_is_never_shed(self):
         st = station()
         a = st.sing(T0, "chatter", text="oops", ttl_s=60)

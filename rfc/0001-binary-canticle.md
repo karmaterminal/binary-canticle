@@ -674,7 +674,7 @@ The spine's layout ("magic + version byte; deterministic CBOR with integer keys;
 
 ### 9.4 CBOR rules
 
-- The map MUST use the core deterministic encoding of RFC 8949 §4.2.1: definite lengths only, shortest-form integers and lengths, map keys sorted by the bytewise order of their encodings, no duplicate keys.
+- The map MUST use the core deterministic encoding of RFC 8949 §4.2.1: definite lengths only, shortest-form integers and lengths, map keys sorted by the bytewise lexicographic order of their encodings, no duplicate keys. This is not RFC 7049's length-first order (RFC 8949 §4.2.3): key 24 (`0x18 0x18`) sorts before key −1 (`0x20`). Non-negative integer keys, which are all the keys frame v2 defines, sort the same either way; the orders differ once negative or text keys appear, for example in bodies.
 - Receivers MUST reject a map that is not deterministically encoded (for example, decode, re-encode and compare bytes). This blocks malleability and duplicate-key tricks, and keeps "byte-identical" meaningful.
 - Core keys (1-31) MUST NOT carry floating-point values or CBOR tags. Nesting depth MUST NOT exceed 4; arrays and maps MUST NOT exceed 32 entries.
 - Parsers MUST be strict, bounded and fuzzed, and a parse error on one packet MUST NOT stop the receiver. The prototype is killed by an 11-byte unauthenticated datagram, `{"a":1e400}` (bug B1); that class of failure is what this rule forbids.

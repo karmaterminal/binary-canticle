@@ -75,12 +75,12 @@ Do not pipe heard text straight into a session. RFC-0001 §14 and §16 require a
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 33 tests, about 6 s
+python -m unittest discover -s tests      # 35 tests, about 6 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
 - `test_wire.py` covers:
-  - strict CBOR, and the RFC §9.13 vectors byte for byte;
+  - strict CBOR, including RFC 8949 core map-key order checked against bytes from an independent encoder (fxamacker/cbor), and the RFC §9.13 vectors byte for byte;
   - the RFC §9.11 size budget (745 / 720 / 1 100 B);
   - all 31 candidate vectors;
   - a check that the committed vectors file equals the generator's output;
@@ -88,7 +88,7 @@ python -m canticle vectors                # regenerate vectors/frame-v2-candidat
 - `test_station.py` drives the carousel on a virtual clock:
   - burst timing, byte-identical repeats, jitter bounds and stopping before expiry;
   - the regulator's fair share, class floor and degraded shedding;
-  - supersede, pluck (including a late pluck that must never be shed) and refresh re-issue;
+  - supersede, pluck (including a late pluck that must never be shed, and a refused hush that must change nothing) and refresh re-issue;
   - depth, stream-id collisions and beacon pages;
   - a late joiner hearing every live item within `loop_ms × 4/3`;
   - the persisted epoch counter: strictly increasing across same-second restarts and a clock that steps back.

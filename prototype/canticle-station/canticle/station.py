@@ -262,13 +262,14 @@ class Station:
         target = st.ring.get(seq)
         if target is None or target.kind != wire.KIND_ITEM:
             raise ValueError(f"no live item {stream}#{seq} to pluck")
-        del st.ring[seq]
         if target.expires_at - now_ms < STOP_BEFORE_EXPIRY_MS:
             raise ValueError("target already expiring")
-        st.head_seq += 1
-        p = wire.Pluck(epoch=self.epoch, stream=st.sid, seq=st.head_seq, issued_at=now_ms,
+        # Build and sign the PLUCK before touching the carousel, so a refused hush changes nothing.
+        p = wire.Pluck(epoch=self.epoch, stream=st.sid, seq=st.head_seq + 1, issued_at=now_ms,
                        expires_at=target.expires_at, scope=target.scope, target_seq=seq, reason=reason)
         frame = wire.encode_pluck(self.sk, p)
+        del st.ring[seq]
+        st.head_seq = p.seq
         oa = _OnAir(frame=frame, kind=wire.KIND_PLUCK, seq=p.seq, cls=target.cls, expires_at=p.expires_at,
                     req_loop_ms=target.req_loop_ms, scope=p.scope)
         self._admit(st, oa, now_ms)
