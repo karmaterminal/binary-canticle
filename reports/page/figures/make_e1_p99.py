@@ -1,9 +1,12 @@
 """Build figures/e1-p99.html from prototype/protocol-dynamics/results/e1_freshness.json.
 
-Small multiples, one per update interval: p99 update latency (log scale) against
-packet loss (both directions) for the canticle carousel (udp-live, 5 s loop) and
-a TCP stream. Series colours are the dataviz reference slots 1-2, validated
-against this page's light and dark surfaces.
+Small multiples, one per update interval: p99 update latency (Kaplan–Meier, log
+scale) against packet loss (both directions) for the canticle carousel (udp-live,
+5 s loop) and a TCP stream. Where too few updates arrived within the run for the
+p99 to be observed, the point is drawn hollow at the run's observation limit, a
+lower bound, and labelled with the share of updates delivered. Series colours are
+the dataviz reference slots 1-2, validated against this page's light and dark
+surfaces.
 
     python reports/page/figures/make_e1_p99.py
 """
@@ -48,6 +51,15 @@ def y_at(ms: float) -> float:
     return MT + PH * (1 - (v - Y_MIN) / (Y_MAX - Y_MIN))
 
 
+def point(rows: dict, u: float, pm: int, arm: str) -> tuple[float, bool, float]:
+    """(value in ms, censored?, delivered fraction). A censored value is a lower bound."""
+    r = rows[(u, pm, arm)]
+    km = r["update_latency_km_ms"]
+    if km.get("p99") is not None:
+        return km["p99"], False, r["delivered_fraction"]
+    return km["censored_beyond_ms"], True, r["delivered_fraction"]
+
+
 def panel(rows: dict, u: float) -> str:
     parts = [f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="p99 update latency against loss, updates every {u:g} s">']
     for v, label in TICKS:
@@ -59,12 +71,26 @@ def panel(rows: dict, u: float) -> str:
     parts.append(f'<text class="xl" x="{ML + PW / 2:.1f}" y="{H - 3}">packet loss, % (both directions)</text>')
     ends = []
     for arm, name, key in ARMS:
-        pts = [(x_at(i), y_at(rows[(u, pm, arm)]), rows[(u, pm, arm)], pm) for i, pm in enumerate(LOSSES)]
-        d = " ".join(f"{'M' if j == 0 else 'L'}{x:.1f},{y:.1f}" for j, (x, y, _, _) in enumerate(pts))
+        pts = []
+        for i, pm in enumerate(LOSSES):
+            ms, cens, frac = point(rows, u, pm, arm)
+            pts.append((x_at(i), y_at(ms), ms, pm, cens, frac))
+        solid = [p for p in pts if not p[4]]
+        d = " ".join(f"{'M' if j == 0 else 'L'}{x:.1f},{y:.1f}" for j, (x, y, *_) in enumerate(solid))
         parts.append(f'<path class="ln s-{key}" d="{d}"/>')
-        for x, y, ms, pm in pts:
-            tip = html.escape(f"{name} · updates every {u:g} s · {pm // 10}% loss: p99 {fmt(ms)}")
-            parts.append(f'<circle class="dot s-{key}" cx="{x:.1f}" cy="{y:.1f}" r="4"><title>{tip}</title></circle>')
+        for a, b in zip(pts, pts[1:]):
+            if b[4]:  # into a lower bound: dashed
+                parts.append(f'<path class="ln lb s-{key}" d="M{a[0]:.1f},{a[1]:.1f} L{b[0]:.1f},{b[1]:.1f}"/>')
+        for x, y, ms, pm, cens, frac in pts:
+            if cens:
+                tip = html.escape(f"{name} · updates every {u:g} s · {pm // 10}% loss: p99 beyond {fmt(ms)}, "
+                                  f"the end of the run; only {frac:.0%} of updates arrived")
+                parts.append(f'<path class="up s-{key}" d="M{x - 4:.1f},{y - 7:.1f} L{x:.1f},{y - 12:.1f} L{x + 4:.1f},{y - 7:.1f}"/>')
+                parts.append(f'<circle class="dot open s-{key}" cx="{x:.1f}" cy="{y:.1f}" r="4"><title>{tip}</title></circle>')
+                parts.append(f'<text class="cl" x="{x - 7:.1f}" y="{y + 3.5:.1f}">{frac:.0%} arrived</text>')
+            else:
+                tip = html.escape(f"{name} · updates every {u:g} s · {pm // 10}% loss: p99 {fmt(ms)}")
+                parts.append(f'<circle class="dot s-{key}" cx="{x:.1f}" cy="{y:.1f}" r="4"><title>{tip}</title></circle>')
             parts.append(f'<circle class="hit" cx="{x:.1f}" cy="{y:.1f}" r="11" data-tip="{tip}" tabindex="0"/>')
         ends.append([pts[-1][1], name, key])
     if abs(ends[0][0] - ends[1][0]) < 14:  # keep end labels from colliding
@@ -81,7 +107,7 @@ def main() -> None:
     rows = {}
     for r in json.loads(DATA.read_text())["rows"]:
         if r["loss_direction"] == "both" and r["outage_s"] == 0:
-            rows[(r["update_s"], r["loss_permille"], r["arm"])] = r["update_latency_ms"]["p99"]
+            rows[(r["update_s"], r["loss_permille"], r["arm"])] = r
     panels = "".join(panel(rows, u) for u in INTERVALS)
     OUT.write_text(f"""<div class="viz-e1">
 <style>
@@ -107,6 +133,10 @@ def main() -> None:
 .viz-e1 .ln {{ fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }}
 .viz-e1 .dot {{ stroke: var(--paper-2); stroke-width: 2; }}
 .viz-e1 .key {{ stroke-width: 2; }}
+.viz-e1 .ln.lb {{ stroke-dasharray: 3 3; }}
+.viz-e1 svg .dot.open {{ fill: var(--paper-2); stroke-width: 2; }}
+.viz-e1 .up {{ fill: none; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }}
+.viz-e1 .cl {{ fill: var(--ink-2); font: 10px var(--sans); text-anchor: end; }}
 .viz-e1 .s-c {{ stroke: var(--s-c); }} .viz-e1 .dot.s-c, .viz-e1 i.s-c {{ fill: var(--s-c); background: var(--s-c); }}
 .viz-e1 .s-t {{ stroke: var(--s-t); }} .viz-e1 .dot.s-t, .viz-e1 i.s-t {{ fill: var(--s-t); background: var(--s-t); }}
 .viz-e1 .hit {{ fill: transparent; cursor: default; }}
@@ -116,7 +146,7 @@ def main() -> None:
 </style>
 <div class="hd"><strong>Worst-case staleness under packet loss</strong>
 <span class="lg"><span><i class="s-c"></i>Carousel (UDP, 5 s loop)</span><span><i class="s-t"></i>TCP stream</span></span></div>
-<p class="sub">p99 time from an update being issued to a receiver holding it, log scale. Measured in <code>prototype/protocol-dynamics</code> (E1): 900 s per condition, 20 receivers per arm, RTT ≈ 0.1 ms. TCP is fresher up to about 10% loss; above that its retransmission backoff runs to minutes.</p>
+<p class="sub">p99 time from an update being issued to a receiver holding it (Kaplan–Meier, so updates still missing at the end of the run count as “not yet”, never as a latency), log scale. Measured in <code>prototype/protocol-dynamics</code> (E1): 900 s per condition, 20 receivers per arm, RTT ≈ 0.1 ms. TCP is fresher up to about 10% loss. At 30% its backoff stalls connections for minutes: a hollow point is a lower bound at the end of the run, marked with the share of updates that arrived at all.</p>
 <div class="grid">{panels}<div class="tip" hidden></div></div>
 <script>
 (function () {{

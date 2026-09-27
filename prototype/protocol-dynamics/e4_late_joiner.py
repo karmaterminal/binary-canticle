@@ -15,10 +15,18 @@ hold a current item for all 20 keys. Arms, all under the same loss:
   LISTEN → LISTEN_OK, retransmitted after 1, 2, 4, 8 s. The relay then sends
   its verified live set once, paced at granted_bps = 32 kbit/s (§7.10), and
   forwards the station's carousel (the 4 kbit/s one) after that. The clock
-  starts at the first HELLO.
+  starts at the first HELLO. Each trial is a new session from a new socket
+  with a fresh client nonce; the relay keys leases by session (address and
+  nonce, i.e. the cookie it validated), so every new session gets a snapshot
+  even when an earlier session's BYE was lost. The joiner RENEWs every
+  22 s × U(0.8, 1.2) (§11.3.5), so a long trial does not lose its lease.
 
 The station → relay ingress is exempt from loss (it is a separate path in a
 real deployment); everything else in the namespace is dropped at rate p.
+
+A join that has not completed when it times out (120 s) or when the run ends
+is right-censored: ``t_full_km_ms`` is the Kaplan–Meier estimate over all
+joins, ``t_full_completed_ms`` is conditional on completion.
 
     python e4_late_joiner.py all --duration 600
 """
@@ -37,6 +45,7 @@ import socket
 import struct
 import subprocess
 import sys
+from typing import Optional
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -46,7 +55,7 @@ from canticle.listener import Listener  # noqa: E402
 from canticle.manifest import Manifest  # noqa: E402
 from canticle.station import StreamConfig  # noqa: E402
 
-from harness import netns, stats  # noqa: E402
+from harness import netns, runs, stats  # noqa: E402
 from harness.arms import CarouselSender, enable_rx_timestamps, make_station, now_ms, rx_time, wall  # noqa: E402
 
 ITEMS = 20
@@ -55,7 +64,8 @@ SLOTS = 10                      # concurrent joiners per arm
 TRIAL_TIMEOUT_S = 120
 GRANTED_BPS = 32_000            # §11.3.7 default per lease
 RETRY_S = (1, 2, 4, 8)          # §11.3.5 HELLO retransmit
-HELLO, COOKIE, LISTEN, LISTEN_OK, BYE = 0x10, 0x11, 0x12, 0x13, 0x15
+LEASE_S, RENEW_S = 75, 22       # §11.3.5
+HELLO, COOKIE, LISTEN, LISTEN_OK, RENEW, BYE = 0x10, 0x11, 0x12, 0x13, 0x14, 0x15
 LEASE_HDR = b"BC\x02"
 KEYS = [f"k{i:02d}" for i in range(ITEMS)]
 
@@ -97,7 +107,12 @@ class UdpSlot:
         self.sock.setblocking(False)
         self.port = self.sock.getsockname()[1]
         self.handler = None
-        asyncio.get_running_loop().add_reader(self.sock, self._readable)
+        self.loop = asyncio.get_running_loop()
+        self.loop.add_reader(self.sock, self._readable)
+
+    def close(self) -> None:
+        self.loop.remove_reader(self.sock)
+        self.sock.close()
 
     def _readable(self) -> None:
         while True:
@@ -118,7 +133,7 @@ class Relay:
         self.listener = Listener(manifest)          # the membrane: verify, supersede, expire
         self.frames: dict = {}                      # identity -> raw frame, for what is current
         self.secret = os.urandom(32)
-        self.leases: dict = {}                      # addr -> expiry (wall)
+        self.leases: dict = {}                      # (addr, client nonce) -> expiry (wall): one per session
         self.loop = asyncio.get_running_loop()
         self.ingress = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.ingress.bind(("127.0.0.1", 0))
@@ -131,6 +146,7 @@ class Relay:
         self.loop.add_reader(self.ingress, self._on_ingress)
         self.loop.add_reader(self.sock, self._on_lease)
         self.snapshots = 0
+        self.renewals = 0
 
     def _cookie(self, addr, nonce: bytes) -> bytes:
         msg = socket.inet_aton(addr[0]) + struct.pack(">H", addr[1]) + nonce
@@ -151,10 +167,13 @@ class Relay:
                 self.frames[f.identity] = data
                 self.frames = {k: v for k, v in self.frames.items() if k in self.listener.current}
             now = wall()
-            for addr, exp in list(self.leases.items()):
+            dests = set()
+            for key, exp in list(self.leases.items()):
                 if now > exp:
-                    del self.leases[addr]
-                    continue
+                    del self.leases[key]
+                else:
+                    dests.add(key[0])
+            for addr in dests:                          # once per address, however many sessions it holds
                 self.sock.sendto(data, addr)            # byte-identical forwarding (I-8)
 
     def _on_lease(self) -> None:
@@ -169,18 +188,24 @@ class Relay:
             if kind == HELLO and len(data) >= 256:
                 nonce = data[4:20]
                 self.sock.sendto(lease_msg(COOKIE, nonce, self._cookie(addr, nonce)), addr)   # 40 B, no state
-            elif kind == LISTEN:
+            elif kind in (LISTEN, RENEW, BYE):
                 nonce, cookie = data[4:20], data[20:36]
                 if not hmac.compare_digest(cookie, self._cookie(addr, nonce)):
                     continue                                                              # silent
-                new = addr not in self.leases
-                self.leases[addr] = wall() + 75
-                self.sock.sendto(lease_msg(LISTEN_OK, nonce, os.urandom(8), bytes(56)), addr)
-                if new:
-                    self.snapshots += 1
-                    self.loop.create_task(self._snapshot(addr))
-            elif kind == BYE:
-                self.leases.pop(addr, None)
+                session = (addr, nonce)                 # the cookie-validated session, not the address
+                if kind == BYE:
+                    self.leases.pop(session, None)
+                elif kind == RENEW:
+                    if session in self.leases:
+                        self.leases[session] = wall() + LEASE_S
+                        self.renewals += 1
+                else:
+                    new = session not in self.leases    # a retransmitted LISTEN is the same session
+                    self.leases[session] = wall() + LEASE_S
+                    self.sock.sendto(lease_msg(LISTEN_OK, nonce, os.urandom(8), bytes(56)), addr)
+                    if new:                             # at most one snapshot per lease (§11.3.5)
+                        self.snapshots += 1
+                        self.loop.create_task(self._snapshot(addr))
 
     async def _snapshot(self, addr) -> None:
         """The verified live set once, paced at granted_bps (§7.10)."""
@@ -191,21 +216,29 @@ class Relay:
 
 # ---------------------------------------------------------------- trials
 
-async def trial_passive(slot: UdpSlot, manifest) -> dict:
+# Every trial fills ``info["t0"]`` when its clock starts, so a trial cut off by the
+# end of the run can be recorded as censored at its elapsed time. A trial that
+# does not complete returns ``elapsed_ms`` (the censoring time) instead of ``t_full_ms``.
+
+async def trial_passive(slot: UdpSlot, manifest, info: dict) -> dict:
     await asyncio.sleep(0)
     j = Joined(manifest, wall())
+    info["t0"] = j.t_start
     slot.handler = lambda d, t, src: j.hear(d, t)
     try:
         t = await asyncio.wait_for(j.done, TRIAL_TIMEOUT_S)
         return {"t_full_ms": (t - j.t_start) * 1000, "frames": j.frames}
     except asyncio.TimeoutError:
-        return {"timeout": True, "keys": len(j.keys)}
+        return {"timeout": True, "elapsed_ms": (wall() - j.t_start) * 1000, "keys": len(j.keys)}
     finally:
         slot.handler = None
 
 
-async def trial_lease(slot: UdpSlot, manifest, relay_addr) -> dict:
+async def trial_lease(manifest, relay_addr, info: dict) -> dict:
+    """A new session from a new socket: fresh client nonce, HELLO → COOKIE → LISTEN → LISTEN_OK, RENEW, BYE."""
+    slot = UdpSlot()
     t0 = wall()
+    info["t0"] = t0
     j = Joined(manifest, t0)
     nonce = os.urandom(16)
     got: dict = {}
@@ -220,7 +253,16 @@ async def trial_lease(slot: UdpSlot, manifest, relay_addr) -> dict:
         j.hear(data, t)
 
     slot.handler = handler
-    tries = {"hello": 0, "listen": 0}
+    tries = {"hello": 0, "listen": 0, "renew": 0}
+    cookie = None
+    renewer = None
+
+    async def renew():
+        while True:
+            await asyncio.sleep(RENEW_S * random.uniform(0.8, 1.2))
+            slot.sock.sendto(lease_msg(RENEW, nonce, cookie, pad_to=96), relay_addr)
+            tries["renew"] += 1
+
     try:
         async def exchange(kind_wait, make, name):
             for wait in RETRY_S + (8,) * 20:
@@ -235,27 +277,32 @@ async def trial_lease(slot: UdpSlot, manifest, relay_addr) -> dict:
             return False
 
         if not await exchange(COOKIE, lambda: lease_msg(HELLO, nonce, pad_to=256), "hello"):
-            return {"timeout": True, "stage": "cookie", **tries}
+            return {"timeout": True, "elapsed_ms": (wall() - t0) * 1000, "stage": "cookie", **tries}
         cookie = got[COOKIE][1][20:36]
         if not await exchange(LISTEN_OK, lambda: lease_msg(LISTEN, nonce, cookie, bytes(28)), "listen"):
-            return {"timeout": True, "stage": "listen_ok", **tries}
+            return {"timeout": True, "elapsed_ms": (wall() - t0) * 1000, "stage": "listen_ok", **tries}
+        renewer = asyncio.create_task(renew())
         t_ok = got[LISTEN_OK][0]
         t = await asyncio.wait_for(j.done, max(1, TRIAL_TIMEOUT_S - (wall() - t0)))
         return {"t_full_ms": (t - t0) * 1000, "handshake_ms": (t_ok - t0) * 1000, **tries}
     except asyncio.TimeoutError:
-        return {"timeout": True, "stage": "items", "keys": len(j.keys), **tries}
+        return {"timeout": True, "elapsed_ms": (wall() - t0) * 1000, "stage": "items", "keys": len(j.keys), **tries}
     finally:
-        slot.sock.sendto(lease_msg(BYE, nonce), relay_addr)
-        slot.handler = None
+        if renewer:
+            renewer.cancel()
+        if cookie is not None:
+            slot.sock.sendto(lease_msg(BYE, nonce, cookie), relay_addr)
+        slot.close()
 
 
-async def trial_tcp(manifest, server_port: int) -> dict:
+async def trial_tcp(manifest, server_port: int, info: dict) -> dict:
     loop = asyncio.get_running_loop()
     s = socket.socket()
     netns.set_cubic(s)
     enable_rx_timestamps(s)
     s.setblocking(False)
     t0 = wall()
+    info["t0"] = t0
     j = Joined(manifest, t0)
     buf = bytearray()
     try:
@@ -282,7 +329,7 @@ async def trial_tcp(manifest, server_port: int) -> dict:
         t = await asyncio.wait_for(j.done, max(1, TRIAL_TIMEOUT_S - (wall() - t0)))
         return {"t_full_ms": (t - t0) * 1000, "connect_ms": (t_conn - t0) * 1000}
     except (asyncio.TimeoutError, OSError) as e:
-        return {"timeout": True, "error": type(e).__name__, "keys": len(j.keys)}
+        return {"timeout": True, "elapsed_ms": (wall() - t0) * 1000, "error": type(e).__name__, "keys": len(j.keys)}
     finally:
         try:
             loop.remove_reader(s)
@@ -291,8 +338,10 @@ async def trial_tcp(manifest, server_port: int) -> dict:
         s.close()
 
 
-async def tcp_snapshot_server(station, stream: str) -> tuple[asyncio.AbstractServer, int]:
+async def tcp_snapshot_server(station, stream: str, served: list) -> tuple[asyncio.AbstractServer, int]:
+    """Every accepted connection gets the 20 current frames at once (one snapshot per connection)."""
     async def serve(reader, writer):
+        served[0] += 1
         sock = writer.get_extra_info("socket")
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         netns.set_cubic(sock)
@@ -323,7 +372,7 @@ async def condition(a) -> dict:
     relay = Relay(manifest)
     exempt = lossy.exempt_udp_port(relay.port_ingress)
 
-    slots = {arm: [UdpSlot() for _ in range(SLOTS)] for arm in ("carousel-4kbps", "carousel-1s", "lease-snapshot")}
+    slots = {arm: [UdpSlot() for _ in range(SLOTS)] for arm in ("carousel-4kbps", "carousel-1s")}
     senders = {
         "slow": CarouselSender(slow, "lens.state", [("127.0.0.1", s.port) for s in slots["carousel-4kbps"]]
                                + [("127.0.0.1", relay.port_ingress)], BODY, loop="fast"),
@@ -331,12 +380,13 @@ async def condition(a) -> dict:
                                loop="fast"),
     }
     stop = asyncio.Event()
-    runs = [asyncio.create_task(s.run(stop)) for s in senders.values()]
+    sender_tasks = [asyncio.create_task(s.run(stop)) for s in senders.values()]
     for k, key in enumerate(KEYS):
         for s in senders.values():
             s.publish(k, state_key=key)
     sing = {name: s.sing_results[0] for name, s in senders.items()}
-    srv, tcp_port = await tcp_snapshot_server(slow, "lens.state")
+    tcp_served = [0]
+    srv, tcp_port = await tcp_snapshot_server(slow, "lens.state", tcp_served)
     await asyncio.sleep(6)          # past every item's burst: joiners see the steady-state loop
     lossy.set_loss(a.loss)
 
@@ -346,12 +396,18 @@ async def condition(a) -> dict:
     async def worker(arm: str, i: int):
         await asyncio.sleep(rng.uniform(0, 10))
         while wall() + 5 < t_end:
-            if arm in ("carousel-4kbps", "carousel-1s"):
-                r = await trial_passive(slots[arm][i], manifest)
-            elif arm == "lease-snapshot":
-                r = await trial_lease(slots[arm][i], manifest, ("127.0.0.1", relay.port))
-            else:
-                r = await trial_tcp(manifest, tcp_port)
+            info: dict = {}
+            try:
+                if arm in ("carousel-4kbps", "carousel-1s"):
+                    r = await trial_passive(slots[arm][i], manifest, info)
+                elif arm == "lease-snapshot":
+                    r = await trial_lease(manifest, ("127.0.0.1", relay.port), info)
+                else:
+                    r = await trial_tcp(manifest, tcp_port, info)
+            except asyncio.CancelledError:
+                if "t0" in info:                        # cut off by the end of the run: censored, not dropped
+                    results[arm].append({"cut_at_end": True, "elapsed_ms": (wall() - info["t0"]) * 1000})
+                raise
             results[arm].append(r)
             await asyncio.sleep(rng.uniform(0.5, 5))    # random arrival phase for the next joiner
 
@@ -364,49 +420,98 @@ async def condition(a) -> dict:
     loops = {name: sorted({oa.loop_ms for oa in s.station.streams[s.stream].ring.values()})   # after reconsideration
              for name, s in senders.items()}
     stop.set()
-    await asyncio.gather(*runs, return_exceptions=True)
+    await asyncio.gather(*sender_tasks, return_exceptions=True)
     srv.close()
     lossy.unexempt(exempt)
 
     arms = {}
     for arm, rs in results.items():
-        ok = [r for r in rs if not r.get("timeout")]
-        arms[arm] = {"trials": len(rs), "timeouts": len(rs) - len(ok),
-                     "t_full_ms": stats.summary(r["t_full_ms"] for r in ok)}
+        ok = [r for r in rs if "t_full_ms" in r]
+        timed_out = [r for r in rs if r.get("timeout") and r.get("error", "TimeoutError") == "TimeoutError"]
+        arms[arm] = {"trials": len(rs), "completed": len(ok), "timeouts": len(timed_out),
+                     "errors": sum(1 for r in rs if r.get("error", "TimeoutError") != "TimeoutError"),
+                     "cut_at_end": sum(1 for r in rs if r.get("cut_at_end")),
+                     "t_full_km_ms": stats.km([r.get("t_full_ms", r.get("elapsed_ms")) for r in rs],
+                                              ["t_full_ms" in r for r in rs]),
+                     "t_full_completed_ms": {**stats.summary(r["t_full_ms"] for r in ok),
+                                             "conditional_on": "completion: timed-out and cut-off joins excluded"}}
         if arm == "lease-snapshot":
             arms[arm]["handshake_ms"] = stats.summary(r["handshake_ms"] for r in ok)
-            arms[arm]["hello_sent"] = stats.summary((r["hello"] for r in rs), "datagrams")
+            arms[arm]["hello_sent"] = stats.summary((r["hello"] for r in rs if "hello" in r), "datagrams")
+            arms[arm]["renew_sent"] = sum(r.get("renew", 0) for r in rs)
             arms[arm]["timeout_stages"] = [r.get("stage") for r in rs if r.get("timeout")]
+            arms[arm]["sessions_with_listen_ok"] = sum(1 for r in rs if "t_full_ms" in r or r.get("stage") == "items")
         if arm == "tcp-snapshot":
             arms[arm]["connect_ms"] = stats.summary(r["connect_ms"] for r in ok)
-            arms[arm]["errors"] = [r.get("error") for r in rs if r.get("timeout")]
-    return {"experiment": "e4_late_joiner", "loss_permille": a.loss, "duration_s": a.duration, "items": ITEMS,
+            arms[arm]["error_kinds"] = [r.get("error") for r in rs if r.get("timeout")]
+    return {"experiment": "e4_late_joiner", "run_id": a.run_id, "tag": a.tag, "loss_permille": a.loss,
+            "duration_s": a.duration, "items": ITEMS, "trial_timeout_s": TRIAL_TIMEOUT_S,
             "slots_per_arm": SLOTS, "frame_bytes": sing["slow"]["size"], "sing": sing, "loop_ms": loops,
-            "relay_snapshots": relay.snapshots, "granted_bps": GRANTED_BPS,
+            "relay_snapshots": relay.snapshots, "relay_renewals": relay.renewals, "tcp_snapshots": tcp_served[0],
+            "granted_bps": GRANTED_BPS,
             "nft": {**counters, "measured_loss": round(counters["dropped_loss"] / counters["offered"], 5)
                     if counters["offered"] else None},
             "arms": arms, "env": stats.env()}
 
 
-def run_all(a) -> None:
-    procs = {}
-    raw = os.path.join(HERE, "results", "raw")
-    os.makedirs(raw, exist_ok=True)
-    with contextlib.ExitStack() as stack:
-        for loss in a.losses:
-            ns = stack.enter_context(netns.netns(f"pd-e4-loss{loss}"))
-            out = os.path.join(raw, f"e4-loss{loss}.json")
-            argv = [sys.executable, os.path.abspath(__file__), "one", "--loss", str(loss), "--duration",
-                    str(a.duration), "--seed", str(loss + 1), "--out", out]
-            procs[loss] = (subprocess.Popen(netns.ns_exec(ns, *argv)), out)
-        for loss, (p, out) in procs.items():
-            p.wait()
-    rows = []
-    for loss, (p, out) in procs.items():
-        with open(out) as f:
-            rows.append(json.load(f))
-    stats.write_json(os.path.join(HERE, "results", "e4_late_joiner.json"), {"experiment": "e4_late_joiner",
-                                                                             "conditions": rows})
+def _spawn(ns: str, argv: list[str], log_path: str) -> subprocess.Popen:
+    """One loss level's worker, inside namespace ``ns`` (tests replace this)."""
+    with open(log_path, "w") as log:
+        return subprocess.Popen(netns.ns_exec(ns, *argv), stdout=log, stderr=subprocess.STDOUT)
+
+
+PROVENANCE = ("run_id", "duration_s", "items", "slots_per_arm", "trial_timeout_s", "granted_bps")
+
+
+def run_all(a) -> int:
+    """All loss levels in parallel namespaces; publish only if every one succeeds (see harness/runs.py)."""
+    results = os.path.abspath(a.results_dir)
+    if a.losses != DEFAULT_LOSSES and results == runs.RESULTS:
+        raise SystemExit("a subset of loss levels writes a partial aggregate; pass --results-dir to put it "
+                         "somewhere other than results/")
+    run_id = runs.new_run_id()
+    stage = runs.stage_dir(results, "e4", run_id)
+    tags = [f"loss{loss}" for loss in a.losses]
+    manifest = runs.manifest("e4_late_joiner", run_id, tags, {"duration_s": a.duration, "losses": a.losses},
+                             os.path.abspath(__file__))
+    procs = []
+    try:
+        with contextlib.ExitStack() as stack:
+            for loss, tag in zip(a.losses, tags):
+                ns = stack.enter_context(netns.netns(netns.name(f"e4-{tag}")))
+                out = os.path.join(stage, f"e4-{tag}.json")
+                argv = [sys.executable, os.path.abspath(__file__), "one", "--loss", str(loss), "--duration",
+                        str(a.duration), "--seed", str(loss + 1), "--run-id", run_id, "--tag", tag, "--out", out]
+                procs.append((tag, out, _spawn(ns, argv, os.path.join(stage, f"e4-{tag}.log"))))
+            runs.wait_all(procs)
+        aggregate = collate([out for _, out, _ in procs], manifest,
+                            expect={"run_id": run_id, "duration_s": a.duration})
+    except runs.RunFailed as e:
+        print(f"e4: {e}. Nothing was published; worker logs are in {stage}", file=sys.stderr)
+        return 1
+    finally:
+        for _, _, p in procs:
+            if p.poll() is None:
+                p.kill()
+    runs.publish(stage, os.path.join(results, "raw"), os.path.join(results, "e4_late_joiner.json"), aggregate)
+    return 0
+
+
+def collate(files: list[str], manifest: dict, expect: Optional[dict] = None) -> dict:
+    stats.km_selfcheck()
+    docs = {}
+    for path in files:
+        with open(path) as f:
+            docs[os.path.basename(path)] = json.load(f)
+    if not docs:
+        raise runs.RunFailed("no raw files to collate")
+    runs.check_consistent(docs, PROVENANCE, expect)
+    return {"experiment": "e4_late_joiner",
+            "manifest": {**manifest, "finished": stats.env()["date"], "raw_files": sorted(docs)},
+            "conditions": sorted(docs.values(), key=lambda d: d["loss_permille"])}
+
+
+DEFAULT_LOSSES = [0, 50, 300]
 
 
 def main() -> None:
@@ -416,15 +521,19 @@ def main() -> None:
     one.add_argument("--loss", type=int, default=0, help="permille, both directions")
     one.add_argument("--duration", type=float, default=600)
     one.add_argument("--seed", type=int, default=1)
+    one.add_argument("--run-id", default="adhoc")
+    one.add_argument("--tag", default="adhoc")
     one.add_argument("--out", required=True)
     al = sub.add_parser("all")
     al.add_argument("--duration", type=float, default=600)
-    al.add_argument("--losses", type=int, nargs="+", default=[0, 50, 300])
+    al.add_argument("--losses", type=int, nargs="+", default=DEFAULT_LOSSES)
+    al.add_argument("--results-dir", default=runs.RESULTS,
+                    help="where raw/ and e4_late_joiner.json are published (default: results/)")
     a = p.parse_args()
     if a.cmd == "one":
         stats.write_json(a.out, asyncio.run(condition(a)))
     else:
-        run_all(a)
+        sys.exit(run_all(a))
 
 
 if __name__ == "__main__":

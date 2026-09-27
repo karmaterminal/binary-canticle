@@ -1,5 +1,7 @@
 {
  "experiment": "e1_freshness",
+ "run_id": "20260927T200358Z-3157-1fe8",
+ "tag": "u0p5-lossdata200",
  "update_s": 0.5,
  "loss_permille": 200,
  "loss_direction": "data-only",
@@ -12,26 +14,26 @@
  "drain_s": 20,
  "outages": [],
  "nft": {
-  "offered": 270618,
-  "dropped_loss": 39955,
-  "eligible": 198921,
-  "measured_loss": 0.20086
+  "offered": 270736,
+  "dropped_loss": 39598,
+  "eligible": 198978,
+  "measured_loss": 0.19901
  },
  "snmp": {
-  "Tcp.OutSegs": 143282,
-  "Tcp.InSegs": 143274,
-  "Tcp.RetransSegs": 18016,
+  "Tcp.OutSegs": 143401,
+  "Tcp.InSegs": 143396,
+  "Tcp.RetransSegs": 17955,
   "Tcp.OutRsts": 0,
   "Tcp.EstabResets": 0,
-  "Udp.OutDatagrams": 109320,
-  "Udp.InDatagrams": 87389,
+  "Udp.OutDatagrams": 109380,
+  "Udp.InDatagrams": 87742,
   "Udp.RcvbufErrors": 0,
   "Udp.InErrors": 0,
-  "TcpExt.TCPTimeouts": 5645,
-  "TcpExt.TCPLossProbes": 12251,
-  "TcpExt.TCPLossProbeRecovery": 7757,
-  "TcpExt.TCPFastRetrans": 120,
-  "TcpExt.TCPSlowStartRetrans": 1,
+  "TcpExt.TCPTimeouts": 5545,
+  "TcpExt.TCPLossProbes": 12293,
+  "TcpExt.TCPLossProbeRecovery": 7824,
+  "TcpExt.TCPFastRetrans": 117,
+  "TcpExt.TCPSlowStartRetrans": 0,
   "TcpExt.TCPSpuriousRTOs": 0,
   "TcpExt.TCPAbortOnTimeout": 0,
   "TcpExt.TCPRetransFail": 0
@@ -40,55 +42,71 @@
   "udp-live": {
    "updates_measured": 1790,
    "samples": 35800,
-   "update_latency_ms": {
+   "delivered": 35800,
+   "censored": 0,
+   "delivered_fraction": 1.0,
+   "update_latency_km_ms": {
+    "n": 35800,
+    "events": 35800,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 1.3,
+    "p90": 501.4,
+    "p95": 502.7,
+    "p99": 1002.8,
+    "p99.9": 2001.1,
+    "max_event": 3500.2
+   },
+   "delivered_latency_ms": {
     "n": 35800,
     "unit": "ms",
-    "mean": 125.4,
+    "mean": 127.0,
     "median": 1.3,
-    "p90": 501.3,
-    "p95": 502.4,
-    "p99": 1002.4,
+    "p90": 501.4,
+    "p95": 502.7,
+    "p99": 1002.8,
     "p99.9": 2001.1,
-    "max": 3004.1,
-    "min": 0.2
+    "max": 3500.2,
+    "min": 0.2,
+    "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
-    "n": 28683,
+    "n": 28664,
     "unit": "ms",
-    "mean": 1.1,
-    "median": 1.0,
-    "p90": 1.7,
-    "p95": 2.0,
-    "p99": 2.6,
-    "p99.9": 9.7,
-    "max": 2001.3,
+    "mean": 1.4,
+    "median": 1.1,
+    "p90": 1.8,
+    "p95": 2.1,
+    "p99": 2.7,
+    "p99.9": 4.8,
+    "max": 2001.9,
     "min": 0.2
    },
-   "skipped_updates": 7117,
-   "censored": 0,
-   "stale_time_fraction": 0.200763,
+   "skipped_updates": 7136,
+   "stale_time_fraction": 0.201266,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
-    "p95": 469.5,
-    "p99": 967.7,
-    "p99.9": 1723.0,
-    "max": 3002.4
+    "p95": 473.8,
+    "p99": 978.6,
+    "p99.9": 1770.8,
+    "max": 3495.4
    },
-   "arrivals": 28842,
+   "arrivals": 28832,
    "superseded_deliveries": 0,
    "superseded_delivery_fraction": 0.0,
    "sender": {
-    "datagrams": 54500,
-    "item_datagrams": 36100,
-    "bytes": 14696480,
+    "datagrams": 54600,
+    "item_datagrams": 36120,
+    "bytes": 14715340,
     "errors": 0,
     "sing": [
      {
       "stream": "lens.state",
       "seq": 1,
-      "epoch": 1790532102,
-      "issued_at": 1790532103248,
-      "expires_at": 1790532283248,
+      "epoch": 1790539441,
+      "issued_at": 1790539442478,
+      "expires_at": 1790539622478,
       "ttl_s": 180.0,
       "loop_ms": 5000,
       "clamp": "none",
@@ -98,62 +116,78 @@
     ]
    },
    "receiver": {
-    "datagrams": 43605,
+    "datagrams": 43734,
     "evidence": {}
    }
   },
   "udp-ctl": {
    "updates_measured": 1790,
    "samples": 35800,
-   "update_latency_ms": {
+   "delivered": 35800,
+   "censored": 0,
+   "delivered_fraction": 1.0,
+   "update_latency_km_ms": {
     "n": 35800,
+    "events": 35800,
+    "censored": 0,
     "unit": "ms",
-    "mean": 127.6,
+    "method": "kaplan-meier",
     "median": 1.3,
     "p90": 501.3,
-    "p95": 502.6,
-    "p99": 1002.7,
-    "p99.9": 2001.0,
-    "max": 4001.6,
-    "min": 0.3
+    "p95": 502.4,
+    "p99": 1002.2,
+    "p99.9": 2000.8,
+    "max_event": 3501.2
+   },
+   "delivered_latency_ms": {
+    "n": 35800,
+    "unit": "ms",
+    "mean": 122.0,
+    "median": 1.3,
+    "p90": 501.3,
+    "p95": 502.4,
+    "p99": 1002.2,
+    "p99.9": 2000.7,
+    "max": 3501.2,
+    "min": 0.2,
+    "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
-    "n": 28592,
+    "n": 28786,
     "unit": "ms",
-    "mean": 1.3,
-    "median": 1.0,
-    "p90": 1.7,
-    "p95": 2.0,
-    "p99": 2.5,
-    "p99.9": 7.7,
-    "max": 4001.6,
-    "min": 0.3
+    "mean": 1.1,
+    "median": 1.1,
+    "p90": 1.8,
+    "p95": 2.1,
+    "p99": 2.6,
+    "p99.9": 5.7,
+    "max": 1001.9,
+    "min": 0.2
    },
-   "skipped_updates": 7208,
-   "censored": 0,
-   "stale_time_fraction": 0.203252,
+   "skipped_updates": 7014,
+   "stale_time_fraction": 0.197837,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
-    "p95": 473.4,
-    "p99": 976.0,
-    "p99.9": 1727.3,
-    "max": 3000.8
+    "p95": 460.4,
+    "p99": 947.7,
+    "p99.9": 1719.8,
+    "max": 3498.7
    },
-   "arrivals": 28756,
+   "arrivals": 28936,
    "superseded_deliveries": 0,
    "superseded_delivery_fraction": 0.0,
    "sender": {
-    "datagrams": 54820,
-    "item_datagrams": 36380,
-    "bytes": 14813080,
+    "datagrams": 54780,
+    "item_datagrams": 36360,
+    "bytes": 14803400,
     "errors": 0,
     "sing": [
      {
       "stream": "ctl.state",
       "seq": 1,
-      "epoch": 1790532102,
-      "issued_at": 1790532103248,
-      "expires_at": 1790532403248,
+      "epoch": 1790539441,
+      "issued_at": 1790539442478,
+      "expires_at": 1790539742478,
       "ttl_s": 300.0,
       "loop_ms": 1000,
       "clamp": "none",
@@ -163,72 +197,88 @@
     ]
    },
    "receiver": {
-    "datagrams": 43784,
+    "datagrams": 44008,
     "evidence": {}
    }
   },
   "tcp-stream": {
    "updates_measured": 1790,
    "samples": 35800,
-   "update_latency_ms": {
+   "delivered": 35800,
+   "censored": 0,
+   "delivered_fraction": 1.0,
+   "update_latency_km_ms": {
+    "n": 35800,
+    "events": 35800,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 1.2,
+    "p90": 210.0,
+    "p95": 349.6,
+    "p99": 838.8,
+    "p99.9": 3147.2,
+    "max_event": 13282.2
+   },
+   "delivered_latency_ms": {
     "n": 35800,
     "unit": "ms",
-    "mean": 90.1,
-    "median": 1.1,
-    "p90": 211.5,
-    "p95": 351.6,
-    "p99": 852.0,
-    "p99.9": 8665.6,
-    "max": 26564.4,
-    "min": 0.1
+    "mean": 72.3,
+    "median": 1.2,
+    "p90": 210.0,
+    "p95": 349.6,
+    "p99": 838.8,
+    "p99.9": 3147.2,
+    "max": 13282.2,
+    "min": 0.1,
+    "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
     "n": 35800,
     "unit": "ms",
-    "mean": 90.1,
-    "median": 1.1,
-    "p90": 211.5,
-    "p95": 351.6,
-    "p99": 852.0,
-    "p99.9": 8665.6,
-    "max": 26564.4,
+    "mean": 72.3,
+    "median": 1.2,
+    "p90": 210.0,
+    "p95": 349.6,
+    "p99": 838.8,
+    "p99.9": 3147.2,
+    "max": 13282.2,
     "min": 0.1
    },
    "skipped_updates": 0,
-   "censored": 0,
-   "stale_time_fraction": 0.117492,
+   "stale_time_fraction": 0.115698,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
-    "p95": 166.7,
-    "p99": 678.0,
-    "p99.9": 8673.2,
-    "max": 26563.6
+    "p95": 161.5,
+    "p99": 581.1,
+    "p99.9": 2869.7,
+    "max": 13277.3
    },
    "arrivals": 36000,
-   "superseded_deliveries": 769,
-   "superseded_delivery_fraction": 0.021361,
+   "superseded_deliveries": 683,
+   "superseded_delivery_fraction": 0.018972,
    "tcp": {
     "total_retrans": [
-     464,
-     427,
-     392,
-     497,
-     448,
-     436,
-     449,
-     450,
-     431,
-     439,
-     457,
-     465,
-     453,
-     427,
-     428,
+     441,
+     461,
+     445,
+     487,
      471,
-     470,
-     412,
-     510,
-     448
+     486,
+     428,
+     475,
+     418,
+     436,
+     474,
+     467,
+     427,
+     420,
+     452,
+     442,
+     450,
+     443,
+     460,
+     418
     ],
     "frames_written": null,
     "coalesced": null,
@@ -236,56 +286,62 @@
     "receiver_errors": [],
     "rejected_on_arrival": {},
     "loss_episodes": {
-     "count": 461,
-     "duration_ms": {
-      "n": 461,
+     "count": 438,
+     "open_at_end": 0,
+     "closed_duration_ms": {
+      "n": 438,
       "unit": "ms",
-      "mean": 717.3,
-      "median": 434.8,
-      "p90": 1264.2,
-      "p95": 1277.4,
-      "p99": 2937.1,
-      "p99.9": 17171.8,
-      "max": 26354.0,
-      "min": 392.2
+      "mean": 663.9,
+      "median": 433.2,
+      "p90": 1259.8,
+      "p95": 1272.5,
+      "p99": 2932.8,
+      "p99.9": 10085.8,
+      "max": 13076.0,
+      "min": 20.7
      },
      "max_backoff_hist": {
-      "1": 364,
-      "2": 83,
-      "3": 11,
-      "4": 2,
-      "6": 1
+      "1": 353,
+      "2": 71,
+      "3": 12,
+      "4": 1,
+      "5": 1
      },
      "longest": [
       {
-       "dur_ms": 26354.0,
-       "max_backoff": 6,
-       "max_rto_ms": 13056.0,
-       "start": 595.724
+       "dur_ms": 13076.0,
+       "max_backoff": 5,
+       "max_rto_ms": 6528.0,
+       "start": 789.216,
+       "open_at_end": false
       },
       {
-       "dur_ms": 6392.8,
+       "dur_ms": 6233.5,
        "max_backoff": 4,
        "max_rto_ms": 3264.0,
-       "start": 863.227
+       "start": 130.726,
+       "open_at_end": false
       },
       {
-       "dur_ms": 6379.7,
-       "max_backoff": 4,
-       "max_rto_ms": 3264.0,
-       "start": 881.928
-      },
-      {
-       "dur_ms": 2940.6,
+       "dur_ms": 2939.5,
        "max_backoff": 3,
        "max_rto_ms": 1632.0,
-       "start": 544.425
+       "start": 224.221,
+       "open_at_end": false
       },
       {
-       "dur_ms": 2937.7,
+       "dur_ms": 2939.4,
        "max_backoff": 3,
        "max_rto_ms": 1632.0,
-       "start": 737.927
+       "start": 224.221,
+       "open_at_end": false
+      },
+      {
+       "dur_ms": 2933.8,
+       "max_backoff": 3,
+       "max_rto_ms": 1632.0,
+       "start": 231.227,
+       "open_at_end": false
       }
      ]
     }
@@ -301,7 +357,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 8.927,
+     "t": 48.23,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -310,43 +366,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 9.345,
-     "rto_ms": 816.0,
-     "backoff": 2,
-     "retransmits": 2,
-     "unacked": 1,
-     "notsent_bytes": 329,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 10.161,
-     "rto_ms": 1632.0,
-     "backoff": 3,
-     "retransmits": 3,
-     "unacked": 1,
-     "notsent_bytes": 987,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 11.847,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 20.224,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 20.666,
+     "t": 48.669,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -355,7 +375,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 21.5,
+     "t": 49.493,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -364,7 +384,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 22.932,
+     "t": 52.221,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -373,7 +393,25 @@
      "ca_state": "Loss"
     },
     {
-     "t": 23.353,
+     "t": 52.662,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 53.226,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 53.667,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -382,7 +420,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 55.422,
+     "t": 72.733,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -391,25 +429,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 55.862,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 153.222,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 153.663,
+     "t": 73.148,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -418,7 +438,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 171.925,
+     "t": 125.931,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -427,43 +447,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 172.347,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 176.433,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 176.87,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 211.23,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 211.669,
+     "t": 126.368,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -472,7 +456,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 223.925,
+     "t": 134.925,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -481,7 +465,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 224.343,
+     "t": 135.347,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -490,7 +474,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 225.183,
+     "t": 136.177,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -499,7 +483,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 228.426,
+     "t": 171.217,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -508,7 +492,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 228.864,
+     "t": 171.642,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -517,7 +501,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 246.931,
+     "t": 233.436,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -526,7 +510,43 @@
      "ca_state": "Loss"
     },
     {
-     "t": 247.348,
+     "t": 233.84,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 240.935,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 241.37,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 263.926,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 264.333,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -535,7 +555,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 262.929,
+     "t": 303.736,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -544,7 +564,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 263.364,
+     "t": 304.146,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -553,7 +573,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 360.221,
+     "t": 369.727,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -562,7 +582,115 @@
      "ca_state": "Loss"
     },
     {
-     "t": 360.678,
+     "t": 370.179,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 374.721,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 375.159,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 474.743,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 475.165,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 483.418,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 483.854,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 494.928,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 495.364,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 531.94,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 532.343,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 576.918,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 577.367,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -571,7 +699,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 361.522,
+     "t": 578.2,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -580,7 +708,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 392.22,
+     "t": 630.428,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -589,25 +717,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 392.663,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 433.931,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 434.364,
+     "t": 630.87,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -616,7 +726,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 442.24,
+     "t": 681.928,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -625,7 +735,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 442.66,
+     "t": 682.349,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -634,7 +744,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 508.719,
+     "t": 712.226,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -643,7 +753,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 509.137,
+     "t": 712.664,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -652,7 +762,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 518.731,
+     "t": 714.723,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -661,61 +771,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 519.166,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 524.929,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 525.369,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 552.431,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 552.869,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 593.932,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 594.367,
+     "t": 715.162,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -724,214 +780,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 595.201,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 595.724,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 596.159,
-     "rto_ms": 816.0,
-     "backoff": 2,
-     "retransmits": 2,
-     "unacked": 1,
-     "notsent_bytes": 331,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 596.977,
-     "rto_ms": 1632.0,
-     "backoff": 3,
-     "retransmits": 3,
-     "unacked": 1,
-     "notsent_bytes": 662,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 598.652,
-     "rto_ms": 3264.0,
-     "backoff": 4,
-     "retransmits": 4,
-     "unacked": 1,
-     "notsent_bytes": 1986,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 602.099,
-     "rto_ms": 6528.0,
-     "backoff": 5,
-     "retransmits": 5,
-     "unacked": 1,
-     "notsent_bytes": 4303,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 608.762,
-     "rto_ms": 13056.0,
-     "backoff": 6,
-     "retransmits": 6,
-     "unacked": 1,
-     "notsent_bytes": 8606,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 622.078,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 3,
-     "notsent_bytes": 0,
-     "ca_state": "Recovery"
-    },
-    {
-     "t": 622.304,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 3,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 622.72,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 694.723,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 695.163,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 729.428,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 729.846,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 743.232,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 743.645,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 823.722,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 824.165,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 830.926,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 831.35,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 836.728,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 837.161,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 864.727,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 865.144,
+     "t": 715.997,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -944,128 +793,151 @@
   "tcp-latest": {
    "updates_measured": 1790,
    "samples": 35800,
-   "update_latency_ms": {
+   "delivered": 35800,
+   "censored": 0,
+   "delivered_fraction": 1.0,
+   "update_latency_km_ms": {
+    "n": 35800,
+    "events": 35800,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 1.2,
+    "p90": 210.1,
+    "p95": 354.9,
+    "p99": 854.3,
+    "p99.9": 9119.2,
+    "max_event": 26618.6
+   },
+   "delivered_latency_ms": {
     "n": 35800,
     "unit": "ms",
-    "mean": 77.6,
-    "median": 1.1,
-    "p90": 211.5,
-    "p95": 364.2,
-    "p99": 856.1,
-    "p99.9": 4323.7,
-    "max": 6840.1,
-    "min": 0.2
+    "mean": 91.1,
+    "median": 1.2,
+    "p90": 210.1,
+    "p95": 354.9,
+    "p99": 854.3,
+    "p99.9": 8719.8,
+    "max": 26618.6,
+    "min": 0.2,
+    "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
-    "n": 35616,
+    "n": 35620,
     "unit": "ms",
-    "mean": 67.6,
-    "median": 1.1,
-    "p90": 211.3,
-    "p95": 330.6,
-    "p99": 836.2,
-    "p99.9": 2824.4,
-    "max": 6840.1,
+    "mean": 66.9,
+    "median": 1.2,
+    "p90": 209.7,
+    "p95": 236.4,
+    "p99": 834.0,
+    "p99.9": 2720.2,
+    "max": 26618.6,
     "min": 0.2
    },
-   "skipped_updates": 184,
-   "censored": 0,
-   "stale_time_fraction": 0.118151,
+   "skipped_updates": 180,
+   "stale_time_fraction": 0.117078,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
-    "p95": 169.0,
-    "p99": 712.1,
-    "p99.9": 4157.7,
-    "max": 6837.0
+    "p95": 166.6,
+    "p99": 698.7,
+    "p99.9": 8726.0,
+    "max": 26616.4
    },
-   "arrivals": 35815,
-   "superseded_deliveries": 617,
-   "superseded_delivery_fraction": 0.017227,
+   "arrivals": 35820,
+   "superseded_deliveries": 590,
+   "superseded_delivery_fraction": 0.016471,
    "tcp": {
     "total_retrans": [
-     466,
-     444,
-     420,
+     456,
+     467,
+     429,
+     469,
+     441,
+     455,
+     443,
+     440,
      468,
-     462,
-     460,
-     448,
-     446,
-     459,
-     451,
-     452,
-     422,
+     444,
+     432,
+     456,
+     467,
+     464,
+     427,
      461,
-     414,
-     471,
-     453,
      442,
-     465,
-     498,
-     440
+     444,
+     426,
+     423
     ],
-    "frames_written": 35815,
-    "coalesced": 185,
+    "frames_written": 35820,
+    "coalesced": 180,
     "sender_errors": [],
     "receiver_errors": [],
     "rejected_on_arrival": {},
     "loss_episodes": {
-     "count": 457,
-     "duration_ms": {
-      "n": 457,
+     "count": 450,
+     "open_at_end": 0,
+     "closed_duration_ms": {
+      "n": 450,
       "unit": "ms",
-      "mean": 746.4,
-      "median": 435.2,
-      "p90": 1267.3,
-      "p95": 1291.5,
-      "p99": 6276.0,
-      "p99.9": 6418.8,
-      "max": 6433.4,
-      "min": 397.7
+      "mean": 744.8,
+      "median": 434.5,
+      "p90": 1266.5,
+      "p95": 1293.4,
+      "p99": 2945.8,
+      "p99.9": 17243.9,
+      "max": 26199.4,
+      "min": 20.8
      },
      "max_backoff_hist": {
-      "1": 352,
-      "2": 84,
-      "3": 14,
-      "4": 7
+      "1": 357,
+      "2": 71,
+      "3": 19,
+      "4": 2,
+      "6": 1
      },
      "longest": [
       {
-       "dur_ms": 6433.4,
-       "max_backoff": 4,
-       "max_rto_ms": 3264.0,
-       "start": 755.428
+       "dur_ms": 26199.4,
+       "max_backoff": 6,
+       "max_rto_ms": 13056.0,
+       "start": 502.428,
+       "open_at_end": false
       },
       {
-       "dur_ms": 6401.4,
+       "dur_ms": 6254.0,
        "max_backoff": 4,
        "max_rto_ms": 3264.0,
-       "start": 7.925
+       "start": 278.927,
+       "open_at_end": false
       },
       {
-       "dur_ms": 6344.8,
+       "dur_ms": 6222.2,
        "max_backoff": 4,
        "max_rto_ms": 3264.0,
-       "start": 15.925
+       "start": 706.73,
+       "open_at_end": false
       },
       {
-       "dur_ms": 6338.3,
-       "max_backoff": 4,
-       "max_rto_ms": 3264.0,
-       "start": 806.725
+       "dur_ms": 2946.7,
+       "max_backoff": 3,
+       "max_rto_ms": 1632.0,
+       "start": 776.92,
+       "open_at_end": false
       },
       {
-       "dur_ms": 6311.1,
-       "max_backoff": 4,
-       "max_rto_ms": 3264.0,
-       "start": 67.931
+       "dur_ms": 2946.6,
+       "max_backoff": 3,
+       "max_rto_ms": 1632.0,
+       "start": 897.432,
+       "open_at_end": false
       }
      ]
     }
    },
    "tcp_info_trace_conn0": [
     {
-     "t": -0.999,
+     "t": -0.998,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1074,7 +946,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 3.928,
+     "t": 24.926,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1083,7 +955,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 4.344,
+     "t": 25.37,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1092,7 +964,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 26.728,
+     "t": 60.428,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1101,7 +973,97 @@
      "ca_state": "Loss"
     },
     {
-     "t": 27.167,
+     "t": 60.85,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 184.932,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 185.367,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 240.43,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 240.853,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 250.927,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 251.347,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 260.925,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 261.371,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 279.722,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 280.145,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1110,7 +1072,25 @@
      "ca_state": "Open"
     },
     {
-     "t": 30.722,
+     "t": 280.526,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 2,
+     "notsent_bytes": 0,
+     "ca_state": "Recovery"
+    },
+    {
+     "t": 280.715,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 337.23,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1119,25 +1099,259 @@
      "ca_state": "Loss"
     },
     {
-     "t": 31.152,
+     "t": 337.664,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 348.219,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 348.662,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 366.428,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 366.865,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 384.223,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 384.666,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 391.72,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 392.146,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 400.428,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 400.852,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
      "unacked": 1,
-     "notsent_bytes": 330,
+     "notsent_bytes": 331,
      "ca_state": "Loss"
     },
     {
-     "t": 32.02,
+     "t": 401.686,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 408.919,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 409.375,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 411.428,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 411.869,
+     "rto_ms": 816.0,
+     "backoff": 2,
+     "retransmits": 2,
+     "unacked": 1,
+     "notsent_bytes": 331,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 412.684,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 413.919,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 414.358,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 466.724,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 467.164,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 512.229,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 512.662,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 514.423,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 514.444,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 575.226,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 575.64,
+     "rto_ms": 816.0,
+     "backoff": 2,
+     "retransmits": 2,
+     "unacked": 1,
+     "notsent_bytes": 331,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 576.478,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
      "unacked": 1,
-     "notsent_bytes": 330,
+     "notsent_bytes": 331,
      "ca_state": "Loss"
     },
     {
-     "t": 33.661,
+     "t": 578.138,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1146,7 +1360,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 34.936,
+     "t": 595.431,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1155,79 +1369,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 35.368,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 78.929,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 79.365,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 103.416,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 103.868,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 151.428,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 151.867,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 156.931,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 157.349,
+     "t": 595.865,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1236,7 +1378,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 158.161,
+     "t": 596.689,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1245,7 +1387,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 180.423,
+     "t": 610.925,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1254,25 +1396,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 180.868,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 192.932,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 193.33,
+     "t": 611.354,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1281,7 +1405,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 213.727,
+     "t": 747.925,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1290,7 +1414,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 214.139,
+     "t": 748.346,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1299,7 +1423,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 233.926,
+     "t": 790.727,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1308,7 +1432,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 234.353,
+     "t": 791.16,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1317,7 +1441,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 357.424,
+     "t": 795.725,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1326,7 +1450,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 357.842,
+     "t": 796.161,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1335,7 +1459,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 360.426,
+     "t": 802.728,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1344,7 +1468,115 @@
      "ca_state": "Loss"
     },
     {
-     "t": 360.863,
+     "t": 803.162,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 810.428,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 810.87,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 846.73,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 847.162,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 850.425,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 850.879,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 865.222,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 865.661,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 872.43,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 872.851,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 892.933,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 893.377,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1353,385 +1585,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 361.686,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 422.925,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 423.362,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 427.924,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 428.36,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 441.218,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 441.663,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 485.721,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 486.148,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 499.437,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 499.868,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 510.931,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 511.361,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 523.227,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 523.643,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 562.426,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 562.844,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 570.728,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 571.16,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 601.425,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 601.852,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 636.421,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 636.855,
-     "rto_ms": 816.0,
-     "backoff": 2,
-     "retransmits": 2,
-     "unacked": 1,
-     "notsent_bytes": 331,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 637.7,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 662.22,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 662.657,
-     "rto_ms": 816.0,
-     "backoff": 2,
-     "retransmits": 2,
-     "unacked": 1,
-     "notsent_bytes": 331,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 663.475,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 684.422,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 684.865,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 687.432,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 687.865,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 718.924,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 719.355,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 742.429,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 742.854,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 796.931,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 797.348,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 865.72,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 866.137,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 878.433,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 878.843,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 881.432,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 881.846,
+     "t": 894.205,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1752,6 +1606,6 @@
   "tcp_rmem": "4096\t131072\t33554432",
   "tcp_wmem": "4096\t16384\t4194304",
   "rmem_max": "4194304",
-  "date": "2026-09-27T18:17:24Z"
+  "date": "2026-09-27T20:19:43Z"
  }
 }

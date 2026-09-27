@@ -10,7 +10,8 @@
 //	fanout recv -mode mcast -n 1000 -group 239.255.13.13:9999 -ifaddr 10.77.0.2
 //
 // The sender prints "ready" once every listener is attached, then a JSON
-// summary on exit. Only the standard library is used; sendmmsg is called
+// summary on exit. Its enqueue_all_* fields time the sender's own loop over
+// the N listeners (sender enqueue time), not delivery to them. Only the standard library is used; sendmmsg is called
 // through syscall.Syscall6.
 package main
 
@@ -75,9 +76,13 @@ type sendStats struct {
 	Bytes       int64   `json:"bytes"`
 	Errors      int64   `json:"errors"`
 	Short       int64   `json:"short_writes"`
-	SpreadP50us float64 `json:"fanout_spread_p50_us"`
-	SpreadP99us float64 `json:"fanout_spread_p99_us"`
-	SpreadMaxus float64 `json:"fanout_spread_max_us"`
+	// Sender enqueue time for one frame to all N listeners: how long the
+	// push() loop (write / sendmmsg / sendto) took, on the sender's clock.
+	// It is not when the last listener received the frame: there are no
+	// receiver timestamps, so arrival spread is not measured.
+	EnqueueAllP50us float64 `json:"enqueue_all_p50_us"`
+	EnqueueAllP99us float64 `json:"enqueue_all_p99_us"`
+	EnqueueAllMaxus float64 `json:"enqueue_all_max_us"`
 	Late        int     `json:"late_ticks"`
 }
 
@@ -107,12 +112,12 @@ func send() {
 	fmt.Println("ready")
 	period := time.Duration(float64(time.Second) / *rate)
 	deadline := time.Now().Add(*duration)
-	spreads := make([]float64, 0, int(duration.Seconds()**rate)+1)
+	enqueue := make([]float64, 0, int(duration.Seconds()**rate)+1) // µs to hand one frame to the kernel for all N
 	next := time.Now()
 	for time.Now().Before(deadline) {
 		t0 := time.Now()
 		push()
-		spreads = append(spreads, float64(time.Since(t0).Microseconds()))
+		enqueue = append(enqueue, float64(time.Since(t0).Microseconds()))
 		st.Frames++
 		next = next.Add(period)
 		if d := time.Until(next); d > 0 {
@@ -121,11 +126,11 @@ func send() {
 			st.Late++
 		}
 	}
-	sort.Float64s(spreads)
-	if len(spreads) > 0 {
-		st.SpreadP50us = spreads[len(spreads)/2]
-		st.SpreadP99us = spreads[len(spreads)*99/100]
-		st.SpreadMaxus = spreads[len(spreads)-1]
+	sort.Float64s(enqueue)
+	if len(enqueue) > 0 {
+		st.EnqueueAllP50us = enqueue[len(enqueue)/2]
+		st.EnqueueAllP99us = enqueue[len(enqueue)*99/100]
+		st.EnqueueAllMaxus = enqueue[len(enqueue)-1]
 	}
 	json.NewEncoder(os.Stdout).Encode(st)
 }

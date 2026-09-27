@@ -11,7 +11,7 @@ in [`results/`](results/).
 | # | Script | Question |
 |---|---|---|
 | E1 | `e1_freshness.py` | How stale is a superseding live-state value at each receiver, under Bernoulli loss (0-30%) and outages (1, 3, 10 s)? Where does TCP's head-of-line blocking and RTO backoff show? |
-| E2 | `e2_fanout.py` + `fanout/` (Go) | What does it cost a relay, per listener, to push one 700 B frame at 10 frames/s to N = 10…5 000 listeners over TCP, UDP unicast (sendmmsg) and UDP multicast? |
+| E2 | `e2_fanout.py` + `fanout/` (Go) | What does it cost a relay, per listener, to push one 700 B frame at 10 frames/s to N = 10…5 000 listeners over TCP, UDP unicast (sendmmsg) and UDP multicast? Also: the sender enqueue time for one frame to all N listeners (not arrival: there are no receiver timestamps). |
 | E3 | `e3_consumers.py` | What does one slow or dead listener out of 100 do to a TCP sender (blocking, queued, dropping, disconnecting) versus a UDP sender and a UDP lease? |
 | E4 | `e4_late_joiner.py` | How long until a late joiner holds all 20 live items: passive carousel, TCP connect + snapshot, or a relay lease + snapshot? |
 | E5 | `e5_reconnect_storm.py` | 1 000 listeners after a relay restart: TCP reconnect versus UDP lease re-establishment. |
@@ -29,9 +29,29 @@ sudo PYTHON=$PWD/.venv/bin/python ./run_all.sh e4     # one experiment (e1 … e
 ```
 
 Every script also runs on its own (`--help`). E1 and E4 write one raw file per
-condition to `results/raw/` and a collated file to `results/`. Namespaces are
-named `pd-*` and are always deleted, also on error; `run_all.sh` deletes any
-left over from an interrupted run before it starts.
+condition and a collated file. Each invocation writes into a fresh staging
+directory (`results/.staging/`); only if every condition exits 0 and every raw
+file agrees on run id, duration and configuration are the raw files moved into
+`results/raw/` and the aggregate written, with a manifest (git commit, whether
+the tree was dirty, a sha256 of the harness and canticle sources, argv, the
+condition list, testbed facts). Otherwise nothing under `results/` changes and
+the script, and `run_all.sh`, exit nonzero. A partial run (`e1 … --only`, or
+`e4 … --losses` other than the default) must name its own `--results-dir`.
+
+Namespaces are named with a per-run prefix, `PD_NS_PREFIX` (`run_all.sh` sets
+`pd<its pid>-`; a script run alone uses `pd<its pid>-`). The harness never
+reuses or deletes a namespace it did not create: creation fails if the name
+exists, and each script deletes only its own, also on error. `run_all.sh`
+records every namespace its run creates and on exit deletes exactly those that
+are left (for example after a script was killed). If `run_all.sh` itself is
+killed with SIGKILL, remove its leftovers by prefix (`ip netns list`).
+
+Tests that need neither root nor namespaces (Kaplan–Meier, E1 censoring, the
+staging and failure rules, E4 lease keying, namespace ownership):
+
+```sh
+PYTHONPATH=../canticle-station python -m unittest discover -s tests -v
+```
 
 Code layout:
 
@@ -42,7 +62,9 @@ Code layout:
   `canticle.listener.Listener`. `frame_for()` signs TCP payloads through the
   same `Station.sing` path;
 - `harness/tcpinfo.py`: decodes `struct tcp_info` (RTO, backoff, retransmits, queues);
-- `harness/stats.py`: percentiles and testbed facts;
+- `harness/stats.py`: percentiles, Kaplan–Meier quantiles for right-censored
+  durations (with a self-check against a hand-computed example), testbed facts;
+- `harness/runs.py`: staging, publish-on-success and the run manifest for E1 and E4;
 - `fanout/main.go`: the E2 sender and receivers (standard library only; `sendmmsg` via `syscall.Syscall6`).
 
 ## Testbed
@@ -76,6 +98,17 @@ Measured on 2026-09-27:
   retransmission can carry a whole backlog, and the send buffer autotunes
   straight to 4 MiB. An earlier E1 pass at MTU 65536 was discarded for that
   reason.
+- **Censoring.** In E1 an update a receiver had not caught up to when the run
+  ended (20 s after the last update) has no observed latency, only a lower
+  bound; the same holds for outage recovery and for E4 joins that timed out or
+  were cut off by the end of the run. These are right-censored: latency
+  quantiles are Kaplan–Meier estimates, reported next to the delivered
+  fraction, and a quantile the estimate never reaches is reported as beyond
+  the largest time observed (delivered latency or censoring time). Kaplan–Meier assumes that when a sample is censored
+  says nothing about its latency. Here censoring is set by issue time, but
+  under TCP's long stalls consecutive updates share one stall, so the tails
+  are estimates, not exact percentiles. The time-weighted staleness measures
+  need no such correction: they are the state of each receiver at each instant.
 - **Python harness.** The canticle arms verify an Ed25519 signature on every
   datagram in Python. Medians around 1 ms at 0% loss are harness time (four
   arms publish in turn, in random order), not network time.

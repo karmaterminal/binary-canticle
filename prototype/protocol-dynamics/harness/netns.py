@@ -13,6 +13,13 @@ lossy radio link. The ``output`` hook is not used because a drop there makes
 ``sendto()`` fail with EPERM, which a real lossy link never does.
 
 There is no delay emulation: RTT on ``lo`` is tens of microseconds.
+
+Namespace names carry a per-run prefix, ``PD_NS_PREFIX`` (``run_all.sh``
+sets ``pd<its pid>-``; a script run on its own defaults to ``pd<pid>-``).
+This module creates namespaces only under fresh names (``ip netns add`` fails
+if the name exists) and deletes only the ones it created. When ``PD_NS_TRACK``
+names a file, every namespace created is appended to it, so ``run_all.sh`` can
+delete exactly what its run made even if a script was killed.
 """
 
 from __future__ import annotations
@@ -25,6 +32,9 @@ from typing import Iterator, Optional
 
 TABLE = "lossy"
 CHAIN = "inp"
+PREFIX = os.environ.get("PD_NS_PREFIX") or f"pd{os.getpid()}-"
+TRACK = os.environ.get("PD_NS_TRACK")
+_created: set[str] = set()
 
 
 def run(*argv: str, check: bool = True) -> str:
@@ -35,22 +45,33 @@ def ns_exec(ns: str, *argv: str) -> list[str]:
     return ["ip", "netns", "exec", ns, *argv]
 
 
-def cleanup(prefix: str = "pd-") -> list[str]:
-    """Delete leftover namespaces from an earlier, interrupted run."""
-    gone = []
-    for line in run("ip", "netns", "list").splitlines():
-        name = line.split()[0] if line.strip() else ""
-        if name.startswith(prefix):
-            run("ip", "netns", "del", name, check=False)
-            gone.append(name)
-    return gone
+def name(suffix: str) -> str:
+    """This run's name for a namespace, e.g. ``pd4242-e1-u2-loss50``."""
+    return PREFIX + suffix
+
+
+def add(ns: str) -> str:
+    """Create namespace ``ns``. Raises if it already exists: another run's namespace is never adopted."""
+    run("ip", "netns", "add", ns)
+    _created.add(ns)
+    if TRACK:
+        with open(TRACK, "a") as f:
+            f.write(ns + "\n")
+    return ns
+
+
+def delete(ns: str) -> None:
+    """Delete ``ns`` if this process created it; anything else is left alone."""
+    if ns in _created:
+        run("ip", "netns", "del", ns, check=False)
+        _created.discard(ns)
 
 
 LO_MTU = 1500
 
 
 @contextlib.contextmanager
-def netns(name: str) -> Iterator[str]:
+def netns(ns: str) -> Iterator[str]:
     """A fresh namespace with ``lo`` up at MTU 1500; always deleted on the way out.
 
     The default ``lo`` MTU of 65536 gives TCP a 64 KiB MSS, which lets one
@@ -58,13 +79,12 @@ def netns(name: str) -> Iterator[str]:
     buffer straight to ``tcp_wmem[2]`` (4 MiB here). MTU 1500 gives the MSS
     (1448 with timestamps) and buffer sizes of an Ethernet path.
     """
-    run("ip", "netns", "del", name, check=False)
-    run("ip", "netns", "add", name)
+    add(ns)
     try:
-        run(*ns_exec(name, "ip", "link", "set", "lo", "mtu", str(LO_MTU), "up"))
-        yield name
+        run(*ns_exec(ns, "ip", "link", "set", "lo", "mtu", str(LO_MTU), "up"))
+        yield ns
     finally:
-        run("ip", "netns", "del", name, check=False)
+        delete(ns)
 
 
 class Lossy:

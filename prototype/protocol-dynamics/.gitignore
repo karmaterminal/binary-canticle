@@ -1,3 +1,5 @@
 fanout/fanout
 results/raw/*.log
 __pycache__/
+results/.staging/
+results/*.failed.json

@@ -1,5 +1,7 @@
 {
  "experiment": "e1_freshness",
+ "run_id": "20260927T200358Z-3157-1fe8",
+ "tag": "u0p5-loss0",
  "update_s": 0.5,
  "loss_permille": 0,
  "loss_direction": "both",
@@ -39,55 +41,71 @@
   "udp-live": {
    "updates_measured": 1790,
    "samples": 35800,
-   "update_latency_ms": {
+   "delivered": 35800,
+   "censored": 0,
+   "delivered_fraction": 1.0,
+   "update_latency_km_ms": {
+    "n": 35800,
+    "events": 35800,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 1.1,
+    "p90": 1.8,
+    "p95": 2.1,
+    "p99": 2.7,
+    "p99.9": 5.2,
+    "max_event": 12.4
+   },
+   "delivered_latency_ms": {
     "n": 35800,
     "unit": "ms",
     "mean": 1.1,
     "median": 1.1,
-    "p90": 1.7,
-    "p95": 2.0,
-    "p99": 2.5,
-    "p99.9": 4.5,
-    "max": 10.3,
-    "min": 0.2
+    "p90": 1.8,
+    "p95": 2.1,
+    "p99": 2.7,
+    "p99.9": 5.2,
+    "max": 12.4,
+    "min": 0.2,
+    "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
     "n": 35800,
     "unit": "ms",
     "mean": 1.1,
     "median": 1.1,
-    "p90": 1.7,
-    "p95": 2.0,
-    "p99": 2.5,
-    "p99.9": 4.5,
-    "max": 10.3,
+    "p90": 1.8,
+    "p95": 2.1,
+    "p99": 2.7,
+    "p99.9": 5.2,
+    "max": 12.4,
     "min": 0.2
    },
    "skipped_updates": 0,
-   "censored": 0,
-   "stale_time_fraction": 0.00205,
+   "stale_time_fraction": 0.002044,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
     "p95": 0.0,
     "p99": 0.0,
     "p99.9": 0.6,
-    "max": 8.5
+    "max": 12.1
    },
    "arrivals": 36000,
    "superseded_deliveries": 0,
    "superseded_delivery_fraction": 0.0,
    "sender": {
-    "datagrams": 54520,
-    "item_datagrams": 36100,
-    "bytes": 14699440,
+    "datagrams": 54480,
+    "item_datagrams": 36120,
+    "bytes": 14696880,
     "errors": 0,
     "sing": [
      {
       "stream": "lens.state",
       "seq": 1,
-      "epoch": 1790532101,
-      "issued_at": 1790532102616,
-      "expires_at": 1790532282616,
+      "epoch": 1790539439,
+      "issued_at": 1790539440812,
+      "expires_at": 1790539620812,
       "ttl_s": 180.0,
       "loop_ms": 5000,
       "clamp": "none",
@@ -97,24 +115,41 @@
     ]
    },
    "receiver": {
-    "datagrams": 54520,
+    "datagrams": 54480,
     "evidence": {}
    }
   },
   "udp-ctl": {
    "updates_measured": 1790,
    "samples": 35800,
-   "update_latency_ms": {
+   "delivered": 35800,
+   "censored": 0,
+   "delivered_fraction": 1.0,
+   "update_latency_km_ms": {
+    "n": 35800,
+    "events": 35800,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 1.1,
+    "p90": 1.7,
+    "p95": 2.1,
+    "p99": 2.7,
+    "p99.9": 4.7,
+    "max_event": 12.2
+   },
+   "delivered_latency_ms": {
     "n": 35800,
     "unit": "ms",
     "mean": 1.1,
     "median": 1.1,
     "p90": 1.7,
     "p95": 2.1,
-    "p99": 2.8,
-    "p99.9": 5.7,
-    "max": 11.0,
-    "min": 0.2
+    "p99": 2.7,
+    "p99.9": 4.7,
+    "max": 12.2,
+    "min": 0.2,
+    "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
     "n": 35800,
@@ -123,36 +158,35 @@
     "median": 1.1,
     "p90": 1.7,
     "p95": 2.1,
-    "p99": 2.8,
-    "p99.9": 5.7,
-    "max": 11.0,
+    "p99": 2.7,
+    "p99.9": 4.7,
+    "max": 12.2,
     "min": 0.2
    },
    "skipped_updates": 0,
-   "censored": 0,
-   "stale_time_fraction": 0.002068,
+   "stale_time_fraction": 0.002048,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
     "p95": 0.0,
     "p99": 0.0,
-    "p99.9": 0.6,
-    "max": 7.6
+    "p99.9": 0.7,
+    "max": 12.1
    },
    "arrivals": 36000,
    "superseded_deliveries": 0,
    "superseded_delivery_fraction": 0.0,
    "sender": {
-    "datagrams": 54760,
+    "datagrams": 54800,
     "item_datagrams": 36360,
-    "bytes": 14800320,
+    "bytes": 14806580,
     "errors": 0,
     "sing": [
      {
       "stream": "ctl.state",
       "seq": 1,
-      "epoch": 1790532101,
-      "issued_at": 1790532102616,
-      "expires_at": 1790532402616,
+      "epoch": 1790539439,
+      "issued_at": 1790539440812,
+      "expires_at": 1790539740812,
       "ttl_s": 300.0,
       "loop_ms": 1000,
       "clamp": "none",
@@ -162,24 +196,41 @@
     ]
    },
    "receiver": {
-    "datagrams": 54760,
+    "datagrams": 54800,
     "evidence": {}
    }
   },
   "tcp-stream": {
    "updates_measured": 1790,
    "samples": 35800,
-   "update_latency_ms": {
+   "delivered": 35800,
+   "censored": 0,
+   "delivered_fraction": 1.0,
+   "update_latency_km_ms": {
+    "n": 35800,
+    "events": 35800,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 1.0,
+    "p90": 1.6,
+    "p95": 1.9,
+    "p99": 2.7,
+    "p99.9": 5.2,
+    "max_event": 12.9
+   },
+   "delivered_latency_ms": {
     "n": 35800,
     "unit": "ms",
     "mean": 1.0,
     "median": 1.0,
     "p90": 1.6,
-    "p95": 1.8,
-    "p99": 2.4,
-    "p99.9": 4.1,
-    "max": 8.2,
-    "min": 0.1
+    "p95": 1.9,
+    "p99": 2.7,
+    "p99.9": 5.2,
+    "max": 12.9,
+    "min": 0.2,
+    "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
     "n": 35800,
@@ -187,21 +238,20 @@
     "mean": 1.0,
     "median": 1.0,
     "p90": 1.6,
-    "p95": 1.8,
-    "p99": 2.4,
-    "p99.9": 4.1,
-    "max": 8.2,
-    "min": 0.1
+    "p95": 1.9,
+    "p99": 2.7,
+    "p99.9": 5.2,
+    "max": 12.9,
+    "min": 0.2
    },
    "skipped_updates": 0,
-   "censored": 0,
-   "stale_time_fraction": 0.001875,
+   "stale_time_fraction": 0.001947,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
     "p95": 0.0,
     "p99": 0.0,
     "p99.9": 0.5,
-    "max": 6.8
+    "max": 12.1
    },
    "arrivals": 36000,
    "superseded_deliveries": 0,
@@ -236,7 +286,8 @@
     "rejected_on_arrival": {},
     "loss_episodes": {
      "count": 0,
-     "duration_ms": {
+     "open_at_end": 0,
+     "closed_duration_ms": {
       "n": 0,
       "unit": "ms"
      },
@@ -246,7 +297,7 @@
    },
    "tcp_info_trace_conn0": [
     {
-     "t": -0.999,
+     "t": -0.998,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -259,39 +310,55 @@
   "tcp-latest": {
    "updates_measured": 1790,
    "samples": 35800,
-   "update_latency_ms": {
+   "delivered": 35800,
+   "censored": 0,
+   "delivered_fraction": 1.0,
+   "update_latency_km_ms": {
     "n": 35800,
+    "events": 35800,
+    "censored": 0,
     "unit": "ms",
-    "mean": 1.0,
+    "method": "kaplan-meier",
     "median": 1.0,
-    "p90": 1.5,
+    "p90": 1.6,
     "p95": 1.8,
     "p99": 2.3,
-    "p99.9": 4.1,
-    "max": 6.9,
-    "min": 0.2
+    "p99.9": 5.7,
+    "max_event": 99.2
+   },
+   "delivered_latency_ms": {
+    "n": 35800,
+    "unit": "ms",
+    "mean": 1.1,
+    "median": 1.0,
+    "p90": 1.6,
+    "p95": 1.8,
+    "p99": 2.3,
+    "p99.9": 5.7,
+    "max": 99.2,
+    "min": 0.1,
+    "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
     "n": 35800,
     "unit": "ms",
-    "mean": 1.0,
+    "mean": 1.1,
     "median": 1.0,
-    "p90": 1.5,
+    "p90": 1.6,
     "p95": 1.8,
     "p99": 2.3,
-    "p99.9": 4.1,
-    "max": 6.9,
-    "min": 0.2
+    "p99.9": 5.7,
+    "max": 99.2,
+    "min": 0.1
    },
    "skipped_updates": 0,
-   "censored": 0,
-   "stale_time_fraction": 0.001926,
+   "stale_time_fraction": 0.001974,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
     "p95": 0.0,
     "p99": 0.0,
     "p99.9": 0.5,
-    "max": 5.6
+    "max": 95.4
    },
    "arrivals": 36000,
    "superseded_deliveries": 0,
@@ -326,7 +393,8 @@
     "rejected_on_arrival": {},
     "loss_episodes": {
      "count": 0,
-     "duration_ms": {
+     "open_at_end": 0,
+     "closed_duration_ms": {
       "n": 0,
       "unit": "ms"
      },
@@ -336,7 +404,7 @@
    },
    "tcp_info_trace_conn0": [
     {
-     "t": -0.999,
+     "t": -0.998,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -357,6 +425,6 @@
   "tcp_rmem": "4096\t131072\t33554432",
   "tcp_wmem": "4096\t16384\t4194304",
   "rmem_max": "4194304",
-  "date": "2026-09-27T18:17:23Z"
+  "date": "2026-09-27T20:19:41Z"
  }
 }

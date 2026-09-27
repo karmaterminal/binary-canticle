@@ -18,9 +18,17 @@ directions, or with ``--data-only`` on data packets only (pure ACKs spared);
 or periodic outages (``--outage`` seconds, every TCP/UDP packet dropped), each
 placed so that one update is issued inside it.
 
-Run everything (root, creates namespaces ``pd-e1-*``)::
+An update a receiver has not caught up to when the run ends is right-censored:
+latencies are Kaplan–Meier estimates (``update_latency_km_ms``), with the
+delivered fraction and censored count beside them; ``delivered_latency_ms``
+is conditional on delivery.
+
+Run everything (root; namespaces are named ``<PD_NS_PREFIX>e1-*``, see
+harness/netns.py). Raw files and ``results/e1_freshness.json`` are published
+only if every condition succeeds::
 
     python e1_freshness.py all --duration 900 --receivers 20
+    python e1_freshness.py all --duration 30 --only u2-loss50 --results-dir /tmp/smoke   # a partial run
 
 Run one condition in the current namespace::
 
@@ -41,6 +49,7 @@ import struct
 import subprocess
 import sys
 import zlib
+from typing import Optional
 
 import numpy as np
 
@@ -51,7 +60,7 @@ from canticle import wire  # noqa: E402
 from canticle.manifest import Manifest  # noqa: E402
 from canticle.station import StreamConfig  # noqa: E402
 
-from harness import netns, stats, tcpinfo  # noqa: E402
+from harness import netns, runs, stats, tcpinfo  # noqa: E402
 from harness.arms import (CarouselSender, TcpFrameReader, UdpListener, frame_for, make_station, now_ms,  # noqa: E402
                           update_index, wall)
 
@@ -148,16 +157,42 @@ def _writable(s: socket.socket) -> bool:
 
 # ---------------------------------------------------------------- analysis
 
+class _Censored:
+    """Durations that are either observed or right-censored at the end of the run."""
+
+    def __init__(self):
+        self.t: list[float] = []
+        self.seen: list[bool] = []
+
+    def add(self, done_at: Optional[float], start: float, t_end: float) -> None:
+        """``done_at`` is when the event happened, or None if it had not by ``t_end`` (censored there)."""
+        self.t.append(((done_at if done_at is not None else t_end) - start) * 1000)
+        self.seen.append(done_at is not None)
+
+    def observed(self) -> list[float]:
+        return [t for t, s in zip(self.t, self.seen) if s]
+
+    def km(self) -> dict:
+        return stats.km(self.t, self.seen)
+
+
 def analyze(issue: dict[int, float], receivers: list[list], w0: float, w1: float, t_end: float,
             outages: list[tuple[float, float]]) -> dict:
-    """Freshness of one arm. ``receivers[r]`` is a list of (time, update index) arrivals."""
+    """Freshness of one arm. ``receivers[r]`` is a list of (time, update index) arrivals.
+
+    An update a receiver had not caught up to by ``t_end`` is right-censored at
+    ``t_end - t_issue``: that is a lower bound on its latency, not a latency. It
+    enters only the Kaplan–Meier estimate (``update_latency_km_ms``) and the
+    counts; ``delivered_latency_ms`` summarises the observed catch-ups alone and
+    is conditional on delivery. Outage recovery is treated the same way.
+    """
     ks = np.array(sorted(issue))
     t_issue = np.full(ks.max() + 2, np.inf)
     for k in ks:
         t_issue[k] = issue[k]
     meas = ks[(t_issue[ks] >= w0) & (t_issue[ks] <= w1)]
-    catchup, exact, censored, skipped, superseded, arrivals_n = [], [], 0, 0, 0, 0
-    recov, affected, in_outage = [], 0, []
+    catchup, recov, recov_aff, in_outage = _Censored(), _Censored(), _Censored(), _Censored()
+    exact, skipped, superseded, arrivals_n, affected = [], 0, 0, 0, 0
     grid = np.arange(w0, w1, SAMPLE_DT)
     newest = np.searchsorted(t_issue[1:ks.max() + 1], grid, side="right")   # newest index issued by t
     stale_s = []
@@ -172,41 +207,47 @@ def analyze(issue: dict[int, float], receivers: list[list], w0: float, w1: float
             rise[1:] = run_max[1:] > run_max[:-1]
         ch_t, ch_v = t_arr[rise], run_max[rise]                             # when the held value advanced
         held_exact = {int(v): float(t) for t, v in zip(ch_t, ch_v)}
-        for k in meas:
+
+        def caught(k: int) -> Optional[float]:
+            """When this receiver first held update k or newer; None if not by the end of the run."""
             i = np.searchsorted(ch_v, k)                                    # first change with value >= k
-            if i < len(ch_v):
-                catchup.append((ch_t[i] - t_issue[k]) * 1000)
-            else:
-                catchup.append((t_end - t_issue[k]) * 1000)
-                censored += 1
+            return float(ch_t[i]) if i < len(ch_v) else None
+
+        for k in meas:
+            catchup.add(caught(k), t_issue[k], t_end)
             if k in held_exact:
                 exact.append((held_exact[k] - t_issue[k]) * 1000)
             else:
                 skipped += 1
         for (s, e) in outages:
-            ks_in = meas[(t_issue[meas] >= s) & (t_issue[meas] <= e)]
-            for k in ks_in:
-                i = np.searchsorted(ch_v, k)
-                in_outage.append(((ch_t[i] if i < len(ch_v) else t_end) - t_issue[k]) * 1000)
+            for k in meas[(t_issue[meas] >= s) & (t_issue[meas] <= e)]:
+                in_outage.add(caught(k), t_issue[k], t_end)
             want = np.searchsorted(t_issue[1:ks.max() + 1], e, side="right")
             j = np.searchsorted(ch_t, e, side="right")
             have = ch_v[j - 1] if j > 0 else 0
             if have >= want:
-                recov.append(0.0)
+                recov.add(e, e, t_end)                                      # held the newest value already: 0
                 continue
             affected += 1
-            i = np.searchsorted(ch_v, want)
-            recov.append(((ch_t[i] if i < len(ch_v) else t_end) - e) * 1000)
+            done = caught(want)
+            recov.add(done, e, t_end)
+            recov_aff.add(done, e, t_end)
         idx = np.searchsorted(ch_t, grid, side="right")
         held = np.where(idx > 0, ch_v[np.maximum(idx - 1, 0)], 0)
         s = np.where(held < newest, grid - t_issue[np.minimum(held + 1, ks.max() + 1)], 0.0)
         stale_s.append(s)
     st = np.concatenate(stale_s) * 1000 if stale_s else np.zeros(0)
+    n = len(catchup.t)
+    delivered = sum(catchup.seen)
     out = {
-        "updates_measured": int(len(meas)), "samples": len(meas) * len(receivers),
-        "update_latency_ms": stats.summary(catchup),
+        "updates_measured": int(len(meas)), "samples": n,
+        "delivered": delivered, "censored": n - delivered,
+        "delivered_fraction": round(delivered / n, 6) if n else None,
+        "update_latency_km_ms": catchup.km(),
+        "delivered_latency_ms": {**stats.summary(catchup.observed()),
+                                 "conditional_on": "delivery: observed catch-ups only, censored samples excluded"},
         "exact_hold_latency_ms": stats.summary(exact),
-        "skipped_updates": skipped, "censored": censored,
+        "skipped_updates": skipped,
         "stale_time_fraction": round(float(np.mean(st > 0)), 6) if st.size else None,
         "staleness_ms_time_weighted": {**stats.weighted_quantiles(st, np.ones_like(st)),
                                        "max": round(float(st.max()), 1) if st.size else None},
@@ -215,11 +256,13 @@ def analyze(issue: dict[int, float], receivers: list[list], w0: float, w1: float
         "superseded_delivery_fraction": round(superseded / arrivals_n, 6) if arrivals_n else None,
     }
     if outages:
-        out["outage_recovery_ms"] = stats.summary(recov)
-        out["outage_recovery_ms_affected_only"] = stats.summary([r for r in recov if r > 0])
-        out["outages_x_receivers"] = len(recov)
+        out["outages_x_receivers"] = len(recov.t)
         out["affected"] = affected
-        out["latency_of_updates_issued_in_outage_ms"] = stats.summary(in_outage)
+        out["outage_recovery_censored"] = len(recov.t) - sum(recov.seen)
+        out["outage_recovery_km_ms"] = recov.km()
+        out["outage_recovery_affected_km_ms"] = recov_aff.km()
+        out["updates_issued_in_outage_censored"] = len(in_outage.t) - sum(in_outage.seen)
+        out["latency_of_updates_issued_in_outage_km_ms"] = in_outage.km()
     return out
 
 
@@ -317,7 +360,7 @@ async def condition(a) -> dict:
                     elif ep is not None:
                         episodes[arm].append({"dur_ms": round((t - ep["start"]) * 1000, 1),
                                               "max_backoff": ep["max_backoff"], "max_rto_ms": ep["max_rto_ms"],
-                                              "start": round(ep["start"] - t0, 3)})
+                                              "start": round(ep["start"] - t0, 3), "open_at_end": False})
                         del open_ep[(arm, i)]
                     if i == 0:
                         key = (b["rto_ms"], b["backoff"], b["retransmits"], b["ca_state"])
@@ -350,6 +393,10 @@ async def condition(a) -> dict:
     snmp1 = netns.snmp()
     for t in aux:
         t.cancel()
+    for (arm, i), ep in open_ep.items():     # still retransmitting at the end: duration is a lower bound
+        episodes[arm].append({"dur_ms": round((t_end - ep["start"]) * 1000, 1), "max_backoff": ep["max_backoff"],
+                              "max_rto_ms": ep["max_rto_ms"], "start": round(ep["start"] - t0, 3),
+                              "open_at_end": True})
     stop.set()
     await asyncio.gather(*loops, return_exceptions=True)
 
@@ -394,14 +441,16 @@ async def condition(a) -> dict:
         arms[arm]["tcp"] = tcp_final[arm]
         eps = episodes[arm]
         arms[arm]["tcp"]["loss_episodes"] = {
-            "count": len(eps), "duration_ms": stats.summary(e["dur_ms"] for e in eps),
+            "count": len(eps), "open_at_end": sum(e["open_at_end"] for e in eps),
+            "closed_duration_ms": stats.summary(e["dur_ms"] for e in eps if not e["open_at_end"]),
             "max_backoff_hist": {str(b): sum(1 for e in eps if e["max_backoff"] == b)
                                  for b in sorted({e["max_backoff"] for e in eps})},
             "longest": sorted(eps, key=lambda e: -e["dur_ms"])[:5]}
         arms[arm]["tcp_info_trace_conn0"] = traces[arm][:1500]
 
     return {
-        "experiment": "e1_freshness", "update_s": a.update_s, "loss_permille": a.loss,
+        "experiment": "e1_freshness", "run_id": a.run_id, "tag": a.tag,
+        "update_s": a.update_s, "loss_permille": a.loss,
         "loss_direction": "data-only" if a.data_only else "both", "outage_s": a.outage,
         "duration_s": a.duration, "receivers": a.receivers, "body_bytes": BODY, "frame_bytes": len(frame),
         "warmup_s": WARMUP_S, "drain_s": DRAIN_S,
@@ -431,47 +480,93 @@ CONDITIONS = ([("loss", p) for p in (0, 10, 50, 100, 200, 300)] + [("outage", o)
               + [("lossdata", p) for p in (100, 200, 300)])
 
 
-def run_all(a) -> None:
-    raw = os.path.join(HERE, "results", "raw")
-    os.makedirs(raw, exist_ok=True)
+def jobs_for(update_values, only) -> list[tuple[str, float, str, float]]:
     jobs = []
-    for u in a.update_values:
+    for u in update_values:
         for kind, v in CONDITIONS:
             tag = f"u{u:g}-{kind}{v:g}".replace(".", "p")
-            if a.only and tag not in a.only:
-                continue
-            jobs.append((f"pd-e1-{tag}", tag, u, kind, v))
+            if not only or tag in only:
+                jobs.append((tag, u, kind, v))
+    unknown = set(only or ()) - {j[0] for j in jobs}
+    if unknown:
+        raise SystemExit(f"unknown condition tags: {sorted(unknown)}")
+    return jobs
+
+
+def _spawn(ns: str, argv: list[str], log_path: str) -> subprocess.Popen:
+    """One condition's worker, inside namespace ``ns`` (tests replace this)."""
+    with open(log_path, "w") as log:
+        return subprocess.Popen(netns.ns_exec(ns, *argv), stdout=log, stderr=subprocess.STDOUT)
+
+
+def run_all(a) -> int:
+    """Run the conditions in parallel namespaces; publish raw files and the aggregate only if all succeed.
+
+    Workers write into a fresh staging directory. Any nonzero exit, missing
+    output or provenance mismatch leaves ``results/`` untouched and returns 1.
+    """
+    results = os.path.abspath(a.results_dir)
+    if a.only and results == runs.RESULTS:
+        raise SystemExit("--only writes an aggregate of just those conditions; pass --results-dir to put it "
+                         "somewhere other than results/")
+    jobs = jobs_for(a.update_values, a.only)
+    run_id = runs.new_run_id()
+    stage = runs.stage_dir(results, "e1", run_id)
+    config = {"duration_s": a.duration, "receivers": a.receivers, "update_values": a.update_values,
+              "warmup_s": WARMUP_S, "drain_s": DRAIN_S, "body_bytes": BODY}
+    manifest = runs.manifest("e1_freshness", run_id, [j[0] for j in jobs], config, os.path.abspath(__file__))
     procs = []
-    with contextlib.ExitStack() as stack:
-        for ns, tag, u, kind, v in jobs:
-            stack.enter_context(netns.netns(ns))
-            out = os.path.join(raw, f"e1-{tag}.json")
-            argv = [sys.executable, os.path.abspath(__file__), "one", "--update-s", str(u), "--duration",
-                    str(a.duration), "--receivers", str(a.receivers), "--seed", str(zlib.crc32(tag.encode())),
-                    "--out", out]
-            argv += {"loss": ["--loss", str(v)], "lossdata": ["--loss", str(v), "--data-only"],
-                     "outage": ["--outage", str(v)]}[kind]
-            log = open(os.path.join(raw, f"e1-{tag}.log"), "w")
-            procs.append((tag, subprocess.Popen(netns.ns_exec(ns, *argv), stdout=log, stderr=subprocess.STDOUT)))
-        failed = [tag for tag, p in procs if p.wait() != 0]
-    if failed:
-        print("failed conditions:", failed, file=sys.stderr)
-    collate(raw, os.path.join(HERE, "results", "e1_freshness.json"))
+    try:
+        with contextlib.ExitStack() as stack:
+            for tag, u, kind, v in jobs:
+                ns = stack.enter_context(netns.netns(netns.name(f"e1-{tag}")))
+                out = os.path.join(stage, f"e1-{tag}.json")
+                argv = [sys.executable, os.path.abspath(__file__), "one", "--update-s", str(u), "--duration",
+                        str(a.duration), "--receivers", str(a.receivers), "--seed", str(zlib.crc32(tag.encode())),
+                        "--run-id", run_id, "--tag", tag, "--out", out]
+                argv += {"loss": ["--loss", str(v)], "lossdata": ["--loss", str(v), "--data-only"],
+                         "outage": ["--outage", str(v)]}[kind]
+                procs.append((tag, out, _spawn(ns, argv, os.path.join(stage, f"e1-{tag}.log"))))
+            runs.wait_all(procs)
+        aggregate = collate([out for _, out, _ in procs], manifest,
+                            expect={"run_id": run_id, "duration_s": a.duration, "receivers": a.receivers})
+    except runs.RunFailed as e:
+        print(f"e1: {e}. Nothing was published; worker logs are in {stage}", file=sys.stderr)
+        return 1
+    finally:
+        for _, _, p in procs:
+            if p.poll() is None:
+                p.kill()
+    runs.publish(stage, os.path.join(results, "raw"), os.path.join(results, "e1_freshness.json"), aggregate)
+    return 0
 
 
-def collate(raw: str, out: str) -> None:
+PROVENANCE = ("run_id", "duration_s", "receivers", "warmup_s", "drain_s", "body_bytes")
+
+
+def collate(files: list[str], manifest: dict, expect: Optional[dict] = None) -> dict:
+    """One row per (condition, arm) from exactly ``files``, which must share one run and configuration."""
+    stats.km_selfcheck()
+    docs = {}
+    for path in files:
+        with open(path) as f:
+            docs[os.path.basename(path)] = json.load(f)
+    if not docs:
+        raise runs.RunFailed("no raw files to collate")
+    runs.check_consistent(docs, PROVENANCE, expect)
+    tags = [d.get("tag") for d in docs.values()]
+    if len(set(tags)) != len(tags):
+        raise runs.RunFailed(f"duplicate condition tags: {tags}")
     rows = []
-    for name in sorted(os.listdir(raw)):
-        if not (name.startswith("e1-") and name.endswith(".json")):
-            continue
-        with open(os.path.join(raw, name)) as f:
-            d = json.load(f)
+    for d in docs.values():
         for arm, m in d["arms"].items():
-            rows.append({"update_s": d["update_s"], "loss_permille": d["loss_permille"],
+            rows.append({"tag": d["tag"], "update_s": d["update_s"], "loss_permille": d["loss_permille"],
                          "loss_direction": d.get("loss_direction", "both"), "outage_s": d["outage_s"],
                          "arm": arm, "measured_loss": d["nft"]["measured_loss"],
+                         **{k: d[k] for k in PROVENANCE},
                          **{k: v for k, v in m.items() if k not in ("tcp_info_trace_conn0",)}})
-    stats.write_json(out, {"experiment": "e1_freshness", "rows": rows})
+    return {"experiment": "e1_freshness",
+            "manifest": {**manifest, "finished": stats.env()["date"], "raw_files": sorted(docs)}, "rows": rows}
 
 
 def main() -> None:
@@ -485,20 +580,33 @@ def main() -> None:
     one.add_argument("--duration", type=float, default=120)
     one.add_argument("--receivers", type=int, default=20)
     one.add_argument("--seed", type=int, default=1)
+    one.add_argument("--run-id", default="adhoc")
+    one.add_argument("--tag", default="adhoc")
     one.add_argument("--out", required=True)
     al = sub.add_parser("all")
     al.add_argument("--duration", type=float, default=900)
     al.add_argument("--receivers", type=int, default=20)
     al.add_argument("--update-values", type=float, nargs="+", default=[0.5, 2, 10])
     al.add_argument("--only", nargs="*", help="condition tags to run, e.g. u2-loss300 u10-lossdata200")
-    sub.add_parser("collate")
+    al.add_argument("--results-dir", default=runs.RESULTS,
+                    help="where raw/ and e1_freshness.json are published (default: results/)")
+    co = sub.add_parser("collate", help="re-collate results/raw/e1-*.json; refuses files from different runs")
+    co.add_argument("--results-dir", default=runs.RESULTS)
     a = p.parse_args()
     if a.cmd == "one":
         stats.write_json(a.out, asyncio.run(condition(a)))
     elif a.cmd == "all":
-        run_all(a)
+        sys.exit(run_all(a))
     else:
-        collate(os.path.join(HERE, "results", "raw"), os.path.join(HERE, "results", "e1_freshness.json"))
+        raw = os.path.join(a.results_dir, "raw")
+        files = sorted(os.path.join(raw, n) for n in os.listdir(raw) if n.startswith("e1-") and n.endswith(".json"))
+        try:
+            agg = collate(files, {"experiment": "e1_freshness", "recollated_from": raw, "argv": sys.argv})
+        except runs.RunFailed as e:
+            sys.exit(f"e1 collate: {e}")
+        runs_id = {r["run_id"] for r in agg["rows"]}
+        agg["manifest"]["run_id"] = runs_id.pop()
+        stats.write_json(os.path.join(a.results_dir, "e1_freshness.json"), agg)
 
 
 if __name__ == "__main__":

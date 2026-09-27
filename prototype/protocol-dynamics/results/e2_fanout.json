@@ -86,9 +86,9 @@
     "bytes": 1960000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 112,
-    "fanout_spread_p99_us": 380,
-    "fanout_spread_max_us": 593,
+    "enqueue_all_p50_us": 112,
+    "enqueue_all_p99_us": 380,
+    "enqueue_all_max_us": 593,
     "late_ticks": 0
    },
    "receiver": {
@@ -171,9 +171,9 @@
     "bytes": 1960000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 104,
-    "fanout_spread_p99_us": 357,
-    "fanout_spread_max_us": 586,
+    "enqueue_all_p50_us": 104,
+    "enqueue_all_p99_us": 357,
+    "enqueue_all_max_us": 586,
     "late_ticks": 0
    },
    "receiver": {
@@ -256,9 +256,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 44,
-    "fanout_spread_p99_us": 144,
-    "fanout_spread_max_us": 662,
+    "enqueue_all_p50_us": 44,
+    "enqueue_all_p99_us": 144,
+    "enqueue_all_max_us": 662,
     "late_ticks": 0
    },
    "receiver": {
@@ -352,9 +352,9 @@
     "bytes": 19600000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 1018,
-    "fanout_spread_p99_us": 2559,
-    "fanout_spread_max_us": 2621,
+    "enqueue_all_p50_us": 1018,
+    "enqueue_all_p99_us": 2559,
+    "enqueue_all_max_us": 2621,
     "late_ticks": 0
    },
    "receiver": {
@@ -437,9 +437,9 @@
     "bytes": 19600000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 385,
-    "fanout_spread_p99_us": 898,
-    "fanout_spread_max_us": 3036,
+    "enqueue_all_p50_us": 385,
+    "enqueue_all_p99_us": 898,
+    "enqueue_all_max_us": 3036,
     "late_ticks": 0
    },
    "receiver": {
@@ -522,9 +522,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 38,
-    "fanout_spread_p99_us": 154,
-    "fanout_spread_max_us": 1107,
+    "enqueue_all_p50_us": 38,
+    "enqueue_all_p99_us": 154,
+    "enqueue_all_max_us": 1107,
     "late_ticks": 0
    },
    "receiver": {
@@ -618,9 +618,9 @@
     "bytes": 196000000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 11548,
-    "fanout_spread_p99_us": 19224,
-    "fanout_spread_max_us": 21951,
+    "enqueue_all_p50_us": 11548,
+    "enqueue_all_p99_us": 19224,
+    "enqueue_all_max_us": 21951,
     "late_ticks": 0
    },
    "receiver": {
@@ -703,9 +703,9 @@
     "bytes": 196000000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 3771,
-    "fanout_spread_p99_us": 18112,
-    "fanout_spread_max_us": 60041,
+    "enqueue_all_p50_us": 3771,
+    "enqueue_all_p99_us": 18112,
+    "enqueue_all_max_us": 60041,
     "late_ticks": 0
    },
    "receiver": {
@@ -788,9 +788,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 41,
-    "fanout_spread_p99_us": 141,
-    "fanout_spread_max_us": 241,
+    "enqueue_all_p50_us": 41,
+    "enqueue_all_p99_us": 141,
+    "enqueue_all_max_us": 241,
     "late_ticks": 0
    },
    "receiver": {
@@ -884,9 +884,9 @@
     "bytes": 980000000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 56630,
-    "fanout_spread_p99_us": 93502,
-    "fanout_spread_max_us": 95780,
+    "enqueue_all_p50_us": 56630,
+    "enqueue_all_p99_us": 93502,
+    "enqueue_all_max_us": 95780,
     "late_ticks": 0
    },
    "receiver": {
@@ -969,9 +969,9 @@
     "bytes": 980000000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 18339,
-    "fanout_spread_p99_us": 33884,
-    "fanout_spread_max_us": 44882,
+    "enqueue_all_p50_us": 18339,
+    "enqueue_all_p99_us": 33884,
+    "enqueue_all_max_us": 44882,
     "late_ticks": 0
    },
    "receiver": {
@@ -1054,9 +1054,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 36,
-    "fanout_spread_p99_us": 117,
-    "fanout_spread_max_us": 172,
+    "enqueue_all_p50_us": 36,
+    "enqueue_all_p99_us": 117,
+    "enqueue_all_max_us": 172,
     "late_ticks": 0
    },
    "receiver": {
@@ -1150,9 +1150,9 @@
     "bytes": 1960000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 114,
-    "fanout_spread_p99_us": 358,
-    "fanout_spread_max_us": 716,
+    "enqueue_all_p50_us": 114,
+    "enqueue_all_p99_us": 358,
+    "enqueue_all_max_us": 716,
     "late_ticks": 0
    },
    "receiver": {
@@ -1235,9 +1235,9 @@
     "bytes": 1960000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 105,
-    "fanout_spread_p99_us": 242,
-    "fanout_spread_max_us": 2045,
+    "enqueue_all_p50_us": 105,
+    "enqueue_all_p99_us": 242,
+    "enqueue_all_max_us": 2045,
     "late_ticks": 0
    },
    "receiver": {
@@ -1320,9 +1320,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 48,
-    "fanout_spread_p99_us": 176,
-    "fanout_spread_max_us": 2339,
+    "enqueue_all_p50_us": 48,
+    "enqueue_all_p99_us": 176,
+    "enqueue_all_max_us": 2339,
     "late_ticks": 0
    },
    "receiver": {
@@ -1416,9 +1416,9 @@
     "bytes": 19600000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 1013,
-    "fanout_spread_p99_us": 2291,
-    "fanout_spread_max_us": 2962,
+    "enqueue_all_p50_us": 1013,
+    "enqueue_all_p99_us": 2291,
+    "enqueue_all_max_us": 2962,
     "late_ticks": 0
    },
    "receiver": {
@@ -1501,9 +1501,9 @@
     "bytes": 19600000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 368,
-    "fanout_spread_p99_us": 802,
-    "fanout_spread_max_us": 1937,
+    "enqueue_all_p50_us": 368,
+    "enqueue_all_p99_us": 802,
+    "enqueue_all_max_us": 1937,
     "late_ticks": 0
    },
    "receiver": {
@@ -1586,9 +1586,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 44,
-    "fanout_spread_p99_us": 263,
-    "fanout_spread_max_us": 653,
+    "enqueue_all_p50_us": 44,
+    "enqueue_all_p99_us": 263,
+    "enqueue_all_max_us": 653,
     "late_ticks": 0
    },
    "receiver": {
@@ -1682,9 +1682,9 @@
     "bytes": 196000000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 11344,
-    "fanout_spread_p99_us": 22390,
-    "fanout_spread_max_us": 93298,
+    "enqueue_all_p50_us": 11344,
+    "enqueue_all_p99_us": 22390,
+    "enqueue_all_max_us": 93298,
     "late_ticks": 1
    },
    "receiver": {
@@ -1767,9 +1767,9 @@
     "bytes": 196000000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 3703,
-    "fanout_spread_p99_us": 7171,
-    "fanout_spread_max_us": 7514,
+    "enqueue_all_p50_us": 3703,
+    "enqueue_all_p99_us": 7171,
+    "enqueue_all_max_us": 7514,
     "late_ticks": 0
    },
    "receiver": {
@@ -1852,9 +1852,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 46,
-    "fanout_spread_p99_us": 273,
-    "fanout_spread_max_us": 1947,
+    "enqueue_all_p50_us": 46,
+    "enqueue_all_p99_us": 273,
+    "enqueue_all_max_us": 1947,
     "late_ticks": 0
    },
    "receiver": {
@@ -1948,9 +1948,9 @@
     "bytes": 980000000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 56826,
-    "fanout_spread_p99_us": 90052,
-    "fanout_spread_max_us": 96847,
+    "enqueue_all_p50_us": 56826,
+    "enqueue_all_p99_us": 90052,
+    "enqueue_all_max_us": 96847,
     "late_ticks": 0
    },
    "receiver": {
@@ -2033,9 +2033,9 @@
     "bytes": 980000000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 18322,
-    "fanout_spread_p99_us": 30661,
-    "fanout_spread_max_us": 55181,
+    "enqueue_all_p50_us": 18322,
+    "enqueue_all_p99_us": 30661,
+    "enqueue_all_max_us": 55181,
     "late_ticks": 0
    },
    "receiver": {
@@ -2118,9 +2118,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 49,
-    "fanout_spread_p99_us": 131,
-    "fanout_spread_max_us": 147,
+    "enqueue_all_p50_us": 49,
+    "enqueue_all_p99_us": 131,
+    "enqueue_all_max_us": 147,
     "late_ticks": 0
    },
    "receiver": {
@@ -2214,9 +2214,9 @@
     "bytes": 1960000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 115,
-    "fanout_spread_p99_us": 270,
-    "fanout_spread_max_us": 460,
+    "enqueue_all_p50_us": 115,
+    "enqueue_all_p99_us": 270,
+    "enqueue_all_max_us": 460,
     "late_ticks": 0
    },
    "receiver": {
@@ -2299,9 +2299,9 @@
     "bytes": 1960000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 104,
-    "fanout_spread_p99_us": 200,
-    "fanout_spread_max_us": 556,
+    "enqueue_all_p50_us": 104,
+    "enqueue_all_p99_us": 200,
+    "enqueue_all_max_us": 556,
     "late_ticks": 0
    },
    "receiver": {
@@ -2384,9 +2384,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 47,
-    "fanout_spread_p99_us": 164,
-    "fanout_spread_max_us": 332,
+    "enqueue_all_p50_us": 47,
+    "enqueue_all_p99_us": 164,
+    "enqueue_all_max_us": 332,
     "late_ticks": 0
    },
    "receiver": {
@@ -2480,9 +2480,9 @@
     "bytes": 19600000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 1050,
-    "fanout_spread_p99_us": 3079,
-    "fanout_spread_max_us": 4109,
+    "enqueue_all_p50_us": 1050,
+    "enqueue_all_p99_us": 3079,
+    "enqueue_all_max_us": 4109,
     "late_ticks": 0
    },
    "receiver": {
@@ -2565,9 +2565,9 @@
     "bytes": 19600000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 392,
-    "fanout_spread_p99_us": 901,
-    "fanout_spread_max_us": 1264,
+    "enqueue_all_p50_us": 392,
+    "enqueue_all_p99_us": 901,
+    "enqueue_all_max_us": 1264,
     "late_ticks": 0
    },
    "receiver": {
@@ -2650,9 +2650,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 47,
-    "fanout_spread_p99_us": 151,
-    "fanout_spread_max_us": 261,
+    "enqueue_all_p50_us": 47,
+    "enqueue_all_p99_us": 151,
+    "enqueue_all_max_us": 261,
     "late_ticks": 0
    },
    "receiver": {
@@ -2746,9 +2746,9 @@
     "bytes": 196000000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 11640,
-    "fanout_spread_p99_us": 19621,
-    "fanout_spread_max_us": 21343,
+    "enqueue_all_p50_us": 11640,
+    "enqueue_all_p99_us": 19621,
+    "enqueue_all_max_us": 21343,
     "late_ticks": 0
    },
    "receiver": {
@@ -2831,9 +2831,9 @@
     "bytes": 196000000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 3750,
-    "fanout_spread_p99_us": 6450,
-    "fanout_spread_max_us": 8665,
+    "enqueue_all_p50_us": 3750,
+    "enqueue_all_p99_us": 6450,
+    "enqueue_all_max_us": 8665,
     "late_ticks": 0
    },
    "receiver": {
@@ -2916,9 +2916,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 46,
-    "fanout_spread_p99_us": 156,
-    "fanout_spread_max_us": 247,
+    "enqueue_all_p50_us": 46,
+    "enqueue_all_p99_us": 156,
+    "enqueue_all_max_us": 247,
     "late_ticks": 0
    },
    "receiver": {
@@ -3012,9 +3012,9 @@
     "bytes": 980000000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 56513,
-    "fanout_spread_p99_us": 85910,
-    "fanout_spread_max_us": 86011,
+    "enqueue_all_p50_us": 56513,
+    "enqueue_all_p99_us": 85910,
+    "enqueue_all_max_us": 86011,
     "late_ticks": 0
    },
    "receiver": {
@@ -3097,9 +3097,9 @@
     "bytes": 980000000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 18501,
-    "fanout_spread_p99_us": 30296,
-    "fanout_spread_max_us": 40433,
+    "enqueue_all_p50_us": 18501,
+    "enqueue_all_p99_us": 30296,
+    "enqueue_all_max_us": 40433,
     "late_ticks": 0
    },
    "receiver": {
@@ -3182,9 +3182,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "fanout_spread_p50_us": 46,
-    "fanout_spread_p99_us": 120,
-    "fanout_spread_max_us": 166,
+    "enqueue_all_p50_us": 46,
+    "enqueue_all_p99_us": 120,
+    "enqueue_all_max_us": 166,
     "late_ticks": 0
    },
    "receiver": {

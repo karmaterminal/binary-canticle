@@ -1,17 +1,20 @@
 {
  "experiment": "e4_late_joiner",
+ "run_id": "20260927T200358Z-3158-56b9",
+ "tag": "loss300",
  "loss_permille": 300,
  "duration_s": 600.0,
  "items": 20,
+ "trial_timeout_s": 120,
  "slots_per_arm": 10,
  "frame_bytes": 327,
  "sing": {
   "slow": {
    "stream": "lens.state",
    "seq": 1,
-   "epoch": 1790532338,
-   "issued_at": 1790532338330,
-   "expires_at": 1790533238330,
+   "epoch": 1790539439,
+   "issued_at": 1790539439879,
+   "expires_at": 1790540339879,
    "ttl_s": 900.0,
    "loop_ms": 5000,
    "clamp": "none",
@@ -21,9 +24,9 @@
   "fast": {
    "stream": "ctl.state",
    "seq": 1,
-   "epoch": 1790532338,
-   "issued_at": 1790532338331,
-   "expires_at": 1790533238331,
+   "epoch": 1790539439,
+   "issued_at": 1790539439880,
+   "expires_at": 1790540339880,
    "ttl_s": 900.0,
    "loop_ms": 1000,
    "clamp": "none",
@@ -39,76 +42,128 @@
    1000
   ]
  },
- "relay_snapshots": 117,
+ "relay_snapshots": 175,
+ "relay_renewals": 75,
+ "tcp_snapshots": 359,
  "granted_bps": 32000,
  "nft": {
-  "offered": 170811,
-  "dropped_loss": 50318,
-  "measured_loss": 0.29458
+  "offered": 181004,
+  "dropped_loss": 53614,
+  "measured_loss": 0.2962
  },
  "arms": {
   "carousel-4kbps": {
-   "trials": 137,
+   "trials": 141,
+   "completed": 136,
    "timeouts": 0,
-   "t_full_ms": {
-    "n": 137,
+   "errors": 0,
+   "cut_at_end": 5,
+   "t_full_km_ms": {
+    "n": 141,
+    "events": 136,
+    "censored": 5,
     "unit": "ms",
-    "mean": 39524.7,
-    "median": 37920.7,
-    "p90": 55375.4,
-    "p95": 59397.9,
-    "p99": 79532.7,
-    "p99.9": 87581.8,
-    "max": 88845.8,
-    "min": 17059.6
+    "method": "kaplan-meier",
+    "median": 38557.0,
+    "p90": 58077.5,
+    "p95": 64270.9,
+    "p99": 83321.6,
+    "p99.9": 90031.7,
+    "max_event": 90031.7
+   },
+   "t_full_completed_ms": {
+    "n": 136,
+    "unit": "ms",
+    "mean": 40235.8,
+    "median": 38418.6,
+    "p90": 56794.2,
+    "p95": 64166.8,
+    "p99": 82980.2,
+    "p99.9": 89125.9,
+    "max": 90031.7,
+    "min": 16167.6,
+    "conditional_on": "completion: timed-out and cut-off joins excluded"
    }
   },
   "carousel-1s": {
    "trials": 1011,
+   "completed": 1011,
    "timeouts": 0,
-   "t_full_ms": {
+   "errors": 0,
+   "cut_at_end": 0,
+   "t_full_km_ms": {
+    "n": 1011,
+    "events": 1011,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 2934.4,
+    "p90": 4434.8,
+    "p95": 5095.7,
+    "p99": 6637.3,
+    "p99.9": 7823.3,
+    "max_event": 8122.3
+   },
+   "t_full_completed_ms": {
     "n": 1011,
     "unit": "ms",
-    "mean": 3145.5,
-    "median": 3026.6,
-    "p90": 4457.0,
-    "p95": 5017.3,
-    "p99": 6024.5,
-    "p99.9": 7135.0,
-    "max": 7656.9,
-    "min": 1133.3
+    "mean": 3097.9,
+    "median": 2934.4,
+    "p90": 4434.8,
+    "p95": 5095.3,
+    "p99": 6624.1,
+    "p99.9": 7819.1,
+    "max": 8122.3,
+    "min": 1051.3,
+    "conditional_on": "completion: timed-out and cut-off joins excluded"
    }
   },
   "tcp-snapshot": {
-   "trials": 292,
-   "timeouts": 19,
-   "t_full_ms": {
-    "n": 273,
+   "trials": 360,
+   "completed": 337,
+   "timeouts": 17,
+   "errors": 0,
+   "cut_at_end": 6,
+   "t_full_km_ms": {
+    "n": 360,
+    "events": 337,
+    "censored": 23,
     "unit": "ms",
-    "mean": 8608.9,
-    "median": 2053.4,
-    "p90": 23928.4,
-    "p95": 47931.1,
-    "p99": 95863.6,
-    "p99.9": 104680.3,
-    "max": 105090.3,
-    "min": 0.5
+    "method": "kaplan-meier",
+    "median": 2079.9,
+    "p90": 35852.1,
+    "p95": null,
+    "p99": null,
+    "p99.9": null,
+    "censored_beyond_ms": 120004.1,
+    "max_event": 118090.2
+   },
+   "t_full_completed_ms": {
+    "n": 337,
+    "unit": "ms",
+    "mean": 6787.0,
+    "median": 1876.5,
+    "p90": 16875.2,
+    "p95": 30647.1,
+    "p99": 67545.5,
+    "p99.9": 113912.5,
+    "max": 118090.2,
+    "min": 0.5,
+    "conditional_on": "completion: timed-out and cut-off joins excluded"
    },
    "connect_ms": {
-    "n": 273,
+    "n": 337,
     "unit": "ms",
-    "mean": 863.6,
-    "median": 1007.0,
-    "p90": 2051.9,
-    "p95": 3059.3,
-    "p99": 4382.4,
-    "p99.9": 5126.8,
-    "max": 5131.2,
+    "mean": 838.4,
+    "median": 1004.5,
+    "p90": 2053.0,
+    "p95": 3068.2,
+    "p99": 5087.4,
+    "p99.9": 5105.2,
+    "max": 5107.8,
     "min": 0.2
    },
-   "errors": [
-    "TimeoutError",
-    "TimeoutError",
+   "error_kinds": [
     "TimeoutError",
     "TimeoutError",
     "TimeoutError",
@@ -129,47 +184,64 @@
    ]
   },
   "lease-snapshot": {
-   "trials": 160,
-   "timeouts": 1,
-   "t_full_ms": {
-    "n": 159,
+   "trials": 175,
+   "completed": 167,
+   "timeouts": 0,
+   "errors": 0,
+   "cut_at_end": 8,
+   "t_full_km_ms": {
+    "n": 175,
+    "events": 167,
+    "censored": 8,
     "unit": "ms",
-    "mean": 32371.1,
-    "median": 32305.4,
-    "p90": 50141.6,
-    "p95": 55301.3,
-    "p99": 62380.2,
-    "p99.9": 66879.2,
-    "max": 67303.2,
-    "min": 7152.8
+    "method": "kaplan-meier",
+    "median": 28195.3,
+    "p90": 57732.0,
+    "p95": 69402.9,
+    "p99": 79761.6,
+    "p99.9": 82736.1,
+    "max_event": 82736.1
+   },
+   "t_full_completed_ms": {
+    "n": 167,
+    "unit": "ms",
+    "mean": 31467.7,
+    "median": 27771.8,
+    "p90": 54367.5,
+    "p95": 67197.6,
+    "p99": 79510.2,
+    "p99.9": 82242.4,
+    "max": 82736.1,
+    "min": 2949.6,
+    "conditional_on": "completion: timed-out and cut-off joins excluded"
    },
    "handshake_ms": {
-    "n": 159,
+    "n": 167,
     "unit": "ms",
-    "mean": 5820.1,
-    "median": 1001.4,
-    "p90": 18005.1,
-    "p95": 24005.2,
-    "p99": 47426.8,
-    "p99.9": 59802.1,
-    "max": 62015.6,
+    "mean": 4942.6,
+    "median": 2001.8,
+    "p90": 15404.9,
+    "p95": 23004.9,
+    "p99": 34387.9,
+    "p99.9": 44847.5,
+    "max": 46010.4,
     "min": 0.2
    },
    "hello_sent": {
-    "n": 160,
+    "n": 167,
     "unit": "datagrams",
-    "mean": 1.9,
+    "mean": 2.1,
     "median": 1.0,
-    "p90": 4.0,
-    "p95": 5.0,
-    "p99": 6.0,
-    "p99.9": 8.5,
-    "max": 9.0,
+    "p90": 4.4,
+    "p95": 5.7,
+    "p99": 7.0,
+    "p99.9": 7.8,
+    "max": 8.0,
     "min": 1.0
    },
-   "timeout_stages": [
-    "items"
-   ]
+   "renew_sent": 118,
+   "timeout_stages": [],
+   "sessions_with_listen_ok": 167
   }
  },
  "env": {
@@ -182,6 +254,6 @@
   "tcp_rmem": "4096\t131072\t33554432",
   "tcp_wmem": "4096\t16384\t4194304",
   "rmem_max": "4194304",
-  "date": "2026-09-27T18:15:44Z"
+  "date": "2026-09-27T20:14:06Z"
  }
 }

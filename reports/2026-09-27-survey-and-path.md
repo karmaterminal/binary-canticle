@@ -720,15 +720,17 @@ Ids and defaults follow RFC-0001 §23.1, the canonical list of D1-D24. The six d
 
 Real Linux TCP (cubic, `TCP_NODELAY`) was run against the unmodified `canticle-station` Station and Listener, in network namespaces with nftables loss at the input hook. There was no RTT emulation (RTT ≈ 0.1 ms), so internet RTTs add to every TCP repair. [V]
 
+*Revised after review of PR #52:* the first analysis counted updates that never arrived before the run ended as if they had arrived at the cutoff. E1 and E4 were re-run with that fixed; latencies are now Kaplan–Meier estimates, with the share of updates delivered wherever it is below 100%.
+
 @@FIGURE:e1-p99@@
 
 | Experiment | Finding [V] |
 |---|---|
-| **E1 freshness** (900 s per condition, 20 receivers per arm) | TCP is fresher up to about 10% loss: one retransmission timeout repairs a lost update (205-212 ms here). At U = 10 s and 5% loss, p99 is 212 ms for TCP against about 1 s for the carousel. At 20-30% loss both ways, TCP's backoff and head-of-line blocking stalled for up to 697 s; at U = 0.5 s and 30% loss, receivers held a superseded value 89% of the time and TCP delivered 2 690 frames after their signed expiry. The carousel's worst case under the same loss was 4 s. |
-| **E1 outages** | After a 10 s outage, TCP resumed in p95 3.9-6.1 s (RTO doubling 408 ms → 6.5 s); the carousel in 0.48-0.91 s with frequent updates. |
-| **E2 fan-out** (up to 5 000 listeners) | Per listener·frame: TCP 11.6-12.0 µs, UDP `sendmmsg` 4.2-4.4 µs, multicast flat. TCP doubles the packets (ACKs) and needs one socket and one queue per listener. Below about 1 000 listeners the cost difference is noise. |
+| **E1 freshness** (900 s per condition, 20 receivers per arm) | TCP is fresher up to about 10% loss: one retransmission timeout repairs a lost update (205-212 ms here). At U = 10 s and 5% loss, p99 is 212 ms for TCP against about 1 s for the carousel. At 20% the result is mixed (TCP p99 0.8-45 s, carousel 1-2 s). At 30% both ways, TCP's backoff and head-of-line blocking stalled connections for minutes (longest finished stall 576 s). With updates every 0.5 s, only 29% of updates reached TCP receivers within the 15-minute run, half the connections were still stalled at the end, receivers held a superseded value 90% of the time, and TCP delivered 2 698 frames after their signed expiry. The carousel delivered every update in every condition; its worst case under the same loss was 3.5-11 s. |
+| **E1 outages** | After a 10 s outage, TCP resumed in p95 3.9-6.3 s (RTO doubling 408 ms → 6.5 s); the carousel in 0.47-0.91 s with frequent updates. |
+| **E2 fan-out** (up to 5 000 listeners) | Per listener·frame of sender CPU: TCP 11.6-12.0 µs, UDP `sendmmsg` 4.2-4.4 µs, multicast flat. TCP doubles the packets (ACKs) and needs one socket and one queue per listener. Below about 1 000 listeners the cost difference is noise. Arrival times at listeners were not measured. |
 | **E3 slow and dead listeners** | One stopped TCP reader stalled a blocking writer, and so all 100 listeners, after 29 s. With autotuned receive buffers the sender never noticed; the stopped reader held 4.1 MB of ten-minute-old data. A silently vanished TCP peer took 938 s to detect (30.4 s with `TCP_USER_TIMEOUT`). A dead UDP lease lapsed in 54-74 s and cost the sender nothing meanwhile. |
-| **E4 late joiner** | A TCP snapshot takes 0.4 ms with no loss but p99 96 s at 30% (lost SYNs). The default 4 kbit/s stream budget gives a 13 s fair-share loop and 14.4 s catch-up with no loss: the budget, not the protocol, decides catch-up time. |
+| **E4 late joiner** | A TCP snapshot takes 0.5 ms with no loss, but at 30% lost SYNs left 17 of 360 joins unfinished at 120 s, so its p99 lies beyond 120 s. A 1 s carousel took 6.6 s p99 at 30%, with no failures. The default 4 kbit/s stream budget gives a 13 s fair-share loop and 14.6 s catch-up with no loss: the budget, not the protocol, decides catch-up time. |
 | **E5 relay restart** (1 000 listeners) | TCP with a 4 096 backlog re-served everyone in 0.3 s. UDP leases took 13.2 s, because a restarted relay can't validate old cookies and listeners wait out three missed beacons. |
 
 ### 15.2 SeedLink and its UDP relatives
@@ -764,7 +766,7 @@ The cohort has already seen the failure mode §9 warns about, over Discord and w
 
 The spike proposes thirteen RFC-0001 amendments, A1-A13 (`spike/protocol-dynamics-udp-vs-tcp-2026-09-27.md` §7). The load-bearing ones are A1 (`trail_seq`, the oldest live sequence, in each beacon), A2 (lease-scoped relay REPAIR with NORM discipline, which needs a scoped exception to non-goal 1), A3 (receiver reports on RENEW and a circuit breaker), A6 (backbone TCP rules), A9 (kinetic proofreading), A11 (contagion controls) and A12 (guardian role and doubt channel). None is applied to RFC-0001 yet; they are for the cohort to accept, amend or reject.
 
-**Limitations.** No RTT emulation; Bernoulli loss on one host; the ≥ 20% loss tails rest on a few long episodes per run (read them as orders of magnitude); QUIC was not measured.
+**Limitations.** No RTT emulation; Bernoulli loss on one host; the ≥ 20% loss tails rest on a few long episodes per run and vary between runs (read them as orders of magnitude); Kaplan–Meier assumes the cutoff says nothing about latency, which TCP's shared stalls strain; QUIC was not measured.
 
 ---
 

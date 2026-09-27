@@ -498,7 +498,7 @@ def run_many(experiment: str, modes: list[tuple], n: int) -> dict:
             rcvbuf = rest[0] if rest else 0
             name = mode + (f"-uto{uto // 1000}s" if uto else "") + ("-autotuned" if experiment == "slow"
                                                                      and not rcvbuf else "")
-            ns = stack.enter_context(netns.netns(f"pd-e3-{name}"))
+            ns = stack.enter_context(netns.netns(netns.name(f"e3-{name}")))
             argv = [sys.executable, os.path.abspath(__file__), "one", "--experiment", experiment, "--mode", mode,
                     "--n", str(n), "--duration", str(dur), "--victim-rcvbuf", str(rcvbuf)]
             if uto:
@@ -563,10 +563,20 @@ def main() -> None:
         # the victim fixes SO_RCVBUF at 64 KiB (the kernel doubles it); plus the autotuned default
         modes = [(m, 0, 600, 65536) for m in ("tcp-blocking", "tcp-queue", "tcp-drop", "tcp-disconnect", "udp")]
         modes += [("tcp-blocking", 0, 600, 0), ("udp", 0, 600, 0)]
-        stats.write_json(a.out, run_many("slow", modes, a.n))
+        _write(a.out, run_many("slow", modes, a.n))
     else:
         modes = [("tcp-kill", 0, 60), ("tcp-silent", 30_000, 90), ("tcp-silent", 0, 1000), ("udp-lease", 0, 150)]
-        stats.write_json(a.out, run_many("dead", modes, a.n))
+        _write(a.out, run_many("dead", modes, a.n))
+
+
+def _write(out: str, res: dict) -> None:
+    """Write the aggregate only if every variant succeeded; otherwise keep the old one and exit 1."""
+    failed = {name: r["error"] for name, r in res["runs"].items() if "error" in r}
+    if failed:
+        stats.write_json(out + ".failed.json", res)
+        sys.exit(f"e3: variants failed (exit codes) {failed}; {out} left unchanged, "
+                 f"partial output in {out}.failed.json")
+    stats.write_json(out, res)
 
 
 if __name__ == "__main__":

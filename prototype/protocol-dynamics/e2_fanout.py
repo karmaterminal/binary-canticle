@@ -8,9 +8,9 @@ by three means, sent by the Go program in ``fanout/``:
 - ``mcast``: one UDP datagram per frame to 239.255.13.13, received by N sockets
   that each joined the group (all N in one receiver process).
 
-Testbed. The sender runs in namespace ``pd-e2-tx``, the listeners in
-``pd-e2-rx``, joined by a veth pair (10.77.0.1 ↔ 10.77.0.2). The veth
-counters in ``pd-e2-tx`` are the "wire": every data packet, and every TCP ACK
+Testbed. The sender runs in namespace ``<PD_NS_PREFIX>e2-tx``, the listeners in
+``<PD_NS_PREFIX>e2-rx``, joined by a veth pair (10.77.0.1 ↔ 10.77.0.2). The veth
+counters in the sender's namespace are the "wire": every data packet, and every TCP ACK
 coming back, crosses it. The sender is pinned to CPU 0 and the listeners to
 CPUs 2-3. RPS steers the listeners' receive processing to CPUs 2-3 and the
 ACKs arriving at the sender to CPU 0, so CPU 0's busy time is the sending host's
@@ -19,6 +19,12 @@ The kernel uses tick-based accounting (HZ 250, no IRQ-time accounting), so
 softirq time lands on whichever CPU runs it; that is why RPS is set.
 ``net.core.netdev_max_backlog`` is raised to 16 384 for the run and restored,
 so bursts of N packets are not dropped in the RPS backlog.
+
+The sender also reports ``enqueue_all_{p50,p99,max}_us``: the time its loop
+took to hand one frame to the kernel for all N listeners (N write() calls,
+N/1024 sendmmsg() calls, or one sendto()). That is sender enqueue time. There
+are no receiver timestamps, so when the last listener received the frame
+(arrival spread) is not measured.
 
 Run (root)::
 
@@ -40,7 +46,7 @@ sys.path.insert(0, HERE)
 
 from harness import netns, stats  # noqa: E402
 
-TX, RX = "pd-e2-tx", "pd-e2-rx"
+TX, RX = netns.name("e2-tx"), netns.name("e2-rx")
 TX_IP, RX_IP = "10.77.0.1", "10.77.0.2"
 GROUP = "239.255.13.13:9999"
 SENDER_CPU, ACK_CPU_MASK, RX_CPUS, RX_CPU_MASK = "0", "1", "2,3", "c"
@@ -54,8 +60,7 @@ def sh(*argv: str) -> str:
 
 def topology() -> None:
     for ns in (TX, RX):
-        sh("ip", "netns", "del", ns) if ns in sh("ip", "netns", "list") else None
-        sh("ip", "netns", "add", ns)
+        netns.add(ns)                   # fails if the name exists; never deletes another run's namespace
         sh(*netns.ns_exec(ns, "ip", "link", "set", "lo", "up"))
     sh("ip", "link", "add", "pdv0", "netns", TX, "type", "veth", "peer", "name", "pdv1", "netns", RX)
     for ns, dev, ip, mask in ((TX, "pdv0", TX_IP, ACK_CPU_MASK), (RX, "pdv1", RX_IP, RX_CPU_MASK)):
@@ -67,7 +72,7 @@ def topology() -> None:
 
 def teardown() -> None:
     for ns in (TX, RX):
-        netns.run("ip", "netns", "del", ns, check=False)
+        netns.delete(ns)                # only if this process created it
 
 
 # ---------------------------------------------------------------- snapshots

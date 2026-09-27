@@ -345,7 +345,7 @@ def run_all(a) -> None:
     for rep in range(a.repeats):
         for strace in (False, True) if rep == 0 else (False,):
             for mode, backlog in (("tcp", 128), ("tcp", 4096), ("udp-lease", 0)):
-                ns = f"pd-e5-{mode}-{backlog}"
+                ns = netns.name(f"e5-{mode}-{backlog}")
                 with netns.netns(ns):
                     argv = [sys.executable, os.path.abspath(__file__), "one", "--mode", mode, "--backlog",
                             str(backlog), "--n", str(a.n)] + (["--strace"] if strace else [])
