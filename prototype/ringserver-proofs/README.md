@@ -38,7 +38,10 @@ PYTHON=.venv/bin/python ./run.sh         # clones + builds ringserver v4.5.4 int
 ```
 
 `run.sh` starts ringserver with a 16 MiB in-memory ring (`-NOMM`), 512-byte packets, a
-`DataLink SeedLink HTTP` listener on `SLPORT` (default 18000) and a DataLink-only
-listener on `DLPORT` (default 16000), then runs the proofs and stops the server.
-Override with `DLPORT`, `SLPORT`, `RINGSERVER` (path to an existing binary) and `PYTHON`.
+`DataLink SeedLink HTTP` listener on `SLPORT` and a DataLink-only listener on `DLPORT`
+(by default two free ports picked at start), then runs the proofs and stops the server.
+Because the proofs write synthetic records, `run.sh` proceeds only once the ringserver it
+started is alive and owns both ports; if either port is taken it refuses, rather than run
+against a server it did not start. Override with `DLPORT`, `SLPORT`, `RINGSERVER` (path to
+an existing binary) and `PYTHON`.
 `cryptography>=45` is required by the receptor; older distro packages fail on import.

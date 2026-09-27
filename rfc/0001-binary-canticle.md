@@ -407,6 +407,7 @@ The loop is the owner's central semantic, and no earlier document specified it (
 - Each stream has a **station ring**: its live set, ordered by `seq`.
 - Retention is `min(depth, TTL)`: "at most TTL seconds, and at most depth frames, whichever is less" (`proto/stations-and-streams-v0.2-open-questions-bytewalk-cael.md:61`). Depth is station-private. Default depth [PROPOSED DEFAULT]: 256 items per stream.
 - An item pushed out by depth before it expires stops looping. That is an honest gap, not a pluck: receivers that already hold it keep it until local expiry.
+- Depth counts ITEMs only. A PLUCK is a tombstone: the station MUST keep it looping until its target's expiry (§7.7) and MUST NOT evict it for depth. A station MAY cap live PLUCKs per stream (default: depth); at the cap it MUST refuse the hush and say so, never drop an earlier PLUCK.
 - The station ring is the loop source. The **hearer ring** (§14.4) is a separate cache on the receiving side. The two were conflated before (`review/spec-core C2`).
 
 ### 7.2 Sing, sign once, loop byte-identically
@@ -432,7 +433,8 @@ Every transmission of the item MUST carry exactly the same bytes. A station MUST
 - A repeat of an accepted tuple with identical bytes is a **benign no-op** for every derived quantity (§12.1). It is not a replay attack and MUST NOT be reported as one. The prototype's `reject/replay` for repeats (`prototype/ringserver-udp-cue/canticle_receptor/receptor.py:78-79`) is the behaviour this rule replaces.
 - A tuple heard with **different bytes** is an equivocation (§10.8).
 - A frame whose local expiry (§14.6.3) has passed is dropped as `expired`. This is what a real replay attack looks like, and it needs no replay table.
-- Dedup entries MUST be retained until local expiry plus 5 s skew and then evicted. Under capacity pressure the oldest entries MUST be evicted first; the dedup store MUST NOT fail closed. The prototype's 24-hour, fail-closed replay table (bug B4: full after about 13 s at 783 accepts/s, locked out for about 25 h, `review/prototype §6`) is the failure this prevents.
+- Dedup entries MUST be retained until local expiry plus 5 s skew and then evicted, and MUST NOT be evicted earlier under capacity pressure: a live entry holds the equivocation evidence (§10.8) and the record that stops a repeat from counting as new or waking again. The same holds for sticky-pluck and supersession marks.
+- Capacity is enforced per key, at admission, instead. When a key's share of the store is full, new tuples from that key are refused with evidence `over-quota` (never landed, never wake-eligible) until its own entries expire. The store never fails closed as a whole: a flooding key locks out only itself. The prototype's 24-hour, global, fail-closed replay table (bug B4: full after about 13 s at 783 accepts/s, locked out for about 25 h, `review/prototype §6`) is the failure this prevents.
 - Capacity [PROPOSED DEFAULT]: size the store at `Σ(rate × TTL)` over tuned streams, with a per-key quota of 4 × the live count that key's beacon advertises.
 
 ### 7.5 The loop-rate regulator
@@ -497,6 +499,7 @@ On a new item, a supersede (§7.8), a pluck (§7.7) or an UNEQUIP (§8.5), the s
 - **Receivers.** On a valid PLUCK, a receiver MUST remove the target from every current surface and MUST add `(key-id, epoch, stream_id, target_seq)` to its **sticky-pluck set**, retained until the target's local expiry plus skew. If the target arrives after the pluck — UDP reorders (`proto/protocol-spec-v0.1.md:59`) — it MUST be suppressed with evidence `plucked`. This is frond-scribe's review refinement on PR #32 (`issuecomment-4735695826`), which never landed on `main` (`review/prs §4.3`).
 - A pluck can only shorten visibility. It cannot extend a TTL or promise global erasure (#51 invariant 7). Text already drained into a session transcript cannot be recalled; for items it has landed, the receptor SHOULD put a one-line "withdrawn by station" note in the digest slot (`review/challenge-redteam T4(f)`).
 - A pluck whose target the receiver never heard is still recorded in the sticky-pluck set.
+- The station's obligation is to keep the PLUCK on air until the target expires (§7.1). Whether a given receiver hears it stays best-effort, as on every lossy path; that is PR #32's contract for hearers that already surfaced the target, and the digest note above is the remedy.
 
 ### 7.8 Supersede by key
 
@@ -550,7 +553,7 @@ The BEACON frame layout is in §9.8. Semantically it does six jobs:
 3. **Liveness.** `next_beacon_ms` states when to expect the next beacon.
 4. **Retention contract.** Per stream: default and maximum TTL.
 5. **Loop contract.** Per stream: live count, typical and maximum `loop_ms`, `B_stream`; per station: `B_station`, and the regulation profile identifier (§12.8).
-6. **Clock offset.** `wallclock` lets receivers estimate δ̂, the station-to-receiver clock offset, as the **minimum** of `(t_receive − wallclock)` over the last 16 beacons (the minimum filters out network delay). δ̂ is used only to make local expiry fail closed (§14.6.3), never to extend it. Without beacons, δ̂ = 0.
+6. **Clock offset.** `wallclock` lets receivers estimate δ̂, the station-to-receiver clock offset, as the **minimum** of `(t_receive − wallclock)` over the last 16 beacons (the minimum filters out network delay). δ̂ moves station times onto the receiver clock, for the time window (§12.2 step 3) and for local expiry (§14.6.3). It can never keep an item past its full TTL counted from first hearing. Without beacons, δ̂ = 0.
 
 A beacon never counts toward salience, evidence mass, accord or any strength quantity. Presence is not intensity (`review/challenge-bio §4 row 17`).
 
@@ -886,7 +889,7 @@ DECISION D4 (recommended: Ed25519 mandatory for every frame that can land in a s
 
 ### 10.3 The fleet manifest
 
-The fleet manifest is the only trust anchor. Receptor allowlists are **derived** from it, never edited by hand at fleet scale.
+The fleet manifest is the only source of keys and capabilities. Receptor allowlists are **derived** from it, never edited by hand at fleet scale. The manifest is not self-authenticating: what anchors it is a root set provisioned out of band (below).
 
 **Deviation from spine:** P5 said "receptors hold allowlists". At fleet scale, revoking a key by editing thousands of allowlists fails, and a revocation signed by the compromised key is worthless. Allowlists are compiled from a manifest signed by an offline root. Evidence: `review/challenge-redteam C2, amendment 1`; `review/transport R5.4`.
 
@@ -912,9 +915,15 @@ Distribution and lifetime:
 - A receiver whose manifest has passed `not_after` MUST fail closed: it keeps processing control frames from the last known root and treats every other frame as `ringbuffer_only`, and it alerts its operator.
 - A single-owner cohort MAY run a 1-of-1 root.
 
-DECISION D15 (recommended: 2-of-*n* offline roots held by humans, separate from alarm-key holders, manifest lifetime 7 days, refresh daily; 1-of-1 acceptable at cohort scale).
+Bootstrap and rollover (raised in review of PR #52):
 
-`~/.binary-canticle/stations.toml` (the static-configuration fallback that `proto/protocol-spec-v0.1.md:305-307` made a MUST) keeps its role as a **locator** and MAY pin the manifest root keys.
+- **Genesis pin.** A receiver MUST NOT accept a manifest unless it verifies against a root set, or the SHA-256 digest of a genesis manifest, that its operator provisioned out of band: configuration management, the install package, or `stations.toml`. A manifest found by location alone (configured URL, DNS-SD `mfst=`, HTTPS) is only a candidate. HTTPS and the WebPKI authenticate the server, not the fleet, and are never sufficient on their own.
+- **Root rotation.** A manifest whose `roots` or `threshold` differ from the currently trusted set MUST carry signatures meeting the threshold of the current set as well as of the new one. A receiver that cannot see such a chain from its pinned set MUST keep the old set and alert its operator.
+- **Rollback.** A receiver MUST durably record the highest `serial` it has accepted before acting on that manifest, and MUST reject a manifest with a lower serial, or the same serial and different bytes (the latter is root equivocation: alert).
+
+DECISION D15 (recommended: 2-of-*n* offline roots held by humans, separate from alarm-key holders, manifest lifetime 7 days, refresh daily; 1-of-1 acceptable at cohort scale; the genesis pin shipped with the install, not fetched).
+
+`~/.binary-canticle/stations.toml` (the static-configuration fallback that `proto/protocol-spec-v0.1.md:305-307` made a MUST) keeps its role as a **locator**, and is one place the genesis pin (root keys and threshold, or a genesis manifest digest) MAY be provisioned.
 
 ### 10.4 Capability classes
 
@@ -1227,14 +1236,16 @@ A relay MUST evaluate every inbound frame in this order, cheapest first, and for
 
 1. Size (≤ 1 100 B canonical, ≤ 1 200 B datagram), `magic`, `version`, `kind`.
 2. `key_id` present in the manifest and not revoked.
-3. Time window: `issued_at` ≤ now + 5 s and `expires_at` > now, read from map keys 4 and 5 by a bounded CBOR parse (they are not at fixed offsets).
+3. Time window, by `kind`, read by a bounded CBOR parse. The fields are not at fixed offsets, and a map key means different things in different kinds (keys 4 and 5 are times in ITEM and PLUCK, `next_beacon_ms` and `profile` in BEACON, §9.6-§9.8).
+   - ITEM and PLUCK: `issued_at` (key 4) ≤ now − δ̂ + 5 s, and local expiry (§14.6.3, from `expires_at`, key 5) > now. δ̂ is the relay's clock-offset estimate for the key from the beacons it has admitted (§8.2), 0 without one; without it a station with a wrong clock would have every frame dropped.
+   - BEACON: no time window. A beacon has no expiry, and its `wallclock` (key 3) is the input to δ̂, so bounding it would reject every beacon from a station whose clock is wrong. Replayed or stale beacons are dropped at step 10, and floods at step 4.
 4. Per-key and per-source packet rate.
 5. Deterministic-CBOR check and Ed25519 signature.
 6. Capability: class, op, `scope` and stream permitted for the key (§10.4).
 7. `scope` permitted on this relay's tier (§4.3). A relay MUST drop `host` frames; fleet and public tiers MUST drop `lan` frames; a public tier accepts only `public` frames and never wake-eligible classes.
 8. TTL not above the class maximum (§6.2).
 9. Per-station ingress budget (`B_station`, capped by the manifest).
-10. Deduplication (§7.4), supersession and pluck bookkeeping (§7.7-§7.8).
+10. Deduplication (§7.4), supersession and pluck bookkeeping (§7.7-§7.8). A BEACON is admitted only if its `(epoch, bseq)` is above the last one admitted for its key (§9.8).
 
 A relay:
 
@@ -1461,7 +1472,7 @@ The receptor is the deterministic judgment core between the wire and the session
 
 A receptor MUST process each datagram in this order:
 
-1. **Cheap checks**: size, `magic`, `version`, `kind`; `key_id` known and not revoked; time window; per-key and per-source rate.
+1. **Cheap checks**: size, `magic`, `version`, `kind`; `key_id` known and not revoked; time window by `kind` (§12.2 step 3: none for BEACON); per-key and per-source rate.
 2. **Crypto**: deterministic-CBOR check, then Ed25519 (§9.3, §9.4).
 3. **Manifest checks**: capability, scope, stream patterns (§10.4).
 4. **Identity**: deduplication, equivocation, supersession, sticky-pluck (§7.4, §7.7, §7.8, §10.8).
@@ -2509,13 +2520,13 @@ The fixture suite is issue #27's deliverable; it absorbs the fixture asks of #37
 |---|---|---|
 | **F-WIRE** codec | valid ITEM, PLUCK and BEACON; tampered header; tampered body; valid signature by an unlisted key; unknown key-id; revoked key; expired; `issued_at` > now + 5 s; identical repeat (no-op); equivocation pair; non-deterministic CBOR (unsorted keys, non-shortest integer, indefinite length, duplicate key); `crit` naming an unknown key; unknown `kind`; unknown `version`; 1 101-byte frame; nesting-depth bomb; float in a core key; signature made without the domain prefix | §9; #48 acceptance ("valid, wrong key, tampered, unknown/revoked, expired, replayed") |
 | **F-LOOP** | L-01..L-08 (§22.4) | §7.5-§7.6 |
-| **F-PLUCK** | PLUCK loops until the target's expiry; sticky-pluck under every ordering, including pluck before original; a pluck cannot extend visibility; a pluck signed by another key is rejected | §7.7; #39; PR #32 review |
+| **F-PLUCK** | PLUCK loops until the target's expiry, including at depth 1 with later items; a hush at the PLUCK cap is refused and changes nothing; sticky-pluck under every ordering, including pluck before original; a pluck cannot extend visibility; a pluck signed by another key is rejected | §7.1; §7.7; #39; PR #32 review |
 | **F-SUP** | every ordering of {old, new} for one state key (RT-30); warm-up after restart (RT-31); high-water mark persisted across restart; far-future `issued_at` cannot win | §7.8 |
 | **F-37** | retention `min(depth, TTL)`: a high-rate stream (depth-bound) and a sparse stream (TTL-bound) | #37 |
 | **F-38** | a forced `stream_id` collision makes the station refuse to start; two names learned for one id → no surfacing, evidence `stream-name-ambiguous` | #38 |
 | **F-40** | catalog learned from beacons and manifest without content types in the beacon; rotation covers every stream within `count` beacons; a `catalog_digest` change invalidates stale entries | #40; §8.4 |
-| **F-CARRIER** | the presence machine, including SIGNED_OFF, ROOT_UNKNOWN and relay decimation; no state ever rendered "offline" | §8.6 |
-| **F-TRUST** | manifest threshold signatures; expired manifest fails closed; key-id collision rejected; capability exceeded → zero accord; REVOKE propagation | §10 |
+| **F-CARRIER** | the presence machine, including SIGNED_OFF, ROOT_UNKNOWN and relay decimation; no state ever rendered "offline"; a relay and a receptor both admit a valid BEACON whatever its `wallclock` and drop one whose `(epoch, bseq)` is not above the last admitted; ITEM and PLUCK time windows applied after δ̂ (a station clock an hour behind still delivers); a higher epoch resets the `bseq` mark | §8.6; §9.8; §12.2 step 3; §14.1 |
+| **F-TRUST** | manifest threshold signatures; expired manifest fails closed; key-id collision rejected; capability exceeded → zero accord; REVOKE propagation; a manifest naming its own unpinned roots is rejected; root rotation without the old threshold is rejected; a lower serial, or a same-serial different manifest, is rejected after restart; a capability-rejected frame leaves epoch, dedup and presence state unchanged | §10 |
 | **F-LEASE** | cookie construction and rotation; replies ≤ request before validation; silence to forged cookies; lease lapse; LEASE_UNKNOWN; listen capability required for `fleet` streams | §11.3; RT-10..RT-14, RT-62 |
 | **DOC** | `canticle doctor`: loopback probe; peer beacons; the 270-second IGMP querier check; broadcast fallback; exit codes | §11.2 |
 | **EM-01..EM-10** | Emeric's acceptance tests (§22.5) | #51 |
@@ -2591,7 +2602,7 @@ The suite runs on a "worm range": at least 20 simulated sessions (an OpenClaw ga
 | D12 | Signed envelope | Bespoke header + deterministic CBOR + trailer; publish a COSE_Sign1 mapping; freeze after S1 | §9.14 |
 | D13 | `post-compaction` landing of heard content | Reserved in v1 | §14.9 |
 | D14 | Who holds alarm keys | Human-operated stations in v1; an automated 2-of-3 keeper issuer behind a flag | §10.4 |
-| D15 | Manifest operations | 2-of-*n* offline human-held roots, separate from alarm-key holders; 7-day lifetime; daily refresh; 1-of-1 at cohort scale | §10.3 |
+| D15 | Manifest operations | 2-of-*n* offline human-held roots, separate from alarm-key holders; 7-day lifetime; daily refresh; 1-of-1 at cohort scale; genesis pin shipped with the install | §10.3 |
 | D16 | Sandbox mandate | Required for any wake-enabled OpenClaw agent | §16.3 |
 | D17 | Public "lighthouse" stations | Optional; ambient-only, never wake-eligible, declared purpose | §4.1 |
 | D18 | "Tuning a new model" | In-context attunement only in v1; no training on broadcast data | §19.6 |

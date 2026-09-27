@@ -684,7 +684,7 @@ Further decisions, mostly surfaced by the adversarial reviews (RFC-0001 ids):
 | D12 | Signed envelope | Bespoke header + deterministic CBOR + trailer; publish a COSE_Sign1 mapping (+11 B, §8.2); freeze after S1 | Frame v2 (N3) |
 | D13 | `post-compaction` landing of heard content | Reserved in v1 | S3 |
 | D14 | Who holds alarm keys | Human-operated stations in v1; an automated 2-of-3 keeper issuer behind a flag until the red-team suite passes | Alarm wake in S3; S5 drills |
-| D15 | Manifest operations | 2-of-n offline roots held by humans, separate from alarm-key holders; 7-day manifest lifetime, refreshed daily; 1-of-1 acceptable at cohort scale | Manifest (N13) |
+| D15 | Manifest operations | 2-of-n offline roots held by humans, separate from alarm-key holders; 7-day manifest lifetime, refreshed daily; 1-of-1 acceptable at cohort scale; the genesis root pin ships with the install, never fetched (RFC-0001 §10.3) | Manifest (N13) |
 | D16 | Sandbox mandate | Required for any wake-enabled OpenClaw agent: tools sandboxed, bootstrap files sealed | Wake in S3 |
 | D17 | Public "lighthouse" stations | Optional; ambient-only, never wake-eligible, declared purpose | Public streams (D6) |
 | D18 | "Tuning a new model" | In-context attunement only in v1; no training on broadcasts or the replay archive | RFC scope |
