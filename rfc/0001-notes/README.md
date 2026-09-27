@@ -47,3 +47,12 @@ landed as [`prototype/ringserver-proofs/`](../../prototype/ringserver-proofs/).
 
 - [`vec/frame_v2_sizes.py`](vec/frame_v2_sizes.py) and [`vec/sizes.out`](vec/sizes.out) generate the frame v2 size budget and the illustrative test vectors in RFC §9.11. They need `cbor2` and `pynacl`.
 - [`brokerx/`](brokerx/) holds the control experiment: the same carousel over raw UDP plus a minimal relay, over NATS core, and over Zenoh, plus the JetStream TTL-at-hop probe (`exp_js.py`). The build caches, venv and binaries are not included; `run_compare.sh` expects `./bin/nats-server` and `./venv`.
+
+## Errata (found by the fact-check passes; the RFC and report carry the corrections)
+
+- `openclaw-rfc.md` §S2: `POST /hooks/wake` with `mode:"next-heartbeat"` plus a caller-chosen `sessionKey` is **not** a silent landing. A `sessionKey` requires `mode:"now"`, which always wakes (`src/gateway/hooks.ts:290-291` on the gates branch, `:282-283` on `main`). `next-heartbeat` lands only in the agent's main session.
+- `seedlink-dash.md`: the ews open-proxy citation `src/routes/api/fdsn/station/+server.ts:82-97,112-131` is wrong at `c5134cb`; the file is about 70 lines and the correct range is `:5-10,35-66`.
+- `seedlink-dash.md`, `prototype.md`: "ringserver sends miniSEED3 unconverted to SeedLink 3.x clients" holds for 4.5.4 only. From 4.5.5 ringserver skips miniSEED3 records for 3.x clients (ChangeLog v4.5.5).
+- `seedlink-dash.md`: the exact `need 47, found 6` string was reproduced from synthetic 526-byte and 14-byte messages built from real packets. The live proxy run produced `found 4` and a RangeError (see proof 06).
+- `spine.md` P3: the "beacon overflow above ~180 streams" figure assumed v0.2's 8-byte entries. With frame-v2 stream entries, rotation starts at about 26-27 streams (RFC-0001 §8.4).
+- `spine.md` P11: the Tier B idempotency key must include `stream_id` (`canticle:<key_id>:<epoch>:<stream_id>:<seq>:<sessionKey>`), because `seq` is per stream (RFC-0001 §16.4).

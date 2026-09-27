@@ -1,5 +1,6 @@
-"""Proof 02: a miniSEED3 text item reaches a SeedLink v4 client intact; a v3.1 client
-gets raw miniSEED3 bytes it cannot parse as miniSEED2.
+"""Proof 02: a miniSEED3 text item reaches a SeedLink v4 client intact; on ringserver
+4.5.4 a v3.1 client gets raw miniSEED3 bytes it cannot parse as miniSEED2 (4.5.5+ skips
+miniSEED3 records for 3.x clients instead).
 
 This is why dashboards that speak SeedLink 3.1 with a miniSEED2 parser (ews-concept-new)
 need numeric miniSEED2 channels (see 03_carrier_writer.py), or an upgrade to v4 + ms3.
