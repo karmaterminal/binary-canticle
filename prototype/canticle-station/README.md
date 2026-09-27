@@ -13,7 +13,7 @@ them loop until they expire.
 | §5 Identity | Key-id = SHA-256(pubkey)[0:8]; `stream_id` = SHA-256("canticle-stream/v2" ‖ 0 ‖ name)[0:4]; collisions are refused, never rehashed (#38). |
 | §7 Carousel | Signs each item once and resends the same bytes. The expiry is absolute and never reset. A burst goes out at 0, +1, +2 and +4 s, then SAP-style loops with jitter U(2/3, 4/3) and reconsideration. Includes the fair-share regulator with a class floor, the availability ceiling and clamp reasons; supersede-by-key; pluck (a PLUCK loops until the target's expiry); refresh re-issue for keep-on-air; and ring depth. |
 | §8 Carrier-beacon | Signed beacons with per-stream heads, live counts, loop and TTL contracts, `next_beacon_ms` (0 = goodbye) and ±10% jitter. Beyond 24 streams it rotates pages with a catalog digest. |
-| §7.4-§7.8, §8.6 Listener | Dedup on the identity tuple: a repeat is a no-op, different bytes are an equivocation. Also sticky-pluck, supersession high-water marks, epoch regression, class capability from the manifest, local expiry clamped to the class max TTL, and δ̂ clock offset that only ever makes expiry earlier. Presence covers ROOT_UNKNOWN, EQUIPPED_QUIET, EQUIPPED_SPEAKING, UNEQUIPPED_PRESENT and UNOBSERVABLE (with a `signed_off` reason). |
+| §7.4-§7.8, §8.6 Listener | Dedup on the identity tuple: a repeat is a no-op, different bytes are an equivocation. Also sticky-pluck, supersession high-water marks, epoch regression, class capability from the manifest (checked before any state changes, so a rejected frame is state-neutral), per-key dedup quotas that refuse new tuples rather than evict live ones, and local expiry per RFC §14.6.3: clamped to the class max TTL, moved onto the receiver clock by δ̂, and never longer than the full TTL from first hearing. Presence covers ROOT_UNKNOWN, EQUIPPED_QUIET, EQUIPPED_SPEAKING, UNEQUIPPED_PRESENT and UNOBSERVABLE (with a `signed_off` reason). |
 | §11.1-§11.2 Bindings | Host-local submission over a unix socket (mode 0600, peer uid checked); UDP unicast and LAN multicast (`239.255.13.13:9999`, provisional per D22, IP TTL 1, don't-fragment). |
 
 Not implemented here, and still open work (see RFC-0001 §23.3):
@@ -75,7 +75,7 @@ Do not pipe heard text straight into a session. RFC-0001 §14 and §16 require a
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 35 tests, about 6 s
+python -m unittest discover -s tests      # 40 tests, about 6 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -88,11 +88,11 @@ python -m canticle vectors                # regenerate vectors/frame-v2-candidat
 - `test_station.py` drives the carousel on a virtual clock:
   - burst timing, byte-identical repeats, jitter bounds and stopping before expiry;
   - the regulator's fair share, class floor and degraded shedding;
-  - supersede, pluck (including a late pluck that must never be shed, and a refused hush that must change nothing) and refresh re-issue;
+  - supersede, pluck (including a late pluck that must never be shed, a PLUCK that depth never evicts, and a refused hush that must change nothing) and refresh re-issue (which keeps provenance flags);
   - depth, stream-id collisions and beacon pages;
   - a late joiner hearing every live item within `loop_ms × 4/3`;
   - the persisted epoch counter: strictly increasing across same-second restarts and a clock that steps back.
-- `test_listener.py` covers the presence state machine, local expiry, the clock-offset rule, garbage input and station restarts (a new epoch's beacons count from 1 again; two starts in one second never reuse an identity tuple).
+- `test_listener.py` covers the presence state machine, local expiry, the §14.6.3 clock rule (including a station clock an hour behind), state-neutral capability rejection, per-key dedup quotas, garbage input and station restarts (a new epoch's beacons count from 1 again; two starts in one second never reuse an identity tuple).
 - `test_udp_e2e.py` runs a real station and listener over loopback UDP and the unix control socket: sing, listen, hush, status and goodbye.
 
 ## Vectors

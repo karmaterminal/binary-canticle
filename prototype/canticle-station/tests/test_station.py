@@ -128,6 +128,32 @@ class CarouselTest(unittest.TestCase):
         self.assertTrue(all(b.flags & wire.Item.REFRESH and b.state_key == "root" for b in refreshed))
         self.assertLessEqual(max(b.issued_at for b in refreshed), T0 + 300_000)
 
+    def test_refresh_keeps_provenance_flags(self):
+        st = station()
+        r = st.sing(T0, "root", body=cbor.encode({1: "hold"}), ctype=7, state_key="root", ttl_s=90,
+                    keep_on_air_s=300, flags=wire.Item.WAKE_DERIVED)
+        sent = items(run(st, T0, T0 + 200_000, step=250))
+        refreshed = {b.seq: b for b in (wire.parse(f, lambda k: PK).body for _, f in sent) if b.seq > r.seq}
+        self.assertTrue(refreshed)
+        for b in refreshed.values():
+            self.assertEqual(b.flags, wire.Item.WAKE_DERIVED | wire.Item.REFRESH)
+
+    def test_depth_never_evicts_a_pluck(self):
+        st = station(depth=1)
+        a = st.sing(T0, "chatter", text="oops", ttl_s=60)
+        p = st.hush(T0 + 1_000, "chatter", a.seq)
+        st.sing(T0 + 2_000, "chatter", text="b")
+        c = st.sing(T0 + 3_000, "chatter", text="c")                 # depth 1 pushes out b, not the pluck
+        s = st.streams["chatter"]
+        self.assertEqual(sorted(s.ring), [p.seq, c.seq])
+        before = (dict(s.ring), s.head_seq)
+        with self.assertRaises(ValueError):
+            st.hush(T0 + 4_000, "chatter", c.seq)                     # a second live PLUCK exceeds depth 1
+        self.assertEqual((dict(s.ring), s.head_seq), before)
+        plucks = items(run(st, T0 + 3_000, T0 + 70_000), kind=wire.KIND_PLUCK)
+        self.assertGreater(plucks[-1][0], a.expires_at - 20_000)      # still looping near the target's expiry
+        self.assertLess(plucks[-1][0], a.expires_at)
+
     def test_depth_pushes_out_oldest(self):
         st = station(depth=3)
         for i in range(5):

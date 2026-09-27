@@ -334,16 +334,24 @@ def _beacon(m: dict) -> Beacon:
     )
 
 
-def local_expiry_ms(it: Item | Pluck, clock_offset_ms: int = 0) -> int:
-    """Receiver-clock expiry: clamp to the class max TTL, and let the clock
-    offset only make expiry earlier, never later (§8.2 job 6, §14.6.3)."""
+def local_expiry_ms(it: Item | Pluck, clock_offset_ms: int = 0, first_heard_ms: Optional[int] = None) -> int:
+    """Receiver-clock expiry (§14.6.3):
+    ``min(expires_eff + δ̂, first_heard + (expires_eff − issued_at))``.
+
+    ``expires_eff`` clamps to the class max TTL (§6.2). δ̂ (receiver minus station clock, §8.2)
+    moves the station's expiry onto the receiver clock, and the TTL counted from first hearing caps
+    it, so a wrong or lying station clock can never keep an item longer than its full TTL.
+    """
     if isinstance(it, Item):
         spec = CLASSES.get(it.cls)
         max_ttl_s = spec.max_ttl_s if spec else MAX_CLAMP_TTL_S
         exp = min(it.expires_at, it.issued_at + max_ttl_s * 1000)
     else:
         exp = it.expires_at
-    return exp + min(clock_offset_ms, 0)
+    local = exp + clock_offset_ms
+    if first_heard_ms is not None:
+        local = min(local, first_heard_ms + (exp - it.issued_at))
+    return local
 
 
 def parse(

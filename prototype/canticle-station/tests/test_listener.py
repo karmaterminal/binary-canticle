@@ -63,10 +63,27 @@ class ExpiryTest(unittest.TestCase):
         self.assertEqual(kinds, ["item", "expired"])
         self.assertEqual(lst.on_air(), [])
 
-    def test_clock_offset_only_makes_expiry_earlier(self):
+    def test_clock_rule_is_rfc_14_6_3(self):
         it = wire.Item(epoch=1, stream=1, seq=1, issued_at=T0, expires_at=T0 + 60_000, cls=1, ctype=1, body=b"x")
-        self.assertEqual(wire.local_expiry_ms(it, 5_000), T0 + 60_000)
-        self.assertEqual(wire.local_expiry_ms(it, -5_000), T0 + 55_000)
+        self.assertEqual(wire.local_expiry_ms(it, -5_000), T0 + 55_000)          # receiver behind: earlier
+        self.assertEqual(wire.local_expiry_ms(it, 5_000), T0 + 65_000)           # receiver ahead: same instant
+        # ... but never more than the full TTL from first hearing
+        self.assertEqual(wire.local_expiry_ms(it, 5_000, first_heard_ms=T0 + 1_000), T0 + 61_000)
+        self.assertEqual(wire.local_expiry_ms(it, 3_600_000, first_heard_ms=T0 + 1_000), T0 + 61_000)
+
+    def test_station_clock_an_hour_behind(self):
+        hour = 3_600_000
+        st = Station(SK, [StreamConfig("chatter"), StreamConfig("root", cls="root")], epoch=1,
+                     rng=random.Random(1), now_ms=T0 - hour)
+        lst = setup()[1]
+        for t in range(0, 2_000, 100):                                   # beacons give δ̂ ≈ +1 h
+            for f in st.poll(T0 - hour + t):
+                lst.hear(f, T0 + t)
+        st.sing(T0 - hour + 2_000, "chatter", text="late clock", ttl_s=60)
+        evs = [e for f in st.poll(T0 - hour + 2_000) for e in lst.hear(f, T0 + 2_000)]
+        self.assertEqual([e.kind for e in evs if e.kind in ("item", "evidence")], ["item"])
+        (h,) = lst.current.values()
+        self.assertEqual(h.local_expiry, T0 + 62_000)
 
     def test_expiry_is_clamped_to_class_max(self):
         it = wire.Item(epoch=1, stream=1, seq=1, issued_at=T0, expires_at=T0 + 10**9, cls=1, ctype=1, body=b"x")
@@ -116,6 +133,45 @@ class RestartTest(unittest.TestCase):
             self.assertEqual(lst.stations[st.key_id].epoch_hwm, now_s + 1)
             self.assertNotIn("equivocation", lst.evidence_counts)
             self.assertEqual(sorted(h["seq"] for h in lst.on_air()), [1, 1])
+
+
+class AdmissionTest(unittest.TestCase):
+    def test_capability_rejected_frames_are_state_neutral(self):
+        st, lst = setup()
+        feed(st, lst, T0, T0 + 1_500)
+        rogue = Station(SK, [StreamConfig("chatter")], epoch=99, rng=random.Random(9), now_ms=T0 + 2_000)
+        rogue.sing(T0 + 2_000, "chatter", cls="advisory", text="not granted")   # class 4: not in the manifest
+        s = lst.stations[st.key_id]
+        before = (s.epoch_hwm, s.bseq, dict(s.last_stream_item), dict(lst.dedup))
+        items_only = [f for f in rogue.poll(T0 + 2_000)
+                      if wire.parse(f, lst.manifest.resolve, T0 + 2_000).kind == wire.KIND_ITEM]
+        evs = [e for f in items_only for e in lst.hear(f, T0 + 2_000)]
+        self.assertEqual([e.data["reason"] for e in evs], ["capability"])
+        self.assertEqual((s.epoch_hwm, s.bseq, dict(s.last_stream_item), dict(lst.dedup)), before)
+        st2 = Station(SK, [StreamConfig("chatter")], epoch=2, rng=random.Random(2), now_ms=T0 + 3_000)
+        st2.sing(T0 + 3_000, "chatter", text="authorised")
+        evs = [e for f in st2.poll(T0 + 3_000) for e in lst.hear(f, T0 + 3_000)]
+        self.assertIn("item", [e.kind for e in evs])
+        self.assertNotIn("epoch-regression", lst.evidence_counts)
+
+    def test_quota_refuses_new_tuples_and_keeps_live_ones(self):
+        sk2 = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(vectors.TEST2))
+        m = Manifest([StationEntry("cael", wire.public_key_bytes(SK), frozenset({1, 9}), ("chatter", "root")),
+                      StationEntry("silas", wire.public_key_bytes(sk2), frozenset({1}), ("chatter",))])
+        lst = Listener(m, dedup_capacity=6)                              # 3 tuples per key
+        loud = Station(SK, [StreamConfig("chatter")], epoch=1, rng=random.Random(1), now_ms=T0)
+        quiet = Station(sk2, [StreamConfig("chatter")], epoch=1, rng=random.Random(2), now_ms=T0)
+        for i in range(5):
+            loud.sing(T0, "chatter", text=f"flood {i}", ttl_s=30)
+        quiet.sing(T0, "chatter", text="still heard", ttl_s=30)
+        evs = [e for f in loud.poll(T0) + quiet.poll(T0) for e in lst.hear(f, T0)]
+        heard = [(e.station, e.seq) for e in evs if e.kind == "item"]
+        self.assertEqual(heard, [("cael", 1), ("cael", 2), ("cael", 3), ("silas", 1)])
+        self.assertEqual(lst.evidence_counts.get("over-quota"), 2)
+        again = [e for f in loud.poll(T0 + 1_000) for e in lst.hear(f, T0 + 1_000)]  # burst repeats
+        self.assertNotIn("item", [e.kind for e in again if e.seq in (1, 2, 3)])   # live entries kept: still no-ops
+        lst.tick(T0 + 40_000)                                                     # expired: room again
+        self.assertEqual(lst.dedup_per_key, {loud.key_id: 0, quiet.key_id: 0})
 
 
 class RobustnessTest(unittest.TestCase):

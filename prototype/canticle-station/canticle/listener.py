@@ -73,6 +73,7 @@ class Listener:
         self.tuned = tuned                    # stream names to surface; None = every named stream
         self.dedup_capacity = dedup_capacity
         self.dedup: dict[tuple, tuple] = {}   # identity -> (sha256(frame), retain_until)
+        self.dedup_per_key: dict[bytes, int] = {}
         self.sticky_pluck: dict[tuple, int] = {}
         self.hwm: dict[tuple, tuple] = {}     # (kid, stream, state_key) -> (issued_at, epoch, seq, retain_until)
         self.current: dict[tuple, _Heard] = {}  # identity -> heard item (on air, from this listener's view)
@@ -146,6 +147,12 @@ class Listener:
         events: list[Event] = []
         body = f.body
         kid = f.key_id
+        # Authorise before touching any state: a rejected frame must leave epoch, dedup,
+        # presence, sticky-pluck and high-water marks exactly as they were (§10.9).
+        if f.kind == wire.KIND_ITEM and body.cls not in self.manifest.entry(kid).classes:
+            events.append(self._evidence("capability", kid, f"class {body.cls} not granted",
+                                         stream=self._stream_name(kid, body.stream), seq=body.seq))
+            return events
         if not self._epoch_ok(kid, body.epoch, now_ms, events):
             return events
         ident = f.identity
@@ -162,7 +169,11 @@ class Listener:
                 h.copies += 1
                 h.last_heard = now_ms
             return events  # a repeat is a benign no-op (§7.4)
-        retain = wire.local_expiry_ms(body, st.offset_ms) + SKEW_MS
+        if not self._room_for(kid, now_ms):
+            events.append(self._evidence("over-quota", kid, "per-key dedup quota full; live entries kept",
+                                         stream=self._stream_name(kid, body.stream), seq=body.seq))
+            return events
+        retain = wire.local_expiry_ms(body, st.offset_ms, first_heard_ms=now_ms) + SKEW_MS
         self._remember(ident, digest, retain)
         name = self._stream_name(kid, body.stream)
         if f.kind == wire.KIND_PLUCK:
@@ -174,10 +185,6 @@ class Listener:
                                     {"by_seq": body.seq, "reason": body.reason}))
             return events
         it: wire.Item = body
-        entry = self.manifest.entry(kid)
-        if it.cls not in entry.classes:
-            events.append(self._evidence("capability", kid, f"class {it.cls} not granted", stream=name, seq=it.seq))
-            return events
         if ident in self.sticky_pluck:
             events.append(self._evidence("plucked", kid, "item arrived after its pluck", stream=name, seq=it.seq))
             return events
@@ -227,11 +234,26 @@ class Listener:
             d["body_ref"] = {"url": it.body_ref[0], "sha256": it.body_ref[1].hex(), "size": it.body_ref[2]}
         return d
 
+    def _quota(self) -> int:
+        """Per-key share of the dedup store (§7.4). A key that floods only fills its own share."""
+        return max(1, self.dedup_capacity // max(1, sum(1 for _ in self.manifest)))
+
+    def _room_for(self, kid: bytes, now_ms: int) -> bool:
+        if self.dedup_per_key.get(kid, 0) < self._quota():
+            return True
+        self._purge_dedup(now_ms)
+        return self.dedup_per_key.get(kid, 0) < self._quota()
+
     def _remember(self, ident: tuple, digest: bytes, retain: int) -> None:
-        if len(self.dedup) >= self.dedup_capacity:  # evict oldest first; never fail closed (§7.4)
-            for k, _ in sorted(self.dedup.items(), key=lambda kv: kv[1][1])[: max(1, self.dedup_capacity // 10)]:
-                del self.dedup[k]
+        # Live entries are never evicted: they hold the equivocation evidence (§10.8) and stop a
+        # repeat from counting as new. New tuples are refused per key instead (_room_for).
         self.dedup[ident] = (digest, retain)
+        self.dedup_per_key[ident[0]] = self.dedup_per_key.get(ident[0], 0) + 1
+
+    def _purge_dedup(self, now_ms: int) -> None:
+        for k in [k for k, v in self.dedup.items() if v[1] <= now_ms]:
+            del self.dedup[k]
+            self.dedup_per_key[k[0]] -= 1
 
     # ------------------------------------------------------------ time
 
@@ -242,9 +264,7 @@ class Listener:
                 del self.current[ident]
                 events.append(Event("expired", self._name(ident[0]), ident[0].hex(),
                                     self._stream_name(ident[0], ident[2]), ident[3]))
-        for d in (self.dedup,):
-            for k in [k for k, v in d.items() if v[1] <= now_ms]:
-                del d[k]
+        self._purge_dedup(now_ms)
         for k in [k for k, v in self.sticky_pluck.items() if v <= now_ms]:
             del self.sticky_pluck[k]
         for k in [k for k, v in self.hwm.items() if v[3] <= now_ms]:

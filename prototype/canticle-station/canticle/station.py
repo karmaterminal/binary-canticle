@@ -250,7 +250,7 @@ class Station:
             oa.refresh_at = now_ms + (2 * ttl_ms) // 3
             oa.reissue = dict(stream=stream, body=body, body_ref=body_ref, cls=spec.name, ctype=it.ctype,
                               ttl_s=ttl_ms / 1000, state_key=state_key, loop=loop, scope=scope,
-                              purpose=purpose, intensity=intensity, hop=hop)
+                              purpose=purpose, intensity=intensity, hop=hop, flags=flags)
         self._admit(st, oa, now_ms)
         return SingResult(stream=stream, seq=it.seq, epoch=self.epoch, issued_at=it.issued_at,
                           expires_at=it.expires_at, ttl_s=ttl_ms / 1000, loop_ms=oa.loop_ms, clamp=oa.clamp,
@@ -264,6 +264,8 @@ class Station:
             raise ValueError(f"no live item {stream}#{seq} to pluck")
         if target.expires_at - now_ms < STOP_BEFORE_EXPIRY_MS:
             raise ValueError("target already expiring")
+        if sum(1 for oa in st.ring.values() if oa.kind == wire.KIND_PLUCK) >= self.depth:
+            raise ValueError("pluck capacity full: the stream already holds depth live PLUCKs (§7.1)")
         # Build and sign the PLUCK before touching the carousel, so a refused hush changes nothing.
         p = wire.Pluck(epoch=self.epoch, stream=st.sid, seq=st.head_seq + 1, issued_at=now_ms,
                        expires_at=target.expires_at, scope=target.scope, target_seq=seq, reason=reason)
@@ -278,8 +280,12 @@ class Station:
                           size=len(frame), kind="pluck")
 
     def _admit(self, st: _Stream, oa: _OnAir, now: int) -> None:
-        while len(st.ring) >= self.depth:  # §7.1: depth pushes out the oldest; an honest gap
-            del st.ring[min(st.ring)]
+        # §7.1: depth counts ITEMs and pushes out the oldest one (an honest gap). PLUCKs are
+        # tombstones: never evicted before their target's expiry, capped separately in hush().
+        if oa.kind == wire.KIND_ITEM:
+            items = [s for s, o in st.ring.items() if o.kind == wire.KIND_ITEM]
+            while len(items) >= self.depth:
+                del st.ring[items.pop(0)]
         st.ring[oa.seq] = oa
         oa.loop_ms, oa.clamp = self._loop(st, oa, now, admission=True)
         # never shed: plucks, control and alarm frames (§12.3 never-shed rules)
@@ -300,8 +306,9 @@ class Station:
                     continue
                 if oa.refresh_at is not None and now_ms >= oa.refresh_at:
                     if now_ms < oa.horizon:
-                        self.sing(now_ms, **oa.reissue, keep_on_air_s=(oa.horizon - now_ms) / 1000,
-                                  flags=wire.Item.REFRESH)
+                        # keep provenance flags (WAKE_DERIVED above all) and add REFRESH (§7.9)
+                        self.sing(now_ms, **{**oa.reissue, "flags": oa.reissue["flags"] | wire.Item.REFRESH},
+                                  keep_on_air_s=(oa.horizon - now_ms) / 1000)
                         continue  # the refresh superseded this entry
                     oa.refresh_at = None
                 if oa.burst and now_ms >= oa.burst[0]:
