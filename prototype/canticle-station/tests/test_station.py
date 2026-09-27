@@ -1,5 +1,7 @@
 import random
+import tempfile
 import unittest
+from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -7,7 +9,7 @@ from canticle import cbor, vectors, wire
 from canticle.ids import stream_id
 from canticle.listener import Listener
 from canticle.manifest import Manifest, StationEntry
-from canticle.station import Station, StreamConfig
+from canticle.station import Station, StreamConfig, next_epoch
 
 T0 = 1_790_000_000_000
 SK = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(vectors.TEST1))
@@ -168,6 +170,29 @@ class LateJoinerTest(unittest.TestCase):
                         first = t - (T0 + 30_000)
         self.assertEqual(heard, {1, 2, 3, 4, 5})
         self.assertLessEqual(first, 10_000 * 4 / 3 + 100)  # within loop_ms x 4/3 (§7.10)
+
+
+class EpochTest(unittest.TestCase):
+    def test_persisted_epoch_strictly_increases(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "k.epoch"
+            now = 1_790_000_000
+            self.assertEqual(next_epoch(path, now_s=now), now)          # first start: not below time-based epochs
+            self.assertEqual(next_epoch(path, now_s=now), now + 1)      # same second
+            self.assertEqual(next_epoch(path, now_s=now - 3600), now + 2)  # clock stepped back
+            self.assertEqual(next_epoch(path, now_s=now + 60), now + 60)
+            self.assertEqual(path.read_text(), f"{now + 60}\n")
+            self.assertFalse(path.with_name("k.epoch.tmp").exists())
+
+    def test_unreadable_counter_refuses(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "k.epoch"
+            path.write_text("not a number\n")
+            with self.assertRaises(ValueError):
+                next_epoch(path, now_s=1)
+            path.write_text(f"{2**32 - 1}\n")
+            with self.assertRaises(ValueError):
+                next_epoch(path, now_s=1)
 
 
 if __name__ == "__main__":

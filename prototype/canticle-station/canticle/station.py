@@ -7,10 +7,12 @@ asyncio runner in ``runner.py`` drives it with the real clock.
 from __future__ import annotations
 
 import hashlib
+import os
 import random
 import statistics
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -92,12 +94,43 @@ class _Stream:
     ring: dict = field(default_factory=dict)  # seq -> _OnAir, in seq order
 
 
+def next_epoch(path, now_s: Optional[int] = None) -> int:
+    """Take the next epoch from a counter persisted at ``path`` (§5.2), storing it before returning it.
+
+    The epoch is ``max(previous + 1, floor(unix seconds))``. It strictly increases across restarts
+    however close together, and across a clock that steps back, and it never falls below the epoch
+    a time-based start would have used, so listeners that heard one don't see a regression. The
+    file is replaced atomically, so a crash leaves the old value or the new one, never neither.
+    A missing file starts the counter; an unreadable one raises rather than guessing.
+    """
+    p = Path(path)
+    now_s = int(time.time()) if now_s is None else now_s
+    prev = int(p.read_text()) if p.exists() else 0
+    n = max(prev + 1, now_s)
+    if n > 2**32 - 1:
+        raise ValueError("epoch space exhausted (u32, §5.2)")
+    tmp = p.with_name(p.name + ".tmp")
+    with open(tmp, "w") as f:
+        f.write(f"{n}\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, p)
+    dfd = os.open(p.parent, os.O_RDONLY)
+    try:
+        os.fsync(dfd)
+    finally:
+        os.close(dfd)
+    return n
+
+
 class Station:
     def __init__(self, sk: Ed25519PrivateKey, streams, *, epoch: Optional[int] = None,
                  b_station: int = DEFAULT_B_STATION, beacon_period_ms: int = 1_000,
                  depth: int = DEFAULT_DEPTH, rng: Optional[random.Random] = None, now_ms: Optional[int] = None):
         self.sk = sk
         self.key_id = key_id(wire.public_key_bytes(sk))
+        # epoch=None falls back to floor(unix seconds): only safe if starts are >= 1 s apart and the
+        # clock never steps back. Anything that can restart should pass next_epoch(path) (§5.2).
         self.epoch = int(time.time()) if epoch is None else epoch
         self.rng = rng or random.Random()
         self.depth = depth

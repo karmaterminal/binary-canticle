@@ -1,12 +1,14 @@
 import random
+import tempfile
 import unittest
+from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from canticle import cbor, vectors, wire
 from canticle.listener import Listener
 from canticle.manifest import Manifest, StationEntry
-from canticle.station import Station, StreamConfig
+from canticle.station import Station, StreamConfig, next_epoch
 
 T0 = 1_790_000_000_000
 SK = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(vectors.TEST1))
@@ -69,6 +71,51 @@ class ExpiryTest(unittest.TestCase):
     def test_expiry_is_clamped_to_class_max(self):
         it = wire.Item(epoch=1, stream=1, seq=1, issued_at=T0, expires_at=T0 + 10**9, cls=1, ctype=1, body=b"x")
         self.assertEqual(wire.local_expiry_ms(it), T0 + 300_000)
+
+
+class RestartTest(unittest.TestCase):
+    def restarted(self, epoch, now_ms):
+        return Station(SK, [StreamConfig("chatter"), StreamConfig("root", cls="root")], epoch=epoch,
+                       rng=random.Random(epoch), now_ms=now_ms)
+
+    def test_higher_epoch_beacons_count_from_one_again(self):
+        st, lst = setup()
+        feed(st, lst, T0, T0 + 4_500)  # epoch 1 reaches bseq 5
+        s = lst.stations[st.key_id]
+        self.assertEqual((s.epoch_hwm, s.bseq), (1, 5))
+        evs = lst.hear(st.goodbye(T0 + 4_600), T0 + 4_600)
+        self.assertEqual([e.data["state"] for e in evs if e.kind == "presence"], ["UNOBSERVABLE:signed_off"])
+        st2 = self.restarted(2, T0 + 5_000)
+        evs = [e for f in st2.poll(T0 + 5_000) for e in lst.hear(f, T0 + 5_000)]  # epoch 2, bseq 1
+        self.assertEqual((s.epoch_hwm, s.bseq, s.last_beacon, s.signed_off), (2, 1, T0 + 5_000, False))
+        self.assertEqual([e.data["state"] for e in evs if e.kind == "presence"], ["ROOT_UNKNOWN"])
+
+    def test_new_epoch_item_before_its_first_beacon(self):
+        st, lst = setup()
+        feed(st, lst, T0, T0 + 4_500)
+        st2 = self.restarted(2, T0 + 5_000)
+        st2.sing(T0 + 5_000, "chatter", text="back")
+        frames = st2.poll(T0 + 5_000)
+        kinds = [wire.parse(f, lst.manifest.resolve, T0 + 5_000).kind for f in frames]
+        order = sorted(range(len(frames)), key=lambda i: kinds[i] == wire.KIND_BEACON)  # items first
+        for i in order:
+            lst.hear(frames[i], T0 + 5_000)
+        s = lst.stations[st.key_id]
+        self.assertEqual((s.epoch_hwm, s.bseq, s.last_beacon), (2, 1, T0 + 5_000))
+
+    def test_two_immediate_restarts_never_reuse_an_identity(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "cael.key.epoch"
+            _, lst = setup()
+            now_s = T0 // 1000
+            for i in range(2):  # two starts within the same second
+                st = self.restarted(next_epoch(path, now_s=now_s), T0 + i)
+                st.sing(T0 + i, "chatter", text=f"start {i}")  # seq 1 both times
+                for f in st.poll(T0 + i):
+                    lst.hear(f, T0 + i)
+            self.assertEqual(lst.stations[st.key_id].epoch_hwm, now_s + 1)
+            self.assertNotIn("equivocation", lst.evidence_counts)
+            self.assertEqual(sorted(h["seq"] for h in lst.on_air()), [1, 1])
 
 
 class RobustnessTest(unittest.TestCase):

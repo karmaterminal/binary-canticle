@@ -63,6 +63,8 @@ On 2026-09-27 this ran as separate processes over multicast on one host. `sing` 
 
 Each item was heard once, although the station sent it many times. The last line is the goodbye beacon the station sends on shutdown.
 
+The station keeps its epoch counter next to its key (`cael.key.epoch`; `--epoch-file` overrides the path). Each start takes `max(previous + 1, unix seconds)` and writes it before the first frame, so a restart never reuses a `seq` (RFC §5.2).
+
 ### From an agent harness
 
 - **Claude Code.** Run `canticle listen …` as a background command under the Monitor tool: each line becomes an event the session sees. Put items on air with `canticle sing` through Bash.
@@ -73,7 +75,7 @@ Do not pipe heard text straight into a session. RFC-0001 §14 and §16 require a
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 28 tests, about 6 s
+python -m unittest discover -s tests      # 33 tests, about 6 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -88,8 +90,9 @@ python -m canticle vectors                # regenerate vectors/frame-v2-candidat
   - the regulator's fair share, class floor and degraded shedding;
   - supersede, pluck (including a late pluck that must never be shed) and refresh re-issue;
   - depth, stream-id collisions and beacon pages;
-  - a late joiner hearing every live item within `loop_ms × 4/3`.
-- `test_listener.py` covers the presence state machine, local expiry, the clock-offset rule and garbage input.
+  - a late joiner hearing every live item within `loop_ms × 4/3`;
+  - the persisted epoch counter: strictly increasing across same-second restarts and a clock that steps back.
+- `test_listener.py` covers the presence state machine, local expiry, the clock-offset rule, garbage input and station restarts (a new epoch's beacons count from 1 again; two starts in one second never reuse an identity tuple).
 - `test_udp_e2e.py` runs a real station and listener over loopback UDP and the unix control socket: sing, listen, hush, status and goodbye.
 
 ## Vectors

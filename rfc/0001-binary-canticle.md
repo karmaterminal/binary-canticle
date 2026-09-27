@@ -290,7 +290,8 @@ Rejected alternatives. v0.1's human-string ids (`proto/protocol-spec-v0.1.md:193
 ### 5.2 Epoch
 
 - `epoch` is a u32 carried in every frame. It MUST strictly increase whenever the station loses its sequence state.
-- RECOMMENDED: persist a counter and increment it at every start. A station without persistent storage MAY use `floor(unix_seconds)` at start, provided it never goes backwards.
+- RECOMMENDED: persist a counter and, at every start, take `max(previous + 1, floor(unix_seconds))`, writing it durably before the first frame. The `max` keeps a station that switches from a time-based epoch from regressing.
+- A station without persistent storage MAY use `floor(unix_seconds)` at start only if no two starts can fall within the same second and its clock never steps back. Otherwise two starts share an epoch and reuse `seq`, which receivers correctly record as equivocation.
 - A receiver that sees a lower epoch for a key than the highest it has seen within the class maximum TTL MUST record evidence `epoch-regression` and MUST NOT let the lower epoch supersede anything.
 - Two epochs of one key that both produce new `seq` values for longer than two advertised beacon periods are an equivocation (§10.8).
 
@@ -739,7 +740,7 @@ A key can pluck only its own items; this is structural, because the pluck's `key
 | Key | Name | Type | Required | Rules |
 |---|---|---|---|---|
 | 1 | `epoch` | uint | yes | |
-| 2 | `bseq` | uint | yes | Beacon counter within the epoch. A lower `bseq` than already seen is ignored |
+| 2 | `bseq` | uint | yes | Beacon counter within the epoch, starting at 1. A lower `bseq` than already seen in the same epoch is ignored; a receiver that accepts a higher epoch resets its `bseq` mark |
 | 3 | `wallclock` | uint, ms since the Unix epoch | yes | Station clock at send time (§8.2 job 6) |
 | 4 | `next_beacon_ms` | uint | yes | Time to the next beacon; `0` = goodbye (§8.3) |
 | 5 | `profile` | tstr ≤ 32 B | yes | Regulation profile id, e.g. `"canticle-regulation/1"` (§12.8) |

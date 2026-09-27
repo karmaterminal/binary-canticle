@@ -15,7 +15,6 @@ import json
 import os
 import signal
 import sys
-import time
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -24,7 +23,7 @@ from . import runner, wire
 from .ids import CLASS_BY_NAME
 from .listener import Listener
 from .manifest import Manifest, StationEntry
-from .station import Station, StreamConfig
+from .station import Station, StreamConfig, next_epoch
 
 
 def _load_key(path: str) -> Ed25519PrivateKey:
@@ -70,18 +69,9 @@ def _stream_config(spec: str) -> StreamConfig:
     return StreamConfig(name=name, cls=cls or "chatter", default_ttl_s=int(ttl) if ttl else None)
 
 
-def _epoch(path: str | None) -> int:
-    if not path:
-        return int(time.time())
-    p = Path(path)
-    n = int(p.read_text()) + 1 if p.exists() else 1
-    p.write_text(f"{n}\n")
-    return n
-
-
 def cmd_station(a) -> int:
     sk = _load_key(a.key)
-    st = Station(sk, [_stream_config(s) for s in a.stream], epoch=_epoch(a.epoch_file),
+    st = Station(sk, [_stream_config(s) for s in a.stream], epoch=next_epoch(a.epoch_file or a.key + ".epoch"),
                  beacon_period_ms=a.beacon_ms, now_ms=runner.now_ms())
     dests = [runner.parse_addr(d) for d in (a.to or [])]
     if a.multicast:
@@ -187,7 +177,8 @@ def main(argv=None) -> int:
     s.add_argument("--multicast", action="store_true", help=f"also send to {runner.MCAST_GROUP}")
     s.add_argument("--port", type=int, default=runner.DEFAULT_PORT)
     s.add_argument("--control")
-    s.add_argument("--epoch-file")
+    s.add_argument("--epoch-file", help="persisted epoch counter (default: <key>.epoch); "
+                   "each start takes the next epoch, so a restart never reuses seq numbers (§5.2)")
     s.add_argument("--beacon-ms", type=int, default=1000)
     s.set_defaults(fn=cmd_station)
 

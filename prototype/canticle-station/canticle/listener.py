@@ -118,6 +118,10 @@ class Listener:
             return False
         if epoch > st.epoch_hwm:
             st.epoch_hwm, st.epoch_seen_at = epoch, now_ms
+            # bseq and the advertised loops belong to the previous epoch (§9.8): a restarted
+            # station counts beacons from 1 again and may loop different streams.
+            st.bseq = 0
+            st.stream_loops.clear()
         return True
 
     def _beacon(self, f: wire.Frame, now_ms: int) -> list[Event]:
