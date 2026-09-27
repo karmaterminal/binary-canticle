@@ -6,7 +6,7 @@ unless marked *data-only*. There is no delay emulation, so RTT is about 0.1 ms
 and every TCP recovery time below is the floor set by Linux's timers (see
 [What internet RTTs change](#what-internet-rtts-change)). Testbed, method and
 limitations are in [README.md](README.md). All numbers come from
-`results/*.json`, and `python summarize.py` prints these tables.
+`results/<experiment>/`, and `python summarize.py` prints these tables.
 
 **Revision after review.** E1 and E4 were re-run with a corrected harness; E2,
 E3 and E5 were not re-run.
@@ -22,8 +22,22 @@ E3 and E5 were not re-run.
   E4 joins that time out or are cut off by the end of the run are now censored
   rather than dropped.
 - E2's "fan-out spread" was the sender's enqueue time and is now named so.
-- Run ids, the git commit and a source hash are in the `manifest` of
-  `results/e1_freshness.json` and `results/e4_late_joiner.json`.
+- E2's cost per listener subtracted one idle sample, taken before all runs,
+  from every run, and printed the difference even where it was noise: down to
+  −40 µs per listener·frame at N ≤ 100, which is impossible. The cost is now
+  reported only where its 95% interval over repeats lies above 0, and "not
+  resolved" elsewhere (see E2). The harness now takes a matched idle control
+  per repeat and N; the E2 data below still has the single unmatched sample.
+- Provenance. Every experiment now publishes `results/<experiment>/` as a
+  whole, with a `manifest.json` (run id, argv, times, git commit, dirty flag,
+  per-file source digests, and the diff when run with `--allow-dirty`), and
+  refuses to run from a tree whose sources differ from HEAD. The data in this
+  document predates that: E1 and E4 name commit 5b04c86 with a dirty tree and a
+  source hash that none of the last twelve commits reproduces, E2, E3 and E5
+  carry no manifest, and E3's
+  `udp-lease` variant was re-run on its own after a harness fix. All five
+  experiments are to be re-run from a clean commit; `python summarize.py verify`
+  then checks each against its commit.
 
 ## Bottom line
 
@@ -234,25 +248,27 @@ Definitions:
 - Each row is the mean of 3 runs of 20 s after a 5 s warm-up.
 - Every listener received all 280 frames in every run.
 - Nothing was dropped in the RPS backlog. `netdev_max_backlog` was raised to 16 384 for the run and restored afterwards.
+- *Cost per listener.* For each repeat, (CPU 0 busy − idle CPU 0 busy) / (N × 10 frames/s); the table gives the mean over the 3 repeats with its 95% t-interval (never narrower than the two-tick quantum of CPU accounting, 1/100 s per window), and only when the interval lies above 0. Where it does not, the listeners' CPU is inside the idle noise: the cell says *not resolved* and gives the interval's half-width instead. No cost is negative and none is clamped.
+- *Idle.* This run took one 20 s idle sample (0.85% of CPU 0) before all runs and used it for every row. The harness now takes a matched idle window for every repeat and N (same namespaces and window, nothing running), shuffled in among the loaded runs; the next run of E2 uses it.
 
-Idle baseline, CPU 0: 0.85% busy. Mean of 3 runs (min–max); 20 s windows after 5 s warm-up. *µs per listener·frame* = (CPU 0 busy − idle) / (N × 10). *Sender enqueue time* = how long the sender's loop took to hand one frame to the kernel for all N listeners (sender clock); when the last listener received it was not measured.
+Mean of 3 runs (min–max); 20 s windows after 5 s warm-up. This run predates matched controls: idle is one unmatched 20 s sample taken before all runs. *µs per listener·frame* = (CPU 0 busy − idle) / (N × frames/s), per repeat; the mean over repeats with its 95% t-interval, widened where needed to the two-tick quantum of CPU accounting (1/100 s per window), shown only when the interval lies above 0. Otherwise the cost is *not resolved* at that N (it is inside the idle noise), and ± is the interval's half-width, about the smallest cost the run could have resolved. *Sender enqueue time* = how long the sender's loop took to hand one frame to the kernel for all N listeners (sender clock); when the last listener received it was not measured.
 
-| mode | N | sender host CPU % (CPU 0) | sender process CPU % | µs per listener·frame | wire out kB/s | wire in kB/s | pkts/s out / in | sender RSS kB | sender fds | syscalls/frame | sender enqueue time, one frame to all N, p50 ms | min frames/listener | backlog drops |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| mcast | 10 | 1.02 (0.90–1.15) | 0.22 (0.20–0.25) | 16.67 (5.00–30.00) | 7.4 | 0.0 | 10 / 0 | 4548 | 6 | 1 | 0.05 | 280 | 0 |
-| tcp | 10 | 1.02 (0.70–1.30) | 0.28 (0.25–0.30) | 16.67 (-15.00–45.00) | 76.6 | 6.6 | 100 / 100 | 4560 | 16 | 10 | 0.11 | 280 | 0 |
-| udp | 10 | 1.12 (0.45–2.10) | 0.28 (0.25–0.30) | 26.67 (-40.00–125.00) | 74.2 | 0.0 | 100 / 0 | 4432 | 6 | 1 | 0.10 | 280 | 0 |
-| mcast | 100 | 0.90 (0.60–1.10) | 0.20 (0.20–0.20) | 0.50 (-2.50–2.50) | 7.4 | 0.0 | 10 / 0 | 4420 | 6 | 1 | 0.04 | 280 | 0 |
-| tcp | 100 | 1.13 (0.60–1.50) | 1.23 (1.20–1.25) | 2.83 (-2.50–6.50) | 765.9 | 66.0 | 1000 / 1000 | 4692 | 106 | 100 | 1.03 | 280 | 0 |
-| udp | 100 | 0.57 (0.40–0.75) | 0.57 (0.55–0.60) | -2.83 (-4.50–-1.00) | 745.6 | 0.0 | 1005 / 0 | 4428 | 6 | 1 | 0.38 | 280 | 0 |
-| mcast | 1000 | 1.55 (1.20–2.00) | 0.20 (0.15–0.25) | 0.70 (0.35–1.15) | 7.4 | 0.0 | 10 / 0 | 4424 | 6 | 1 | 0.04 | 280 | 0 |
-| tcp | 1000 | 12.48 (11.70–13.00) | 11.98 (11.75–12.35) | 11.63 (10.85–12.14) | 7676.2 | 660.9 | 10021 / 10014 | 5268 | 1006 | 1000 | 11.51 | 280 | 0 |
-| udp | 1000 | 5.27 (4.55–5.90) | 4.15 (4.00–4.25) | 4.42 (3.70–5.05) | 7443.8 | 0.0 | 10032 / 0 | 4496 | 6 | 1 | 3.74 | 280 | 0 |
-| mcast | 5000 | 1.95 (1.75–2.20) | 0.25 (0.20–0.30) | 0.22 (0.18–0.27) | 7.4 | 0.0 | 10 / 0 | 4484 | 6 | 1 | 0.04 | 280 | 0 |
-| tcp | 5000 | 60.72 (60.14–61.19) | 58.20 (57.59–59.14) | 11.97 (11.86–12.07) | 38296.1 | 3299.6 | 49995 / 49995 | 7856 | 5006 | 5000 | 56.66 | 280 | 0 |
-| udp | 5000 | 22.03 (20.35–24.90) | 19.41 (19.20–19.60) | 4.24 (3.90–4.81) | 37127.9 | 0.0 | 50038 / 0 | 4816 | 6 | 5 | 18.39 | 280 | 0 |
+| mode | N | sender host CPU % (CPU 0) | idle CPU 0 % (one unmatched sample) | sender process CPU % | µs per listener·frame (95% CI) | wire out kB/s | wire in kB/s | pkts/s out / in | sender RSS kB | sender fds | syscalls/frame | sender enqueue time, one frame to all N, p50 ms | min frames/listener | backlog drops |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| mcast | 10 | 1.02 (0.90–1.15) | 0.85 (0.85–0.85) | 0.22 (0.20–0.25) | not resolved (±31.26) | 7.4 | 0.0 | 10 / 0 | 4548 | 6 | 1 | 0.05 | 280 | 0 |
+| tcp | 10 | 1.02 (0.70–1.30) | 0.85 (0.85–0.85) | 0.28 (0.25–0.30) | not resolved (±74.87) | 76.6 | 6.6 | 100 / 100 | 4560 | 16 | 10 | 0.11 | 280 | 0 |
+| udp | 10 | 1.12 (0.45–2.10) | 0.85 (0.85–0.85) | 0.28 (0.25–0.30) | not resolved (±215.99) | 74.2 | 0.0 | 100 / 0 | 4432 | 6 | 1 | 0.10 | 280 | 0 |
+| mcast | 100 | 0.90 (0.60–1.10) | 0.85 (0.85–0.85) | 0.20 (0.20–0.20) | not resolved (±6.57) | 7.4 | 0.0 | 10 / 0 | 4420 | 6 | 1 | 0.04 | 280 | 0 |
+| tcp | 100 | 1.13 (0.60–1.50) | 0.85 (0.85–0.85) | 1.23 (1.20–1.25) | not resolved (±11.74) | 765.9 | 66.0 | 1000 / 1000 | 4692 | 106 | 100 | 1.03 | 280 | 0 |
+| udp | 100 | 0.57 (0.40–0.75) | 0.85 (0.85–0.85) | 0.57 (0.55–0.60) | not resolved (±4.36) | 745.6 | 0.0 | 1005 / 0 | 4428 | 6 | 1 | 0.38 | 280 | 0 |
+| mcast | 1000 | 1.55 (1.20–2.00) | 0.85 (0.85–0.85) | 0.20 (0.15–0.25) | not resolved (±1.02) | 7.4 | 0.0 | 10 / 0 | 4424 | 6 | 1 | 0.04 | 280 | 0 |
+| tcp | 1000 | 12.48 (11.70–13.00) | 0.85 (0.85–0.85) | 11.98 (11.75–12.35) | 11.63 (9.92–13.34) | 7676.2 | 660.9 | 10021 / 10014 | 5268 | 1006 | 1000 | 11.51 | 280 | 0 |
+| udp | 1000 | 5.27 (4.55–5.90) | 0.85 (0.85–0.85) | 4.15 (4.00–4.25) | 4.42 (2.73–6.10) | 7443.8 | 0.0 | 10032 / 0 | 4496 | 6 | 1 | 3.74 | 280 | 0 |
+| mcast | 5000 | 1.95 (1.75–2.20) | 0.85 (0.85–0.85) | 0.25 (0.20–0.30) | 0.22 (0.11–0.33) | 7.4 | 0.0 | 10 / 0 | 4484 | 6 | 1 | 0.04 | 280 | 0 |
+| tcp | 5000 | 60.72 (60.14–61.19) | 0.85 (0.85–0.85) | 58.20 (57.59–59.14) | 11.97 (11.71–12.24) | 38296.1 | 3299.6 | 49995 / 49995 | 7856 | 5006 | 5000 | 56.66 | 280 | 0 |
+| udp | 5000 | 22.03 (20.35–24.90) | 0.85 (0.85–0.85) | 19.41 (19.20–19.60) | 4.24 (3.00–5.47) | 37127.9 | 0.0 | 50038 / 0 | 4816 | 6 | 5 | 18.39 | 280 | 0 |
 
-Memory (first run of each; slab is host-wide, so it counts both ends of every TCP connection):
+Memory, N ≥ 1 000 (first run of each; slab is host-wide, so it counts both ends of every TCP connection). Rows for N ≤ 100 are inside the slab's drift with nothing running; they are in `results/e2/e2_fanout.json`.
 
 | mode | N | slab Δ kB (both ends) | TCP sockets in use (tx ns) | TCP mem pages (host) | Σ skmem t (tx) | Σ skmem w (tx) | receiver RSS kB |
 |---|---|---|---|---|---|---|---|
@@ -263,13 +279,11 @@ Memory (first run of each; slab is host-wide, so it counts both ends of every TC
 | udp | 1000 | 2180 | 0 | 54 | – | – | 9948 |
 | udp | 5000 | 20016 | 0 | 314 | – | – | 31744 |
 
-(Rows for N ≤ 100 are inside the ±0.5 MB slab noise; they are in `results/e2_fanout.json`.)
-
 **Reading.**
-- **Below 1 000 listeners it is all noise.** Every mode costs ≤ 1.5% of a core, inside the 0.85% idle baseline, so the per-listener column means nothing there.
+- **Below 1 000 listeners the cost is not resolved.** Every mode keeps CPU 0 at 0.57-1.13% busy, against 0.85% with nothing running, so the listeners' CPU is inside the noise and no cost is given there. Multicast is not resolved at 1 000 either.
 - **Per listener, TCP costs 2.6-2.8× what UDP does.**
-  - TCP: 11.6-12.0 µs of sending-host CPU per listener and frame (one `write()` plus the ACK it triggers).
-  - UDP unicast with `sendmmsg`: 4.2-4.4 µs.
+  - TCP: 11.6-12.0 µs of sending-host CPU per listener and frame (one `write()` plus the ACK it triggers); 95% intervals 9.9-13.3 µs at N = 1 000 and 11.7-12.2 µs at N = 5 000.
+  - UDP unicast with `sendmmsg`: 4.2-4.4 µs (2.7-6.1 µs at 1 000, 3.0-5.5 µs at 5 000).
   - At 5 000 listeners that is 60.7% against 22.0% of a vCPU.
   - Multicast is flat at about 2%: one `sendto()` per frame whatever N. Its fan-out moves to the network and to the receiving hosts; here one namespace cloned each datagram to 5 000 sockets.
 - **CPU is not what decides feasibility.** Extrapolated linearly, 100 000 TCP listeners at 1 frame/s need about 1.2 cores of this VM. That agrees with epoll servers routinely holding 100k+ connections.
@@ -281,7 +295,7 @@ Memory (first run of each; slab is host-wide, so it counts both ends of every TC
     - The UDP sender holds one socket; the 20.0 MB slab growth in the UDP run is the 5 000 receiver sockets.
   - Syscalls: 5 000 per frame, against 5 (`sendmmsg`, 1 024 per call) or 1 (multicast).
   - Sender enqueue time: handing one frame to the kernel for all 5 000 listeners took 56.7 ms over TCP (median; 5 000 `write()` calls), 18.4 ms with `sendmmsg` (5 calls) and 0.04 ms with multicast (one `sendto()`). It is timed on the sender's clock around its send loop. There are no receiver timestamps, so the arrival spread (when the last listener received the frame) was not measured.
-  - This field was called `fanout_spread_*_us` when E2 was run. It is the same measurement, renamed `enqueue_all_*_us` in `fanout/main.go` and in `results/e2_fanout.json`; E2 was not re-run.
+  - This field was called `fanout_spread_*_us` when E2 was run. It is the same measurement, renamed `enqueue_all_*_us` in `fanout/main.go` and in `results/e2/e2_fanout.json`; E2 was not re-run.
 - **Portability.** Absolute µs are for this VM (virtualised, 4 vCPUs); the ratios carry over.
 
 ## E3: slow and dead consumers

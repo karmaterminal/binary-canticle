@@ -30,8 +30,9 @@ stopped (see SUMMARY.md). Sender variants:
 Listeners stamp arrivals with the kernel receive time, and each frame carries
 the time it was scheduled, so latency includes time queued at the sender.
 
-    python e3_consumers.py slow        # about 5 min (variants run in parallel)
-    python e3_consumers.py dead        # about 17 min (tcp-silent waits for the kernel to give up)
+    python e3_consumers.py slow        # about 10 min (variants run in parallel); publishes results/e3-slow/
+    python e3_consumers.py dead        # about 17 min (tcp-silent waits for the kernel to give up); results/e3-dead/
+    python e3_consumers.py slow --duration 30 --results-dir /tmp/smoke --allow-dirty    # a smoke run
 """
 
 from __future__ import annotations
@@ -56,7 +57,7 @@ from collections import deque
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from harness import netns, stats, tcpinfo  # noqa: E402
+from harness import netns, runs, stats, tcpinfo  # noqa: E402
 from harness.arms import enable_rx_timestamps, rx_time  # noqa: E402
 
 HOST = "127.0.0.1"
@@ -490,28 +491,55 @@ def _victim_port(port: int, pid: int) -> int:
     raise RuntimeError("victim connection not found")
 
 
-def run_many(experiment: str, modes: list[tuple], n: int) -> dict:
-    """Each variant in its own namespace, all in parallel (they are light)."""
-    procs = {}
-    with contextlib.ExitStack() as stack:
-        for mode, uto, dur, *rest in modes:
-            rcvbuf = rest[0] if rest else 0
-            name = mode + (f"-uto{uto // 1000}s" if uto else "") + ("-autotuned" if experiment == "slow"
-                                                                     and not rcvbuf else "")
-            ns = stack.enter_context(netns.netns(netns.name(f"e3-{name}")))
-            argv = [sys.executable, os.path.abspath(__file__), "one", "--experiment", experiment, "--mode", mode,
-                    "--n", str(n), "--duration", str(dur), "--victim-rcvbuf", str(rcvbuf)]
-            if uto:
-                argv += ["--user-timeout-ms", str(uto)]
-            procs[name] = subprocess.Popen(netns.ns_exec(ns, *argv), stdout=subprocess.PIPE, text=True)
-        runs = {}
-        for name, p in procs.items():
-            out, _ = p.communicate()
-            runs[name] = json.loads(out.splitlines()[-1]) if p.returncode == 0 else {"error": p.returncode}
-            if isinstance(runs[name].get("relay"), dict) and "timeline" in runs[name]["relay"]:
-                runs[name]["relay"]["timeline"] = _thin(runs[name]["relay"]["timeline"])
+def run_many(experiment: str, modes: list[tuple], n: int, run: runs.Run) -> dict:
+    """Each variant in its own namespace, all in parallel (they are light).
+
+    Every variant's output goes to ``raw/<variant>.json`` and its stderr to
+    ``raw/<variant>.log`` in the stage. Raises ``RunFailed`` unless all succeed.
+    """
+    procs, logs = {}, []
+    try:
+        with contextlib.ExitStack() as stack:
+            for mode, uto, dur, *rest in modes:
+                rcvbuf = rest[0] if rest else 0
+                name = mode + (f"-uto{uto // 1000}s" if uto else "") + ("-autotuned" if experiment == "slow"
+                                                                         and not rcvbuf else "")
+                ns = stack.enter_context(netns.netns(netns.name(f"e3-{name}")))
+                argv = [sys.executable, os.path.abspath(__file__), "one", "--experiment", experiment, "--mode", mode,
+                        "--n", str(n), "--duration", str(dur), "--victim-rcvbuf", str(rcvbuf)]
+                if uto:
+                    argv += ["--user-timeout-ms", str(uto)]
+                logs.append(open(run.raw(f"{name}.log"), "w"))
+                procs[name] = subprocess.Popen(netns.ns_exec(ns, *argv), stdout=subprocess.PIPE, stderr=logs[-1],
+                                               text=True)
+            out, failed = {}, {}
+            for name, p in procs.items():
+                text, _ = p.communicate()
+                lines = [ln for ln in text.splitlines() if ln.startswith("{")]
+                if p.returncode != 0 or not lines:
+                    failed[name] = p.returncode
+                    continue
+                out[name] = json.loads(lines[-1])
+                stats.write_json(run.raw(f"{name}.json"), out[name])
+    finally:
+        for p in procs.values():
+            if p.poll() is None:
+                p.kill()
+        for f in logs:
+            f.close()
+    if failed:
+        raise runs.RunFailed(f"variants failed (exit codes) {failed}")
+    for r in out.values():
+        if isinstance(r.get("relay"), dict) and "timeline" in r["relay"]:
+            r["relay"]["timeline"] = _thin(r["relay"]["timeline"])
     return {"experiment": f"e3_{experiment}", "n": n, "rate": 10, "frame_bytes": 700, "event_at_s": 10,
-            "queue_cap_bytes": CAP, "runs": runs, "env": stats.env()}
+            "queue_cap_bytes": CAP, "runs": out, "env": stats.env()}
+
+
+# (mode, TCP_USER_TIMEOUT ms, duration s[, victim SO_RCVBUF]) per variant
+SLOW = [(m, 0, 600, 65536) for m in ("tcp-blocking", "tcp-queue", "tcp-drop", "tcp-disconnect", "udp")] + \
+       [("tcp-blocking", 0, 600, 0), ("udp", 0, 600, 0)]    # 64 KiB fixed (the kernel doubles it); autotuned
+DEAD = [("tcp-kill", 0, 60), ("tcp-silent", 30_000, 90), ("tcp-silent", 0, 1000), ("udp-lease", 0, 150)]
 
 
 def main() -> None:
@@ -546,7 +574,12 @@ def main() -> None:
     for name in ("slow", "dead"):
         s = sub.add_parser(name)
         s.add_argument("--n", type=int, default=100)
-        s.add_argument("--out", default=os.path.join(HERE, "results", f"e3_{name}.json"))
+        s.add_argument("--duration", type=float,
+                       help="run every variant this long instead of its default (a smoke run; needs --results-dir)")
+        s.add_argument("--results-dir", default=runs.RESULTS,
+                       help=f"publish into <dir>/e3-{name}/ (default: results/)")
+        s.add_argument("--allow-dirty", action="store_true",
+                       help="run even if source files differ from HEAD; the manifest then embeds the diff")
     a = p.parse_args()
     if a.cmd == "relay":
         if a.mode.startswith("udp"):
@@ -559,24 +592,30 @@ def main() -> None:
         listeners(a)
     elif a.cmd == "one":
         run_one(a)
-    elif a.cmd == "slow":
-        # the victim fixes SO_RCVBUF at 64 KiB (the kernel doubles it); plus the autotuned default
-        modes = [(m, 0, 600, 65536) for m in ("tcp-blocking", "tcp-queue", "tcp-drop", "tcp-disconnect", "udp")]
-        modes += [("tcp-blocking", 0, 600, 0), ("udp", 0, 600, 0)]
-        _write(a.out, run_many("slow", modes, a.n))
     else:
-        modes = [("tcp-kill", 0, 60), ("tcp-silent", 30_000, 90), ("tcp-silent", 0, 1000), ("udp-lease", 0, 150)]
-        _write(a.out, run_many("dead", modes, a.n))
+        sys.exit(run_all(a))
 
 
-def _write(out: str, res: dict) -> None:
-    """Write the aggregate only if every variant succeeded; otherwise keep the old one and exit 1."""
-    failed = {name: r["error"] for name, r in res["runs"].items() if "error" in r}
-    if failed:
-        stats.write_json(out + ".failed.json", res)
-        sys.exit(f"e3: variants failed (exit codes) {failed}; {out} left unchanged, "
-                 f"partial output in {out}.failed.json")
-    stats.write_json(out, res)
+def run_all(a) -> int:
+    """``slow`` or ``dead``: publish ``results/e3-<cmd>/`` only if every variant succeeds (harness/runs.py)."""
+    results = os.path.abspath(a.results_dir)
+    if a.duration and results == runs.RESULTS:
+        raise SystemExit("--duration changes what the variants measure; pass --results-dir to put the result "
+                         "somewhere other than results/")
+    modes = [(m[0], m[1], a.duration or m[2], *m[3:]) for m in (SLOW if a.cmd == "slow" else DEAD)]
+    try:
+        run = runs.Run(f"e3-{a.cmd}", f"e3_{a.cmd}", __file__, {"n": a.n, "variants": modes},
+                       results_dir=results, allow_dirty=a.allow_dirty, conditions=[m[0] for m in modes])
+    except runs.RunFailed as e:
+        print(f"e3 {a.cmd}: {e}. Nothing was run or published.", file=sys.stderr)
+        return 1
+    try:
+        run.publish(f"e3_{a.cmd}.json", run_many(a.cmd, modes, a.n, run))
+    except runs.RunFailed as e:
+        print(f"e3 {a.cmd}: {e}. Nothing was published; variant outputs and logs are in {run.stage}",
+              file=sys.stderr)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

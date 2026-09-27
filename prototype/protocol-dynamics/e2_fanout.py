@@ -26,25 +26,44 @@ N/1024 sendmmsg() calls, or one sendto()). That is sender enqueue time. There
 are no receiver timestamps, so when the last listener received the frame
 (arrival spread) is not measured.
 
+Cost per listener, with a matched idle control. Each repeat runs one block per
+N: an idle window (the same namespaces, veth and RPS, the same warm-up and
+measurement window, no sender or listeners) and the three loaded runs, in an
+order shuffled per block. For each repeat r, the cost of a mode at N is
+(CPU 0 busy, loaded − CPU 0 busy, that block's idle) / (N × rate). ``cost()``
+reports its mean over repeats with a 95% t-interval (widened, if need be, to the
+two-tick quantum of CPU accounting), and only when the interval lies above 0.
+Otherwise the cost is *not resolved* at that N: its CPU is inside the idle
+noise, and the interval's half-width is reported as the resolution. No cost is
+ever negative, and none is clamped.
+
+The binary is built from ``fanout/`` into a private directory at launch, so
+the digested sources are what ran (see harness/runs.py).
+
 Run (root)::
 
-    python e2_fanout.py --repeats 3 --measure 20
+    python e2_fanout.py --repeats 3 --measure 20                          # publishes results/e2/
+    python e2_fanout.py --repeats 1 --measure 3 --ns 10 100 --results-dir /tmp/smoke --allow-dirty
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import math
 import os
+import random
 import re
 import subprocess
 import sys
+import tempfile
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from harness import netns, stats  # noqa: E402
+from harness import netns, runs, stats  # noqa: E402
 
 TX, RX = netns.name("e2-tx"), netns.name("e2-rx")
 TX_IP, RX_IP = "10.77.0.1", "10.77.0.2"
@@ -208,7 +227,6 @@ def _one(binary: str, mode: str, n: int, a) -> dict:
         "sender_process_cpu_s_per_s": round(sender_cpu, 5),
         "sender_host_cpu0_busy_s_per_s": round(host_tx_cpu, 5),
         "sender_host_cpu0_softirq_s_per_s": round(cpu["cpu0"]["softirq"], 5),
-        "sender_host_us_per_listener_frame": round(host_tx_cpu * 1e6 / (n * frames_per_s), 3),
         "sender_process_us_per_listener_frame": round(sender_cpu * 1e6 / (n * frames_per_s), 3),
         "receivers_cpu23_busy_s_per_s": round(rx_cpu, 5),
         "cpu1_busy_s_per_s": round(cpu["cpu1"]["busy"], 5),
@@ -227,51 +245,156 @@ def _one(binary: str, mode: str, n: int, a) -> dict:
     }
 
 
+def idle(n: int, a) -> dict:
+    """The matched control: the same topology, warm-up and window as a loaded run, with nothing running."""
+    topology()
+    try:
+        base = meminfo()                # as a loaded run: after the topology, before its processes
+        time.sleep(a.warmup)
+        t0, c0 = time.monotonic(), cpu_times()
+        time.sleep(a.measure)
+        t1, c1 = time.monotonic(), cpu_times()
+        end = meminfo()
+    finally:
+        teardown()
+    dt = t1 - t0
+    busy = {c: round((c1[c]["busy"] - c0[c]["busy"]) / CLK_TCK / dt, 5) for c in c0}
+    return {"mode": "idle", "n": n, "rate": a.rate, "measure_s": round(dt, 3),
+            "sender_host_cpu0_busy_s_per_s": busy["cpu0"], "cpu_busy_s_per_s": busy,
+            "slab_delta_kb": end["Slab"] - base["Slab"]}       # host-wide slab drift with nothing running
+
+
+# two-sided 95% Student t quantiles by degrees of freedom (a df not listed uses the next smaller one)
+T975 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228,
+        15: 2.131, 20: 2.086, 30: 2.042, 60: 2.000, 120: 1.980}
+
+
+def _t975(df: int) -> float:
+    return T975[max(k for k in T975 if k <= df)]
+
+
+def cost(doc: dict) -> list[dict]:
+    """Sending-host CPU per listener and frame, (loaded − idle) / (N × rate), per (mode, N).
+
+    Idle is the matched control of the same repeat and N (``mode == "idle"``
+    rows). A run from before matched controls has only ``idle_baseline``, one
+    unmatched sample for all rows; it is used then, and ``idle_matched`` says so.
+
+    The interval is the mean over repeats ± h, where h is the 95% Student t
+    half-width, but never less than the CPU accounting quantum: /proc/stat counts
+    in 1/CLK_TCK s ticks, so a loaded − idle difference is uncertain by two ticks
+    per window. The cost is reported only when the whole interval lies above 0;
+    otherwise ``resolved`` is False, ``us_per_listener_frame`` is None and
+    ``resolution_us`` is h. With one repeat there is no interval: not resolved.
+    """
+    loaded: dict = {}
+    for r in doc["rows"]:
+        if r["mode"] != "idle":
+            loaded.setdefault((r["mode"], r["n"]), []).append(r)
+    ctrl = {(r["repeat"], r["n"]): r["sender_host_cpu0_busy_s_per_s"] for r in doc["rows"] if r["mode"] == "idle"}
+    matched = bool(ctrl)
+    out = []
+    for (mode, n), rs in sorted(loaded.items(), key=lambda kv: (kv[0][1], kv[0][0])):
+        pairs = []
+        for r in sorted(rs, key=lambda r: r["repeat"]):
+            i = ctrl.get((r["repeat"], n)) if matched else doc["idle_baseline"]["cpu0"]
+            if i is None:
+                raise ValueError(f"no idle control for repeat {r['repeat']}, N = {n}")
+            pairs.append((r["sender_host_cpu0_busy_s_per_s"], i, r["rate"], r["measure_s"]))
+        per = [(ld - i) * 1e6 / (n * rate) for ld, i, rate, _ in pairs]
+        quantum = max(2 / CLK_TCK / w * 1e6 / (n * rate) for _, _, rate, w in pairs)
+        k = len(per)
+        mean = sum(per) / k
+        half = None
+        if k > 1:
+            sd = math.sqrt(sum((x - mean) ** 2 for x in per) / (k - 1))
+            half = max(_t975(k - 1) * sd / math.sqrt(k), quantum)
+        resolved = half is not None and mean - half > 0
+        out.append({"mode": mode, "n": n, "repeats": k, "idle_matched": matched,
+                    "loaded_cpu0_busy_s_per_s": [p[0] for p in pairs],
+                    "idle_cpu0_busy_s_per_s": [p[1] for p in pairs],
+                    "accounting_quantum_us": round(quantum, 3),
+                    "resolved": resolved,
+                    "us_per_listener_frame": {"mean": round(mean, 3), "ci95": [round(mean - half, 3),
+                                                                             round(mean + half, 3)]}
+                    if resolved else None,
+                    "resolution_us": round(half, 3) if half is not None else None})
+    return out
+
+
+def build(workdir: str) -> tuple[str, dict]:
+    """Build fanout/ (the digested sources) into ``workdir``; return the binary and what built it."""
+    go = os.environ.get("GO", "go")
+    binary = os.path.join(workdir, "fanout")
+    subprocess.run([go, "build", "-trimpath", "-buildvcs=false", "-o", binary, "."],
+                   cwd=os.path.join(HERE, "fanout"), check=True)
+    with open(binary, "rb") as f:
+        sha = hashlib.sha256(f.read()).hexdigest()
+    return binary, {"go": subprocess.run([go, "version"], capture_output=True, text=True, check=True).stdout.strip(),
+                    "flags": "-trimpath -buildvcs=false", "binary_sha256": sha}
+
+
+UNIT, AGGREGATE = "e2", "e2_fanout.json"
+DEFAULT_NS, DEFAULT_MODES = [10, 100, 1000, 5000], ["tcp", "udp", "mcast"]
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--ns", type=int, nargs="+", default=[10, 100, 1000, 5000])
-    p.add_argument("--modes", nargs="+", default=["tcp", "udp", "mcast"])
+    p.add_argument("--ns", type=int, nargs="+", default=DEFAULT_NS)
+    p.add_argument("--modes", nargs="+", default=DEFAULT_MODES)
     p.add_argument("--repeats", type=int, default=3)
     p.add_argument("--warmup", type=float, default=5)
     p.add_argument("--measure", type=float, default=20)
     p.add_argument("--rate", type=float, default=10)
     p.add_argument("--size", type=int, default=700)
-    p.add_argument("--binary", default=os.path.join(HERE, "fanout", "fanout"))
-    p.add_argument("--out", default=os.path.join(HERE, "results", "e2_fanout.json"))
+    p.add_argument("--seed", type=int, default=1, help="shuffles the order of runs within each block")
+    p.add_argument("--results-dir", default=runs.RESULTS, help="publish into <dir>/e2/ (default: results/)")
+    p.add_argument("--allow-dirty", action="store_true",
+                   help="run even if source files differ from HEAD; the manifest then embeds the diff")
     a = p.parse_args()
-    if not os.path.exists(a.binary):
-        subprocess.run(["go", "build", "-o", a.binary, "."], cwd=os.path.join(HERE, "fanout"), check=True)
+    results = os.path.abspath(a.results_dir)
+    if (sorted(a.ns) != DEFAULT_NS or sorted(a.modes) != sorted(DEFAULT_MODES)) and results == runs.RESULTS:
+        sys.exit("a subset of N or modes writes a partial aggregate; pass --results-dir to put it somewhere other "
+                 "than results/")
+    config = {k: v for k, v in vars(a).items() if k not in ("results_dir", "allow_dirty")}
+    try:
+        run = runs.Run(UNIT, "e2_fanout", __file__, config, results_dir=results, allow_dirty=a.allow_dirty,
+                       extra_sources=("fanout/*.go", "fanout/go.mod", "fanout/go.sum"),
+                       conditions=[f"{m}-n{n}" for n in a.ns for m in a.modes])
+    except runs.RunFailed as e:
+        sys.exit(f"e2: {e}. Nothing was run or published.")
     os.sched_setaffinity(0, {1})      # keep the harness off the measured CPUs
+    rng = random.Random(a.seed)
     with open(BACKLOG) as f:
         old_backlog = f.read().strip()
     rows = []
+    with tempfile.TemporaryDirectory(prefix="pd-e2-build-") as bindir:
+        binary, built = build(bindir)
+        try:
+            with open(BACKLOG, "w") as f:
+                f.write("16384")
+            for rep in range(a.repeats):
+                for n in a.ns:
+                    block = ["idle", *a.modes]
+                    rng.shuffle(block)          # the idle control's position varies from block to block
+                    for pos, mode in enumerate(block):
+                        r = idle(n, a) if mode == "idle" else one(binary, mode, n, a)
+                        r.update(repeat=rep, block_order=block, position=pos)
+                        rows.append(r)
+                        print(json.dumps({k: r.get(k) for k in ("mode", "n", "repeat", "position",
+                                                                 "sender_host_cpu0_busy_s_per_s", "softnet_drops")}
+                                         | ({"min_frames": r["receiver"]["min_frames"], "wire": r["wire"]}
+                                            if mode != "idle" else {})), flush=True)
+        finally:
+            with open(BACKLOG, "w") as f:
+                f.write(old_backlog)
+            teardown()
+    doc = {"experiment": "e2_fanout", "rows": rows, "config": config, "build": built, "env": stats.env()}
+    doc["cost"] = cost(doc)
     try:
-        with open(BACKLOG, "w") as f:
-            f.write("16384")
-        idle = _idle(a.measure)
-        for rep in range(a.repeats):
-            for n in a.ns:
-                for mode in a.modes:
-                    r = one(a.binary, mode, n, a)
-                    r["repeat"] = rep
-                    rows.append(r)
-                    print(json.dumps({k: r[k] for k in ("mode", "n", "repeat", "sender_host_cpu0_busy_s_per_s",
-                                                         "sender_host_us_per_listener_frame", "softnet_drops")}
-                                     | {"min_frames": r["receiver"]["min_frames"], "wire": r["wire"]}), flush=True)
-    finally:
-        with open(BACKLOG, "w") as f:
-            f.write(old_backlog)
-        teardown()
-    stats.write_json(a.out, {"experiment": "e2_fanout", "idle_baseline": idle, "rows": rows,
-                             "config": {k: v for k, v in vars(a).items() if k != "out"}, "env": stats.env()})
-
-
-def _idle(seconds: float) -> dict:
-    """Per-CPU busy time with nothing running, to show the floor under every number."""
-    c0 = cpu_times()
-    time.sleep(seconds)
-    c1 = cpu_times()
-    return {c: round((c1[c]["busy"] - c0[c]["busy"]) / CLK_TCK / seconds, 5) for c in c0}
+        run.publish(AGGREGATE, doc, build=built)
+    except runs.RunFailed as e:
+        sys.exit(f"e2: {e}")
 
 
 if __name__ == "__main__":

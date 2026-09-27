@@ -24,11 +24,12 @@ delivered fraction and censored count beside them; ``delivered_latency_ms``
 is conditional on delivery.
 
 Run everything (root; namespaces are named ``<PD_NS_PREFIX>e1-*``, see
-harness/netns.py). Raw files and ``results/e1_freshness.json`` are published
-only if every condition succeeds::
+harness/netns.py). ``results/e1/`` (``e1_freshness.json``, ``manifest.json``,
+``raw/``) is replaced as a whole, and only if every condition succeeds and no
+source file differs from HEAD (see harness/runs.py)::
 
     python e1_freshness.py all --duration 900 --receivers 20
-    python e1_freshness.py all --duration 30 --only u2-loss50 --results-dir /tmp/smoke   # a partial run
+    python e1_freshness.py all --duration 30 --only u2-loss50 --results-dir /tmp/smoke --allow-dirty   # a partial run
 
 Run one condition in the current namespace::
 
@@ -500,51 +501,57 @@ def _spawn(ns: str, argv: list[str], log_path: str) -> subprocess.Popen:
 
 
 def run_all(a) -> int:
-    """Run the conditions in parallel namespaces; publish raw files and the aggregate only if all succeed.
+    """Run the conditions in parallel namespaces; publish ``results/e1/`` only if all succeed.
 
+    Refuses a dirty source tree unless ``--allow-dirty`` (see harness/runs.py).
     Workers write into a fresh staging directory. Any nonzero exit, missing
-    output or provenance mismatch leaves ``results/`` untouched and returns 1.
+    output, provenance mismatch or source change during the run leaves
+    ``results/`` untouched and returns 1.
     """
     results = os.path.abspath(a.results_dir)
     if a.only and results == runs.RESULTS:
         raise SystemExit("--only writes an aggregate of just those conditions; pass --results-dir to put it "
                          "somewhere other than results/")
     jobs = jobs_for(a.update_values, a.only)
-    run_id = runs.new_run_id()
-    stage = runs.stage_dir(results, "e1", run_id)
     config = {"duration_s": a.duration, "receivers": a.receivers, "update_values": a.update_values,
               "warmup_s": WARMUP_S, "drain_s": DRAIN_S, "body_bytes": BODY}
-    manifest = runs.manifest("e1_freshness", run_id, [j[0] for j in jobs], config, os.path.abspath(__file__))
+    try:
+        run = runs.Run(UNIT, "e1_freshness", __file__, config, results_dir=results, allow_dirty=a.allow_dirty,
+                       conditions=[j[0] for j in jobs])
+    except runs.RunFailed as e:
+        print(f"e1: {e}. Nothing was run or published.", file=sys.stderr)
+        return 1
     procs = []
     try:
         with contextlib.ExitStack() as stack:
             for tag, u, kind, v in jobs:
                 ns = stack.enter_context(netns.netns(netns.name(f"e1-{tag}")))
-                out = os.path.join(stage, f"e1-{tag}.json")
+                out = run.raw(f"e1-{tag}.json")
                 argv = [sys.executable, os.path.abspath(__file__), "one", "--update-s", str(u), "--duration",
                         str(a.duration), "--receivers", str(a.receivers), "--seed", str(zlib.crc32(tag.encode())),
-                        "--run-id", run_id, "--tag", tag, "--out", out]
+                        "--run-id", run.id, "--tag", tag, "--out", out]
                 argv += {"loss": ["--loss", str(v)], "lossdata": ["--loss", str(v), "--data-only"],
                          "outage": ["--outage", str(v)]}[kind]
-                procs.append((tag, out, _spawn(ns, argv, os.path.join(stage, f"e1-{tag}.log"))))
+                procs.append((tag, out, _spawn(ns, argv, run.raw(f"e1-{tag}.log"))))
             runs.wait_all(procs)
-        aggregate = collate([out for _, out, _ in procs], manifest,
-                            expect={"run_id": run_id, "duration_s": a.duration, "receivers": a.receivers})
+        aggregate = collate([out for _, out, _ in procs],
+                            expect={"run_id": run.id, "duration_s": a.duration, "receivers": a.receivers})
+        run.publish(AGGREGATE, aggregate)
     except runs.RunFailed as e:
-        print(f"e1: {e}. Nothing was published; worker logs are in {stage}", file=sys.stderr)
+        print(f"e1: {e}. Nothing was published; worker logs are in {run.stage}", file=sys.stderr)
         return 1
     finally:
         for _, _, p in procs:
             if p.poll() is None:
                 p.kill()
-    runs.publish(stage, os.path.join(results, "raw"), os.path.join(results, "e1_freshness.json"), aggregate)
     return 0
 
 
+UNIT, AGGREGATE = "e1", "e1_freshness.json"
 PROVENANCE = ("run_id", "duration_s", "receivers", "warmup_s", "drain_s", "body_bytes")
 
 
-def collate(files: list[str], manifest: dict, expect: Optional[dict] = None) -> dict:
+def collate(files: list[str], expect: Optional[dict] = None) -> dict:
     """One row per (condition, arm) from exactly ``files``, which must share one run and configuration."""
     stats.km_selfcheck()
     docs = {}
@@ -565,8 +572,7 @@ def collate(files: list[str], manifest: dict, expect: Optional[dict] = None) -> 
                          "arm": arm, "measured_loss": d["nft"]["measured_loss"],
                          **{k: d[k] for k in PROVENANCE},
                          **{k: v for k, v in m.items() if k not in ("tcp_info_trace_conn0",)}})
-    return {"experiment": "e1_freshness",
-            "manifest": {**manifest, "finished": stats.env()["date"], "raw_files": sorted(docs)}, "rows": rows}
+    return {"experiment": "e1_freshness", "rows": rows}
 
 
 def main() -> None:
@@ -589,24 +595,33 @@ def main() -> None:
     al.add_argument("--update-values", type=float, nargs="+", default=[0.5, 2, 10])
     al.add_argument("--only", nargs="*", help="condition tags to run, e.g. u2-loss300 u10-lossdata200")
     al.add_argument("--results-dir", default=runs.RESULTS,
-                    help="where raw/ and e1_freshness.json are published (default: results/)")
-    co = sub.add_parser("collate", help="re-collate results/raw/e1-*.json; refuses files from different runs")
+                    help="publish into <dir>/e1/ (default: results/, i.e. results/e1/)")
+    al.add_argument("--allow-dirty", action="store_true",
+                    help="run even if source files differ from HEAD; the manifest then embeds the diff")
+    co = sub.add_parser("collate", help="re-collate <results>/e1/raw/e1-*.json (read-only; refuses mixed runs)")
     co.add_argument("--results-dir", default=runs.RESULTS)
+    co.add_argument("--out", help="write the aggregate here (default: stdout); never into the published generation")
     a = p.parse_args()
     if a.cmd == "one":
         stats.write_json(a.out, asyncio.run(condition(a)))
     elif a.cmd == "all":
         sys.exit(run_all(a))
     else:
-        raw = os.path.join(a.results_dir, "raw")
+        gen = os.path.join(os.path.abspath(a.results_dir), UNIT)
+        raw = os.path.join(gen, "raw")
         files = sorted(os.path.join(raw, n) for n in os.listdir(raw) if n.startswith("e1-") and n.endswith(".json"))
+        if a.out and os.path.realpath(a.out).startswith(os.path.realpath(gen) + os.sep):
+            sys.exit("e1 collate: --out must not be inside the published generation")
         try:
-            agg = collate(files, {"experiment": "e1_freshness", "recollated_from": raw, "argv": sys.argv})
+            agg = collate(files)
         except runs.RunFailed as e:
             sys.exit(f"e1 collate: {e}")
-        runs_id = {r["run_id"] for r in agg["rows"]}
-        agg["manifest"]["run_id"] = runs_id.pop()
-        stats.write_json(os.path.join(a.results_dir, "e1_freshness.json"), agg)
+        agg = {"run_id": agg["rows"][0]["run_id"], "recollated_from": raw, **agg}
+        if a.out:
+            stats.write_json(a.out, agg)
+        else:
+            json.dump(agg, sys.stdout, indent=1)
+            print()
 
 
 if __name__ == "__main__":

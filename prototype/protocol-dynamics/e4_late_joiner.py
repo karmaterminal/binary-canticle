@@ -28,7 +28,7 @@ A join that has not completed when it times out (120 s) or when the run ends
 is right-censored: ``t_full_km_ms`` is the Kaplan–Meier estimate over all
 joins, ``t_full_completed_ms`` is conditional on completion.
 
-    python e4_late_joiner.py all --duration 600
+    python e4_late_joiner.py all --duration 600     # publishes results/e4/ (see harness/runs.py)
 """
 
 from __future__ import annotations
@@ -79,7 +79,7 @@ class Joined:
     """A fresh listener that reports when it holds all 20 keys."""
 
     def __init__(self, manifest: Manifest, t_start: float):
-        self.listener = Listener(manifest)
+        self.listener = Listener(manifest, warmup=False)   # catch-up by transport: no §7.8 rule 4 hold
         self.t_start = t_start
         self.keys: set = set()
         self.done: asyncio.Future = asyncio.get_running_loop().create_future()
@@ -130,7 +130,7 @@ class Relay:
     """A minimal §11.3 relay: stateless cookie, lease table, paced snapshot, fan-out."""
 
     def __init__(self, manifest: Manifest):
-        self.listener = Listener(manifest)          # the membrane: verify, supersede, expire
+        self.listener = Listener(manifest, warmup=False)   # the membrane: verify, supersede, expire
         self.frames: dict = {}                      # identity -> raw frame, for what is current
         self.secret = os.urandom(32)
         self.leases: dict = {}                      # (addr, client nonce) -> expiry (wall): one per session
@@ -464,40 +464,44 @@ PROVENANCE = ("run_id", "duration_s", "items", "slots_per_arm", "trial_timeout_s
 
 
 def run_all(a) -> int:
-    """All loss levels in parallel namespaces; publish only if every one succeeds (see harness/runs.py)."""
+    """All loss levels in parallel namespaces; publish ``results/e4/`` only if every one succeeds (harness/runs.py)."""
     results = os.path.abspath(a.results_dir)
     if a.losses != DEFAULT_LOSSES and results == runs.RESULTS:
         raise SystemExit("a subset of loss levels writes a partial aggregate; pass --results-dir to put it "
                          "somewhere other than results/")
-    run_id = runs.new_run_id()
-    stage = runs.stage_dir(results, "e4", run_id)
     tags = [f"loss{loss}" for loss in a.losses]
-    manifest = runs.manifest("e4_late_joiner", run_id, tags, {"duration_s": a.duration, "losses": a.losses},
-                             os.path.abspath(__file__))
+    try:
+        run = runs.Run(UNIT, "e4_late_joiner", __file__, {"duration_s": a.duration, "losses": a.losses},
+                       results_dir=results, allow_dirty=a.allow_dirty, conditions=tags)
+    except runs.RunFailed as e:
+        print(f"e4: {e}. Nothing was run or published.", file=sys.stderr)
+        return 1
     procs = []
     try:
         with contextlib.ExitStack() as stack:
             for loss, tag in zip(a.losses, tags):
                 ns = stack.enter_context(netns.netns(netns.name(f"e4-{tag}")))
-                out = os.path.join(stage, f"e4-{tag}.json")
+                out = run.raw(f"e4-{tag}.json")
                 argv = [sys.executable, os.path.abspath(__file__), "one", "--loss", str(loss), "--duration",
-                        str(a.duration), "--seed", str(loss + 1), "--run-id", run_id, "--tag", tag, "--out", out]
-                procs.append((tag, out, _spawn(ns, argv, os.path.join(stage, f"e4-{tag}.log"))))
+                        str(a.duration), "--seed", str(loss + 1), "--run-id", run.id, "--tag", tag, "--out", out]
+                procs.append((tag, out, _spawn(ns, argv, run.raw(f"e4-{tag}.log"))))
             runs.wait_all(procs)
-        aggregate = collate([out for _, out, _ in procs], manifest,
-                            expect={"run_id": run_id, "duration_s": a.duration})
+        aggregate = collate([out for _, out, _ in procs], expect={"run_id": run.id, "duration_s": a.duration})
+        run.publish(AGGREGATE, aggregate)
     except runs.RunFailed as e:
-        print(f"e4: {e}. Nothing was published; worker logs are in {stage}", file=sys.stderr)
+        print(f"e4: {e}. Nothing was published; worker logs are in {run.stage}", file=sys.stderr)
         return 1
     finally:
         for _, _, p in procs:
             if p.poll() is None:
                 p.kill()
-    runs.publish(stage, os.path.join(results, "raw"), os.path.join(results, "e4_late_joiner.json"), aggregate)
     return 0
 
 
-def collate(files: list[str], manifest: dict, expect: Optional[dict] = None) -> dict:
+UNIT, AGGREGATE = "e4", "e4_late_joiner.json"
+
+
+def collate(files: list[str], expect: Optional[dict] = None) -> dict:
     stats.km_selfcheck()
     docs = {}
     for path in files:
@@ -506,9 +510,7 @@ def collate(files: list[str], manifest: dict, expect: Optional[dict] = None) -> 
     if not docs:
         raise runs.RunFailed("no raw files to collate")
     runs.check_consistent(docs, PROVENANCE, expect)
-    return {"experiment": "e4_late_joiner",
-            "manifest": {**manifest, "finished": stats.env()["date"], "raw_files": sorted(docs)},
-            "conditions": sorted(docs.values(), key=lambda d: d["loss_permille"])}
+    return {"experiment": "e4_late_joiner", "conditions": sorted(docs.values(), key=lambda d: d["loss_permille"])}
 
 
 DEFAULT_LOSSES = [0, 50, 300]
@@ -528,7 +530,9 @@ def main() -> None:
     al.add_argument("--duration", type=float, default=600)
     al.add_argument("--losses", type=int, nargs="+", default=DEFAULT_LOSSES)
     al.add_argument("--results-dir", default=runs.RESULTS,
-                    help="where raw/ and e4_late_joiner.json are published (default: results/)")
+                    help="publish into <dir>/e4/ (default: results/, i.e. results/e4/)")
+    al.add_argument("--allow-dirty", action="store_true",
+                    help="run even if source files differ from HEAD; the manifest then embeds the diff")
     a = p.parse_args()
     if a.cmd == "one":
         stats.write_json(a.out, asyncio.run(condition(a)))

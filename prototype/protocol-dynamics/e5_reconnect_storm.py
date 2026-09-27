@@ -24,7 +24,8 @@ that pass is not timed).
 No loss is applied. Frames are not signed here: E5 is about connection and
 lease dynamics, not verification.
 
-    python e5_reconnect_storm.py all
+    python e5_reconnect_storm.py all            # publishes results/e5/ (see harness/runs.py)
+    python e5_reconnect_storm.py all --n 100 --repeats 1 --results-dir /tmp/smoke --allow-dirty
 """
 
 from __future__ import annotations
@@ -46,7 +47,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from harness import netns, stats  # noqa: E402
+from harness import netns, runs, stats  # noqa: E402
 
 ITEMS, FRAME = 20, 330
 PORT = 7400
@@ -340,21 +341,38 @@ def run_one(a) -> None:
             "Udp": ["InDatagrams", "OutDatagrams", "RcvbufErrors", "NoPorts"]})}))
 
 
-def run_all(a) -> None:
-    runs = []
-    for rep in range(a.repeats):
-        for strace in (False, True) if rep == 0 else (False,):
-            for mode, backlog in (("tcp", 128), ("tcp", 4096), ("udp-lease", 0)):
-                ns = netns.name(f"e5-{mode}-{backlog}")
-                with netns.netns(ns):
-                    argv = [sys.executable, os.path.abspath(__file__), "one", "--mode", mode, "--backlog",
-                            str(backlog), "--n", str(a.n)] + (["--strace"] if strace else [])
-                    runs.append({"repeat": rep, **json.loads(netns.run(*netns.ns_exec(ns, *argv)).splitlines()[-1])})
-                print(json.dumps({k: runs[-1][k] for k in ("repeat", "strace_pass", "mode", "backlog",
-                                                           "all_served_after_kill_s")}), flush=True)
-    stats.write_json(os.path.join(HERE, "results", "e5_reconnect_storm.json"),
-                     {"experiment": "e5_reconnect_storm", "n": a.n, "items": ITEMS, "frame_bytes": FRAME,
-                      "runs": runs, "env": stats.env()})
+def run_all(a) -> int:
+    """Every (repeat, pass, mode, backlog) in turn; publish ``results/e5/`` only if all succeed (harness/runs.py)."""
+    plan = [(rep, strace, mode, backlog) for rep in range(a.repeats) for strace in ((False, True) if rep == 0 else
+            (False,)) for mode, backlog in (("tcp", 128), ("tcp", 4096), ("udp-lease", 0))]
+    tags = [f"rep{rep}-{'strace' if st else 'timed'}-{mode}-{backlog}" for rep, st, mode, backlog in plan]
+    try:
+        run = runs.Run("e5", "e5_reconnect_storm", __file__, {"n": a.n, "repeats": a.repeats, "items": ITEMS,
+                                                               "frame_bytes": FRAME},
+                       results_dir=a.results_dir, allow_dirty=a.allow_dirty, conditions=tags)
+    except runs.RunFailed as e:
+        print(f"e5: {e}. Nothing was run or published.", file=sys.stderr)
+        return 1
+    out = []
+    try:
+        for (rep, strace, mode, backlog), tag in zip(plan, tags):
+            with netns.netns(netns.name(f"e5-{mode}-{backlog}")) as ns, open(run.raw(f"{tag}.log"), "w") as log:
+                argv = [sys.executable, os.path.abspath(__file__), "one", "--mode", mode, "--backlog", str(backlog),
+                        "--n", str(a.n)] + (["--strace"] if strace else [])
+                p = subprocess.run(netns.ns_exec(ns, *argv), stdout=subprocess.PIPE, stderr=log, text=True)
+            lines = [ln for ln in p.stdout.splitlines() if ln.startswith("{")]
+            if p.returncode != 0 or not lines:
+                raise runs.RunFailed(f"{tag} failed (exit {p.returncode})")
+            out.append({"repeat": rep, **json.loads(lines[-1])})
+            stats.write_json(run.raw(f"{tag}.json"), out[-1])
+            print(json.dumps({k: out[-1][k] for k in ("repeat", "strace_pass", "mode", "backlog",
+                                                      "all_served_after_kill_s")}), flush=True)
+        run.publish("e5_reconnect_storm.json", {"experiment": "e5_reconnect_storm", "n": a.n, "items": ITEMS,
+                                                "frame_bytes": FRAME, "runs": out, "env": stats.env()})
+    except runs.RunFailed as e:
+        print(f"e5: {e}. Nothing was published; outputs and logs are in {run.stage}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def main() -> None:
@@ -374,6 +392,9 @@ def main() -> None:
     al = sub.add_parser("all")
     al.add_argument("--n", type=int, default=1000)
     al.add_argument("--repeats", type=int, default=3)
+    al.add_argument("--results-dir", default=runs.RESULTS, help="publish into <dir>/e5/ (default: results/)")
+    al.add_argument("--allow-dirty", action="store_true",
+                    help="run even if source files differ from HEAD; the manifest then embeds the diff")
     a = p.parse_args()
     if a.cmd == "relay":
         asyncio.run(tcp_relay(a.backlog) if a.mode == "tcp" else udp_relay())
@@ -382,7 +403,7 @@ def main() -> None:
     elif a.cmd == "one":
         run_one(a)
     else:
-        run_all(a)
+        sys.exit(run_all(a))
 
 
 if __name__ == "__main__":
