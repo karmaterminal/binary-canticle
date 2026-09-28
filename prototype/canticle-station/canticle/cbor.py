@@ -56,7 +56,7 @@ def encode(obj) -> bytes:
     if isinstance(obj, (list, tuple)):
         return _head(4, len(obj)) + b"".join(encode(x) for x in obj)
     if isinstance(obj, dict):
-        items = sorted(((encode(k), encode(v)) for k, v in obj.items()), reverse=True)  # CI proof: deliberately wrong map-key order; reverted by the next commit
+        items = sorted((encode(k), encode(v)) for k, v in obj.items())
         for a, b in zip(items, items[1:]):
             if a[0] == b[0]:
                 raise CborError("duplicate-key")
