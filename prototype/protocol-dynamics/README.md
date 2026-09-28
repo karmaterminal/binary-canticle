@@ -24,7 +24,7 @@ Needs root (network namespaces, nftables, `taskset`), git, Python 3.11+ with
 ```sh
 cd prototype/protocol-dynamics
 python3 -m venv .venv && . .venv/bin/activate && pip install -e ../canticle-station numpy
-sudo PYTHON=$PWD/.venv/bin/python ./run_all.sh        # everything, about 55 minutes
+sudo PYTHON=$PWD/.venv/bin/python ./run_all.sh        # everything, about 45 minutes (42 min 50 s on 2026-09-27)
 sudo PYTHON=$PWD/.venv/bin/python ./run_all.sh e4     # one experiment (e1 … e5)
 python summarize.py verify                            # check what is published (below)
 ```
@@ -116,7 +116,7 @@ Code layout:
 
 ## Testbed
 
-Measured on 2026-09-27:
+Measured on 2026-09-27 and 28 (the last run ended 00:08 UTC):
 
 - **Host.** Linux 6.18.44, 4 vCPUs, 16 GB, `HZ=250`, tick-based CPU accounting without IRQ-time accounting.
 - **Languages.** Python 3.11.15 with cryptography 50.0.1 for the canticle arms and the E1/E3/E4/E5 harness; Go 1.24.7 for the E2 sender and receivers.
@@ -140,8 +140,9 @@ Measured on 2026-09-27:
   RPS and CPU pinning to keep receive-side work off the sender's CPU (details
   in `e2_fanout.py`). Its absolute CPU numbers are for this VM; the ratios
   between arms are what carry over. With tick-based accounting (HZ 250) and
-  about 1% of background load on CPU 0, a 20 s window cannot resolve the few
-  µs per listener that N ≤ 100 costs; E2 reports those as not resolved.
+  0.05-1.7% of background load on CPU 0 (E2's idle windows), a 20 s window
+  cannot resolve the few µs per listener that N ≤ 100 costs; E2 reports those
+  as not resolved.
 - **Loss model.** Bernoulli and independent per packet, except the outages. Real
   radio loss is bursty, and bursts favour the carousel (long gaps) less than
   they hurt TCP (backoff); the outage conditions bracket that case.

@@ -109,7 +109,7 @@ Data for the chart: p99 update latency (Kaplan–Meier) in ms, or s where marked
 
 - Each failed retransmission doubles the RTO, up to 120 s (`TCP_RTO_MAX`).
 - With loss in both directions, a retransmission *and* its ACK must survive, so each attempt fails about half the time at 30%.
-- At 30% the RTO reached the 120 s cap in five of the six TCP cells. Timestamp echo during loss also inflates SRTT: TCP_INFO once showed a 120 s RTO at backoff 0.
+- At 30% the RTO reached the 120 s cap in five of the six TCP cells. Timestamp echo during loss also inflates SRTT: TCP_INFO showed a 120 s RTO after at most one backoff.
 - TCP only aborts after `tcp_retries2` = 15 (≈ 924 s), so a connection sits stalled for minutes without resetting. None reset in any run.
 - The carousel's worst case is bounded by its schedule. It has no memory of past loss to back off from.
 
@@ -131,7 +131,7 @@ Data for the chart: p99 update latency (Kaplan–Meier) in ms, or s where marked
 
 - A killed process sends FIN, and the sender knows in 5 ms.
 - A host that simply disappears keeps a TCP sender retransmitting for about 15 minutes (939 s measured), holding its queue. Every TCP relay needs `TCP_USER_TIMEOUT`.
-- A UDP lease just lapses (54-75 s measured, inside RFC-0001's bound). The only waste is datagrams sent into the void meanwhile.
+- A UDP lease just lapses (54-75 s measured, against RFC-0001's 75 s lease; the maximum sits at the bound within the 0.1 s resolution). The only waste is datagrams sent into the void meanwhile.
 
 ### 3.6 Late joiners and restarts
 
