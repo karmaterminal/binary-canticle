@@ -20,9 +20,14 @@ import time
 from typing import Callable, Optional
 
 from .listener import Event, Listener
+from .ids import CLASSES
 from .station import Station
 
 MCAST_GROUP = "239.255.13.13"   # provisional, D22
+# Classes whose authority rests on checks this spike does not implement: the op inside a typed
+# regulatory body (§10.4: `regulatory` vs `quarantine` ops), and the taint, content-policy and
+# issuer rules for alarm and control (§15.4). The agent-facing socket refuses them, fail closed.
+SOCKET_NEVER = frozenset({"regulatory", "alarm", "control"})
 DEFAULT_PORT = 9999             # provisional, D22
 CONTROL_LINE_LIMIT = 64 * 1024
 
@@ -46,10 +51,14 @@ def _peer_uid(writer: asyncio.StreamWriter) -> Optional[int]:
     return struct.unpack("3i", creds)[1]
 
 
-def _dispatch(station: Station, req: dict) -> dict:
+def _dispatch(station: Station, req: dict, socket_classes: frozenset) -> dict:
     op = req.get("op")
     now = now_ms()
     if op == "sing":
+        stream = station.streams.get(req.get("stream"))
+        cls = req.get("class") or (stream.cfg.cls if stream else None)
+        if cls is not None and cls not in socket_classes:
+            return {"ok": False, "error": f"class {cls} is not granted to this control socket (§15.4)"}
         kwargs = {k: req[k] for k in ("text", "state_key", "loop", "scope", "purpose", "intensity") if k in req}
         if "class" in req:
             kwargs["cls"] = req["class"]
@@ -71,12 +80,27 @@ def _dispatch(station: Station, req: dict) -> dict:
     return {"ok": False, "error": f"unknown op {op!r}"}
 
 
+def socket_grant(station: Station, requested=None) -> frozenset:
+    """Classes the control socket may request: the key's grant minus SOCKET_NEVER, narrowed further
+    by ``requested`` (names). Asking for a class outside that set is a configuration error."""
+    names = {c.name for c in CLASSES.values() if c.code in station.grant.classes} - SOCKET_NEVER
+    if requested is None:
+        return frozenset(names)
+    bad = set(requested) - names
+    if bad:
+        raise ValueError(f"control socket cannot be granted {sorted(bad)}: not granted to the key, "
+                         f"or not supported over the socket in this spike ({sorted(SOCKET_NEVER)})")
+    return frozenset(requested)
+
+
 async def run_station(station: Station, dests: list[tuple[str, int]], control_path: Optional[str] = None,
-                      stop: Optional[asyncio.Event] = None, log: Callable[[str], None] = lambda s: None) -> None:
+                      stop: Optional[asyncio.Event] = None, log: Callable[[str], None] = lambda s: None,
+                      socket_classes=None) -> None:
     if station.grant is None:
         raise ValueError("a station behind a control socket needs its manifest grant (§10.4)")
     if station.host_binding:
         raise ValueError("run_station only sends UDP; it cannot carry host-scoped frames (§4.3)")
+    allowed = socket_grant(station, socket_classes)
     stop = stop or asyncio.Event()
     wake = asyncio.Event()
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -94,7 +118,7 @@ async def run_station(station: Station, dests: list[tuple[str, int]], control_pa
             else:
                 line = await reader.readline()
                 try:
-                    resp = _dispatch(station, json.loads(line))
+                    resp = _dispatch(station, json.loads(line), allowed)
                 except (ValueError, KeyError, TypeError) as e:
                     resp = {"ok": False, "error": str(e)}
             writer.write((json.dumps(resp) + "\n").encode())

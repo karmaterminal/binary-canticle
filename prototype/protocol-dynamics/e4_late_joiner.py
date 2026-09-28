@@ -79,7 +79,7 @@ class Joined:
     """A fresh listener that reports when it holds all 20 keys."""
 
     def __init__(self, manifest: Manifest, t_start: float):
-        self.listener = Listener(manifest, warmup=False)   # catch-up by transport: no §7.8 rule 4 hold
+        self.listener = Listener(manifest, warmup=False, ephemeral=True)   # catch-up by transport: no §7.8 rule 4 hold
         self.t_start = t_start
         self.keys: set = set()
         self.done: asyncio.Future = asyncio.get_running_loop().create_future()
@@ -130,7 +130,7 @@ class Relay:
     """A minimal §11.3 relay: stateless cookie, lease table, paced snapshot, fan-out."""
 
     def __init__(self, manifest: Manifest):
-        self.listener = Listener(manifest, warmup=False)   # the membrane: verify, supersede, expire
+        self.listener = Listener(manifest, warmup=False, ephemeral=True)   # the membrane: verify, supersede, expire
         self.frames: dict = {}                      # identity -> raw frame, for what is current
         self.secret = os.urandom(32)
         self.leases: dict = {}                      # (addr, client nonce) -> expiry (wall): one per session

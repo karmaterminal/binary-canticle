@@ -81,7 +81,12 @@ class _StationState:
 
 class Listener:
     def __init__(self, manifest: Manifest, tuned: Optional[set] = None, dedup_capacity: int = 100_000,
-                 binding: str = "lan", state_path=None, warmup: bool = True):
+                 binding: str = "lan", state_path=None, warmup: bool = True, ephemeral: bool = False):
+        # Restart safety is the default: without state_path a restarted listener could surface a
+        # stale or withdrawn item (§7.4-§7.8). Tests and experiments must opt out explicitly.
+        if state_path is None and not ephemeral:
+            raise ValueError("a listener needs state_path for restart safety (§7.4-§7.8), "
+                             "or ephemeral=True where restarts are not under test")
         self.manifest = manifest
         # binding: where frames reach this listener. A frame whose scope is narrower than the
         # binding (a `host` frame heard over UDP) is a scope violation (§4.3, §10.9).

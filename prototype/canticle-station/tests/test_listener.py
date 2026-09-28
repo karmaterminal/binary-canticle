@@ -18,7 +18,7 @@ def setup():
     st = Station(SK, [StreamConfig("chatter"), StreamConfig("root", cls="root")], epoch=1,
                  rng=random.Random(1), now_ms=T0)
     m = Manifest([StationEntry("cael", wire.public_key_bytes(SK), frozenset({1, 9}), ("chatter", "root"))])
-    return st, Listener(m)
+    return st, Listener(m, ephemeral=True)
 
 
 def feed(st, lst, start, end, step=100):
@@ -158,7 +158,7 @@ class AdmissionTest(unittest.TestCase):
         sk2 = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(vectors.TEST2))
         m = Manifest([StationEntry("cael", wire.public_key_bytes(SK), frozenset({1, 9}), ("chatter", "root")),
                       StationEntry("silas", wire.public_key_bytes(sk2), frozenset({1}), ("chatter",))])
-        lst = Listener(m, dedup_capacity=6)                              # 3 tuples per key
+        lst = Listener(m, dedup_capacity=6, ephemeral=True)                              # 3 tuples per key
         loud = Station(SK, [StreamConfig("chatter")], epoch=1, rng=random.Random(1), now_ms=T0)
         quiet = Station(sk2, [StreamConfig("chatter")], epoch=1, rng=random.Random(2), now_ms=T0)
         for i in range(5):
@@ -186,7 +186,7 @@ class ScopeAndHopTest(unittest.TestCase):
 
     def test_scope_must_be_granted(self):
         m = Manifest([StationEntry("cael", wire.public_key_bytes(SK), frozenset({1}), ("chatter",), scopes=frozenset({1}))])
-        lst = Listener(m)
+        lst = Listener(m, ephemeral=True)
         st = Station(SK, [StreamConfig("chatter")], epoch=5, rng=random.Random(1), now_ms=T0)
         st.sing(T0, "chatter", text="to everyone", scope="public")
         evs = [e for f in st.poll(T0) for e in lst.hear(f, T0) if e.kind == "evidence"]
@@ -194,7 +194,7 @@ class ScopeAndHopTest(unittest.TestCase):
 
     def test_hop_limit_boundaries(self):
         m = Manifest([StationEntry("cael", wire.public_key_bytes(SK), frozenset({1, 7}), ("chatter", "alarm"))])
-        lst = Listener(m)
+        lst = Listener(m, ephemeral=True)
         st = Station(SK, [StreamConfig("chatter"), StreamConfig("alarm", cls="alarm")], epoch=5,
                      rng=random.Random(1), now_ms=T0)
         st.sing(T0, "chatter", text="hop 2", hop=2)            # chatter allows 2
@@ -207,6 +207,12 @@ class ScopeAndHopTest(unittest.TestCase):
 
 
 class PersistenceTest(unittest.TestCase):
+    def test_state_is_required_unless_explicitly_ephemeral(self):
+        with self.assertRaises(ValueError):
+            Listener(setup()[1].manifest)
+        with tempfile.TemporaryDirectory() as d:
+            Listener(setup()[1].manifest, state_path=Path(d) / "s.json")
+
     def keyed(self, st, t, text):
         return st.sing(t, "root", body=cbor.encode({1: text}), ctype=7, state_key="root", ttl_s=600)
 
@@ -240,7 +246,7 @@ class PersistenceTest(unittest.TestCase):
 
     def test_live_state_waits_for_warm_up(self):
         m = Manifest([StationEntry("cael", wire.public_key_bytes(SK), frozenset({3}), ("lens.threat",))])
-        lst = Listener(m)
+        lst = Listener(m, ephemeral=True)
         st = Station(SK, [StreamConfig("lens.threat", cls="live-state")], epoch=1, rng=random.Random(1), now_ms=T0)
         st.sing(T0, "lens.threat", text="elevated", state_key="now", ttl_s=120)
         evs = []
@@ -255,7 +261,7 @@ class PersistenceTest(unittest.TestCase):
 
     def test_warm_up_never_lands_an_older_value(self):
         m = Manifest([StationEntry("cael", wire.public_key_bytes(SK), frozenset({3}), ("lens.threat",))])
-        lst = Listener(m)
+        lst = Listener(m, ephemeral=True)
         st = Station(SK, [StreamConfig("lens.threat", cls="live-state")], epoch=1, rng=random.Random(1), now_ms=T0)
         st.sing(T0, "lens.threat", text="old", state_key="now", ttl_s=120)
         old = st.poll(T0)

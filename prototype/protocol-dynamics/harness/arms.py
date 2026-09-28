@@ -150,7 +150,7 @@ class UdpListener:
 
     def __init__(self, manifest: Manifest, port: int = 0, host: str = "127.0.0.1",
                  on_item: Optional[Callable[[int, float, object], None]] = None):
-        self.listener = Listener(manifest, warmup=False)   # transport freshness: no §7.8 rule 4 hold
+        self.listener = Listener(manifest, warmup=False, ephemeral=True)   # transport freshness: no §7.8 rule 4 hold; restarts not under test
         self.heard = Heard()
         self.on_item = on_item
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

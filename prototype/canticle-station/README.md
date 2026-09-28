@@ -13,8 +13,8 @@ them loop until they expire.
 | §5 Identity | Key-id = SHA-256(pubkey)[0:8]; `stream_id` = SHA-256("canticle-stream/v2" ‖ 0 ‖ name)[0:4]; collisions are refused, never rehashed (#38). |
 | §7 Carousel | Signs each item once and resends the same bytes. The expiry is absolute and never reset. A burst goes out at 0, +1, +2 and +4 s, then SAP-style loops with jitter U(2/3, 4/3) and reconsideration. Includes the fair-share regulator with a class floor, the availability ceiling and clamp reasons; supersede-by-key; pluck (a PLUCK loops until the target's expiry); refresh re-issue for keep-on-air; and ring depth. |
 | §8 Carrier-beacon | Signed beacons with per-stream heads, live counts, loop and TTL contracts, `next_beacon_ms` (0 = goodbye) and ±10% jitter. Beyond 24 streams it rotates pages with a catalog digest. |
-| §7.4-§7.8, §8.6 Listener | Dedup on the identity tuple: a repeat is a no-op, different bytes are an equivocation. Also sticky-pluck, supersession high-water marks, epoch regression, class capability, granted scope, binding scope (a `host` frame heard over UDP is a `scope-violation`) and per-class hop limits from the manifest, all checked before any state changes so a rejected frame is state-neutral; safety state (epochs, dedup digests, sticky PLUCKs, high-water marks) persisted atomically with `--state` and re-loaded at start, and the §7.8 warm-up for live-state keys, per-key dedup quotas that refuse new tuples rather than evict live ones, and local expiry per RFC §14.6.3: clamped to the class max TTL, moved onto the receiver clock by δ̂, and never longer than the full TTL from first hearing. Presence covers ROOT_UNKNOWN, EQUIPPED_QUIET, EQUIPPED_SPEAKING, UNEQUIPPED_PRESENT and UNOBSERVABLE (with a `signed_off` reason). |
-| §10.4 Publisher grants | The station signs only the classes, scopes and streams its manifest entry grants, checked before a `seq` is allocated; `host` scope is refused because this station only speaks UDP; one station per key (an exclusive lease on the key file); epochs from a locked, fsynced counter. |
+| §7.4-§7.8, §8.6 Listener | Dedup on the identity tuple: a repeat is a no-op, different bytes are an equivocation. Also sticky-pluck, supersession high-water marks, epoch regression, class capability, granted scope, binding scope (a `host` frame heard over UDP is a `scope-violation`) and per-class hop limits from the manifest, all checked before any state changes so a rejected frame is state-neutral; safety state (epochs, dedup digests, sticky PLUCKs, high-water marks) persisted atomically and re-loaded at start, by default (the CLI derives a state file and holds a lease on it; `--ephemeral` is an explicit, warned opt-out, and the library requires `state_path` or `ephemeral=True`), and the §7.8 warm-up for live-state keys, per-key dedup quotas that refuse new tuples rather than evict live ones, and local expiry per RFC §14.6.3: clamped to the class max TTL, moved onto the receiver clock by δ̂, and never longer than the full TTL from first hearing. Presence covers ROOT_UNKNOWN, EQUIPPED_QUIET, EQUIPPED_SPEAKING, UNEQUIPPED_PRESENT and UNOBSERVABLE (with a `signed_off` reason). |
+| §10.4 Publisher grants | The station signs only the classes, scopes and streams its manifest entry grants, checked before a `seq` is allocated. The control socket has its own grant, narrower than the key's (`--socket-class`), and never accepts `regulatory`, `alarm` or `control`, because their op-level and typed-body checks (§10.4, §15.4) are not implemented here; `host` scope is refused because this station only speaks UDP; one station per key (an exclusive lease on the key file); epochs from a locked, fsynced counter. |
 | §11.1-§11.2 Bindings | Host-local submission over a unix socket (mode 0600, peer uid checked); UDP unicast and LAN multicast (`239.255.13.13:9999`, provisional per D22, IP TTL 1, don't-fragment). |
 
 Not implemented here, and still open work (see RFC-0001 §23.3):
@@ -42,7 +42,7 @@ python3 -m venv .venv && . .venv/bin/activate && pip install -e .
 canticle keygen --out cael.key --manifest fleet.json --name cael \
   --classes chatter,live-state,root --streams chatter,lens.threat,root
 
-canticle listen --manifest fleet.json --bind 0.0.0.0:9999 --multicast --state ./listener.json &   # one JSON event per line
+canticle listen --manifest fleet.json --bind 0.0.0.0:9999 --multicast &   # one JSON event per line; state under $XDG_STATE_HOME/canticle
 canticle station --key cael.key --manifest fleet.json --stream chatter --stream lens.threat:live-state --stream root:root \
   --multicast --control ./cael.sock &
 
@@ -77,7 +77,7 @@ Do not pipe heard text straight into a session. RFC-0001 §14 and §16 require a
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 50 tests, about 6 s
+python -m unittest discover -s tests      # 53 tests, about 6 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 

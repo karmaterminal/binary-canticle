@@ -32,7 +32,7 @@ class UdpEndToEndTest(unittest.TestCase):
 
         async def scenario():
             stop_listener, stop_station = asyncio.Event(), asyncio.Event()
-            lst_task = asyncio.create_task(runner.run_listener(Listener(m, warmup=False), ("127.0.0.1", port), events.append, stop=stop_listener))
+            lst_task = asyncio.create_task(runner.run_listener(Listener(m, warmup=False, ephemeral=True), ("127.0.0.1", port), events.append, stop=stop_listener))
             st_task = asyncio.create_task(runner.run_station(st, [("127.0.0.1", port)], control, stop_station))
             while not os.path.exists(control):
                 await asyncio.sleep(0.02)

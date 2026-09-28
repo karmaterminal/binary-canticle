@@ -198,7 +198,7 @@ class LateJoinerTest(unittest.TestCase):
             st.sing(T0, "chatter", text=f"item {i}", ttl_s=300)
         run(st, T0, T0 + 30_000)
         m = Manifest([StationEntry("test1", wire.public_key_bytes(SK), frozenset({1}), ("chatter",))])
-        lst = Listener(m)
+        lst = Listener(m, ephemeral=True)
         heard, first = set(), None
         for t, f in run(st, T0 + 30_000, T0 + 60_000):
             for ev in lst.hear(f, t):
@@ -265,6 +265,33 @@ class GrantTest(unittest.TestCase):
                          grant=StationEntry("cael", wire.public_key_bytes(SK), frozenset({1}), ("chatter",)))
         with self.assertRaises(ValueError):
             asyncio.run(runner.run_station(hosted, []))
+
+
+class SocketGrantTest(unittest.TestCase):
+    def station(self):
+        entry = StationEntry("keeper", wire.public_key_bytes(SK), frozenset({1, 6, 7, 8}),
+                             ("chatter", "alarm", "reg"), scopes=frozenset({1}))
+        return Station(SK, (StreamConfig("chatter"), StreamConfig("alarm", cls="alarm"),
+                            StreamConfig("reg", cls="regulatory")), epoch=7, now_ms=T0, grant=entry)
+
+    def test_socket_never_takes_regulatory_alarm_or_control(self):
+        st = self.station()
+        self.assertEqual(runner.socket_grant(st), frozenset({"chatter"}))
+        for cls in ("control", "alarm", "regulatory"):
+            with self.assertRaises(ValueError):
+                runner.socket_grant(st, [cls])     # even when the key holds it
+        with self.assertRaises(ValueError):
+            runner.socket_grant(st, ["advisory"])  # not granted to the key at all
+
+    def test_dispatch_refuses_before_signing(self):
+        st = self.station()
+        allowed = runner.socket_grant(st)
+        for req in ({"op": "sing", "stream": "alarm", "text": "x", "state_key": "a"},
+                    {"op": "sing", "stream": "reg", "text": "quarantine-vote", "state_key": "q"},
+                    {"op": "sing", "stream": "chatter", "text": "x", "class": "control", "state_key": "c"}):
+            self.assertFalse(runner._dispatch(st, req, allowed)["ok"])
+        self.assertEqual({n: s.head_seq for n, s in st.streams.items()}, {"chatter": 0, "alarm": 0, "reg": 0})
+        self.assertTrue(runner._dispatch(st, {"op": "sing", "stream": "chatter", "text": "ok"}, allowed)["ok"])
 
 
 def _next_epoch_worker(args):

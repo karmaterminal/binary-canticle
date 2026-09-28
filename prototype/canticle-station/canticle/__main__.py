@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import fcntl
+import hashlib
 import json
 import os
 import signal
@@ -88,6 +89,11 @@ def cmd_station(a) -> int:
         return 1
     st = Station(sk, [_stream_config(s) for s in a.stream], epoch=next_epoch(a.epoch_file or a.key + ".epoch"),
                  beacon_period_ms=a.beacon_ms, now_ms=runner.now_ms(), grant=grant)
+    try:
+        runner.socket_grant(st, a.socket_class)
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return 1
     dests = [runner.parse_addr(d) for d in (a.to or [])]
     if a.multicast:
         dests.append((runner.MCAST_GROUP, a.port))
@@ -103,7 +109,7 @@ def cmd_station(a) -> int:
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, stop.set)
-        await runner.run_station(st, dests, control, stop, log)
+        await runner.run_station(st, dests, control, stop, log, socket_classes=a.socket_class)
 
     asyncio.run(main())
     return 0
@@ -146,8 +152,29 @@ def cmd_status(a) -> int:
     return 0
 
 
+def _default_state(manifest: str, bind: str) -> str:
+    base = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
+    tag = hashlib.sha256(f"{os.path.abspath(manifest)}|{bind}".encode()).hexdigest()[:12]
+    return os.path.join(base, "canticle", f"listener-{tag}.json")
+
+
 def cmd_listen(a) -> int:
-    lst = Listener(Manifest.load(a.manifest), tuned=set(a.stream) if a.stream else None, state_path=a.state)
+    if a.ephemeral:
+        state = None
+        print("warning: --ephemeral: no restart safety; after a restart this listener can surface stale "
+              "or withdrawn items (§7.4-§7.8)", file=sys.stderr)
+    else:
+        state = a.state or _default_state(a.manifest, a.bind)
+        os.makedirs(os.path.dirname(os.path.abspath(state)), exist_ok=True)
+        lease = open(state + ".lease", "a")  # one listener per state file
+        try:
+            fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print(f"another listener holds {state}; refusing to start", file=sys.stderr)
+            return 1
+        print(json.dumps({"listener_state": state}), file=sys.stderr, flush=True)
+    lst = Listener(Manifest.load(a.manifest), tuned=set(a.stream) if a.stream else None,
+                   state_path=state, ephemeral=a.ephemeral)
     bind = runner.parse_addr(a.bind)
 
     def on_event(ev):
@@ -189,6 +216,9 @@ def main(argv=None) -> int:
     s = sub.add_parser("station", help="run a looping station")
     s.add_argument("--key", required=True)
     s.add_argument("--manifest", required=True, help="fleet manifest; the station signs only what its entry grants")
+    s.add_argument("--socket-class", action="append", help="class the control socket may request (repeatable); "
+                   "default: every class the key is granted except regulatory, alarm and control, which the "
+                   "socket never accepts in this spike")
     s.add_argument("--stream", action="append", required=True, help="name[:class[:default_ttl_s]]")
     s.add_argument("--to", action="append", help="host:port destination (repeatable)")
     s.add_argument("--multicast", action="store_true", help=f"also send to {runner.MCAST_GROUP}")
@@ -232,7 +262,9 @@ def main(argv=None) -> int:
     l.add_argument("--stream", action="append", help="only surface these stream names")
     l.add_argument("--evidence", action="store_true", help="also print rejected datagrams and other evidence")
     l.add_argument("--state", help="file for the safety state kept across restarts (dedup, plucks, "
-                   "supersession, epochs; §7.4-§7.8). Without it a restarted listener can surface stale items")
+                   "supersession, epochs; §7.4-§7.8). Default: $XDG_STATE_HOME/canticle/listener-<manifest+bind>.json")
+    l.add_argument("--ephemeral", action="store_true", help="UNSAFE: keep no state across restarts (tests only); "
+                   "a restarted listener can then surface stale or withdrawn items")
     l.set_defaults(fn=cmd_listen)
 
     v = sub.add_parser("vectors", help="regenerate the candidate conformance vectors")
