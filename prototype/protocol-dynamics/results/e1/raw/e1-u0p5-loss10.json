@@ -1,6 +1,6 @@
 {
  "experiment": "e1_freshness",
- "run_id": "20260927T200358Z-3157-1fe8",
+ "run_id": "20260927T232539Z-9515-1d9e",
  "tag": "u0p5-loss10",
  "update_s": 0.5,
  "loss_permille": 10,
@@ -14,23 +14,23 @@
  "drain_s": 20,
  "outages": [],
  "nft": {
-  "offered": 255453,
-  "dropped_loss": 2586,
-  "measured_loss": 0.01012
+  "offered": 255535,
+  "dropped_loss": 2568,
+  "measured_loss": 0.01005
  },
  "snmp": {
-  "Tcp.OutSegs": 144810,
-  "Tcp.InSegs": 144810,
-  "Tcp.RetransSegs": 1463,
+  "Tcp.OutSegs": 144837,
+  "Tcp.InSegs": 144837,
+  "Tcp.RetransSegs": 1478,
   "Tcp.OutRsts": 0,
   "Tcp.EstabResets": 0,
-  "Udp.OutDatagrams": 109180,
-  "Udp.InDatagrams": 108057,
+  "Udp.OutDatagrams": 109220,
+  "Udp.InDatagrams": 108130,
   "Udp.RcvbufErrors": 0,
   "Udp.InErrors": 0,
-  "TcpExt.TCPTimeouts": 48,
-  "TcpExt.TCPLossProbes": 1415,
-  "TcpExt.TCPLossProbeRecovery": 721,
+  "TcpExt.TCPTimeouts": 47,
+  "TcpExt.TCPLossProbes": 1431,
+  "TcpExt.TCPLossProbeRecovery": 708,
   "TcpExt.TCPFastRetrans": 0,
   "TcpExt.TCPSlowStartRetrans": 0,
   "TcpExt.TCPSpuriousRTOs": 0,
@@ -52,60 +52,60 @@
     "method": "kaplan-meier",
     "median": 1.1,
     "p90": 1.9,
-    "p95": 2.2,
-    "p99": 499.7,
+    "p95": 2.4,
+    "p99": 8.6,
     "p99.9": 502.6,
-    "max_event": 1001.7
+    "max_event": 1000.6
    },
    "delivered_latency_ms": {
     "n": 35800,
     "unit": "ms",
-    "mean": 6.5,
+    "mean": 5.9,
     "median": 1.1,
     "p90": 1.9,
-    "p95": 2.2,
-    "p99": 499.7,
+    "p95": 2.4,
+    "p99": 8.6,
     "p99.9": 502.6,
-    "max": 1001.7,
+    "max": 1000.6,
     "min": 0.2,
     "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
-    "n": 35418,
+    "n": 35463,
     "unit": "ms",
     "mean": 1.1,
     "median": 1.1,
     "p90": 1.8,
-    "p95": 2.2,
-    "p99": 2.7,
-    "p99.9": 5.0,
-    "max": 5.1,
+    "p95": 2.3,
+    "p99": 3.7,
+    "p99.9": 6.4,
+    "max": 9.6,
     "min": 0.2
    },
-   "skipped_updates": 382,
-   "stale_time_fraction": 0.01284,
+   "skipped_updates": 337,
+   "stale_time_fraction": 0.011748,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
     "p95": 0.0,
-    "p99": 33.3,
-    "p99.9": 460.3,
-    "max": 1000.7
+    "p99": 1.1,
+    "p99.9": 450.7,
+    "max": 996.8
    },
-   "arrivals": 35616,
+   "arrivals": 35659,
    "superseded_deliveries": 0,
    "superseded_delivery_fraction": 0.0,
    "sender": {
-    "datagrams": 54440,
-    "item_datagrams": 36100,
-    "bytes": 14687220,
+    "datagrams": 54460,
+    "item_datagrams": 36120,
+    "bytes": 14693740,
     "errors": 0,
     "sing": [
      {
       "stream": "lens.state",
       "seq": 1,
-      "epoch": 1790539439,
-      "issued_at": 1790539440988,
-      "expires_at": 1790539620988,
+      "epoch": 1790551541,
+      "issued_at": 1790551543151,
+      "expires_at": 1790551723151,
       "ttl_s": 180.0,
       "loop_ms": 5000,
       "clamp": "none",
@@ -115,7 +115,7 @@
     ]
    },
    "receiver": {
-    "datagrams": 53871,
+    "datagrams": 53948,
     "evidence": {}
    }
   },
@@ -132,61 +132,61 @@
     "unit": "ms",
     "method": "kaplan-meier",
     "median": 1.1,
-    "p90": 1.8,
-    "p95": 2.2,
-    "p99": 498.6,
-    "p99.9": 502.5,
-    "max_event": 1001.3
+    "p90": 1.9,
+    "p95": 2.3,
+    "p99": 499.2,
+    "p99.9": 502.8,
+    "max_event": 1002.6
    },
    "delivered_latency_ms": {
     "n": 35800,
     "unit": "ms",
-    "mean": 6.2,
+    "mean": 6.5,
     "median": 1.1,
-    "p90": 1.8,
-    "p95": 2.2,
-    "p99": 498.6,
-    "p99.9": 502.4,
-    "max": 1001.3,
+    "p90": 1.9,
+    "p95": 2.3,
+    "p99": 499.2,
+    "p99.9": 502.8,
+    "max": 1002.6,
     "min": 0.2,
     "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
-    "n": 35437,
+    "n": 35419,
     "unit": "ms",
     "mean": 1.1,
-    "median": 1.1,
+    "median": 1.0,
     "p90": 1.8,
-    "p95": 2.1,
-    "p99": 2.7,
-    "p99.9": 5.2,
-    "max": 5.9,
+    "p95": 2.2,
+    "p99": 4.0,
+    "p99.9": 7.2,
+    "max": 9.9,
     "min": 0.2
    },
-   "skipped_updates": 363,
-   "stale_time_fraction": 0.012256,
+   "skipped_updates": 381,
+   "stale_time_fraction": 0.012889,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
     "p95": 0.0,
-    "p99": 8.3,
-    "p99.9": 454.4,
-    "max": 1000.5
+    "p99": 31.7,
+    "p99.9": 459.1,
+    "max": 1001.4
    },
-   "arrivals": 35635,
+   "arrivals": 35615,
    "superseded_deliveries": 0,
    "superseded_delivery_fraction": 0.0,
    "sender": {
-    "datagrams": 54740,
-    "item_datagrams": 36380,
-    "bytes": 14800800,
+    "datagrams": 54760,
+    "item_datagrams": 36360,
+    "bytes": 14800400,
     "errors": 0,
     "sing": [
      {
       "stream": "ctl.state",
       "seq": 1,
-      "epoch": 1790539439,
-      "issued_at": 1790539440988,
-      "expires_at": 1790539740988,
+      "epoch": 1790551541,
+      "issued_at": 1790551543151,
+      "expires_at": 1790551843151,
       "ttl_s": 300.0,
       "loop_ms": 1000,
       "clamp": "none",
@@ -196,7 +196,7 @@
     ]
    },
    "receiver": {
-    "datagrams": 54186,
+    "datagrams": 54182,
     "evidence": {}
    }
   },
@@ -214,10 +214,10 @@
     "method": "kaplan-meier",
     "median": 1.0,
     "p90": 1.7,
-    "p95": 1.9,
-    "p99": 205.6,
-    "p99.9": 210.9,
-    "max_event": 418.5
+    "p95": 2.0,
+    "p99": 204.8,
+    "p99.9": 210.4,
+    "max_event": 417.2
    },
    "delivered_latency_ms": {
     "n": 35800,
@@ -225,11 +225,11 @@
     "mean": 3.2,
     "median": 1.0,
     "p90": 1.7,
-    "p95": 1.9,
-    "p99": 205.6,
-    "p99.9": 210.9,
-    "max": 418.5,
-    "min": 0.1,
+    "p95": 2.0,
+    "p99": 204.8,
+    "p99.9": 210.4,
+    "max": 417.2,
+    "min": 0.2,
     "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
@@ -238,46 +238,46 @@
     "mean": 3.2,
     "median": 1.0,
     "p90": 1.7,
-    "p95": 1.9,
-    "p99": 205.6,
-    "p99.9": 210.9,
-    "max": 418.5,
-    "min": 0.1
+    "p95": 2.0,
+    "p99": 204.8,
+    "p99.9": 210.4,
+    "max": 417.2,
+    "min": 0.2
    },
    "skipped_updates": 0,
-   "stale_time_fraction": 0.006429,
+   "stale_time_fraction": 0.006422,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
     "p95": 0.0,
     "p99": 0.0,
-    "p99.9": 162.4,
-    "max": 417.6
+    "p99.9": 161.3,
+    "max": 414.3
    },
    "arrivals": 36000,
    "superseded_deliveries": 0,
    "superseded_delivery_fraction": 0.0,
    "tcp": {
     "total_retrans": [
-     48,
-     37,
-     31,
-     32,
-     34,
-     41,
-     50,
-     29,
-     32,
-     40,
-     46,
+     36,
      33,
      37,
-     39,
      35,
-     32,
+     38,
+     43,
+     37,
+     41,
+     40,
      35,
      30,
      30,
-     32
+     41,
+     49,
+     49,
+     46,
+     31,
+     35,
+     41,
+     28
     ],
     "frames_written": null,
     "coalesced": null,
@@ -285,14 +285,32 @@
     "receiver_errors": [],
     "rejected_on_arrival": {},
     "loss_episodes": {
-     "count": 0,
+     "count": 1,
      "open_at_end": 0,
      "closed_duration_ms": {
-      "n": 0,
-      "unit": "ms"
+      "n": 1,
+      "unit": "ms",
+      "mean": 422.9,
+      "median": 422.9,
+      "p90": 422.9,
+      "p95": 422.9,
+      "p99": 422.9,
+      "p99.9": 422.9,
+      "max": 422.9,
+      "min": 422.9
      },
-     "max_backoff_hist": {},
-     "longest": []
+     "max_backoff_hist": {
+      "1": 1
+     },
+     "longest": [
+      {
+       "dur_ms": 422.9,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 76.229,
+       "open_at_end": false
+      }
+     ]
     }
    },
    "tcp_info_trace_conn0": [
@@ -321,10 +339,10 @@
     "method": "kaplan-meier",
     "median": 1.0,
     "p90": 1.7,
-    "p95": 2.0,
-    "p99": 205.7,
-    "p99.9": 210.9,
-    "max_event": 418.7
+    "p95": 2.1,
+    "p99": 205.4,
+    "p99.9": 210.4,
+    "max_event": 418.1
    },
    "delivered_latency_ms": {
     "n": 35800,
@@ -332,10 +350,10 @@
     "mean": 3.3,
     "median": 1.0,
     "p90": 1.7,
-    "p95": 2.0,
-    "p99": 205.7,
-    "p99.9": 210.9,
-    "max": 418.7,
+    "p95": 2.1,
+    "p99": 205.4,
+    "p99.9": 210.4,
+    "max": 418.1,
     "min": 0.2,
     "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
@@ -345,46 +363,46 @@
     "mean": 3.3,
     "median": 1.0,
     "p90": 1.7,
-    "p95": 2.0,
-    "p99": 205.7,
-    "p99.9": 210.9,
-    "max": 418.7,
+    "p95": 2.1,
+    "p99": 205.4,
+    "p99.9": 210.4,
+    "max": 418.1,
     "min": 0.2
    },
    "skipped_updates": 0,
-   "stale_time_fraction": 0.006476,
+   "stale_time_fraction": 0.006569,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
     "p95": 0.0,
     "p99": 0.0,
-    "p99.9": 163.1,
-    "max": 415.9
+    "p99.9": 162.4,
+    "max": 418.0
    },
    "arrivals": 36000,
    "superseded_deliveries": 0,
    "superseded_delivery_fraction": 0.0,
    "tcp": {
     "total_retrans": [
-     36,
-     32,
-     27,
-     31,
-     36,
-     33,
-     45,
-     55,
-     33,
      39,
-     36,
-     32,
-     36,
-     47,
-     33,
-     41,
+     44,
+     40,
+     34,
+     30,
+     46,
+     26,
+     43,
+     39,
      38,
-     45,
+     37,
+     27,
+     39,
      31,
-     34
+     34,
+     33,
+     28,
+     33,
+     40,
+     42
     ],
     "frames_written": 36000,
     "coalesced": 0,
@@ -404,7 +422,7 @@
    },
    "tcp_info_trace_conn0": [
     {
-     "t": -0.999,
+     "t": -0.998,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -425,6 +443,6 @@
   "tcp_rmem": "4096\t131072\t33554432",
   "tcp_wmem": "4096\t16384\t4194304",
   "rmem_max": "4194304",
-  "date": "2026-09-27T20:19:42Z"
+  "date": "2026-09-27T23:41:23Z"
  }
 }

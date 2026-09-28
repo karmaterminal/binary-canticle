@@ -1,6 +1,6 @@
 {
  "experiment": "e1_freshness",
- "run_id": "20260927T200358Z-3157-1fe8",
+ "run_id": "20260927T232539Z-9515-1d9e",
  "tag": "u0p5-outage3",
  "update_s": 0.5,
  "loss_permille": 0,
@@ -18,31 +18,31 @@
    9.976
   ],
   [
-   25.164,
-   28.185
+   25.165,
+   28.184
   ],
   [
-   44.054,
+   44.053,
    47.072
   ],
   [
-   64.586,
-   67.623
+   64.587,
+   67.596
   ],
   [
-   84.541,
+   84.539,
    87.56
   ],
   [
    103.166,
-   106.176
+   106.184
   ],
   [
    123.083,
    126.092
   ],
   [
-   142.558,
+   142.556,
    145.576
   ],
   [
@@ -51,127 +51,127 @@
   ],
   [
    183.472,
-   186.492
+   186.48
   ],
   [
-   203.07,
-   206.088
+   203.072,
+   206.092
   ],
   [
    223.54,
-   226.564
+   226.56
   ],
   [
-   243.135,
-   246.157
+   243.128,
+   246.144
   ],
   [
-   263.005,
-   266.024
+   263.007,
+   266.028
   ],
   [
    282.442,
-   285.468
+   285.472
   ],
   [
-   302.596,
-   305.604
+   302.602,
+   305.624
   ],
   [
-   321.219,
-   324.232
+   321.22,
+   324.244
   ],
   [
-   340.182,
-   343.205
+   340.192,
+   343.216
   ],
   [
-   360.336,
-   363.348
+   360.341,
+   363.36
   ],
   [
-   380.34,
-   383.36
+   380.344,
+   383.368
   ],
   [
-   399.677,
+   399.67,
    402.7
   ],
   [
-   420.396,
-   423.412
+   420.402,
+   423.424
   ],
   [
-   439.726,
-   442.744
+   439.719,
+   442.74
   ],
   [
-   458.192,
+   458.194,
    461.22
   ],
   [
-   478.129,
-   481.15
+   478.13,
+   481.159
   ],
   [
    496.901,
    499.924
   ],
   [
-   516.599,
-   519.625
+   516.602,
+   519.62
   ],
   [
-   537.53,
-   540.552
+   537.534,
+   540.556
   ],
   [
-   558.767,
-   561.788
+   558.771,
+   561.792
   ],
   [
-   577.411,
-   580.433
+   577.415,
+   580.436
   ],
   [
-   597.39,
-   600.409
+   597.392,
+   600.416
   ],
   [
    616.527,
    619.536
   ],
   [
-   637.287,
-   640.301
+   637.286,
+   640.312
   ],
   [
-   657.58,
-   660.6
+   657.578,
+   660.588
   ],
   [
    676.74,
-   679.752
+   679.776
   ],
   [
-   697.701,
-   700.728
+   697.699,
+   700.72
   ],
   [
-   716.378,
+   716.38,
    719.4
   ],
   [
-   735.851,
-   738.872
+   735.847,
+   738.859
   ],
   [
-   755.202,
-   758.221
+   755.198,
+   758.216
   ],
   [
-   775.082,
-   778.092
+   775.081,
+   778.1
   ],
   [
    794.892,
@@ -179,27 +179,27 @@
   ],
   [
    815.095,
-   818.116
+   818.104
   ],
   [
-   834.268,
+   834.269,
    837.288
   ],
   [
-   855.25,
+   855.249,
    858.272
   ],
   [
-   873.791,
-   876.82
+   873.788,
+   876.808
   ],
   [
-   892.857,
-   895.876
+   892.854,
+   895.868
   ]
  ],
  "nft": {
-  "offered": 247900,
+  "offered": 247840,
   "dropped_loss": 0,
   "measured_loss": 0.0
  },
@@ -209,8 +209,8 @@
   "Tcp.RetransSegs": 9200,
   "Tcp.OutRsts": 0,
   "Tcp.EstabResets": 0,
-  "Udp.OutDatagrams": 109300,
-  "Udp.InDatagrams": 92740,
+  "Udp.OutDatagrams": 109240,
+  "Udp.InDatagrams": 92640,
   "Udp.RcvbufErrors": 0,
   "Udp.InErrors": 0,
   "TcpExt.TCPTimeouts": 7360,
@@ -235,46 +235,46 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 1.3,
-    "p90": 1499.6,
-    "p95": 2500.0,
-    "p99": 3001.3,
-    "p99.9": 3002.7,
-    "max_event": 3498.0
+    "median": 1.2,
+    "p90": 1500.1,
+    "p95": 2499.8,
+    "p99": 3001.0,
+    "p99.9": 3002.1,
+    "max_event": 3495.4
    },
    "delivered_latency_ms": {
     "n": 35800,
     "unit": "ms",
-    "mean": 272.9,
-    "median": 1.3,
-    "p90": 1499.6,
-    "p95": 2500.0,
-    "p99": 3001.3,
-    "p99.9": 3002.7,
-    "max": 3498.0,
-    "min": 0.3,
+    "mean": 272.8,
+    "median": 1.2,
+    "p90": 1500.1,
+    "p95": 2499.8,
+    "p99": 3001.0,
+    "p99.9": 3002.1,
+    "max": 3495.4,
+    "min": 0.2,
     "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
     "n": 30260,
     "unit": "ms",
     "mean": 1.1,
-    "median": 1.1,
-    "p90": 1.8,
-    "p95": 2.2,
-    "p99": 2.8,
-    "p99.9": 4.4,
-    "max": 5.3,
-    "min": 0.3
+    "median": 1.0,
+    "p90": 1.7,
+    "p95": 2.0,
+    "p99": 2.5,
+    "p99.9": 6.2,
+    "max": 6.5,
+    "min": 0.2
    },
    "skipped_updates": 5540,
-   "stale_time_fraction": 0.156667,
+   "stale_time_fraction": 0.156625,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
-    "p95": 2039.2,
-    "p99": 2817.1,
-    "p99.9": 2992.3,
-    "max": 3496.1
+    "p95": 2039.4,
+    "p99": 2816.9,
+    "p99.9": 2992.2,
+    "max": 3494.0
    },
    "arrivals": 30460,
    "superseded_deliveries": 0,
@@ -288,12 +288,12 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 273.3,
-    "p90": 437.1,
-    "p95": 449.6,
-    "p99": 478.5,
-    "p99.9": 478.5,
-    "max_event": 478.5
+    "median": 281.1,
+    "p90": 441.0,
+    "p95": 445.1,
+    "p99": 474.6,
+    "p99.9": 474.7,
+    "max_event": 474.7
    },
    "outage_recovery_affected_km_ms": {
     "n": 920,
@@ -301,12 +301,12 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 273.3,
-    "p90": 437.1,
-    "p95": 449.6,
-    "p99": 478.5,
-    "p99.9": 478.5,
-    "max_event": 478.5
+    "median": 281.1,
+    "p90": 441.0,
+    "p95": 445.1,
+    "p99": 474.6,
+    "p99.9": 474.7,
+    "max_event": 474.7
    },
    "updates_issued_in_outage_censored": 0,
    "latency_of_updates_issued_in_outage_km_ms": {
@@ -315,25 +315,25 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 1999.3,
-    "p90": 3000.9,
-    "p95": 3001.5,
-    "p99": 3002.7,
-    "p99.9": 3497.9,
-    "max_event": 3498.0
+    "median": 1998.6,
+    "p90": 3000.6,
+    "p95": 3001.1,
+    "p99": 3002.0,
+    "p99.9": 3495.4,
+    "max_event": 3495.4
    },
    "sender": {
-    "datagrams": 54540,
-    "item_datagrams": 36120,
-    "bytes": 14706040,
+    "datagrams": 54520,
+    "item_datagrams": 36100,
+    "bytes": 14699440,
     "errors": 0,
     "sing": [
      {
       "stream": "lens.state",
       "seq": 1,
-      "epoch": 1790539440,
-      "issued_at": 1790539441869,
-      "expires_at": 1790539621869,
+      "epoch": 1790551543,
+      "issued_at": 1790551544207,
+      "expires_at": 1790551724207,
       "ttl_s": 180.0,
       "loop_ms": 5000,
       "clamp": "none",
@@ -343,7 +343,7 @@
     ]
    },
    "receiver": {
-    "datagrams": 46240,
+    "datagrams": 46220,
     "evidence": {}
    }
   },
@@ -359,46 +359,46 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 1.3,
-    "p90": 1499.3,
-    "p95": 2499.8,
-    "p99": 3001.4,
-    "p99.9": 3003.0,
-    "max_event": 3498.2
+    "median": 1.2,
+    "p90": 1500.0,
+    "p95": 2499.6,
+    "p99": 3000.9,
+    "p99.9": 3002.3,
+    "max_event": 3495.6
    },
    "delivered_latency_ms": {
     "n": 35800,
     "unit": "ms",
-    "mean": 272.9,
-    "median": 1.3,
-    "p90": 1499.3,
-    "p95": 2499.8,
-    "p99": 3001.4,
-    "p99.9": 3002.9,
-    "max": 3498.2,
-    "min": 0.2,
+    "mean": 272.8,
+    "median": 1.2,
+    "p90": 1500.0,
+    "p95": 2499.6,
+    "p99": 3000.9,
+    "p99.9": 3002.3,
+    "max": 3495.6,
+    "min": 0.3,
     "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
     "n": 30260,
     "unit": "ms",
-    "mean": 1.1,
-    "median": 1.1,
-    "p90": 1.8,
-    "p95": 2.1,
-    "p99": 2.8,
-    "p99.9": 7.5,
-    "max": 8.9,
-    "min": 0.2
+    "mean": 1.0,
+    "median": 1.0,
+    "p90": 1.7,
+    "p95": 2.0,
+    "p99": 2.5,
+    "p99.9": 6.0,
+    "max": 6.8,
+    "min": 0.3
    },
    "skipped_updates": 5540,
-   "stale_time_fraction": 0.156654,
+   "stale_time_fraction": 0.156566,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
-    "p95": 2039.3,
-    "p99": 2817.3,
-    "p99.9": 2992.3,
-    "max": 3496.1
+    "p95": 2039.1,
+    "p99": 2816.5,
+    "p99.9": 2991.6,
+    "max": 3494.0
    },
    "arrivals": 30460,
    "superseded_deliveries": 0,
@@ -412,12 +412,12 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 273.1,
-    "p90": 436.7,
-    "p95": 449.8,
-    "p99": 478.7,
-    "p99.9": 478.8,
-    "max_event": 478.8
+    "median": 280.9,
+    "p90": 440.7,
+    "p95": 445.2,
+    "p99": 474.8,
+    "p99.9": 474.8,
+    "max_event": 474.8
    },
    "outage_recovery_affected_km_ms": {
     "n": 920,
@@ -425,12 +425,12 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 273.1,
-    "p90": 436.7,
-    "p95": 449.8,
-    "p99": 478.7,
-    "p99.9": 478.8,
-    "max_event": 478.8
+    "median": 280.9,
+    "p90": 440.7,
+    "p95": 445.2,
+    "p99": 474.8,
+    "p99.9": 474.8,
+    "max_event": 474.8
    },
    "updates_issued_in_outage_censored": 0,
    "latency_of_updates_issued_in_outage_km_ms": {
@@ -439,25 +439,25 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 1998.8,
-    "p90": 3000.7,
-    "p95": 3001.6,
-    "p99": 3002.9,
-    "p99.9": 3498.2,
-    "max_event": 3498.2
+    "median": 1998.6,
+    "p90": 3000.4,
+    "p95": 3001.1,
+    "p99": 3001.8,
+    "p99.9": 3495.6,
+    "max_event": 3495.6
    },
    "sender": {
-    "datagrams": 54760,
-    "item_datagrams": 36380,
-    "bytes": 14803900,
+    "datagrams": 54720,
+    "item_datagrams": 36360,
+    "bytes": 14794200,
     "errors": 0,
     "sing": [
      {
       "stream": "ctl.state",
       "seq": 1,
-      "epoch": 1790539440,
-      "issued_at": 1790539441869,
-      "expires_at": 1790539741869,
+      "epoch": 1790551543,
+      "issued_at": 1790551544207,
+      "expires_at": 1790551844207,
       "ttl_s": 300.0,
       "loop_ms": 1000,
       "clamp": "none",
@@ -467,7 +467,7 @@
     ]
    },
    "receiver": {
-    "datagrams": 46500,
+    "datagrams": 46420,
     "evidence": {}
    }
   },
@@ -483,46 +483,46 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 1.2,
-    "p90": 1827.2,
-    "p95": 2826.1,
-    "p99": 3343.2,
-    "p99.9": 3356.1,
-    "max_event": 3366.2
+    "median": 1.1,
+    "p90": 1827.1,
+    "p95": 2823.6,
+    "p99": 3339.4,
+    "p99.9": 3354.9,
+    "max_event": 3355.1
    },
    "delivered_latency_ms": {
     "n": 35800,
     "unit": "ms",
-    "mean": 331.6,
-    "median": 1.2,
-    "p90": 1827.2,
-    "p95": 2826.1,
-    "p99": 3343.2,
-    "p99.9": 3356.1,
-    "max": 3366.2,
-    "min": 0.2,
+    "mean": 331.7,
+    "median": 1.1,
+    "p90": 1827.1,
+    "p95": 2823.6,
+    "p99": 3339.4,
+    "p99.9": 3354.9,
+    "max": 3355.1,
+    "min": 0.1,
     "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
     "n": 35800,
     "unit": "ms",
-    "mean": 331.6,
-    "median": 1.2,
-    "p90": 1827.2,
-    "p95": 2826.1,
-    "p99": 3343.2,
-    "p99.9": 3356.1,
-    "max": 3366.2,
-    "min": 0.2
+    "mean": 331.7,
+    "median": 1.1,
+    "p90": 1827.1,
+    "p95": 2823.6,
+    "p99": 3339.4,
+    "p99.9": 3354.9,
+    "max": 3355.1,
+    "min": 0.1
    },
    "skipped_updates": 0,
-   "stale_time_fraction": 0.173398,
+   "stale_time_fraction": 0.173339,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
-    "p95": 2366.6,
+    "p95": 2366.4,
     "p99": 3144.4,
     "p99.9": 3319.4,
-    "max": 3364.6
+    "max": 3354.3
    },
    "arrivals": 36000,
    "superseded_deliveries": 5520,
@@ -536,12 +536,12 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 599.9,
-    "p90": 772.0,
-    "p95": 775.7,
-    "p99": 799.9,
-    "p99.9": 799.9,
-    "max_event": 799.9
+    "median": 607.8,
+    "p90": 775.8,
+    "p95": 779.8,
+    "p99": 804.0,
+    "p99.9": 804.0,
+    "max_event": 804.0
    },
    "outage_recovery_affected_km_ms": {
     "n": 920,
@@ -549,12 +549,12 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 599.9,
-    "p90": 772.0,
-    "p95": 775.7,
-    "p99": 799.9,
-    "p99.9": 799.9,
-    "max_event": 799.9
+    "median": 607.8,
+    "p90": 775.8,
+    "p95": 779.8,
+    "p99": 804.0,
+    "p99.9": 804.0,
+    "max_event": 804.0
    },
    "updates_issued_in_outage_censored": 0,
    "latency_of_updates_issued_in_outage_km_ms": {
@@ -563,12 +563,12 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 1865.8,
-    "p90": 3332.0,
-    "p95": 3346.9,
-    "p99": 3355.0,
-    "p99.9": 3366.2,
-    "max_event": 3366.2
+    "median": 1857.8,
+    "p90": 3335.6,
+    "p95": 3344.5,
+    "p99": 3354.5,
+    "p99.9": 3355.1,
+    "max_event": 3355.1
    },
    "tcp": {
     "total_retrans": [
@@ -604,53 +604,52 @@
      "closed_duration_ms": {
       "n": 920,
       "unit": "ms",
-      "mean": 2949.8,
-      "median": 2950.3,
-      "p90": 2963.4,
-      "p95": 2976.1,
-      "p99": 2983.5,
-      "p99.9": 2983.6,
-      "max": 2983.6,
-      "min": 2921.2
+      "mean": 2951.7,
+      "median": 2951.9,
+      "p90": 2969.0,
+      "p95": 2970.9,
+      "p99": 2982.6,
+      "p99.9": 2982.6,
+      "max": 2982.6,
+      "min": 2927.7
      },
      "max_backoff_hist": {
-      "3": 901,
-      "4": 19
+      "3": 920
      },
      "longest": [
       {
-       "dur_ms": 2983.6,
+       "dur_ms": 2982.6,
        "max_backoff": 3,
        "max_rto_ms": 1632.0,
-       "start": 340.918,
+       "start": 143.422,
        "open_at_end": false
       },
       {
-       "dur_ms": 2983.6,
+       "dur_ms": 2982.6,
        "max_backoff": 3,
        "max_rto_ms": 1632.0,
-       "start": 340.918,
+       "start": 143.422,
        "open_at_end": false
       },
       {
-       "dur_ms": 2983.6,
+       "dur_ms": 2982.6,
        "max_backoff": 3,
        "max_rto_ms": 1632.0,
-       "start": 340.918,
+       "start": 143.422,
        "open_at_end": false
       },
       {
-       "dur_ms": 2983.5,
+       "dur_ms": 2982.6,
        "max_backoff": 3,
        "max_rto_ms": 1632.0,
-       "start": 340.918,
+       "start": 143.422,
        "open_at_end": false
       },
       {
-       "dur_ms": 2983.5,
+       "dur_ms": 2982.6,
        "max_backoff": 3,
        "max_rto_ms": 1632.0,
-       "start": 340.918,
+       "start": 143.422,
        "open_at_end": false
       }
      ]
@@ -658,7 +657,7 @@
    },
    "tcp_info_trace_conn0": [
     {
-     "t": -0.998,
+     "t": -0.999,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -667,7 +666,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 7.437,
+     "t": 7.423,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -676,7 +675,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 7.869,
+     "t": 7.843,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -685,7 +684,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 8.696,
+     "t": 8.671,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -694,7 +693,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 10.393,
+     "t": 10.382,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -703,7 +702,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 25.926,
+     "t": 25.922,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -712,7 +711,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 26.357,
+     "t": 26.356,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -721,7 +720,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 27.192,
+     "t": 27.204,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -739,7 +738,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 44.94,
+     "t": 44.921,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -748,7 +747,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 45.356,
+     "t": 45.35,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -757,7 +756,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 46.209,
+     "t": 46.17,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -766,7 +765,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 47.891,
+     "t": 47.862,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -775,7 +774,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 65.424,
+     "t": 65.43,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -784,7 +783,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 65.84,
+     "t": 65.863,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -793,7 +792,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 66.683,
+     "t": 66.693,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -802,7 +801,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 68.379,
+     "t": 68.373,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -811,7 +810,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 85.423,
+     "t": 85.426,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -820,7 +819,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 85.857,
+     "t": 85.858,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -829,7 +828,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 86.683,
+     "t": 86.677,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -838,7 +837,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 88.369,
+     "t": 88.382,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -847,7 +846,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 103.93,
+     "t": 103.92,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -856,7 +855,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 104.34,
+     "t": 104.355,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -865,7 +864,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 105.164,
+     "t": 105.176,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -874,7 +873,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 106.882,
+     "t": 106.869,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -883,7 +882,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 123.928,
+     "t": 123.935,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -892,7 +891,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 124.341,
+     "t": 124.344,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -901,7 +900,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 125.168,
+     "t": 125.177,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -910,7 +909,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 126.865,
+     "t": 126.871,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -919,7 +918,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 143.436,
+     "t": 143.422,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -928,7 +927,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 143.867,
+     "t": 143.879,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -937,7 +936,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 144.687,
+     "t": 144.7,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -946,7 +945,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 146.381,
+     "t": 146.405,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -955,7 +954,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 163.939,
+     "t": 163.941,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -964,7 +963,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 164.356,
+     "t": 164.351,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -973,7 +972,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 165.181,
+     "t": 165.178,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -982,7 +981,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 166.87,
+     "t": 166.868,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -991,7 +990,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 183.935,
+     "t": 183.928,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1000,7 +999,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 184.356,
+     "t": 184.34,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1018,7 +1017,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 186.864,
+     "t": 186.882,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1027,7 +1026,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 203.925,
+     "t": 203.923,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1036,7 +1035,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 204.338,
+     "t": 204.355,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1045,7 +1044,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 205.164,
+     "t": 205.18,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1063,7 +1062,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 224.429,
+     "t": 224.428,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1072,7 +1071,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 224.863,
+     "t": 224.859,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1081,7 +1080,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 225.685,
+     "t": 225.689,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1090,7 +1089,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 227.373,
+     "t": 227.381,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1099,7 +1098,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 243.927,
+     "t": 243.933,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1108,7 +1107,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 244.338,
+     "t": 244.344,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1117,7 +1116,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 245.172,
+     "t": 245.188,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1126,7 +1125,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 246.876,
+     "t": 246.877,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1135,7 +1134,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 263.425,
+     "t": 263.426,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1144,7 +1143,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 263.857,
+     "t": 263.874,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1153,7 +1152,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 264.684,
+     "t": 264.698,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1162,7 +1161,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 266.379,
+     "t": 266.394,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1171,7 +1170,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 282.944,
+     "t": 282.922,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1180,7 +1179,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 283.395,
+     "t": 283.353,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1189,7 +1188,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 284.22,
+     "t": 284.198,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1198,7 +1197,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 285.903,
+     "t": 285.876,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1207,7 +1206,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 303.431,
+     "t": 303.429,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1216,7 +1215,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 303.868,
+     "t": 303.846,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1225,7 +1224,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 304.698,
+     "t": 304.674,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1234,7 +1233,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 306.395,
+     "t": 306.365,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1243,7 +1242,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 321.928,
+     "t": 321.924,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1252,7 +1251,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 322.359,
+     "t": 322.374,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1261,7 +1260,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 323.188,
+     "t": 323.198,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1270,7 +1269,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 324.886,
+     "t": 324.888,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1279,7 +1278,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 340.918,
+     "t": 340.937,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1288,7 +1287,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 341.379,
+     "t": 341.355,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1297,7 +1296,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 342.203,
+     "t": 342.183,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1306,7 +1305,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 343.902,
+     "t": 343.865,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1315,7 +1314,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 360.927,
+     "t": 360.924,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1324,7 +1323,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 361.357,
+     "t": 361.333,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1333,7 +1332,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 362.202,
+     "t": 362.173,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1342,7 +1341,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 363.884,
+     "t": 363.864,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1351,7 +1350,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 380.937,
+     "t": 380.922,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1360,7 +1359,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 381.371,
+     "t": 381.335,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1369,7 +1368,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 382.19,
+     "t": 382.183,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1378,7 +1377,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 383.888,
+     "t": 383.861,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1387,7 +1386,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 400.424,
+     "t": 400.427,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1396,7 +1395,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 400.856,
+     "t": 400.858,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1405,7 +1404,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 401.678,
+     "t": 401.686,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1414,7 +1413,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 403.373,
+     "t": 403.379,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1423,7 +1422,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 420.938,
+     "t": 420.92,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1432,7 +1431,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 421.372,
+     "t": 421.338,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1441,7 +1440,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 422.21,
+     "t": 422.181,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1450,7 +1449,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 423.894,
+     "t": 423.864,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1459,7 +1458,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 440.424,
+     "t": 440.427,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1468,7 +1467,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 440.856,
+     "t": 440.858,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1477,7 +1476,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 441.683,
+     "t": 441.697,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1486,7 +1485,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 443.401,
+     "t": 443.385,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1495,7 +1494,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 458.924,
+     "t": 458.93,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1504,7 +1503,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 459.356,
+     "t": 459.362,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1513,7 +1512,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 460.183,
+     "t": 460.201,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1522,7 +1521,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 461.878,
+     "t": 461.886,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1531,7 +1530,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 478.919,
+     "t": 478.939,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1540,7 +1539,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 479.351,
+     "t": 479.352,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1549,7 +1548,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 480.183,
+     "t": 480.196,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1558,7 +1557,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 481.875,
+     "t": 481.9,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1567,7 +1566,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 497.422,
+     "t": 497.425,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1576,7 +1575,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 497.855,
+     "t": 497.856,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1585,7 +1584,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 498.676,
+     "t": 498.682,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1594,7 +1593,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 500.389,
+     "t": 500.377,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1603,7 +1602,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 517.431,
+     "t": 517.421,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1612,7 +1611,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 517.843,
+     "t": 517.852,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1621,7 +1620,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 518.691,
+     "t": 518.694,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1630,7 +1629,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 520.37,
+     "t": 520.382,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1639,7 +1638,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 538.424,
+     "t": 538.422,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1648,7 +1647,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 538.836,
+     "t": 538.852,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1657,7 +1656,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 539.661,
+     "t": 539.674,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1666,7 +1665,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 541.358,
+     "t": 541.386,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1675,7 +1674,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 559.428,
+     "t": 559.431,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1684,7 +1683,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 559.861,
+     "t": 559.863,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1693,7 +1692,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 560.689,
+     "t": 560.703,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1702,7 +1701,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 562.379,
+     "t": 562.412,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1711,7 +1710,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 577.926,
+     "t": 577.93,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1720,7 +1719,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 578.356,
+     "t": 578.363,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1729,7 +1728,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 579.183,
+     "t": 579.208,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1738,7 +1737,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 580.879,
+     "t": 580.901,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1747,7 +1746,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 597.929,
+     "t": 597.918,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1756,7 +1755,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 598.362,
+     "t": 598.36,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1765,7 +1764,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 599.189,
+     "t": 599.202,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1774,7 +1773,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 600.905,
+     "t": 600.881,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1783,7 +1782,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 617.439,
+     "t": 617.423,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1792,7 +1791,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 617.851,
+     "t": 617.853,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1801,7 +1800,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 618.672,
+     "t": 618.693,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1810,7 +1809,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 620.378,
+     "t": 620.374,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1819,7 +1818,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 637.925,
+     "t": 637.922,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1828,7 +1827,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 638.354,
+     "t": 638.373,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1837,7 +1836,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 639.197,
+     "t": 639.195,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1846,7 +1845,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 640.879,
+     "t": 640.891,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1855,7 +1854,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 658.426,
+     "t": 658.42,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1864,7 +1863,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 658.846,
+     "t": 658.85,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1873,7 +1872,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 659.669,
+     "t": 659.668,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1882,7 +1881,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 661.37,
+     "t": 661.363,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1891,7 +1890,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 677.427,
+     "t": 677.423,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1900,7 +1899,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 677.84,
+     "t": 677.852,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1909,7 +1908,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 678.689,
+     "t": 678.676,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1918,7 +1917,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 680.371,
+     "t": 680.372,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1927,7 +1926,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 698.422,
+     "t": 698.427,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1936,7 +1935,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 698.836,
+     "t": 698.837,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1945,7 +1944,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 699.663,
+     "t": 699.682,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1954,7 +1953,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 701.38,
+     "t": 701.367,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1963,7 +1962,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 716.944,
+     "t": 716.929,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -1972,7 +1971,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 717.357,
+     "t": 717.34,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -1981,7 +1980,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 718.202,
+     "t": 718.173,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -1990,7 +1989,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 719.887,
+     "t": 719.866,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -1999,7 +1998,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 736.426,
+     "t": 736.416,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2008,7 +2007,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 736.856,
+     "t": 736.866,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2017,7 +2016,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 737.68,
+     "t": 737.685,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2026,7 +2025,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 739.376,
+     "t": 739.386,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2035,7 +2034,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 755.926,
+     "t": 755.927,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2062,7 +2061,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 758.862,
+     "t": 758.866,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2071,7 +2070,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 775.925,
+     "t": 775.928,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2080,7 +2079,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 776.376,
+     "t": 776.344,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2089,7 +2088,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 777.203,
+     "t": 777.187,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2098,7 +2097,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 778.885,
+     "t": 778.868,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2107,7 +2106,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 795.434,
+     "t": 795.431,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2116,7 +2115,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 795.867,
+     "t": 795.829,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2125,7 +2124,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 796.69,
+     "t": 796.671,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2134,7 +2133,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 798.381,
+     "t": 798.359,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2143,7 +2142,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 815.924,
+     "t": 815.922,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2170,7 +2169,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 818.864,
+     "t": 818.891,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2179,7 +2178,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 834.927,
+     "t": 834.931,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2188,7 +2187,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 835.359,
+     "t": 835.362,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2197,7 +2196,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 836.181,
+     "t": 836.187,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2206,7 +2205,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 837.867,
+     "t": 837.881,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2215,7 +2214,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 855.938,
+     "t": 855.918,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2233,7 +2232,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 857.188,
+     "t": 857.181,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2242,7 +2241,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 858.872,
+     "t": 858.87,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2260,7 +2259,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 874.841,
+     "t": 874.844,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2269,7 +2268,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 875.664,
+     "t": 875.686,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2278,7 +2277,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 877.361,
+     "t": 877.369,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2287,7 +2286,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 893.421,
+     "t": 893.416,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2296,7 +2295,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 893.853,
+     "t": 893.846,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2305,7 +2304,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 894.683,
+     "t": 894.693,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2314,7 +2313,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 896.371,
+     "t": 896.372,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2337,45 +2336,45 @@
     "unit": "ms",
     "method": "kaplan-meier",
     "median": 1.1,
-    "p90": 1860.7,
-    "p95": 2826.0,
-    "p99": 3343.4,
-    "p99.9": 3363.4,
-    "max_event": 3366.1
+    "p90": 1860.1,
+    "p95": 2823.5,
+    "p99": 3339.3,
+    "p99.9": 3354.8,
+    "max_event": 3355.0
    },
    "delivered_latency_ms": {
     "n": 35800,
     "unit": "ms",
-    "mean": 336.4,
+    "mean": 336.2,
     "median": 1.1,
-    "p90": 1860.9,
-    "p95": 2826.0,
-    "p99": 3343.4,
-    "p99.9": 3363.3,
-    "max": 3366.1,
+    "p90": 1860.1,
+    "p95": 2823.5,
+    "p99": 3339.3,
+    "p99.9": 3354.8,
+    "max": 3355.0,
     "min": 0.2,
     "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
    },
    "exact_hold_latency_ms": {
     "n": 32120,
     "unit": "ms",
-    "mean": 188.7,
-    "median": 1.1,
+    "mean": 188.6,
+    "median": 1.0,
     "p90": 2.2,
-    "p95": 2827.9,
-    "p99": 3343.4,
-    "p99.9": 3363.4,
-    "max": 3366.1,
+    "p95": 2831.2,
+    "p99": 3339.6,
+    "p99.9": 3354.8,
+    "max": 3355.0,
     "min": 0.2
    },
    "skipped_updates": 3680,
-   "stale_time_fraction": 0.175264,
+   "stale_time_fraction": 0.175185,
    "staleness_ms_time_weighted": {
     "p50": 0.0,
-    "p95": 2372.9,
+    "p95": 2372.3,
     "p99": 3144.4,
-    "p99.9": 3319.4,
-    "max": 3364.6
+    "p99.9": 3319.5,
+    "max": 3354.3
    },
    "arrivals": 32320,
    "superseded_deliveries": 1840,
@@ -2389,12 +2388,12 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 649.6,
-    "p90": 804.8,
-    "p95": 805.6,
-    "p99": 837.8,
-    "p99.9": 837.9,
-    "max_event": 837.9
+    "median": 641.3,
+    "p90": 817.7,
+    "p95": 824.3,
+    "p99": 837.5,
+    "p99.9": 837.6,
+    "max_event": 837.6
    },
    "outage_recovery_affected_km_ms": {
     "n": 920,
@@ -2402,12 +2401,12 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 649.6,
-    "p90": 804.8,
-    "p95": 805.6,
-    "p99": 837.8,
-    "p99.9": 837.9,
-    "max_event": 837.9
+    "median": 641.3,
+    "p90": 817.7,
+    "p95": 824.3,
+    "p99": 837.5,
+    "p99.9": 837.6,
+    "max_event": 837.6
    },
    "updates_issued_in_outage_censored": 0,
    "latency_of_updates_issued_in_outage_km_ms": {
@@ -2416,12 +2415,12 @@
     "censored": 0,
     "unit": "ms",
     "method": "kaplan-meier",
-    "median": 1900.4,
+    "median": 1910.5,
     "p90": 3335.5,
-    "p95": 3347.0,
-    "p99": 3355.9,
-    "p99.9": 3366.1,
-    "max_event": 3366.1
+    "p95": 3344.4,
+    "p99": 3354.4,
+    "p99.9": 3355.0,
+    "max_event": 3355.0
    },
    "tcp": {
     "total_retrans": [
@@ -2457,53 +2456,52 @@
      "closed_duration_ms": {
       "n": 920,
       "unit": "ms",
-      "mean": 2950.5,
-      "median": 2950.3,
-      "p90": 2966.6,
-      "p95": 2976.2,
-      "p99": 2983.6,
-      "p99.9": 2983.6,
-      "max": 2983.6,
-      "min": 2897.6
+      "mean": 2951.7,
+      "median": 2951.9,
+      "p90": 2969.1,
+      "p95": 2970.9,
+      "p99": 2982.5,
+      "p99.9": 2982.6,
+      "max": 2982.6,
+      "min": 2927.5
      },
      "max_backoff_hist": {
-      "3": 892,
-      "4": 28
+      "3": 920
      },
      "longest": [
       {
-       "dur_ms": 2983.6,
+       "dur_ms": 2982.6,
        "max_backoff": 3,
        "max_rto_ms": 1632.0,
-       "start": 340.918,
+       "start": 143.422,
        "open_at_end": false
       },
       {
-       "dur_ms": 2983.6,
+       "dur_ms": 2982.6,
        "max_backoff": 3,
        "max_rto_ms": 1632.0,
-       "start": 340.918,
+       "start": 143.422,
        "open_at_end": false
       },
       {
-       "dur_ms": 2983.6,
+       "dur_ms": 2982.6,
        "max_backoff": 3,
        "max_rto_ms": 1632.0,
-       "start": 340.918,
+       "start": 143.422,
        "open_at_end": false
       },
       {
-       "dur_ms": 2983.6,
+       "dur_ms": 2982.6,
        "max_backoff": 3,
        "max_rto_ms": 1632.0,
-       "start": 340.918,
+       "start": 143.422,
        "open_at_end": false
       },
       {
-       "dur_ms": 2983.6,
+       "dur_ms": 2982.5,
        "max_backoff": 3,
        "max_rto_ms": 1632.0,
-       "start": 340.918,
+       "start": 143.423,
        "open_at_end": false
       }
      ]
@@ -2511,7 +2509,7 @@
    },
    "tcp_info_trace_conn0": [
     {
-     "t": -0.998,
+     "t": -0.999,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2520,7 +2518,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 7.437,
+     "t": 7.424,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2529,7 +2527,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 7.87,
+     "t": 7.843,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2538,7 +2536,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 8.696,
+     "t": 8.671,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2547,7 +2545,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 10.394,
+     "t": 10.382,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2556,7 +2554,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 25.926,
+     "t": 25.922,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2565,7 +2563,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 26.357,
+     "t": 26.356,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2574,7 +2572,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 27.192,
+     "t": 27.204,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2583,7 +2581,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 28.89,
+     "t": 28.888,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2592,7 +2590,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 44.94,
+     "t": 44.921,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2601,7 +2599,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 45.356,
+     "t": 45.35,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2610,7 +2608,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 46.209,
+     "t": 46.171,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2619,7 +2617,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 47.891,
+     "t": 47.863,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2628,7 +2626,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 65.424,
+     "t": 65.431,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2637,7 +2635,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 65.841,
+     "t": 65.863,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2646,7 +2644,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 66.683,
+     "t": 66.693,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2655,7 +2653,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 68.379,
+     "t": 68.374,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2664,7 +2662,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 85.423,
+     "t": 85.427,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2673,7 +2671,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 85.857,
+     "t": 85.858,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2682,7 +2680,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 86.683,
+     "t": 86.677,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2691,7 +2689,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 88.369,
+     "t": 88.382,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2700,7 +2698,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 103.93,
+     "t": 103.92,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2709,7 +2707,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 104.34,
+     "t": 104.355,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2718,7 +2716,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 105.164,
+     "t": 105.177,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2727,7 +2725,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 106.883,
+     "t": 106.87,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2736,7 +2734,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 123.928,
+     "t": 123.935,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2745,7 +2743,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 124.341,
+     "t": 124.344,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2754,7 +2752,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 125.168,
+     "t": 125.177,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2763,7 +2761,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 126.865,
+     "t": 126.871,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2772,7 +2770,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 143.436,
+     "t": 143.422,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2781,43 +2779,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 143.867,
-     "rto_ms": 816.0,
-     "backoff": 2,
-     "retransmits": 2,
-     "unacked": 1,
-     "notsent_bytes": 331,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 144.687,
-     "rto_ms": 1632.0,
-     "backoff": 3,
-     "retransmits": 3,
-     "unacked": 1,
-     "notsent_bytes": 331,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 146.382,
-     "rto_ms": 204.0,
-     "backoff": 0,
-     "retransmits": 0,
-     "unacked": 0,
-     "notsent_bytes": 0,
-     "ca_state": "Open"
-    },
-    {
-     "t": 163.939,
-     "rto_ms": 408.0,
-     "backoff": 1,
-     "retransmits": 1,
-     "unacked": 1,
-     "notsent_bytes": 0,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 164.356,
+     "t": 143.879,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2826,7 +2788,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 165.181,
+     "t": 144.7,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2835,7 +2797,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 166.87,
+     "t": 146.405,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2844,7 +2806,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 183.936,
+     "t": 163.941,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2853,7 +2815,43 @@
      "ca_state": "Loss"
     },
     {
-     "t": 184.356,
+     "t": 164.351,
+     "rto_ms": 816.0,
+     "backoff": 2,
+     "retransmits": 2,
+     "unacked": 1,
+     "notsent_bytes": 331,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 165.178,
+     "rto_ms": 1632.0,
+     "backoff": 3,
+     "retransmits": 3,
+     "unacked": 1,
+     "notsent_bytes": 331,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 166.869,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 183.928,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 184.341,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2871,7 +2869,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 186.864,
+     "t": 186.882,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2880,7 +2878,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 203.925,
+     "t": 203.923,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2889,7 +2887,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 204.339,
+     "t": 204.355,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2898,7 +2896,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 205.164,
+     "t": 205.18,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2916,7 +2914,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 224.429,
+     "t": 224.428,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2925,7 +2923,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 224.864,
+     "t": 224.859,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2934,7 +2932,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 225.685,
+     "t": 225.689,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2943,7 +2941,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 227.373,
+     "t": 227.382,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2952,7 +2950,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 243.927,
+     "t": 243.933,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2961,7 +2959,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 244.338,
+     "t": 244.344,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -2970,7 +2968,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 245.173,
+     "t": 245.189,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -2979,7 +2977,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 246.876,
+     "t": 246.877,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -2988,7 +2986,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 263.425,
+     "t": 263.426,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -2997,7 +2995,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 263.857,
+     "t": 263.875,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3006,7 +3004,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 264.684,
+     "t": 264.698,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3015,7 +3013,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 266.379,
+     "t": 266.394,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3024,7 +3022,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 282.945,
+     "t": 282.922,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3033,7 +3031,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 283.396,
+     "t": 283.353,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3042,7 +3040,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 284.22,
+     "t": 284.199,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3051,7 +3049,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 285.903,
+     "t": 285.877,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3060,7 +3058,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 303.431,
+     "t": 303.429,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3069,7 +3067,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 303.868,
+     "t": 303.846,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3078,7 +3076,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 304.698,
+     "t": 304.674,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3087,7 +3085,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 306.395,
+     "t": 306.365,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3096,7 +3094,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 321.928,
+     "t": 321.924,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3105,7 +3103,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 322.36,
+     "t": 322.374,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3114,7 +3112,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 323.189,
+     "t": 323.198,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3123,7 +3121,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 324.886,
+     "t": 324.888,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3132,7 +3130,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 340.918,
+     "t": 340.937,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3141,7 +3139,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 341.379,
+     "t": 341.355,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3150,7 +3148,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 342.203,
+     "t": 342.183,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3159,7 +3157,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 343.902,
+     "t": 343.865,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3168,7 +3166,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 360.927,
+     "t": 360.924,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3177,7 +3175,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 361.358,
+     "t": 361.333,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3186,7 +3184,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 362.202,
+     "t": 362.173,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3195,7 +3193,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 363.884,
+     "t": 363.864,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3204,7 +3202,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 380.937,
+     "t": 380.922,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3213,7 +3211,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 381.371,
+     "t": 381.336,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3222,7 +3220,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 382.19,
+     "t": 382.183,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3231,7 +3229,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 383.888,
+     "t": 383.861,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3240,7 +3238,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 400.424,
+     "t": 400.428,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3249,7 +3247,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 400.856,
+     "t": 400.858,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3258,7 +3256,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 401.678,
+     "t": 401.686,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3267,7 +3265,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 403.373,
+     "t": 403.379,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3276,7 +3274,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 420.938,
+     "t": 420.92,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3285,7 +3283,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 421.372,
+     "t": 421.339,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3294,7 +3292,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 422.21,
+     "t": 422.181,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3303,7 +3301,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 423.894,
+     "t": 423.865,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3312,7 +3310,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 440.425,
+     "t": 440.427,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3321,7 +3319,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 440.856,
+     "t": 440.858,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3330,7 +3328,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 441.683,
+     "t": 441.697,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3339,7 +3337,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 443.401,
+     "t": 443.385,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3348,7 +3346,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 458.924,
+     "t": 458.93,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3357,7 +3355,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 459.356,
+     "t": 459.362,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3366,7 +3364,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 460.183,
+     "t": 460.201,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3375,7 +3373,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 461.878,
+     "t": 461.886,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3384,7 +3382,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 478.919,
+     "t": 478.939,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3393,7 +3391,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 479.351,
+     "t": 479.352,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3402,7 +3400,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 480.183,
+     "t": 480.196,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3411,7 +3409,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 481.875,
+     "t": 481.9,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3420,7 +3418,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 497.422,
+     "t": 497.425,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3429,7 +3427,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 497.855,
+     "t": 497.856,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3438,7 +3436,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 498.676,
+     "t": 498.682,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3447,7 +3445,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 500.389,
+     "t": 500.377,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3456,7 +3454,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 517.431,
+     "t": 517.421,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3465,7 +3463,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 517.843,
+     "t": 517.852,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3474,7 +3472,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 518.691,
+     "t": 518.694,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3483,7 +3481,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 520.371,
+     "t": 520.382,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3492,7 +3490,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 538.424,
+     "t": 538.423,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3501,7 +3499,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 538.836,
+     "t": 538.852,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3510,7 +3508,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 539.661,
+     "t": 539.674,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3519,7 +3517,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 541.359,
+     "t": 541.387,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3528,7 +3526,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 559.429,
+     "t": 559.431,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3537,7 +3535,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 559.861,
+     "t": 559.863,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3546,7 +3544,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 560.689,
+     "t": 560.704,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3555,7 +3553,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 562.379,
+     "t": 562.412,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3564,7 +3562,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 577.926,
+     "t": 577.93,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3573,7 +3571,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 578.356,
+     "t": 578.363,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3582,7 +3580,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 579.183,
+     "t": 579.188,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3591,7 +3589,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 580.879,
+     "t": 580.901,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3600,7 +3598,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 597.929,
+     "t": 597.918,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3609,7 +3607,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 598.362,
+     "t": 598.36,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3618,7 +3616,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 599.189,
+     "t": 599.202,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3627,7 +3625,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 600.905,
+     "t": 600.882,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3636,7 +3634,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 617.44,
+     "t": 617.423,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3645,7 +3643,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 617.851,
+     "t": 617.853,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3654,7 +3652,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 618.673,
+     "t": 618.693,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3663,7 +3661,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 620.378,
+     "t": 620.374,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3672,7 +3670,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 637.925,
+     "t": 637.922,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3681,7 +3679,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 638.354,
+     "t": 638.373,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3690,7 +3688,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 639.197,
+     "t": 639.195,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3699,7 +3697,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 640.879,
+     "t": 640.891,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3708,7 +3706,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 658.427,
+     "t": 658.42,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3717,7 +3715,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 658.846,
+     "t": 658.85,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3726,7 +3724,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 659.669,
+     "t": 659.668,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3735,7 +3733,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 661.371,
+     "t": 661.363,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3744,7 +3742,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 677.427,
+     "t": 677.423,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3753,7 +3751,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 677.84,
+     "t": 677.853,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3762,7 +3760,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 678.689,
+     "t": 678.676,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3771,7 +3769,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 680.372,
+     "t": 680.373,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3780,7 +3778,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 698.422,
+     "t": 698.428,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3789,7 +3787,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 698.836,
+     "t": 698.837,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3798,7 +3796,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 699.663,
+     "t": 699.682,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3807,7 +3805,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 701.38,
+     "t": 701.367,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3816,7 +3814,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 716.944,
+     "t": 716.929,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3825,7 +3823,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 717.357,
+     "t": 717.34,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3834,7 +3832,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 718.202,
+     "t": 718.173,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3843,7 +3841,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 719.887,
+     "t": 719.866,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3852,7 +3850,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 736.426,
+     "t": 736.416,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3861,7 +3859,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 736.857,
+     "t": 736.866,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3870,7 +3868,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 737.68,
+     "t": 737.686,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3879,7 +3877,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 739.376,
+     "t": 739.386,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3888,7 +3886,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 755.926,
+     "t": 755.927,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3897,7 +3895,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 756.34,
+     "t": 756.341,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3915,7 +3913,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 758.862,
+     "t": 758.867,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3924,7 +3922,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 775.926,
+     "t": 775.929,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3933,7 +3931,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 776.376,
+     "t": 776.344,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3942,7 +3940,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 777.204,
+     "t": 777.187,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3951,7 +3949,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 778.885,
+     "t": 778.868,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3960,7 +3958,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 795.434,
+     "t": 795.432,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -3969,7 +3967,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 795.867,
+     "t": 795.829,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -3978,7 +3976,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 796.69,
+     "t": 796.671,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -3987,7 +3985,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 798.381,
+     "t": 798.359,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -3996,7 +3994,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 815.924,
+     "t": 815.922,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -4014,7 +4012,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 817.176,
+     "t": 817.177,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -4023,7 +4021,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 818.864,
+     "t": 818.891,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -4032,7 +4030,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 834.927,
+     "t": 834.931,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -4041,7 +4039,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 835.359,
+     "t": 835.362,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -4050,7 +4048,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 836.181,
+     "t": 836.187,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -4059,7 +4057,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 837.867,
+     "t": 837.881,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -4068,7 +4066,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 855.939,
+     "t": 855.918,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -4086,7 +4084,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 857.188,
+     "t": 857.181,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -4095,7 +4093,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 858.872,
+     "t": 858.87,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -4113,7 +4111,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 874.841,
+     "t": 874.844,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -4122,7 +4120,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 875.664,
+     "t": 875.686,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -4131,7 +4129,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 877.361,
+     "t": 877.369,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -4140,7 +4138,7 @@
      "ca_state": "Open"
     },
     {
-     "t": 893.421,
+     "t": 893.416,
      "rto_ms": 408.0,
      "backoff": 1,
      "retransmits": 1,
@@ -4149,7 +4147,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 893.853,
+     "t": 893.847,
      "rto_ms": 816.0,
      "backoff": 2,
      "retransmits": 2,
@@ -4158,7 +4156,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 894.683,
+     "t": 894.693,
      "rto_ms": 1632.0,
      "backoff": 3,
      "retransmits": 3,
@@ -4167,16 +4165,7 @@
      "ca_state": "Loss"
     },
     {
-     "t": 896.332,
-     "rto_ms": 3264.0,
-     "backoff": 4,
-     "retransmits": 4,
-     "unacked": 1,
-     "notsent_bytes": 331,
-     "ca_state": "Loss"
-    },
-    {
-     "t": 896.371,
+     "t": 896.372,
      "rto_ms": 204.0,
      "backoff": 0,
      "retransmits": 0,
@@ -4197,6 +4186,6 @@
   "tcp_rmem": "4096\t131072\t33554432",
   "tcp_wmem": "4096\t16384\t4194304",
   "rmem_max": "4194304",
-  "date": "2026-09-27T20:19:43Z"
+  "date": "2026-09-27T23:41:23Z"
  }
 }

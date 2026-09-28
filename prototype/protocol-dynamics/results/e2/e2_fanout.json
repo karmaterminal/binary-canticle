@@ -1,26 +1,224 @@
 {
+ "run_id": "20260927T234231Z-11226-5348",
  "experiment": "e2_fanout",
- "idle_baseline": {
-  "cpu0": 0.0085,
-  "cpu1": 0.0115,
-  "cpu2": 0.0045,
-  "cpu3": 0.0075
- },
  "rows": [
+  {
+   "mode": "mcast",
+   "n": 10,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.004,
+   "setup_s": 0.01,
+   "sender_process_cpu_s_per_s": 0.003,
+   "sender_host_cpu0_busy_s_per_s": 0.007,
+   "sender_host_cpu0_softirq_s_per_s": 0.0,
+   "sender_process_us_per_listener_frame": 29.994,
+   "receivers_cpu23_busy_s_per_s": 0.004,
+   "cpu1_busy_s_per_s": 0.004,
+   "wire": {
+    "tx_bytes_per_s": 7419,
+    "tx_packets_per_s": 10,
+    "rx_bytes_per_s": 0,
+    "rx_packets_per_s": 0,
+    "tx_bytes_per_listener_s": 741.9,
+    "rx_bytes_per_listener_s": 0.0,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 4536,
+    "sender_fds": 6,
+    "sender_threads": 4,
+    "receiver_rss_kb": 4664,
+    "slab_delta_kb_both_ends": -252,
+    "sunreclaim_delta_kb_both_ends": -292,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 3
+     },
+     "TCP": {
+      "inuse": 0,
+      "orphan": 12,
+      "tw": 0,
+      "alloc": 31,
+      "mem": 158
+     },
+     "UDP": {
+      "inuse": 1,
+      "mem": 512
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": null
+   },
+   "sender": {
+    "mode": "mcast",
+    "n": 10,
+    "frames": 280,
+    "syscalls": 280,
+    "messages": 280,
+    "bytes": 196000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 42,
+    "enqueue_all_p99_us": 126,
+    "enqueue_all_max_us": 148,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "mcast",
+    "n": 10,
+    "attached": 10,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 2800,
+    "bytes": 1960000,
+    "errors": 0
+   },
+   "repeat": 0,
+   "block_order": [
+    "mcast",
+    "idle",
+    "udp",
+    "tcp"
+   ],
+   "position": 0
+  },
+  {
+   "mode": "idle",
+   "n": 10,
+   "rate": 10,
+   "measure_s": 20.0,
+   "sender_host_cpu0_busy_s_per_s": 0.003,
+   "cpu_busy_s_per_s": {
+    "cpu0": 0.003,
+    "cpu1": 0.0045,
+    "cpu2": 0.005,
+    "cpu3": 0.001
+   },
+   "slab_delta_kb": -172,
+   "repeat": 0,
+   "block_order": [
+    "mcast",
+    "idle",
+    "udp",
+    "tcp"
+   ],
+   "position": 1
+  },
+  {
+   "mode": "udp",
+   "n": 10,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.003,
+   "setup_s": 0.011,
+   "sender_process_cpu_s_per_s": 0.003,
+   "sender_host_cpu0_busy_s_per_s": 0.001,
+   "sender_host_cpu0_softirq_s_per_s": 0.0005,
+   "sender_process_us_per_listener_frame": 29.995,
+   "receivers_cpu23_busy_s_per_s": 0.005,
+   "cpu1_busy_s_per_s": 0.0055,
+   "wire": {
+    "tx_bytes_per_s": 74188,
+    "tx_packets_per_s": 100,
+    "rx_bytes_per_s": 0,
+    "rx_packets_per_s": 0,
+    "tx_bytes_per_listener_s": 7418.8,
+    "rx_bytes_per_listener_s": 0.0,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 4424,
+    "sender_fds": 6,
+    "sender_threads": 4,
+    "receiver_rss_kb": 4660,
+    "slab_delta_kb_both_ends": -240,
+    "sunreclaim_delta_kb_both_ends": -160,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 3
+     },
+     "TCP": {
+      "inuse": 0,
+      "orphan": 5,
+      "tw": 0,
+      "alloc": 24,
+      "mem": 0
+     },
+     "UDP": {
+      "inuse": 1,
+      "mem": 512
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": null
+   },
+   "sender": {
+    "mode": "udp",
+    "n": 10,
+    "frames": 280,
+    "syscalls": 280,
+    "messages": 2800,
+    "bytes": 1960000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 100,
+    "enqueue_all_p99_us": 229,
+    "enqueue_all_max_us": 1083,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "udp",
+    "n": 10,
+    "attached": 10,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 2800,
+    "bytes": 1960000,
+    "errors": 0
+   },
+   "repeat": 0,
+   "block_order": [
+    "mcast",
+    "idle",
+    "udp",
+    "tcp"
+   ],
+   "position": 2
+  },
   {
    "mode": "tcp",
    "n": 10,
    "rate": 10,
    "frame_bytes": 700,
    "measure_s": 20.004,
-   "setup_s": 0.307,
+   "setup_s": 0.311,
    "sender_process_cpu_s_per_s": 0.003,
-   "sender_host_cpu0_busy_s_per_s": 0.013,
-   "sender_host_cpu0_softirq_s_per_s": 0.0065,
-   "sender_host_us_per_listener_frame": 129.976,
+   "sender_host_cpu0_busy_s_per_s": 0.012,
+   "sender_host_cpu0_softirq_s_per_s": 0.005,
    "sender_process_us_per_listener_frame": 29.994,
-   "receivers_cpu23_busy_s_per_s": 0.024,
-   "cpu1_busy_s_per_s": 0.0105,
+   "receivers_cpu23_busy_s_per_s": 0.02,
+   "cpu1_busy_s_per_s": 0.002,
    "wire": {
     "tx_bytes_per_s": 76586,
     "tx_packets_per_s": 100,
@@ -32,26 +230,26 @@
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4560,
+    "sender_rss_kb": 4620,
     "sender_fds": 16,
     "sender_threads": 4,
-    "receiver_rss_kb": 4788,
-    "slab_delta_kb_both_ends": -312,
-    "sunreclaim_delta_kb_both_ends": -292,
+    "receiver_rss_kb": 4860,
+    "slab_delta_kb_both_ends": -540,
+    "sunreclaim_delta_kb_both_ends": -508,
     "sockstat_tx": {
      "sockets": {
       "used": 14
      },
      "TCP": {
       "inuse": 11,
-      "orphan": 100,
+      "orphan": 3,
       "tw": 0,
-      "alloc": 145,
-      "mem": 53
+      "alloc": 40,
+      "mem": 0
      },
      "UDP": {
       "inuse": 0,
-      "mem": 495
+      "mem": 512
      },
      "UDPLITE": {
       "inuse": 0
@@ -86,9 +284,9 @@
     "bytes": 1960000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 112,
-    "enqueue_all_p99_us": 380,
-    "enqueue_all_max_us": 593,
+    "enqueue_all_p50_us": 117,
+    "enqueue_all_p99_us": 431,
+    "enqueue_all_max_us": 520,
     "late_ticks": 0
    },
    "receiver": {
@@ -101,138 +299,59 @@
     "bytes": 1960000,
     "errors": 0
    },
-   "repeat": 0
-  },
-  {
-   "mode": "udp",
-   "n": 10,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.003,
-   "setup_s": 0.01,
-   "sender_process_cpu_s_per_s": 0.003,
-   "sender_host_cpu0_busy_s_per_s": 0.021,
-   "sender_host_cpu0_softirq_s_per_s": 0.0015,
-   "sender_host_us_per_listener_frame": 209.968,
-   "sender_process_us_per_listener_frame": 29.995,
-   "receivers_cpu23_busy_s_per_s": 0.03449,
-   "cpu1_busy_s_per_s": 0.013,
-   "wire": {
-    "tx_bytes_per_s": 74189,
-    "tx_packets_per_s": 100,
-    "rx_bytes_per_s": 0,
-    "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7418.9,
-    "rx_bytes_per_listener_s": 0.0,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 4432,
-    "sender_fds": 6,
-    "sender_threads": 4,
-    "receiver_rss_kb": 4732,
-    "slab_delta_kb_both_ends": -520,
-    "sunreclaim_delta_kb_both_ends": -520,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 3
-     },
-     "TCP": {
-      "inuse": 0,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 23,
-      "mem": 314
-     },
-     "UDP": {
-      "inuse": 1,
-      "mem": 495
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": null
-   },
-   "sender": {
-    "mode": "udp",
-    "n": 10,
-    "frames": 280,
-    "syscalls": 280,
-    "messages": 2800,
-    "bytes": 1960000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 104,
-    "enqueue_all_p99_us": 357,
-    "enqueue_all_max_us": 586,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "udp",
-    "n": 10,
-    "attached": 10,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 2800,
-    "bytes": 1960000,
-    "errors": 0
-   },
-   "repeat": 0
+   "repeat": 0,
+   "block_order": [
+    "mcast",
+    "idle",
+    "udp",
+    "tcp"
+   ],
+   "position": 3
   },
   {
    "mode": "mcast",
-   "n": 10,
+   "n": 100,
    "rate": 10,
    "frame_bytes": 700,
-   "measure_s": 20.003,
-   "setup_s": 0.011,
-   "sender_process_cpu_s_per_s": 0.0025,
-   "sender_host_cpu0_busy_s_per_s": 0.0115,
-   "sender_host_cpu0_softirq_s_per_s": 0.002,
-   "sender_host_us_per_listener_frame": 114.982,
-   "sender_process_us_per_listener_frame": 24.996,
-   "receivers_cpu23_busy_s_per_s": 0.013,
-   "cpu1_busy_s_per_s": 0.0185,
+   "measure_s": 20.007,
+   "setup_s": 0.02,
+   "sender_process_cpu_s_per_s": 0.002,
+   "sender_host_cpu0_busy_s_per_s": 0.0025,
+   "sender_host_cpu0_softirq_s_per_s": 0.0005,
+   "sender_process_us_per_listener_frame": 1.999,
+   "receivers_cpu23_busy_s_per_s": 0.0065,
+   "cpu1_busy_s_per_s": 0.0045,
    "wire": {
-    "tx_bytes_per_s": 7419,
+    "tx_bytes_per_s": 7417,
     "tx_packets_per_s": 10,
     "rx_bytes_per_s": 0,
     "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 741.9,
+    "tx_bytes_per_listener_s": 74.2,
     "rx_bytes_per_listener_s": 0.0,
     "tx_dropped": 0
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4548,
+    "sender_rss_kb": 4428,
     "sender_fds": 6,
     "sender_threads": 4,
-    "receiver_rss_kb": 4736,
-    "slab_delta_kb_both_ends": -272,
-    "sunreclaim_delta_kb_both_ends": -256,
+    "receiver_rss_kb": 5200,
+    "slab_delta_kb_both_ends": -5268,
+    "sunreclaim_delta_kb_both_ends": -312,
     "sockstat_tx": {
      "sockets": {
       "used": 3
      },
      "TCP": {
       "inuse": 0,
-      "orphan": 0,
+      "orphan": 3,
       "tw": 0,
-      "alloc": 21,
-      "mem": 54
+      "alloc": 19,
+      "mem": 0
      },
      "UDP": {
       "inuse": 1,
-      "mem": 495
+      "mem": 512
      },
      "UDPLITE": {
       "inuse": 0
@@ -249,29 +368,36 @@
    },
    "sender": {
     "mode": "mcast",
-    "n": 10,
+    "n": 100,
     "frames": 280,
     "syscalls": 280,
     "messages": 280,
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 44,
-    "enqueue_all_p99_us": 144,
-    "enqueue_all_max_us": 662,
+    "enqueue_all_p50_us": 41,
+    "enqueue_all_p99_us": 217,
+    "enqueue_all_max_us": 341,
     "late_ticks": 0
    },
    "receiver": {
     "mode": "mcast",
-    "n": 10,
-    "attached": 10,
+    "n": 100,
+    "attached": 100,
     "min_frames": 280,
     "max_frames": 280,
-    "frames": 2800,
-    "bytes": 1960000,
+    "frames": 28000,
+    "bytes": 19600000,
     "errors": 0
    },
-   "repeat": 0
+   "repeat": 0,
+   "block_order": [
+    "mcast",
+    "tcp",
+    "idle",
+    "udp"
+   ],
+   "position": 0
   },
   {
    "mode": "tcp",
@@ -279,21 +405,20 @@
    "rate": 10,
    "frame_bytes": 700,
    "measure_s": 20.003,
-   "setup_s": 0.322,
-   "sender_process_cpu_s_per_s": 0.0125,
-   "sender_host_cpu0_busy_s_per_s": 0.015,
+   "setup_s": 0.334,
+   "sender_process_cpu_s_per_s": 0.013,
+   "sender_host_cpu0_busy_s_per_s": 0.0045,
    "sender_host_cpu0_softirq_s_per_s": 0.003,
-   "sender_host_us_per_listener_frame": 14.998,
-   "sender_process_us_per_listener_frame": 12.498,
-   "receivers_cpu23_busy_s_per_s": 0.0135,
-   "cpu1_busy_s_per_s": 0.0065,
+   "sender_process_us_per_listener_frame": 12.998,
+   "receivers_cpu23_busy_s_per_s": 0.0125,
+   "cpu1_busy_s_per_s": 0.0015,
    "wire": {
-    "tx_bytes_per_s": 765880,
+    "tx_bytes_per_s": 766149,
     "tx_packets_per_s": 1000,
-    "rx_bytes_per_s": 65990,
-    "rx_packets_per_s": 1000,
-    "tx_bytes_per_listener_s": 7658.8,
-    "rx_bytes_per_listener_s": 659.9,
+    "rx_bytes_per_s": 66051,
+    "rx_packets_per_s": 1001,
+    "tx_bytes_per_listener_s": 7661.5,
+    "rx_bytes_per_listener_s": 660.5,
     "tx_dropped": 0
    },
    "softnet_drops": 0,
@@ -301,9 +426,9 @@
     "sender_rss_kb": 4692,
     "sender_fds": 106,
     "sender_threads": 4,
-    "receiver_rss_kb": 6120,
-    "slab_delta_kb_both_ends": -128,
-    "sunreclaim_delta_kb_both_ends": -128,
+    "receiver_rss_kb": 6092,
+    "slab_delta_kb_both_ends": -788,
+    "sunreclaim_delta_kb_both_ends": -740,
     "sockstat_tx": {
      "sockets": {
       "used": 104
@@ -312,12 +437,12 @@
       "inuse": 101,
       "orphan": 0,
       "tw": 0,
-      "alloc": 220,
-      "mem": 310
+      "alloc": 217,
+      "mem": 0
      },
      "UDP": {
       "inuse": 0,
-      "mem": 495
+      "mem": 512
      },
      "UDPLITE": {
       "inuse": 0
@@ -352,9 +477,9 @@
     "bytes": 19600000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 1018,
-    "enqueue_all_p99_us": 2559,
-    "enqueue_all_max_us": 2621,
+    "enqueue_all_p50_us": 1066,
+    "enqueue_all_p99_us": 2536,
+    "enqueue_all_max_us": 3631,
     "late_ticks": 0
    },
    "receiver": {
@@ -367,7 +492,36 @@
     "bytes": 19600000,
     "errors": 0
    },
-   "repeat": 0
+   "repeat": 0,
+   "block_order": [
+    "mcast",
+    "tcp",
+    "idle",
+    "udp"
+   ],
+   "position": 1
+  },
+  {
+   "mode": "idle",
+   "n": 100,
+   "rate": 10,
+   "measure_s": 20.0,
+   "sender_host_cpu0_busy_s_per_s": 0.0055,
+   "cpu_busy_s_per_s": {
+    "cpu0": 0.0055,
+    "cpu1": 0.002,
+    "cpu2": 0.0065,
+    "cpu3": 0.001
+   },
+   "slab_delta_kb": -432,
+   "repeat": 0,
+   "block_order": [
+    "mcast",
+    "tcp",
+    "idle",
+    "udp"
+   ],
+   "position": 2
   },
   {
    "mode": "udp",
@@ -375,31 +529,30 @@
    "rate": 10,
    "frame_bytes": 700,
    "measure_s": 20.003,
-   "setup_s": 0.03,
+   "setup_s": 0.025,
    "sender_process_cpu_s_per_s": 0.0055,
-   "sender_host_cpu0_busy_s_per_s": 0.0075,
-   "sender_host_cpu0_softirq_s_per_s": 0.004,
-   "sender_host_us_per_listener_frame": 7.499,
+   "sender_host_cpu0_busy_s_per_s": 0.003,
+   "sender_host_cpu0_softirq_s_per_s": 0.001,
    "sender_process_us_per_listener_frame": 5.499,
-   "receivers_cpu23_busy_s_per_s": 0.017,
-   "cpu1_busy_s_per_s": 0.011,
+   "receivers_cpu23_busy_s_per_s": 0.011,
+   "cpu1_busy_s_per_s": 0.0025,
    "wire": {
-    "tx_bytes_per_s": 745583,
-    "tx_packets_per_s": 1005,
-    "rx_bytes_per_s": 2,
+    "tx_bytes_per_s": 741887,
+    "tx_packets_per_s": 1000,
+    "rx_bytes_per_s": 0,
     "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7455.8,
+    "tx_bytes_per_listener_s": 7418.9,
     "rx_bytes_per_listener_s": 0.0,
     "tx_dropped": 0
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4428,
+    "sender_rss_kb": 4436,
     "sender_fds": 6,
     "sender_threads": 4,
-    "receiver_rss_kb": 5148,
-    "slab_delta_kb_both_ends": -544,
-    "sunreclaim_delta_kb_both_ends": -424,
+    "receiver_rss_kb": 5212,
+    "slab_delta_kb_both_ends": -12,
+    "sunreclaim_delta_kb_both_ends": -44,
     "sockstat_tx": {
      "sockets": {
       "used": 3
@@ -408,12 +561,12 @@
       "inuse": 0,
       "orphan": 0,
       "tw": 0,
-      "alloc": 18,
-      "mem": 310
+      "alloc": 16,
+      "mem": 0
      },
      "UDP": {
       "inuse": 1,
-      "mem": 495
+      "mem": 512
      },
      "UDPLITE": {
       "inuse": 0
@@ -437,9 +590,9 @@
     "bytes": 19600000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 385,
-    "enqueue_all_p99_us": 898,
-    "enqueue_all_max_us": 3036,
+    "enqueue_all_p50_us": 386,
+    "enqueue_all_p99_us": 1006,
+    "enqueue_all_max_us": 2026,
     "late_ticks": 0
    },
    "receiver": {
@@ -452,39 +605,67 @@
     "bytes": 19600000,
     "errors": 0
    },
-   "repeat": 0
+   "repeat": 0,
+   "block_order": [
+    "mcast",
+    "tcp",
+    "idle",
+    "udp"
+   ],
+   "position": 3
   },
   {
-   "mode": "mcast",
-   "n": 100,
+   "mode": "idle",
+   "n": 1000,
+   "rate": 10,
+   "measure_s": 20.0,
+   "sender_host_cpu0_busy_s_per_s": 0.0035,
+   "cpu_busy_s_per_s": {
+    "cpu0": 0.0035,
+    "cpu1": 0.0055,
+    "cpu2": 0.003,
+    "cpu3": 0.005
+   },
+   "slab_delta_kb": -336,
+   "repeat": 0,
+   "block_order": [
+    "idle",
+    "udp",
+    "tcp",
+    "mcast"
+   ],
+   "position": 0
+  },
+  {
+   "mode": "udp",
+   "n": 1000,
    "rate": 10,
    "frame_bytes": 700,
-   "measure_s": 20.004,
-   "setup_s": 0.02,
-   "sender_process_cpu_s_per_s": 0.002,
-   "sender_host_cpu0_busy_s_per_s": 0.01,
-   "sender_host_cpu0_softirq_s_per_s": 0.0025,
-   "sender_host_us_per_listener_frame": 9.998,
-   "sender_process_us_per_listener_frame": 2.0,
-   "receivers_cpu23_busy_s_per_s": 0.02,
-   "cpu1_busy_s_per_s": 0.008,
+   "measure_s": 20.005,
+   "setup_s": 0.099,
+   "sender_process_cpu_s_per_s": 0.03849,
+   "sender_host_cpu0_busy_s_per_s": 0.04499,
+   "sender_host_cpu0_softirq_s_per_s": 0.02399,
+   "sender_process_us_per_listener_frame": 3.849,
+   "receivers_cpu23_busy_s_per_s": 0.09547,
+   "cpu1_busy_s_per_s": 0.009,
    "wire": {
-    "tx_bytes_per_s": 7419,
-    "tx_packets_per_s": 10,
+    "tx_bytes_per_s": 7420385,
+    "tx_packets_per_s": 10001,
     "rx_bytes_per_s": 0,
     "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 74.2,
+    "tx_bytes_per_listener_s": 7420.4,
     "rx_bytes_per_listener_s": 0.0,
     "tx_dropped": 0
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4420,
+    "sender_rss_kb": 4512,
     "sender_fds": 6,
     "sender_threads": 4,
-    "receiver_rss_kb": 5224,
-    "slab_delta_kb_both_ends": -284,
-    "sunreclaim_delta_kb_both_ends": -284,
+    "receiver_rss_kb": 9952,
+    "slab_delta_kb_both_ends": 2636,
+    "sunreclaim_delta_kb_both_ends": 1320,
     "sockstat_tx": {
      "sockets": {
       "used": 3
@@ -493,12 +674,12 @@
       "inuse": 0,
       "orphan": 0,
       "tw": 0,
-      "alloc": 18,
-      "mem": 310
+      "alloc": 16,
+      "mem": 0
      },
      "UDP": {
       "inuse": 1,
-      "mem": 495
+      "mem": 768
      },
      "UDPLITE": {
       "inuse": 0
@@ -514,30 +695,37 @@
     "ss_skmem_tx": null
    },
    "sender": {
-    "mode": "mcast",
-    "n": 100,
+    "mode": "udp",
+    "n": 1000,
     "frames": 280,
     "syscalls": 280,
-    "messages": 280,
-    "bytes": 196000,
+    "messages": 280000,
+    "bytes": 196000000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 38,
-    "enqueue_all_p99_us": 154,
-    "enqueue_all_max_us": 1107,
+    "enqueue_all_p50_us": 3606,
+    "enqueue_all_p99_us": 6208,
+    "enqueue_all_max_us": 9683,
     "late_ticks": 0
    },
    "receiver": {
-    "mode": "mcast",
-    "n": 100,
-    "attached": 100,
+    "mode": "udp",
+    "n": 1000,
+    "attached": 1000,
     "min_frames": 280,
     "max_frames": 280,
-    "frames": 28000,
-    "bytes": 19600000,
+    "frames": 280000,
+    "bytes": 196000000,
     "errors": 0
    },
-   "repeat": 0
+   "repeat": 0,
+   "block_order": [
+    "idle",
+    "udp",
+    "tcp",
+    "mcast"
+   ],
+   "position": 1
   },
   {
    "mode": "tcp",
@@ -545,31 +733,30 @@
    "rate": 10,
    "frame_bytes": 700,
    "measure_s": 20.003,
-   "setup_s": 0.42,
-   "sender_process_cpu_s_per_s": 0.11748,
-   "sender_host_cpu0_busy_s_per_s": 0.11698,
-   "sender_host_cpu0_softirq_s_per_s": 0.07199,
-   "sender_host_us_per_listener_frame": 11.698,
-   "sender_process_us_per_listener_frame": 11.748,
+   "setup_s": 0.414,
+   "sender_process_cpu_s_per_s": 0.11848,
+   "sender_host_cpu0_busy_s_per_s": 0.12198,
+   "sender_host_cpu0_softirq_s_per_s": 0.07399,
+   "sender_process_us_per_listener_frame": 11.848,
    "receivers_cpu23_busy_s_per_s": 0.17947,
-   "cpu1_busy_s_per_s": 0.022,
+   "cpu1_busy_s_per_s": 0.007,
    "wire": {
-    "tx_bytes_per_s": 7676188,
-    "tx_packets_per_s": 10021,
-    "rx_bytes_per_s": 660920,
-    "rx_packets_per_s": 10014,
-    "tx_bytes_per_listener_s": 7676.2,
-    "rx_bytes_per_listener_s": 660.9,
+    "tx_bytes_per_s": 7669192,
+    "tx_packets_per_s": 10012,
+    "rx_bytes_per_s": 660805,
+    "rx_packets_per_s": 10012,
+    "tx_bytes_per_listener_s": 7669.2,
+    "rx_bytes_per_listener_s": 660.8,
     "tx_dropped": 0
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 5268,
+    "sender_rss_kb": 5272,
     "sender_fds": 1006,
     "sender_threads": 4,
-    "receiver_rss_kb": 16656,
-    "slab_delta_kb_both_ends": 8280,
-    "sunreclaim_delta_kb_both_ends": 5388,
+    "receiver_rss_kb": 16632,
+    "slab_delta_kb_both_ends": 7680,
+    "sunreclaim_delta_kb_both_ends": 5072,
     "sockstat_tx": {
      "sockets": {
       "used": 1004
@@ -578,12 +765,12 @@
       "inuse": 1001,
       "orphan": 0,
       "tw": 0,
-      "alloc": 2019,
-      "mem": 310
+      "alloc": 2017,
+      "mem": 0
      },
      "UDP": {
       "inuse": 0,
-      "mem": 495
+      "mem": 256
      },
      "UDPLITE": {
       "inuse": 0
@@ -618,9 +805,9 @@
     "bytes": 196000000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 11548,
-    "enqueue_all_p99_us": 19224,
-    "enqueue_all_max_us": 21951,
+    "enqueue_all_p50_us": 11430,
+    "enqueue_all_p99_us": 18955,
+    "enqueue_all_max_us": 22463,
     "late_ticks": 0
    },
    "receiver": {
@@ -633,92 +820,14 @@
     "bytes": 196000000,
     "errors": 0
    },
-   "repeat": 0
-  },
-  {
-   "mode": "udp",
-   "n": 1000,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.003,
-   "setup_s": 0.111,
-   "sender_process_cpu_s_per_s": 0.04249,
-   "sender_host_cpu0_busy_s_per_s": 0.05899,
-   "sender_host_cpu0_softirq_s_per_s": 0.0245,
-   "sender_host_us_per_listener_frame": 5.899,
-   "sender_process_us_per_listener_frame": 4.249,
-   "receivers_cpu23_busy_s_per_s": 0.11298,
-   "cpu1_busy_s_per_s": 0.018,
-   "wire": {
-    "tx_bytes_per_s": 7443759,
-    "tx_packets_per_s": 10032,
-    "rx_bytes_per_s": 0,
-    "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7443.8,
-    "rx_bytes_per_listener_s": 0.0,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 4496,
-    "sender_fds": 6,
-    "sender_threads": 4,
-    "receiver_rss_kb": 9948,
-    "slab_delta_kb_both_ends": 2180,
-    "sunreclaim_delta_kb_both_ends": 1224,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 3
-     },
-     "TCP": {
-      "inuse": 0,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 17,
-      "mem": 54
-     },
-     "UDP": {
-      "inuse": 1,
-      "mem": 1007
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": null
-   },
-   "sender": {
-    "mode": "udp",
-    "n": 1000,
-    "frames": 280,
-    "syscalls": 280,
-    "messages": 280000,
-    "bytes": 196000000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 3771,
-    "enqueue_all_p99_us": 18112,
-    "enqueue_all_max_us": 60041,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "udp",
-    "n": 1000,
-    "attached": 1000,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 280000,
-    "bytes": 196000000,
-    "errors": 0
-   },
-   "repeat": 0
+   "repeat": 0,
+   "block_order": [
+    "idle",
+    "udp",
+    "tcp",
+    "mcast"
+   ],
+   "position": 2
   },
   {
    "mode": "mcast",
@@ -726,14 +835,13 @@
    "rate": 10,
    "frame_bytes": 700,
    "measure_s": 20.003,
-   "setup_s": 0.092,
-   "sender_process_cpu_s_per_s": 0.0015,
-   "sender_host_cpu0_busy_s_per_s": 0.02,
-   "sender_host_cpu0_softirq_s_per_s": 0.0105,
-   "sender_host_us_per_listener_frame": 2.0,
-   "sender_process_us_per_listener_frame": 0.15,
-   "receivers_cpu23_busy_s_per_s": 0.09999,
-   "cpu1_busy_s_per_s": 0.004,
+   "setup_s": 0.098,
+   "sender_process_cpu_s_per_s": 0.0045,
+   "sender_host_cpu0_busy_s_per_s": 0.0105,
+   "sender_host_cpu0_softirq_s_per_s": 0.0045,
+   "sender_process_us_per_listener_frame": 0.45,
+   "receivers_cpu23_busy_s_per_s": 0.03449,
+   "cpu1_busy_s_per_s": 0.0065,
    "wire": {
     "tx_bytes_per_s": 7419,
     "tx_packets_per_s": 10,
@@ -745,12 +853,12 @@
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4424,
+    "sender_rss_kb": 4548,
     "sender_fds": 6,
     "sender_threads": 4,
-    "receiver_rss_kb": 9972,
-    "slab_delta_kb_both_ends": 1812,
-    "sunreclaim_delta_kb_both_ends": 880,
+    "receiver_rss_kb": 9940,
+    "slab_delta_kb_both_ends": 2208,
+    "sunreclaim_delta_kb_both_ends": 976,
     "sockstat_tx": {
      "sockets": {
       "used": 3
@@ -760,11 +868,11 @@
       "orphan": 0,
       "tw": 0,
       "alloc": 16,
-      "mem": 54
+      "mem": 0
      },
      "UDP": {
       "inuse": 1,
-      "mem": 1007
+      "mem": 1280
      },
      "UDPLITE": {
       "inuse": 0
@@ -789,9 +897,9 @@
     "errors": 0,
     "short_writes": 0,
     "enqueue_all_p50_us": 41,
-    "enqueue_all_p99_us": 141,
-    "enqueue_all_max_us": 241,
-    "late_ticks": 0
+    "enqueue_all_p99_us": 185,
+    "enqueue_all_max_us": 2705,
+    "late_ticks": 1
    },
    "receiver": {
     "mode": "mcast",
@@ -803,135 +911,45 @@
     "bytes": 196000000,
     "errors": 0
    },
-   "repeat": 0
-  },
-  {
-   "mode": "tcp",
-   "n": 5000,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.003,
-   "setup_s": 0.544,
-   "sender_process_cpu_s_per_s": 0.5914,
-   "sender_host_cpu0_busy_s_per_s": 0.6119,
-   "sender_host_cpu0_softirq_s_per_s": 0.39743,
-   "sender_host_us_per_listener_frame": 12.238,
-   "sender_process_us_per_listener_frame": 11.828,
-   "receivers_cpu23_busy_s_per_s": 0.92884,
-   "cpu1_busy_s_per_s": 0.0175,
-   "wire": {
-    "tx_bytes_per_s": 38296142,
-    "tx_packets_per_s": 49995,
-    "rx_bytes_per_s": 3299646,
-    "rx_packets_per_s": 49995,
-    "tx_bytes_per_listener_s": 7659.2,
-    "rx_bytes_per_listener_s": 659.9,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 7856,
-    "sender_fds": 5006,
-    "sender_threads": 4,
-    "receiver_rss_kb": 59388,
-    "slab_delta_kb_both_ends": 47792,
-    "sunreclaim_delta_kb_both_ends": 29904,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 5002
-     },
-     "TCP": {
-      "inuse": 5001,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 10017,
-      "mem": 310
-     },
-     "UDP": {
-      "inuse": 0,
-      "mem": 239
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": {
-     "sockets": 5000,
-     "r": 0,
-     "rb": 655360000,
-     "t": 1532,
-     "tb": 345600000,
-     "f": 15384,
-     "w": 9192,
-     "o": 0,
-     "bl": 0,
-     "d": 0
-    }
-   },
-   "sender": {
-    "mode": "tcp",
-    "n": 5000,
-    "frames": 280,
-    "syscalls": 1400000,
-    "messages": 1400000,
-    "bytes": 980000000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 56630,
-    "enqueue_all_p99_us": 93502,
-    "enqueue_all_max_us": 95780,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "tcp",
-    "n": 5000,
-    "attached": 5000,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 1400000,
-    "bytes": 980000000,
-    "errors": 0
-   },
-   "repeat": 0
+   "repeat": 0,
+   "block_order": [
+    "idle",
+    "udp",
+    "tcp",
+    "mcast"
+   ],
+   "position": 3
   },
   {
    "mode": "udp",
    "n": 5000,
    "rate": 10,
    "frame_bytes": 700,
-   "measure_s": 20.003,
-   "setup_s": 0.187,
-   "sender_process_cpu_s_per_s": 0.19597,
-   "sender_host_cpu0_busy_s_per_s": 0.24896,
-   "sender_host_cpu0_softirq_s_per_s": 0.12898,
-   "sender_host_us_per_listener_frame": 4.979,
-   "sender_process_us_per_listener_frame": 3.919,
-   "receivers_cpu23_busy_s_per_s": 0.51243,
-   "cpu1_busy_s_per_s": 0.05499,
+   "measure_s": 20.004,
+   "setup_s": 0.155,
+   "sender_process_cpu_s_per_s": 0.17897,
+   "sender_host_cpu0_busy_s_per_s": 0.17297,
+   "sender_host_cpu0_softirq_s_per_s": 0.08548,
+   "sender_process_us_per_listener_frame": 3.579,
+   "receivers_cpu23_busy_s_per_s": 0.41692,
+   "cpu1_busy_s_per_s": 0.0055,
    "wire": {
-    "tx_bytes_per_s": 37127865,
-    "tx_packets_per_s": 50038,
+    "tx_bytes_per_s": 37139990,
+    "tx_packets_per_s": 50054,
     "rx_bytes_per_s": 0,
     "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7425.6,
+    "tx_bytes_per_listener_s": 7428.0,
     "rx_bytes_per_listener_s": 0.0,
     "tx_dropped": 0
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4816,
+    "sender_rss_kb": 4828,
     "sender_fds": 6,
     "sender_threads": 4,
-    "receiver_rss_kb": 31744,
-    "slab_delta_kb_both_ends": 20016,
-    "sunreclaim_delta_kb_both_ends": 11816,
+    "receiver_rss_kb": 31496,
+    "slab_delta_kb_both_ends": 18172,
+    "sunreclaim_delta_kb_both_ends": 9456,
     "sockstat_tx": {
      "sockets": {
       "used": 3
@@ -941,11 +959,11 @@
       "orphan": 0,
       "tw": 0,
       "alloc": 16,
-      "mem": 314
+      "mem": 0
      },
      "UDP": {
       "inuse": 1,
-      "mem": 4847
+      "mem": 4864
      },
      "UDPLITE": {
       "inuse": 0
@@ -969,9 +987,9 @@
     "bytes": 980000000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 18339,
-    "enqueue_all_p99_us": 33884,
-    "enqueue_all_max_us": 44882,
+    "enqueue_all_p50_us": 17449,
+    "enqueue_all_p99_us": 30649,
+    "enqueue_all_max_us": 33615,
     "late_ticks": 0
    },
    "receiver": {
@@ -984,22 +1002,28 @@
     "bytes": 980000000,
     "errors": 0
    },
-   "repeat": 0
+   "repeat": 0,
+   "block_order": [
+    "udp",
+    "mcast",
+    "idle",
+    "tcp"
+   ],
+   "position": 0
   },
   {
    "mode": "mcast",
    "n": 5000,
    "rate": 10,
    "frame_bytes": 700,
-   "measure_s": 20.004,
-   "setup_s": 0.291,
-   "sender_process_cpu_s_per_s": 0.002,
-   "sender_host_cpu0_busy_s_per_s": 0.022,
-   "sender_host_cpu0_softirq_s_per_s": 0.017,
-   "sender_host_us_per_listener_frame": 0.44,
-   "sender_process_us_per_listener_frame": 0.04,
-   "receivers_cpu23_busy_s_per_s": 0.19346,
-   "cpu1_busy_s_per_s": 0.07498,
+   "measure_s": 20.005,
+   "setup_s": 0.28,
+   "sender_process_cpu_s_per_s": 0.001,
+   "sender_host_cpu0_busy_s_per_s": 0.01949,
+   "sender_host_cpu0_softirq_s_per_s": 0.0135,
+   "sender_process_us_per_listener_frame": 0.02,
+   "receivers_cpu23_busy_s_per_s": 0.15596,
+   "cpu1_busy_s_per_s": 0.0035,
    "wire": {
     "tx_bytes_per_s": 7418,
     "tx_packets_per_s": 10,
@@ -1011,12 +1035,12 @@
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4484,
+    "sender_rss_kb": 4428,
     "sender_fds": 6,
     "sender_threads": 4,
-    "receiver_rss_kb": 30788,
-    "slab_delta_kb_both_ends": 17084,
-    "sunreclaim_delta_kb_both_ends": 8652,
+    "receiver_rss_kb": 31036,
+    "slab_delta_kb_both_ends": 17424,
+    "sunreclaim_delta_kb_both_ends": 8904,
     "sockstat_tx": {
      "sockets": {
       "used": 3
@@ -1025,12 +1049,12 @@
       "inuse": 0,
       "orphan": 0,
       "tw": 0,
-      "alloc": 40,
-      "mem": 58
+      "alloc": 16,
+      "mem": 0
      },
      "UDP": {
       "inuse": 1,
-      "mem": 5103
+      "mem": 5120
      },
      "UDPLITE": {
       "inuse": 0
@@ -1054,9 +1078,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 36,
-    "enqueue_all_p99_us": 117,
-    "enqueue_all_max_us": 172,
+    "enqueue_all_p50_us": 38,
+    "enqueue_all_p99_us": 109,
+    "enqueue_all_max_us": 167,
     "late_ticks": 0
    },
    "receiver": {
@@ -1069,53 +1093,81 @@
     "bytes": 980000000,
     "errors": 0
    },
-   "repeat": 0
+   "repeat": 0,
+   "block_order": [
+    "udp",
+    "mcast",
+    "idle",
+    "tcp"
+   ],
+   "position": 1
+  },
+  {
+   "mode": "idle",
+   "n": 5000,
+   "rate": 10,
+   "measure_s": 20.0,
+   "sender_host_cpu0_busy_s_per_s": 0.0075,
+   "cpu_busy_s_per_s": {
+    "cpu0": 0.0075,
+    "cpu1": 0.0025,
+    "cpu2": 0.004,
+    "cpu3": 0.005
+   },
+   "slab_delta_kb": -688,
+   "repeat": 0,
+   "block_order": [
+    "udp",
+    "mcast",
+    "idle",
+    "tcp"
+   ],
+   "position": 2
   },
   {
    "mode": "tcp",
-   "n": 10,
+   "n": 5000,
    "rate": 10,
    "frame_bytes": 700,
    "measure_s": 20.004,
-   "setup_s": 0.306,
-   "sender_process_cpu_s_per_s": 0.0025,
-   "sender_host_cpu0_busy_s_per_s": 0.0105,
-   "sender_host_cpu0_softirq_s_per_s": 0.0035,
-   "sender_host_us_per_listener_frame": 104.981,
-   "sender_process_us_per_listener_frame": 24.996,
-   "receivers_cpu23_busy_s_per_s": 0.0255,
-   "cpu1_busy_s_per_s": 0.013,
+   "setup_s": 0.548,
+   "sender_process_cpu_s_per_s": 0.5764,
+   "sender_host_cpu0_busy_s_per_s": 0.59339,
+   "sender_host_cpu0_softirq_s_per_s": 0.38993,
+   "sender_process_us_per_listener_frame": 11.528,
+   "receivers_cpu23_busy_s_per_s": 0.89634,
+   "cpu1_busy_s_per_s": 0.0175,
    "wire": {
-    "tx_bytes_per_s": 76586,
-    "tx_packets_per_s": 100,
-    "rx_bytes_per_s": 6599,
-    "rx_packets_per_s": 100,
-    "tx_bytes_per_listener_s": 7658.6,
-    "rx_bytes_per_listener_s": 659.9,
+    "tx_bytes_per_s": 38304074,
+    "tx_packets_per_s": 50005,
+    "rx_bytes_per_s": 3300760,
+    "rx_packets_per_s": 50012,
+    "tx_bytes_per_listener_s": 7660.8,
+    "rx_bytes_per_listener_s": 660.2,
     "tx_dropped": 0
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4620,
-    "sender_fds": 16,
+    "sender_rss_kb": 7856,
+    "sender_fds": 5006,
     "sender_threads": 4,
-    "receiver_rss_kb": 4912,
-    "slab_delta_kb_both_ends": -1104,
-    "sunreclaim_delta_kb_both_ends": -832,
+    "receiver_rss_kb": 55148,
+    "slab_delta_kb_both_ends": 48680,
+    "sunreclaim_delta_kb_both_ends": 30556,
     "sockstat_tx": {
      "sockets": {
-      "used": 14
+      "used": 5004
      },
      "TCP": {
-      "inuse": 11,
+      "inuse": 5001,
       "orphan": 0,
       "tw": 0,
-      "alloc": 36,
-      "mem": 58
+      "alloc": 10014,
+      "mem": 0
      },
      "UDP": {
       "inuse": 0,
-      "mem": 495
+      "mem": 256
      },
      "UDPLITE": {
       "inuse": 0
@@ -1129,13 +1181,13 @@
      }
     },
     "ss_skmem_tx": {
-     "sockets": 10,
+     "sockets": 5000,
      "r": 0,
-     "rb": 1310720,
-     "t": 0,
-     "tb": 691200,
-     "f": 0,
-     "w": 0,
+     "rb": 655360000,
+     "t": 3064,
+     "tb": 345600000,
+     "f": 20512,
+     "w": 12256,
      "o": 0,
      "bl": 0,
      "d": 0
@@ -1143,114 +1195,36 @@
    },
    "sender": {
     "mode": "tcp",
-    "n": 10,
+    "n": 5000,
     "frames": 280,
-    "syscalls": 2800,
-    "messages": 2800,
-    "bytes": 1960000,
+    "syscalls": 1400000,
+    "messages": 1400000,
+    "bytes": 980000000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 114,
-    "enqueue_all_p99_us": 358,
-    "enqueue_all_max_us": 716,
+    "enqueue_all_p50_us": 56508,
+    "enqueue_all_p99_us": 82145,
+    "enqueue_all_max_us": 95518,
     "late_ticks": 0
    },
    "receiver": {
     "mode": "tcp",
-    "n": 10,
-    "attached": 10,
+    "n": 5000,
+    "attached": 5000,
     "min_frames": 280,
     "max_frames": 280,
-    "frames": 2800,
-    "bytes": 1960000,
+    "frames": 1400000,
+    "bytes": 980000000,
     "errors": 0
    },
-   "repeat": 1
-  },
-  {
-   "mode": "udp",
-   "n": 10,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.003,
-   "setup_s": 0.01,
-   "sender_process_cpu_s_per_s": 0.0025,
-   "sender_host_cpu0_busy_s_per_s": 0.008,
-   "sender_host_cpu0_softirq_s_per_s": 0.001,
-   "sender_host_us_per_listener_frame": 79.988,
-   "sender_process_us_per_listener_frame": 24.996,
-   "receivers_cpu23_busy_s_per_s": 0.021,
-   "cpu1_busy_s_per_s": 0.008,
-   "wire": {
-    "tx_bytes_per_s": 74188,
-    "tx_packets_per_s": 100,
-    "rx_bytes_per_s": 0,
-    "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7418.8,
-    "rx_bytes_per_listener_s": 0.0,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 4424,
-    "sender_fds": 6,
-    "sender_threads": 4,
-    "receiver_rss_kb": 4728,
-    "slab_delta_kb_both_ends": -268,
-    "sunreclaim_delta_kb_both_ends": -248,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 3
-     },
-     "TCP": {
-      "inuse": 0,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 15,
-      "mem": 0
-     },
-     "UDP": {
-      "inuse": 1,
-      "mem": 495
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": null
-   },
-   "sender": {
-    "mode": "udp",
-    "n": 10,
-    "frames": 280,
-    "syscalls": 280,
-    "messages": 2800,
-    "bytes": 1960000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 105,
-    "enqueue_all_p99_us": 242,
-    "enqueue_all_max_us": 2045,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "udp",
-    "n": 10,
-    "attached": 10,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 2800,
-    "bytes": 1960000,
-    "errors": 0
-   },
-   "repeat": 1
+   "repeat": 0,
+   "block_order": [
+    "udp",
+    "mcast",
+    "idle",
+    "tcp"
+   ],
+   "position": 3
   },
   {
    "mode": "mcast",
@@ -1259,13 +1233,12 @@
    "frame_bytes": 700,
    "measure_s": 20.003,
    "setup_s": 0.01,
-   "sender_process_cpu_s_per_s": 0.002,
-   "sender_host_cpu0_busy_s_per_s": 0.01,
-   "sender_host_cpu0_softirq_s_per_s": 0.003,
-   "sender_host_us_per_listener_frame": 99.986,
-   "sender_process_us_per_listener_frame": 19.997,
-   "receivers_cpu23_busy_s_per_s": 0.0135,
-   "cpu1_busy_s_per_s": 0.007,
+   "sender_process_cpu_s_per_s": 0.0025,
+   "sender_host_cpu0_busy_s_per_s": 0.0045,
+   "sender_host_cpu0_softirq_s_per_s": 0.0005,
+   "sender_process_us_per_listener_frame": 24.996,
+   "receivers_cpu23_busy_s_per_s": 0.013,
+   "cpu1_busy_s_per_s": 0.005,
    "wire": {
     "tx_bytes_per_s": 7419,
     "tx_packets_per_s": 10,
@@ -1277,12 +1250,12 @@
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4556,
+    "sender_rss_kb": 4432,
     "sender_fds": 6,
     "sender_threads": 4,
-    "receiver_rss_kb": 4736,
-    "slab_delta_kb_both_ends": -268,
-    "sunreclaim_delta_kb_both_ends": -268,
+    "receiver_rss_kb": 4728,
+    "slab_delta_kb_both_ends": -848,
+    "sunreclaim_delta_kb_both_ends": -436,
     "sockstat_tx": {
      "sockets": {
       "used": 3
@@ -1291,12 +1264,12 @@
       "inuse": 0,
       "orphan": 0,
       "tw": 0,
-      "alloc": 15,
+      "alloc": 13,
       "mem": 0
      },
      "UDP": {
       "inuse": 1,
-      "mem": 495
+      "mem": 256
      },
      "UDPLITE": {
       "inuse": 0
@@ -1320,10 +1293,10 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 48,
-    "enqueue_all_p99_us": 176,
-    "enqueue_all_max_us": 2339,
-    "late_ticks": 0
+    "enqueue_all_p50_us": 38,
+    "enqueue_all_p99_us": 240,
+    "enqueue_all_max_us": 908,
+    "late_ticks": 1
    },
    "receiver": {
     "mode": "mcast",
@@ -1335,209 +1308,34 @@
     "bytes": 1960000,
     "errors": 0
    },
-   "repeat": 1
-  },
-  {
-   "mode": "tcp",
-   "n": 100,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.004,
-   "setup_s": 0.337,
-   "sender_process_cpu_s_per_s": 0.012,
-   "sender_host_cpu0_busy_s_per_s": 0.006,
-   "sender_host_cpu0_softirq_s_per_s": 0.0025,
-   "sender_host_us_per_listener_frame": 5.999,
-   "sender_process_us_per_listener_frame": 11.998,
-   "receivers_cpu23_busy_s_per_s": 0.0135,
-   "cpu1_busy_s_per_s": 0.007,
-   "wire": {
-    "tx_bytes_per_s": 765852,
-    "tx_packets_per_s": 1000,
-    "rx_bytes_per_s": 65989,
-    "rx_packets_per_s": 1000,
-    "tx_bytes_per_listener_s": 7658.5,
-    "rx_bytes_per_listener_s": 659.9,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 4692,
-    "sender_fds": 106,
-    "sender_threads": 4,
-    "receiver_rss_kb": 6128,
-    "slab_delta_kb_both_ends": -152,
-    "sunreclaim_delta_kb_both_ends": -136,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 104
-     },
-     "TCP": {
-      "inuse": 101,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 216,
-      "mem": 58
-     },
-     "UDP": {
-      "inuse": 0,
-      "mem": 495
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": {
-     "sockets": 100,
-     "r": 0,
-     "rb": 13107200,
-     "t": 0,
-     "tb": 6912000,
-     "f": 0,
-     "w": 0,
-     "o": 0,
-     "bl": 0,
-     "d": 0
-    }
-   },
-   "sender": {
-    "mode": "tcp",
-    "n": 100,
-    "frames": 280,
-    "syscalls": 28000,
-    "messages": 28000,
-    "bytes": 19600000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 1013,
-    "enqueue_all_p99_us": 2291,
-    "enqueue_all_max_us": 2962,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "tcp",
-    "n": 100,
-    "attached": 100,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 28000,
-    "bytes": 19600000,
-    "errors": 0
-   },
-   "repeat": 1
+   "repeat": 1,
+   "block_order": [
+    "mcast",
+    "udp",
+    "tcp",
+    "idle"
+   ],
+   "position": 0
   },
   {
    "mode": "udp",
-   "n": 100,
+   "n": 10,
    "rate": 10,
    "frame_bytes": 700,
    "measure_s": 20.003,
-   "setup_s": 0.028,
-   "sender_process_cpu_s_per_s": 0.0055,
-   "sender_host_cpu0_busy_s_per_s": 0.004,
+   "setup_s": 0.01,
+   "sender_process_cpu_s_per_s": 0.0025,
+   "sender_host_cpu0_busy_s_per_s": 0.0005,
    "sender_host_cpu0_softirq_s_per_s": 0.0005,
-   "sender_host_us_per_listener_frame": 3.999,
-   "sender_process_us_per_listener_frame": 5.499,
-   "receivers_cpu23_busy_s_per_s": 0.0095,
-   "cpu1_busy_s_per_s": 0.0055,
+   "sender_process_us_per_listener_frame": 24.996,
+   "receivers_cpu23_busy_s_per_s": 0.012,
+   "cpu1_busy_s_per_s": 0.0015,
    "wire": {
-    "tx_bytes_per_s": 741881,
-    "tx_packets_per_s": 1000,
+    "tx_bytes_per_s": 74189,
+    "tx_packets_per_s": 100,
     "rx_bytes_per_s": 0,
     "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7418.8,
-    "rx_bytes_per_listener_s": 0.0,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 4428,
-    "sender_fds": 6,
-    "sender_threads": 4,
-    "receiver_rss_kb": 5212,
-    "slab_delta_kb_both_ends": -612,
-    "sunreclaim_delta_kb_both_ends": -484,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 3
-     },
-     "TCP": {
-      "inuse": 0,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 15,
-      "mem": 58
-     },
-     "UDP": {
-      "inuse": 1,
-      "mem": 495
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": null
-   },
-   "sender": {
-    "mode": "udp",
-    "n": 100,
-    "frames": 280,
-    "syscalls": 280,
-    "messages": 28000,
-    "bytes": 19600000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 368,
-    "enqueue_all_p99_us": 802,
-    "enqueue_all_max_us": 1937,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "udp",
-    "n": 100,
-    "attached": 100,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 28000,
-    "bytes": 19600000,
-    "errors": 0
-   },
-   "repeat": 1
-  },
-  {
-   "mode": "mcast",
-   "n": 100,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.003,
-   "setup_s": 0.03,
-   "sender_process_cpu_s_per_s": 0.002,
-   "sender_host_cpu0_busy_s_per_s": 0.006,
-   "sender_host_cpu0_softirq_s_per_s": 0.001,
-   "sender_host_us_per_listener_frame": 5.999,
-   "sender_process_us_per_listener_frame": 2.0,
-   "receivers_cpu23_busy_s_per_s": 0.015,
-   "cpu1_busy_s_per_s": 0.004,
-   "wire": {
-    "tx_bytes_per_s": 7419,
-    "tx_packets_per_s": 10,
-    "rx_bytes_per_s": 0,
-    "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 74.2,
+    "tx_bytes_per_listener_s": 7418.9,
     "rx_bytes_per_listener_s": 0.0,
     "tx_dropped": 0
    },
@@ -1546,456 +1344,9 @@
     "sender_rss_kb": 4552,
     "sender_fds": 6,
     "sender_threads": 4,
-    "receiver_rss_kb": 5204,
-    "slab_delta_kb_both_ends": -11952,
-    "sunreclaim_delta_kb_both_ends": -704,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 3
-     },
-     "TCP": {
-      "inuse": 0,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 15,
-      "mem": 58
-     },
-     "UDP": {
-      "inuse": 1,
-      "mem": 495
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": null
-   },
-   "sender": {
-    "mode": "mcast",
-    "n": 100,
-    "frames": 280,
-    "syscalls": 280,
-    "messages": 280,
-    "bytes": 196000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 44,
-    "enqueue_all_p99_us": 263,
-    "enqueue_all_max_us": 653,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "mcast",
-    "n": 100,
-    "attached": 100,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 28000,
-    "bytes": 19600000,
-    "errors": 0
-   },
-   "repeat": 1
-  },
-  {
-   "mode": "tcp",
-   "n": 1000,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.004,
-   "setup_s": 0.397,
-   "sender_process_cpu_s_per_s": 0.11847,
-   "sender_host_cpu0_busy_s_per_s": 0.12747,
-   "sender_host_cpu0_softirq_s_per_s": 0.08148,
-   "sender_host_us_per_listener_frame": 12.747,
-   "sender_process_us_per_listener_frame": 11.847,
-   "receivers_cpu23_busy_s_per_s": 0.19546,
-   "cpu1_busy_s_per_s": 0.009,
-   "wire": {
-    "tx_bytes_per_s": 7669890,
-    "tx_packets_per_s": 10013,
-    "rx_bytes_per_s": 660846,
-    "rx_packets_per_s": 10013,
-    "tx_bytes_per_listener_s": 7669.9,
-    "rx_bytes_per_listener_s": 660.8,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 5276,
-    "sender_fds": 1006,
-    "sender_threads": 4,
-    "receiver_rss_kb": 16708,
-    "slab_delta_kb_both_ends": 8064,
-    "sunreclaim_delta_kb_both_ends": 5292,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 1004
-     },
-     "TCP": {
-      "inuse": 1001,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 2016,
-      "mem": 570
-     },
-     "UDP": {
-      "inuse": 0,
-      "mem": 239
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": {
-     "sockets": 1000,
-     "r": 0,
-     "rb": 131072000,
-     "t": 0,
-     "tb": 69120000,
-     "f": 0,
-     "w": 0,
-     "o": 0,
-     "bl": 0,
-     "d": 0
-    }
-   },
-   "sender": {
-    "mode": "tcp",
-    "n": 1000,
-    "frames": 280,
-    "syscalls": 280000,
-    "messages": 280000,
-    "bytes": 196000000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 11344,
-    "enqueue_all_p99_us": 22390,
-    "enqueue_all_max_us": 93298,
-    "late_ticks": 1
-   },
-   "receiver": {
-    "mode": "tcp",
-    "n": 1000,
-    "attached": 1000,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 280000,
-    "bytes": 196000000,
-    "errors": 0
-   },
-   "repeat": 1
-  },
-  {
-   "mode": "udp",
-   "n": 1000,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.006,
-   "setup_s": 0.115,
-   "sender_process_cpu_s_per_s": 0.03999,
-   "sender_host_cpu0_busy_s_per_s": 0.04549,
-   "sender_host_cpu0_softirq_s_per_s": 0.02599,
-   "sender_host_us_per_listener_frame": 4.549,
-   "sender_process_us_per_listener_frame": 3.999,
-   "receivers_cpu23_busy_s_per_s": 0.08647,
-   "cpu1_busy_s_per_s": 0.0095,
-   "wire": {
-    "tx_bytes_per_s": 7417797,
-    "tx_packets_per_s": 9997,
-    "rx_bytes_per_s": 0,
-    "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7417.8,
-    "rx_bytes_per_listener_s": 0.0,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 4504,
-    "sender_fds": 6,
-    "sender_threads": 4,
-    "receiver_rss_kb": 10064,
-    "slab_delta_kb_both_ends": 1756,
-    "sunreclaim_delta_kb_both_ends": 1008,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 3
-     },
-     "TCP": {
-      "inuse": 0,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 15,
-      "mem": 58
-     },
-     "UDP": {
-      "inuse": 1,
-      "mem": 1007
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": null
-   },
-   "sender": {
-    "mode": "udp",
-    "n": 1000,
-    "frames": 280,
-    "syscalls": 280,
-    "messages": 280000,
-    "bytes": 196000000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 3703,
-    "enqueue_all_p99_us": 7171,
-    "enqueue_all_max_us": 7514,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "udp",
-    "n": 1000,
-    "attached": 1000,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 280000,
-    "bytes": 196000000,
-    "errors": 0
-   },
-   "repeat": 1
-  },
-  {
-   "mode": "mcast",
-   "n": 1000,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.005,
-   "setup_s": 0.099,
-   "sender_process_cpu_s_per_s": 0.002,
-   "sender_host_cpu0_busy_s_per_s": 0.012,
-   "sender_host_cpu0_softirq_s_per_s": 0.006,
-   "sender_host_us_per_listener_frame": 1.2,
-   "sender_process_us_per_listener_frame": 0.2,
-   "receivers_cpu23_busy_s_per_s": 0.02649,
-   "cpu1_busy_s_per_s": 0.006,
-   "wire": {
-    "tx_bytes_per_s": 7418,
-    "tx_packets_per_s": 10,
-    "rx_bytes_per_s": 0,
-    "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7.4,
-    "rx_bytes_per_listener_s": 0.0,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 4620,
-    "sender_fds": 6,
-    "sender_threads": 4,
-    "receiver_rss_kb": 9944,
-    "slab_delta_kb_both_ends": 1368,
-    "sunreclaim_delta_kb_both_ends": 876,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 3
-     },
-     "TCP": {
-      "inuse": 0,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 15,
-      "mem": 58
-     },
-     "UDP": {
-      "inuse": 1,
-      "mem": 1007
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": null
-   },
-   "sender": {
-    "mode": "mcast",
-    "n": 1000,
-    "frames": 280,
-    "syscalls": 280,
-    "messages": 280,
-    "bytes": 196000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 46,
-    "enqueue_all_p99_us": 273,
-    "enqueue_all_max_us": 1947,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "mcast",
-    "n": 1000,
-    "attached": 1000,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 280000,
-    "bytes": 196000000,
-    "errors": 0
-   },
-   "repeat": 1
-  },
-  {
-   "mode": "tcp",
-   "n": 5000,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.007,
-   "setup_s": 0.551,
-   "sender_process_cpu_s_per_s": 0.57881,
-   "sender_host_cpu0_busy_s_per_s": 0.6083,
-   "sender_host_cpu0_softirq_s_per_s": 0.40286,
-   "sender_host_us_per_listener_frame": 12.166,
-   "sender_process_us_per_listener_frame": 11.576,
-   "receivers_cpu23_busy_s_per_s": 0.94118,
-   "cpu1_busy_s_per_s": 0.01949,
-   "wire": {
-    "tx_bytes_per_s": 38289963,
-    "tx_packets_per_s": 49987,
-    "rx_bytes_per_s": 3299076,
-    "rx_packets_per_s": 49986,
-    "tx_bytes_per_listener_s": 7658.0,
-    "rx_bytes_per_listener_s": 659.8,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 7864,
-    "sender_fds": 5006,
-    "sender_threads": 4,
-    "receiver_rss_kb": 57308,
-    "slab_delta_kb_both_ends": 48128,
-    "sunreclaim_delta_kb_both_ends": 30232,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 5002
-     },
-     "TCP": {
-      "inuse": 5001,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 10014,
-      "mem": 58
-     },
-     "UDP": {
-      "inuse": 0,
-      "mem": 239
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": {
-     "sockets": 5000,
-     "r": 0,
-     "rb": 655360000,
-     "t": 0,
-     "tb": 345600000,
-     "f": 15384,
-     "w": 9192,
-     "o": 0,
-     "bl": 0,
-     "d": 0
-    }
-   },
-   "sender": {
-    "mode": "tcp",
-    "n": 5000,
-    "frames": 280,
-    "syscalls": 1400000,
-    "messages": 1400000,
-    "bytes": 980000000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 56826,
-    "enqueue_all_p99_us": 90052,
-    "enqueue_all_max_us": 96847,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "tcp",
-    "n": 5000,
-    "attached": 5000,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 1400000,
-    "bytes": 980000000,
-    "errors": 0
-   },
-   "repeat": 1
-  },
-  {
-   "mode": "udp",
-   "n": 5000,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.003,
-   "setup_s": 0.167,
-   "sender_process_cpu_s_per_s": 0.19197,
-   "sender_host_cpu0_busy_s_per_s": 0.20847,
-   "sender_host_cpu0_softirq_s_per_s": 0.11348,
-   "sender_host_us_per_listener_frame": 4.169,
-   "sender_process_us_per_listener_frame": 3.839,
-   "receivers_cpu23_busy_s_per_s": 0.43194,
-   "cpu1_busy_s_per_s": 0.0125,
-   "wire": {
-    "tx_bytes_per_s": 37136353,
-    "tx_packets_per_s": 50049,
-    "rx_bytes_per_s": 0,
-    "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7427.3,
-    "rx_bytes_per_listener_s": 0.0,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 4828,
-    "sender_fds": 6,
-    "sender_threads": 4,
-    "receiver_rss_kb": 31752,
-    "slab_delta_kb_both_ends": 19288,
-    "sunreclaim_delta_kb_both_ends": 11128,
+    "receiver_rss_kb": 4732,
+    "slab_delta_kb_both_ends": -500,
+    "sunreclaim_delta_kb_both_ends": -496,
     "sockstat_tx": {
      "sockets": {
       "used": 3
@@ -2005,11 +1356,11 @@
       "orphan": 0,
       "tw": 0,
       "alloc": 13,
-      "mem": 314
+      "mem": 0
      },
      "UDP": {
       "inuse": 1,
-      "mem": 5103
+      "mem": 256
      },
      "UDPLITE": {
       "inuse": 0
@@ -2026,114 +1377,36 @@
    },
    "sender": {
     "mode": "udp",
-    "n": 5000,
-    "frames": 280,
-    "syscalls": 1400,
-    "messages": 1400000,
-    "bytes": 980000000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 18322,
-    "enqueue_all_p99_us": 30661,
-    "enqueue_all_max_us": 55181,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "udp",
-    "n": 5000,
-    "attached": 5000,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 1400000,
-    "bytes": 980000000,
-    "errors": 0
-   },
-   "repeat": 1
-  },
-  {
-   "mode": "mcast",
-   "n": 5000,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.005,
-   "setup_s": 0.306,
-   "sender_process_cpu_s_per_s": 0.003,
-   "sender_host_cpu0_busy_s_per_s": 0.0175,
-   "sender_host_cpu0_softirq_s_per_s": 0.0105,
-   "sender_host_us_per_listener_frame": 0.35,
-   "sender_process_us_per_listener_frame": 0.06,
-   "receivers_cpu23_busy_s_per_s": 0.20445,
-   "cpu1_busy_s_per_s": 0.0045,
-   "wire": {
-    "tx_bytes_per_s": 7418,
-    "tx_packets_per_s": 10,
-    "rx_bytes_per_s": 0,
-    "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 1.5,
-    "rx_bytes_per_listener_s": 0.0,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 4556,
-    "sender_fds": 6,
-    "sender_threads": 4,
-    "receiver_rss_kb": 31000,
-    "slab_delta_kb_both_ends": 17008,
-    "sunreclaim_delta_kb_both_ends": 8624,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 3
-     },
-     "TCP": {
-      "inuse": 0,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 12,
-      "mem": 314
-     },
-     "UDP": {
-      "inuse": 1,
-      "mem": 5103
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": null
-   },
-   "sender": {
-    "mode": "mcast",
-    "n": 5000,
+    "n": 10,
     "frames": 280,
     "syscalls": 280,
-    "messages": 280,
-    "bytes": 196000,
+    "messages": 2800,
+    "bytes": 1960000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 49,
-    "enqueue_all_p99_us": 131,
-    "enqueue_all_max_us": 147,
+    "enqueue_all_p50_us": 95,
+    "enqueue_all_p99_us": 272,
+    "enqueue_all_max_us": 1514,
     "late_ticks": 0
    },
    "receiver": {
-    "mode": "mcast",
-    "n": 5000,
-    "attached": 5000,
+    "mode": "udp",
+    "n": 10,
+    "attached": 10,
     "min_frames": 280,
     "max_frames": 280,
-    "frames": 1400000,
-    "bytes": 980000000,
+    "frames": 2800,
+    "bytes": 1960000,
     "errors": 0
    },
-   "repeat": 1
+   "repeat": 1,
+   "block_order": [
+    "mcast",
+    "udp",
+    "tcp",
+    "idle"
+   ],
+   "position": 1
   },
   {
    "mode": "tcp",
@@ -2141,14 +1414,13 @@
    "rate": 10,
    "frame_bytes": 700,
    "measure_s": 20.003,
-   "setup_s": 0.31,
-   "sender_process_cpu_s_per_s": 0.003,
-   "sender_host_cpu0_busy_s_per_s": 0.007,
-   "sender_host_cpu0_softirq_s_per_s": 0.001,
-   "sender_host_us_per_listener_frame": 69.989,
-   "sender_process_us_per_listener_frame": 29.995,
-   "receivers_cpu23_busy_s_per_s": 0.007,
-   "cpu1_busy_s_per_s": 0.0035,
+   "setup_s": 0.306,
+   "sender_process_cpu_s_per_s": 0.0025,
+   "sender_host_cpu0_busy_s_per_s": 0.003,
+   "sender_host_cpu0_softirq_s_per_s": 0.0005,
+   "sender_process_us_per_listener_frame": 24.996,
+   "receivers_cpu23_busy_s_per_s": 0.008,
+   "cpu1_busy_s_per_s": 0.0025,
    "wire": {
     "tx_bytes_per_s": 76588,
     "tx_packets_per_s": 100,
@@ -2163,9 +1435,9 @@
     "sender_rss_kb": 4628,
     "sender_fds": 16,
     "sender_threads": 4,
-    "receiver_rss_kb": 4928,
-    "slab_delta_kb_both_ends": -864,
-    "sunreclaim_delta_kb_both_ends": -624,
+    "receiver_rss_kb": 4856,
+    "slab_delta_kb_both_ends": -88,
+    "sunreclaim_delta_kb_both_ends": -88,
     "sockstat_tx": {
      "sockets": {
       "used": 14
@@ -2174,12 +1446,12 @@
       "inuse": 11,
       "orphan": 0,
       "tw": 0,
-      "alloc": 33,
-      "mem": 314
+      "alloc": 34,
+      "mem": 0
      },
      "UDP": {
       "inuse": 0,
-      "mem": 495
+      "mem": 256
      },
      "UDPLITE": {
       "inuse": 0
@@ -2214,9 +1486,9 @@
     "bytes": 1960000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 115,
-    "enqueue_all_p99_us": 270,
-    "enqueue_all_max_us": 460,
+    "enqueue_all_p50_us": 107,
+    "enqueue_all_p99_us": 356,
+    "enqueue_all_max_us": 477,
     "late_ticks": 0
    },
    "receiver": {
@@ -2229,124 +1501,67 @@
     "bytes": 1960000,
     "errors": 0
    },
-   "repeat": 2
+   "repeat": 1,
+   "block_order": [
+    "mcast",
+    "udp",
+    "tcp",
+    "idle"
+   ],
+   "position": 2
   },
   {
-   "mode": "udp",
+   "mode": "idle",
    "n": 10,
    "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.003,
-   "setup_s": 0.011,
-   "sender_process_cpu_s_per_s": 0.003,
-   "sender_host_cpu0_busy_s_per_s": 0.0045,
-   "sender_host_cpu0_softirq_s_per_s": 0.001,
-   "sender_host_us_per_listener_frame": 44.993,
-   "sender_process_us_per_listener_frame": 29.996,
-   "receivers_cpu23_busy_s_per_s": 0.009,
-   "cpu1_busy_s_per_s": 0.0055,
-   "wire": {
-    "tx_bytes_per_s": 74189,
-    "tx_packets_per_s": 100,
-    "rx_bytes_per_s": 0,
-    "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7418.9,
-    "rx_bytes_per_listener_s": 0.0,
-    "tx_dropped": 0
+   "measure_s": 20.0,
+   "sender_host_cpu0_busy_s_per_s": 0.0035,
+   "cpu_busy_s_per_s": {
+    "cpu0": 0.0035,
+    "cpu1": 0.001,
+    "cpu2": 0.0045,
+    "cpu3": 0.004
    },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 4428,
-    "sender_fds": 6,
-    "sender_threads": 4,
-    "receiver_rss_kb": 4740,
-    "slab_delta_kb_both_ends": -140,
-    "sunreclaim_delta_kb_both_ends": -120,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 3
-     },
-     "TCP": {
-      "inuse": 0,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 12,
-      "mem": 314
-     },
-     "UDP": {
-      "inuse": 1,
-      "mem": 495
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": null
-   },
-   "sender": {
-    "mode": "udp",
-    "n": 10,
-    "frames": 280,
-    "syscalls": 280,
-    "messages": 2800,
-    "bytes": 1960000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 104,
-    "enqueue_all_p99_us": 200,
-    "enqueue_all_max_us": 556,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "udp",
-    "n": 10,
-    "attached": 10,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 2800,
-    "bytes": 1960000,
-    "errors": 0
-   },
-   "repeat": 2
+   "slab_delta_kb": -176,
+   "repeat": 1,
+   "block_order": [
+    "mcast",
+    "udp",
+    "tcp",
+    "idle"
+   ],
+   "position": 3
   },
   {
    "mode": "mcast",
-   "n": 10,
+   "n": 100,
    "rate": 10,
    "frame_bytes": 700,
    "measure_s": 20.003,
-   "setup_s": 0.01,
+   "setup_s": 0.027,
    "sender_process_cpu_s_per_s": 0.002,
-   "sender_host_cpu0_busy_s_per_s": 0.009,
-   "sender_host_cpu0_softirq_s_per_s": 0.0015,
-   "sender_host_us_per_listener_frame": 89.987,
-   "sender_process_us_per_listener_frame": 19.997,
-   "receivers_cpu23_busy_s_per_s": 0.0105,
+   "sender_host_cpu0_busy_s_per_s": 0.004,
+   "sender_host_cpu0_softirq_s_per_s": 0.0005,
+   "sender_process_us_per_listener_frame": 2.0,
+   "receivers_cpu23_busy_s_per_s": 0.007,
    "cpu1_busy_s_per_s": 0.0035,
    "wire": {
     "tx_bytes_per_s": 7419,
     "tx_packets_per_s": 10,
     "rx_bytes_per_s": 0,
     "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 741.9,
+    "tx_bytes_per_listener_s": 74.2,
     "rx_bytes_per_listener_s": 0.0,
     "tx_dropped": 0
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4612,
+    "sender_rss_kb": 4552,
     "sender_fds": 6,
     "sender_threads": 4,
-    "receiver_rss_kb": 4736,
-    "slab_delta_kb_both_ends": -276,
-    "sunreclaim_delta_kb_both_ends": -276,
+    "receiver_rss_kb": 5200,
+    "slab_delta_kb_both_ends": -304,
+    "sunreclaim_delta_kb_both_ends": -144,
     "sockstat_tx": {
      "sockets": {
       "used": 3
@@ -2355,12 +1570,12 @@
       "inuse": 0,
       "orphan": 0,
       "tw": 0,
-      "alloc": 12,
-      "mem": 314
+      "alloc": 13,
+      "mem": 0
      },
      "UDP": {
       "inuse": 1,
-      "mem": 495
+      "mem": 256
      },
      "UDPLITE": {
       "inuse": 0
@@ -2377,29 +1592,36 @@
    },
    "sender": {
     "mode": "mcast",
-    "n": 10,
+    "n": 100,
     "frames": 280,
     "syscalls": 280,
     "messages": 280,
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 47,
-    "enqueue_all_p99_us": 164,
-    "enqueue_all_max_us": 332,
+    "enqueue_all_p50_us": 37,
+    "enqueue_all_p99_us": 114,
+    "enqueue_all_max_us": 885,
     "late_ticks": 0
    },
    "receiver": {
     "mode": "mcast",
-    "n": 10,
-    "attached": 10,
+    "n": 100,
+    "attached": 100,
     "min_frames": 280,
     "max_frames": 280,
-    "frames": 2800,
-    "bytes": 1960000,
+    "frames": 28000,
+    "bytes": 19600000,
     "errors": 0
    },
-   "repeat": 2
+   "repeat": 1,
+   "block_order": [
+    "mcast",
+    "tcp",
+    "udp",
+    "idle"
+   ],
+   "position": 0
   },
   {
    "mode": "tcp",
@@ -2407,18 +1629,17 @@
    "rate": 10,
    "frame_bytes": 700,
    "measure_s": 20.003,
-   "setup_s": 0.328,
+   "setup_s": 0.322,
    "sender_process_cpu_s_per_s": 0.0125,
-   "sender_host_cpu0_busy_s_per_s": 0.013,
-   "sender_host_cpu0_softirq_s_per_s": 0.006,
-   "sender_host_us_per_listener_frame": 12.998,
+   "sender_host_cpu0_busy_s_per_s": 0.0045,
+   "sender_host_cpu0_softirq_s_per_s": 0.002,
    "sender_process_us_per_listener_frame": 12.498,
-   "receivers_cpu23_busy_s_per_s": 0.0195,
-   "cpu1_busy_s_per_s": 0.0075,
+   "receivers_cpu23_busy_s_per_s": 0.013,
+   "cpu1_busy_s_per_s": 0.004,
    "wire": {
-    "tx_bytes_per_s": 765877,
+    "tx_bytes_per_s": 765884,
     "tx_packets_per_s": 1000,
-    "rx_bytes_per_s": 65989,
+    "rx_bytes_per_s": 65990,
     "rx_packets_per_s": 1000,
     "tx_bytes_per_listener_s": 7658.8,
     "rx_bytes_per_listener_s": 659.9,
@@ -2429,9 +1650,9 @@
     "sender_rss_kb": 4692,
     "sender_fds": 106,
     "sender_threads": 4,
-    "receiver_rss_kb": 6108,
-    "slab_delta_kb_both_ends": -256,
-    "sunreclaim_delta_kb_both_ends": -272,
+    "receiver_rss_kb": 6152,
+    "slab_delta_kb_both_ends": -372,
+    "sunreclaim_delta_kb_both_ends": -276,
     "sockstat_tx": {
      "sockets": {
       "used": 104
@@ -2440,12 +1661,12 @@
       "inuse": 101,
       "orphan": 0,
       "tw": 0,
-      "alloc": 212,
-      "mem": 314
+      "alloc": 214,
+      "mem": 0
      },
      "UDP": {
       "inuse": 0,
-      "mem": 495
+      "mem": 256
      },
      "UDPLITE": {
       "inuse": 0
@@ -2480,9 +1701,9 @@
     "bytes": 19600000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 1050,
-    "enqueue_all_p99_us": 3079,
-    "enqueue_all_max_us": 4109,
+    "enqueue_all_p50_us": 1015,
+    "enqueue_all_p99_us": 2283,
+    "enqueue_all_max_us": 3752,
     "late_ticks": 0
    },
    "receiver": {
@@ -2495,39 +1716,45 @@
     "bytes": 19600000,
     "errors": 0
    },
-   "repeat": 2
+   "repeat": 1,
+   "block_order": [
+    "mcast",
+    "tcp",
+    "udp",
+    "idle"
+   ],
+   "position": 1
   },
   {
    "mode": "udp",
    "n": 100,
    "rate": 10,
    "frame_bytes": 700,
-   "measure_s": 20.007,
-   "setup_s": 0.025,
-   "sender_process_cpu_s_per_s": 0.006,
-   "sender_host_cpu0_busy_s_per_s": 0.0055,
-   "sender_host_cpu0_softirq_s_per_s": 0.0025,
-   "sender_host_us_per_listener_frame": 5.498,
-   "sender_process_us_per_listener_frame": 5.998,
-   "receivers_cpu23_busy_s_per_s": 0.0085,
-   "cpu1_busy_s_per_s": 0.007,
+   "measure_s": 20.005,
+   "setup_s": 0.023,
+   "sender_process_cpu_s_per_s": 0.0055,
+   "sender_host_cpu0_busy_s_per_s": 0.0025,
+   "sender_host_cpu0_softirq_s_per_s": 0.001,
+   "sender_process_us_per_listener_frame": 5.499,
+   "receivers_cpu23_busy_s_per_s": 0.01,
+   "cpu1_busy_s_per_s": 0.002,
    "wire": {
-    "tx_bytes_per_s": 741741,
+    "tx_bytes_per_s": 741801,
     "tx_packets_per_s": 1000,
     "rx_bytes_per_s": 0,
     "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7417.4,
+    "tx_bytes_per_listener_s": 7418.0,
     "rx_bytes_per_listener_s": 0.0,
     "tx_dropped": 0
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4432,
+    "sender_rss_kb": 4436,
     "sender_fds": 6,
     "sender_threads": 4,
-    "receiver_rss_kb": 5212,
-    "slab_delta_kb_both_ends": -112,
-    "sunreclaim_delta_kb_both_ends": 20,
+    "receiver_rss_kb": 5228,
+    "slab_delta_kb_both_ends": -464,
+    "sunreclaim_delta_kb_both_ends": -376,
     "sockstat_tx": {
      "sockets": {
       "used": 3
@@ -2536,12 +1763,12 @@
       "inuse": 0,
       "orphan": 0,
       "tw": 0,
-      "alloc": 11,
-      "mem": 58
+      "alloc": 13,
+      "mem": 0
      },
      "UDP": {
       "inuse": 1,
-      "mem": 495
+      "mem": 256
      },
      "UDPLITE": {
       "inuse": 0
@@ -2565,9 +1792,9 @@
     "bytes": 19600000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 392,
-    "enqueue_all_p99_us": 901,
-    "enqueue_all_max_us": 1264,
+    "enqueue_all_p50_us": 410,
+    "enqueue_all_p99_us": 1383,
+    "enqueue_all_max_us": 3324,
     "late_ticks": 0
    },
    "receiver": {
@@ -2580,124 +1807,67 @@
     "bytes": 19600000,
     "errors": 0
    },
-   "repeat": 2
+   "repeat": 1,
+   "block_order": [
+    "mcast",
+    "tcp",
+    "udp",
+    "idle"
+   ],
+   "position": 2
   },
   {
-   "mode": "mcast",
+   "mode": "idle",
    "n": 100,
    "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.003,
-   "setup_s": 0.036,
-   "sender_process_cpu_s_per_s": 0.002,
-   "sender_host_cpu0_busy_s_per_s": 0.011,
-   "sender_host_cpu0_softirq_s_per_s": 0.0055,
-   "sender_host_us_per_listener_frame": 10.998,
-   "sender_process_us_per_listener_frame": 2.0,
-   "receivers_cpu23_busy_s_per_s": 0.0265,
-   "cpu1_busy_s_per_s": 0.005,
-   "wire": {
-    "tx_bytes_per_s": 7419,
-    "tx_packets_per_s": 10,
-    "rx_bytes_per_s": 0,
-    "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 74.2,
-    "rx_bytes_per_listener_s": 0.0,
-    "tx_dropped": 0
+   "measure_s": 20.0,
+   "sender_host_cpu0_busy_s_per_s": 0.0005,
+   "cpu_busy_s_per_s": {
+    "cpu0": 0.0005,
+    "cpu1": 0.0025,
+    "cpu2": 0.0055,
+    "cpu3": 0.001
    },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 4428,
-    "sender_fds": 6,
-    "sender_threads": 4,
-    "receiver_rss_kb": 5204,
-    "slab_delta_kb_both_ends": -164,
-    "sunreclaim_delta_kb_both_ends": -148,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 3
-     },
-     "TCP": {
-      "inuse": 0,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 11,
-      "mem": 58
-     },
-     "UDP": {
-      "inuse": 1,
-      "mem": 495
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": null
-   },
-   "sender": {
-    "mode": "mcast",
-    "n": 100,
-    "frames": 280,
-    "syscalls": 280,
-    "messages": 280,
-    "bytes": 196000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 47,
-    "enqueue_all_p99_us": 151,
-    "enqueue_all_max_us": 261,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "mcast",
-    "n": 100,
-    "attached": 100,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 28000,
-    "bytes": 19600000,
-    "errors": 0
-   },
-   "repeat": 2
+   "slab_delta_kb": -172,
+   "repeat": 1,
+   "block_order": [
+    "mcast",
+    "tcp",
+    "udp",
+    "idle"
+   ],
+   "position": 3
   },
   {
    "mode": "tcp",
    "n": 1000,
    "rate": 10,
    "frame_bytes": 700,
-   "measure_s": 20.008,
-   "setup_s": 0.399,
-   "sender_process_cpu_s_per_s": 0.12345,
-   "sender_host_cpu0_busy_s_per_s": 0.12995,
-   "sender_host_cpu0_softirq_s_per_s": 0.08397,
-   "sender_host_us_per_listener_frame": 12.995,
-   "sender_process_us_per_listener_frame": 12.345,
-   "receivers_cpu23_busy_s_per_s": 0.19092,
-   "cpu1_busy_s_per_s": 0.01449,
+   "measure_s": 20.003,
+   "setup_s": 0.44,
+   "sender_process_cpu_s_per_s": 0.11398,
+   "sender_host_cpu0_busy_s_per_s": 0.11748,
+   "sender_host_cpu0_softirq_s_per_s": 0.07049,
+   "sender_process_us_per_listener_frame": 11.398,
+   "receivers_cpu23_busy_s_per_s": 0.17547,
+   "cpu1_busy_s_per_s": 0.009,
    "wire": {
-    "tx_bytes_per_s": 7678946,
-    "tx_packets_per_s": 10025,
-    "rx_bytes_per_s": 661590,
-    "rx_packets_per_s": 10024,
-    "tx_bytes_per_listener_s": 7678.9,
-    "rx_bytes_per_listener_s": 661.6,
+    "tx_bytes_per_s": 7671643,
+    "tx_packets_per_s": 10015,
+    "rx_bytes_per_s": 660967,
+    "rx_packets_per_s": 10015,
+    "tx_bytes_per_listener_s": 7671.6,
+    "rx_bytes_per_listener_s": 661.0,
     "tx_dropped": 0
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 5276,
+    "sender_rss_kb": 5268,
     "sender_fds": 1006,
     "sender_threads": 4,
-    "receiver_rss_kb": 16668,
-    "slab_delta_kb_both_ends": 7636,
-    "sunreclaim_delta_kb_both_ends": 4948,
+    "receiver_rss_kb": 16708,
+    "slab_delta_kb_both_ends": 8420,
+    "sunreclaim_delta_kb_both_ends": 5396,
     "sockstat_tx": {
      "sockets": {
       "used": 1004
@@ -2706,12 +1876,12 @@
       "inuse": 1001,
       "orphan": 0,
       "tw": 0,
-      "alloc": 2012,
-      "mem": 314
+      "alloc": 2014,
+      "mem": 0
      },
      "UDP": {
       "inuse": 0,
-      "mem": 495
+      "mem": 256
      },
      "UDPLITE": {
       "inuse": 0
@@ -2746,9 +1916,9 @@
     "bytes": 196000000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 11640,
-    "enqueue_all_p99_us": 19621,
-    "enqueue_all_max_us": 21343,
+    "enqueue_all_p50_us": 11049,
+    "enqueue_all_p99_us": 22544,
+    "enqueue_all_max_us": 30789,
     "late_ticks": 0
    },
    "receiver": {
@@ -2761,39 +1931,67 @@
     "bytes": 196000000,
     "errors": 0
    },
-   "repeat": 2
+   "repeat": 1,
+   "block_order": [
+    "tcp",
+    "idle",
+    "mcast",
+    "udp"
+   ],
+   "position": 0
   },
   {
-   "mode": "udp",
+   "mode": "idle",
+   "n": 1000,
+   "rate": 10,
+   "measure_s": 20.0,
+   "sender_host_cpu0_busy_s_per_s": 0.0025,
+   "cpu_busy_s_per_s": {
+    "cpu0": 0.0025,
+    "cpu1": 0.0025,
+    "cpu2": 0.0035,
+    "cpu3": 0.0025
+   },
+   "slab_delta_kb": -1032,
+   "repeat": 1,
+   "block_order": [
+    "tcp",
+    "idle",
+    "mcast",
+    "udp"
+   ],
+   "position": 1
+  },
+  {
+   "mode": "mcast",
    "n": 1000,
    "rate": 10,
    "frame_bytes": 700,
-   "measure_s": 20.006,
-   "setup_s": 0.112,
-   "sender_process_cpu_s_per_s": 0.04199,
-   "sender_host_cpu0_busy_s_per_s": 0.05349,
-   "sender_host_cpu0_softirq_s_per_s": 0.02799,
-   "sender_host_us_per_listener_frame": 5.349,
-   "sender_process_us_per_listener_frame": 4.199,
-   "receivers_cpu23_busy_s_per_s": 0.10447,
-   "cpu1_busy_s_per_s": 0.0065,
+   "measure_s": 20.003,
+   "setup_s": 0.083,
+   "sender_process_cpu_s_per_s": 0.002,
+   "sender_host_cpu0_busy_s_per_s": 0.006,
+   "sender_host_cpu0_softirq_s_per_s": 0.002,
+   "sender_process_us_per_listener_frame": 0.2,
+   "receivers_cpu23_busy_s_per_s": 0.0265,
+   "cpu1_busy_s_per_s": 0.003,
    "wire": {
-    "tx_bytes_per_s": 7417953,
-    "tx_packets_per_s": 9997,
+    "tx_bytes_per_s": 7419,
+    "tx_packets_per_s": 10,
     "rx_bytes_per_s": 0,
     "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7418.0,
+    "tx_bytes_per_listener_s": 7.4,
     "rx_bytes_per_listener_s": 0.0,
     "tx_dropped": 0
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4508,
+    "sender_rss_kb": 4432,
     "sender_fds": 6,
     "sender_threads": 4,
-    "receiver_rss_kb": 9964,
-    "slab_delta_kb_both_ends": 1472,
-    "sunreclaim_delta_kb_both_ends": 932,
+    "receiver_rss_kb": 9960,
+    "slab_delta_kb_both_ends": 2484,
+    "sunreclaim_delta_kb_both_ends": 1256,
     "sockstat_tx": {
      "sockets": {
       "used": 3
@@ -2802,12 +2000,103 @@
       "inuse": 0,
       "orphan": 0,
       "tw": 0,
-      "alloc": 11,
-      "mem": 58
+      "alloc": 13,
+      "mem": 0
      },
      "UDP": {
       "inuse": 1,
-      "mem": 1007
+      "mem": 1280
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": null
+   },
+   "sender": {
+    "mode": "mcast",
+    "n": 1000,
+    "frames": 280,
+    "syscalls": 280,
+    "messages": 280,
+    "bytes": 196000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 37,
+    "enqueue_all_p99_us": 195,
+    "enqueue_all_max_us": 73990,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "mcast",
+    "n": 1000,
+    "attached": 1000,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 280000,
+    "bytes": 196000000,
+    "errors": 0
+   },
+   "repeat": 1,
+   "block_order": [
+    "tcp",
+    "idle",
+    "mcast",
+    "udp"
+   ],
+   "position": 2
+  },
+  {
+   "mode": "udp",
+   "n": 1000,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.003,
+   "setup_s": 0.1,
+   "sender_process_cpu_s_per_s": 0.03849,
+   "sender_host_cpu0_busy_s_per_s": 0.04049,
+   "sender_host_cpu0_softirq_s_per_s": 0.0225,
+   "sender_process_us_per_listener_frame": 3.849,
+   "receivers_cpu23_busy_s_per_s": 0.08849,
+   "cpu1_busy_s_per_s": 0.006,
+   "wire": {
+    "tx_bytes_per_s": 7440382,
+    "tx_packets_per_s": 10027,
+    "rx_bytes_per_s": 0,
+    "rx_packets_per_s": 0,
+    "tx_bytes_per_listener_s": 7440.4,
+    "rx_bytes_per_listener_s": 0.0,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 4500,
+    "sender_fds": 6,
+    "sender_threads": 4,
+    "receiver_rss_kb": 9968,
+    "slab_delta_kb_both_ends": 2244,
+    "sunreclaim_delta_kb_both_ends": 1184,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 3
+     },
+     "TCP": {
+      "inuse": 0,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 13,
+      "mem": 0
+     },
+     "UDP": {
+      "inuse": 1,
+      "mem": 1024
      },
      "UDPLITE": {
       "inuse": 0
@@ -2831,9 +2120,9 @@
     "bytes": 196000000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 3750,
-    "enqueue_all_p99_us": 6450,
-    "enqueue_all_max_us": 8665,
+    "enqueue_all_p50_us": 3670,
+    "enqueue_all_p99_us": 6731,
+    "enqueue_all_max_us": 8159,
     "late_ticks": 0
    },
    "receiver": {
@@ -2846,39 +2135,45 @@
     "bytes": 196000000,
     "errors": 0
    },
-   "repeat": 2
+   "repeat": 1,
+   "block_order": [
+    "tcp",
+    "idle",
+    "mcast",
+    "udp"
+   ],
+   "position": 3
   },
   {
-   "mode": "mcast",
-   "n": 1000,
+   "mode": "udp",
+   "n": 5000,
    "rate": 10,
    "frame_bytes": 700,
    "measure_s": 20.003,
-   "setup_s": 0.098,
-   "sender_process_cpu_s_per_s": 0.0025,
-   "sender_host_cpu0_busy_s_per_s": 0.0145,
-   "sender_host_cpu0_softirq_s_per_s": 0.0065,
-   "sender_host_us_per_listener_frame": 1.45,
-   "sender_process_us_per_listener_frame": 0.25,
-   "receivers_cpu23_busy_s_per_s": 0.05249,
-   "cpu1_busy_s_per_s": 0.004,
+   "setup_s": 0.189,
+   "sender_process_cpu_s_per_s": 0.17248,
+   "sender_host_cpu0_busy_s_per_s": 0.16648,
+   "sender_host_cpu0_softirq_s_per_s": 0.08899,
+   "sender_process_us_per_listener_frame": 3.45,
+   "receivers_cpu23_busy_s_per_s": 0.40144,
+   "cpu1_busy_s_per_s": 0.0085,
    "wire": {
-    "tx_bytes_per_s": 7419,
-    "tx_packets_per_s": 10,
-    "rx_bytes_per_s": 0,
+    "tx_bytes_per_s": 37173787,
+    "tx_packets_per_s": 50099,
+    "rx_bytes_per_s": 2,
     "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7.4,
+    "tx_bytes_per_listener_s": 7434.8,
     "rx_bytes_per_listener_s": 0.0,
     "tx_dropped": 0
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4556,
+    "sender_rss_kb": 4824,
     "sender_fds": 6,
     "sender_threads": 4,
-    "receiver_rss_kb": 9952,
-    "slab_delta_kb_both_ends": 1184,
-    "sunreclaim_delta_kb_both_ends": 676,
+    "receiver_rss_kb": 31892,
+    "slab_delta_kb_both_ends": 24356,
+    "sunreclaim_delta_kb_both_ends": 15832,
     "sockstat_tx": {
      "sockets": {
       "used": 3
@@ -2888,192 +2183,11 @@
       "orphan": 0,
       "tw": 0,
       "alloc": 13,
-      "mem": 53
+      "mem": 0
      },
      "UDP": {
       "inuse": 1,
-      "mem": 1263
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": null
-   },
-   "sender": {
-    "mode": "mcast",
-    "n": 1000,
-    "frames": 280,
-    "syscalls": 280,
-    "messages": 280,
-    "bytes": 196000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 46,
-    "enqueue_all_p99_us": 156,
-    "enqueue_all_max_us": 247,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "mcast",
-    "n": 1000,
-    "attached": 1000,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 280000,
-    "bytes": 196000000,
-    "errors": 0
-   },
-   "repeat": 2
-  },
-  {
-   "mode": "tcp",
-   "n": 5000,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.004,
-   "setup_s": 0.562,
-   "sender_process_cpu_s_per_s": 0.57588,
-   "sender_host_cpu0_busy_s_per_s": 0.60138,
-   "sender_host_cpu0_softirq_s_per_s": 0.40242,
-   "sender_host_us_per_listener_frame": 12.028,
-   "sender_process_us_per_listener_frame": 11.518,
-   "receivers_cpu23_busy_s_per_s": 0.92581,
-   "cpu1_busy_s_per_s": 0.0215,
-   "wire": {
-    "tx_bytes_per_s": 38305909,
-    "tx_packets_per_s": 50008,
-    "rx_bytes_per_s": 3300950,
-    "rx_packets_per_s": 50014,
-    "tx_bytes_per_listener_s": 7661.2,
-    "rx_bytes_per_listener_s": 660.2,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 7860,
-    "sender_fds": 5006,
-    "sender_threads": 4,
-    "receiver_rss_kb": 50936,
-    "slab_delta_kb_both_ends": 48700,
-    "sunreclaim_delta_kb_both_ends": 30532,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 5002
-     },
-     "TCP": {
-      "inuse": 5001,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 10015,
-      "mem": 309
-     },
-     "UDP": {
-      "inuse": 0,
-      "mem": 495
-     },
-     "UDPLITE": {
-      "inuse": 0
-     },
-     "RAW": {
-      "inuse": 0
-     },
-     "FRAG": {
-      "inuse": 0,
-      "memory": 0
-     }
-    },
-    "ss_skmem_tx": {
-     "sockets": 5000,
-     "r": 0,
-     "rb": 655360000,
-     "t": 1532,
-     "tb": 345600000,
-     "f": 179480,
-     "w": 107240,
-     "o": 0,
-     "bl": 0,
-     "d": 0
-    }
-   },
-   "sender": {
-    "mode": "tcp",
-    "n": 5000,
-    "frames": 280,
-    "syscalls": 1400000,
-    "messages": 1400000,
-    "bytes": 980000000,
-    "errors": 0,
-    "short_writes": 0,
-    "enqueue_all_p50_us": 56513,
-    "enqueue_all_p99_us": 85910,
-    "enqueue_all_max_us": 86011,
-    "late_ticks": 0
-   },
-   "receiver": {
-    "mode": "tcp",
-    "n": 5000,
-    "attached": 5000,
-    "min_frames": 280,
-    "max_frames": 280,
-    "frames": 1400000,
-    "bytes": 980000000,
-    "errors": 0
-   },
-   "repeat": 2
-  },
-  {
-   "mode": "udp",
-   "n": 5000,
-   "rate": 10,
-   "frame_bytes": 700,
-   "measure_s": 20.003,
-   "setup_s": 0.147,
-   "sender_process_cpu_s_per_s": 0.19447,
-   "sender_host_cpu0_busy_s_per_s": 0.20347,
-   "sender_host_cpu0_softirq_s_per_s": 0.10898,
-   "sender_host_us_per_listener_frame": 4.069,
-   "sender_process_us_per_listener_frame": 3.889,
-   "receivers_cpu23_busy_s_per_s": 0.43243,
-   "cpu1_busy_s_per_s": 0.013,
-   "wire": {
-    "tx_bytes_per_s": 37110691,
-    "tx_packets_per_s": 50014,
-    "rx_bytes_per_s": 0,
-    "rx_packets_per_s": 0,
-    "tx_bytes_per_listener_s": 7422.1,
-    "rx_bytes_per_listener_s": 0.0,
-    "tx_dropped": 0
-   },
-   "softnet_drops": 0,
-   "memory": {
-    "sender_rss_kb": 4824,
-    "sender_fds": 6,
-    "sender_threads": 4,
-    "receiver_rss_kb": 31732,
-    "slab_delta_kb_both_ends": 15144,
-    "sunreclaim_delta_kb_both_ends": 6848,
-    "sockstat_tx": {
-     "sockets": {
-      "used": 3
-     },
-     "TCP": {
-      "inuse": 0,
-      "orphan": 0,
-      "tw": 0,
-      "alloc": 14,
-      "mem": 309
-     },
-     "UDP": {
-      "inuse": 1,
-      "mem": 4847
+      "mem": 4864
      },
      "UDPLITE": {
       "inuse": 0
@@ -3097,9 +2211,9 @@
     "bytes": 980000000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 18501,
-    "enqueue_all_p99_us": 30296,
-    "enqueue_all_max_us": 40433,
+    "enqueue_all_p50_us": 17128,
+    "enqueue_all_p99_us": 28278,
+    "enqueue_all_max_us": 29328,
     "late_ticks": 0
    },
    "receiver": {
@@ -3112,7 +2226,14 @@
     "bytes": 980000000,
     "errors": 0
    },
-   "repeat": 2
+   "repeat": 1,
+   "block_order": [
+    "udp",
+    "mcast",
+    "tcp",
+    "idle"
+   ],
+   "position": 0
   },
   {
    "mode": "mcast",
@@ -3120,14 +2241,13 @@
    "rate": 10,
    "frame_bytes": 700,
    "measure_s": 20.006,
-   "setup_s": 0.298,
-   "sender_process_cpu_s_per_s": 0.0025,
-   "sender_host_cpu0_busy_s_per_s": 0.01899,
-   "sender_host_cpu0_softirq_s_per_s": 0.012,
-   "sender_host_us_per_listener_frame": 0.38,
-   "sender_process_us_per_listener_frame": 0.05,
-   "receivers_cpu23_busy_s_per_s": 0.20694,
-   "cpu1_busy_s_per_s": 0.0085,
+   "setup_s": 0.321,
+   "sender_process_cpu_s_per_s": 0.002,
+   "sender_host_cpu0_busy_s_per_s": 0.04599,
+   "sender_host_cpu0_softirq_s_per_s": 0.0145,
+   "sender_process_us_per_listener_frame": 0.04,
+   "receivers_cpu23_busy_s_per_s": 0.19345,
+   "cpu1_busy_s_per_s": 0.03399,
    "wire": {
     "tx_bytes_per_s": 7418,
     "tx_packets_per_s": 10,
@@ -3139,12 +2259,12 @@
    },
    "softnet_drops": 0,
    "memory": {
-    "sender_rss_kb": 4492,
+    "sender_rss_kb": 4540,
     "sender_fds": 6,
     "sender_threads": 4,
-    "receiver_rss_kb": 31004,
-    "slab_delta_kb_both_ends": 16572,
-    "sunreclaim_delta_kb_both_ends": 8548,
+    "receiver_rss_kb": 30964,
+    "slab_delta_kb_both_ends": 12260,
+    "sunreclaim_delta_kb_both_ends": 7748,
     "sockstat_tx": {
      "sockets": {
       "used": 3
@@ -3153,12 +2273,12 @@
       "inuse": 0,
       "orphan": 0,
       "tw": 0,
-      "alloc": 14,
-      "mem": 309
+      "alloc": 17,
+      "mem": 412
      },
      "UDP": {
       "inuse": 1,
-      "mem": 5359
+      "mem": 5120
      },
      "UDPLITE": {
       "inuse": 0
@@ -3182,9 +2302,9 @@
     "bytes": 196000,
     "errors": 0,
     "short_writes": 0,
-    "enqueue_all_p50_us": 46,
-    "enqueue_all_p99_us": 120,
-    "enqueue_all_max_us": 166,
+    "enqueue_all_p50_us": 38,
+    "enqueue_all_p99_us": 137,
+    "enqueue_all_max_us": 232,
     "late_ticks": 0
    },
    "receiver": {
@@ -3197,7 +2317,1362 @@
     "bytes": 980000000,
     "errors": 0
    },
-   "repeat": 2
+   "repeat": 1,
+   "block_order": [
+    "udp",
+    "mcast",
+    "tcp",
+    "idle"
+   ],
+   "position": 1
+  },
+  {
+   "mode": "tcp",
+   "n": 5000,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.004,
+   "setup_s": 0.526,
+   "sender_process_cpu_s_per_s": 0.57838,
+   "sender_host_cpu0_busy_s_per_s": 0.60187,
+   "sender_host_cpu0_softirq_s_per_s": 0.38892,
+   "sender_process_us_per_listener_frame": 11.568,
+   "receivers_cpu23_busy_s_per_s": 0.9233,
+   "cpu1_busy_s_per_s": 0.04149,
+   "wire": {
+    "tx_bytes_per_s": 38296171,
+    "tx_packets_per_s": 49995,
+    "rx_bytes_per_s": 3299657,
+    "rx_packets_per_s": 49995,
+    "tx_bytes_per_listener_s": 7659.2,
+    "rx_bytes_per_listener_s": 659.9,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 7852,
+    "sender_fds": 5006,
+    "sender_threads": 4,
+    "receiver_rss_kb": 55100,
+    "slab_delta_kb_both_ends": 48164,
+    "sunreclaim_delta_kb_both_ends": 30076,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 5004
+     },
+     "TCP": {
+      "inuse": 5001,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 10018,
+      "mem": 117
+     },
+     "UDP": {
+      "inuse": 0,
+      "mem": 256
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": {
+     "sockets": 5000,
+     "r": 0,
+     "rb": 655360000,
+     "t": 4596,
+     "tb": 345600000,
+     "f": 20512,
+     "w": 12256,
+     "o": 0,
+     "bl": 0,
+     "d": 0
+    }
+   },
+   "sender": {
+    "mode": "tcp",
+    "n": 5000,
+    "frames": 280,
+    "syscalls": 1400000,
+    "messages": 1400000,
+    "bytes": 980000000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 56081,
+    "enqueue_all_p99_us": 89720,
+    "enqueue_all_max_us": 94328,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "tcp",
+    "n": 5000,
+    "attached": 5000,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 1400000,
+    "bytes": 980000000,
+    "errors": 0
+   },
+   "repeat": 1,
+   "block_order": [
+    "udp",
+    "mcast",
+    "tcp",
+    "idle"
+   ],
+   "position": 2
+  },
+  {
+   "mode": "idle",
+   "n": 5000,
+   "rate": 10,
+   "measure_s": 20.0,
+   "sender_host_cpu0_busy_s_per_s": 0.017,
+   "cpu_busy_s_per_s": {
+    "cpu0": 0.017,
+    "cpu1": 0.009,
+    "cpu2": 0.0295,
+    "cpu3": 0.024
+   },
+   "slab_delta_kb": -2040,
+   "repeat": 1,
+   "block_order": [
+    "udp",
+    "mcast",
+    "tcp",
+    "idle"
+   ],
+   "position": 3
+  },
+  {
+   "mode": "tcp",
+   "n": 10,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.003,
+   "setup_s": 0.307,
+   "sender_process_cpu_s_per_s": 0.003,
+   "sender_host_cpu0_busy_s_per_s": 0.0025,
+   "sender_host_cpu0_softirq_s_per_s": 0.001,
+   "sender_process_us_per_listener_frame": 29.995,
+   "receivers_cpu23_busy_s_per_s": 0.0095,
+   "cpu1_busy_s_per_s": 0.0045,
+   "wire": {
+    "tx_bytes_per_s": 76588,
+    "tx_packets_per_s": 100,
+    "rx_bytes_per_s": 6599,
+    "rx_packets_per_s": 100,
+    "tx_bytes_per_listener_s": 7658.8,
+    "rx_bytes_per_listener_s": 659.9,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 4624,
+    "sender_fds": 16,
+    "sender_threads": 4,
+    "receiver_rss_kb": 4928,
+    "slab_delta_kb_both_ends": -144,
+    "sunreclaim_delta_kb_both_ends": -144,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 14
+     },
+     "TCP": {
+      "inuse": 11,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 38,
+      "mem": 104
+     },
+     "UDP": {
+      "inuse": 0,
+      "mem": 256
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": {
+     "sockets": 10,
+     "r": 0,
+     "rb": 1310720,
+     "t": 0,
+     "tb": 691200,
+     "f": 0,
+     "w": 0,
+     "o": 0,
+     "bl": 0,
+     "d": 0
+    }
+   },
+   "sender": {
+    "mode": "tcp",
+    "n": 10,
+    "frames": 280,
+    "syscalls": 2800,
+    "messages": 2800,
+    "bytes": 1960000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 106,
+    "enqueue_all_p99_us": 306,
+    "enqueue_all_max_us": 380,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "tcp",
+    "n": 10,
+    "attached": 10,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 2800,
+    "bytes": 1960000,
+    "errors": 0
+   },
+   "repeat": 2,
+   "block_order": [
+    "tcp",
+    "udp",
+    "mcast",
+    "idle"
+   ],
+   "position": 0
+  },
+  {
+   "mode": "udp",
+   "n": 10,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.003,
+   "setup_s": 0.01,
+   "sender_process_cpu_s_per_s": 0.0025,
+   "sender_host_cpu0_busy_s_per_s": 0.005,
+   "sender_host_cpu0_softirq_s_per_s": 0.0015,
+   "sender_process_us_per_listener_frame": 24.996,
+   "receivers_cpu23_busy_s_per_s": 0.0085,
+   "cpu1_busy_s_per_s": 0.002,
+   "wire": {
+    "tx_bytes_per_s": 74191,
+    "tx_packets_per_s": 100,
+    "rx_bytes_per_s": 2,
+    "rx_packets_per_s": 0,
+    "tx_bytes_per_listener_s": 7419.1,
+    "rx_bytes_per_listener_s": 0.2,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 4428,
+    "sender_fds": 6,
+    "sender_threads": 4,
+    "receiver_rss_kb": 4724,
+    "slab_delta_kb_both_ends": -416,
+    "sunreclaim_delta_kb_both_ends": -416,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 3
+     },
+     "TCP": {
+      "inuse": 0,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 17,
+      "mem": 104
+     },
+     "UDP": {
+      "inuse": 1,
+      "mem": 256
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": null
+   },
+   "sender": {
+    "mode": "udp",
+    "n": 10,
+    "frames": 280,
+    "syscalls": 280,
+    "messages": 2800,
+    "bytes": 1960000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 101,
+    "enqueue_all_p99_us": 233,
+    "enqueue_all_max_us": 5790,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "udp",
+    "n": 10,
+    "attached": 10,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 2800,
+    "bytes": 1960000,
+    "errors": 0
+   },
+   "repeat": 2,
+   "block_order": [
+    "tcp",
+    "udp",
+    "mcast",
+    "idle"
+   ],
+   "position": 1
+  },
+  {
+   "mode": "mcast",
+   "n": 10,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.003,
+   "setup_s": 0.011,
+   "sender_process_cpu_s_per_s": 0.0015,
+   "sender_host_cpu0_busy_s_per_s": 0.003,
+   "sender_host_cpu0_softirq_s_per_s": 0.0005,
+   "sender_process_us_per_listener_frame": 14.998,
+   "receivers_cpu23_busy_s_per_s": 0.0095,
+   "cpu1_busy_s_per_s": 0.0055,
+   "wire": {
+    "tx_bytes_per_s": 7419,
+    "tx_packets_per_s": 10,
+    "rx_bytes_per_s": 0,
+    "rx_packets_per_s": 0,
+    "tx_bytes_per_listener_s": 741.9,
+    "rx_bytes_per_listener_s": 0.0,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 4544,
+    "sender_fds": 6,
+    "sender_threads": 4,
+    "receiver_rss_kb": 4728,
+    "slab_delta_kb_both_ends": -456,
+    "sunreclaim_delta_kb_both_ends": -376,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 3
+     },
+     "TCP": {
+      "inuse": 0,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 17,
+      "mem": 104
+     },
+     "UDP": {
+      "inuse": 1,
+      "mem": 256
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": null
+   },
+   "sender": {
+    "mode": "mcast",
+    "n": 10,
+    "frames": 280,
+    "syscalls": 280,
+    "messages": 280,
+    "bytes": 196000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 36,
+    "enqueue_all_p99_us": 130,
+    "enqueue_all_max_us": 255,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "mcast",
+    "n": 10,
+    "attached": 10,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 2800,
+    "bytes": 1960000,
+    "errors": 0
+   },
+   "repeat": 2,
+   "block_order": [
+    "tcp",
+    "udp",
+    "mcast",
+    "idle"
+   ],
+   "position": 2
+  },
+  {
+   "mode": "idle",
+   "n": 10,
+   "rate": 10,
+   "measure_s": 20.0,
+   "sender_host_cpu0_busy_s_per_s": 0.0045,
+   "cpu_busy_s_per_s": {
+    "cpu0": 0.0045,
+    "cpu1": 0.004,
+    "cpu2": 0.01,
+    "cpu3": 0.007
+   },
+   "slab_delta_kb": -108,
+   "repeat": 2,
+   "block_order": [
+    "tcp",
+    "udp",
+    "mcast",
+    "idle"
+   ],
+   "position": 3
+  },
+  {
+   "mode": "tcp",
+   "n": 100,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.003,
+   "setup_s": 0.325,
+   "sender_process_cpu_s_per_s": 0.0135,
+   "sender_host_cpu0_busy_s_per_s": 0.01,
+   "sender_host_cpu0_softirq_s_per_s": 0.004,
+   "sender_process_us_per_listener_frame": 13.498,
+   "receivers_cpu23_busy_s_per_s": 0.017,
+   "cpu1_busy_s_per_s": 0.0045,
+   "wire": {
+    "tx_bytes_per_s": 765872,
+    "tx_packets_per_s": 1000,
+    "rx_bytes_per_s": 65989,
+    "rx_packets_per_s": 1000,
+    "tx_bytes_per_listener_s": 7658.7,
+    "rx_bytes_per_listener_s": 659.9,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 4696,
+    "sender_fds": 106,
+    "sender_threads": 4,
+    "receiver_rss_kb": 6112,
+    "slab_delta_kb_both_ends": -256,
+    "sunreclaim_delta_kb_both_ends": -256,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 104
+     },
+     "TCP": {
+      "inuse": 101,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 217,
+      "mem": 360
+     },
+     "UDP": {
+      "inuse": 0,
+      "mem": 256
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": {
+     "sockets": 100,
+     "r": 0,
+     "rb": 13107200,
+     "t": 0,
+     "tb": 6912000,
+     "f": 0,
+     "w": 0,
+     "o": 0,
+     "bl": 0,
+     "d": 0
+    }
+   },
+   "sender": {
+    "mode": "tcp",
+    "n": 100,
+    "frames": 280,
+    "syscalls": 28000,
+    "messages": 28000,
+    "bytes": 19600000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 1024,
+    "enqueue_all_p99_us": 2491,
+    "enqueue_all_max_us": 3449,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "tcp",
+    "n": 100,
+    "attached": 100,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 28000,
+    "bytes": 19600000,
+    "errors": 0
+   },
+   "repeat": 2,
+   "block_order": [
+    "tcp",
+    "idle",
+    "udp",
+    "mcast"
+   ],
+   "position": 0
+  },
+  {
+   "mode": "idle",
+   "n": 100,
+   "rate": 10,
+   "measure_s": 20.0,
+   "sender_host_cpu0_busy_s_per_s": 0.0025,
+   "cpu_busy_s_per_s": {
+    "cpu0": 0.0025,
+    "cpu1": 0.007,
+    "cpu2": 0.0025,
+    "cpu3": 0.002
+   },
+   "slab_delta_kb": -888,
+   "repeat": 2,
+   "block_order": [
+    "tcp",
+    "idle",
+    "udp",
+    "mcast"
+   ],
+   "position": 1
+  },
+  {
+   "mode": "udp",
+   "n": 100,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.003,
+   "setup_s": 0.03,
+   "sender_process_cpu_s_per_s": 0.0055,
+   "sender_host_cpu0_busy_s_per_s": 0.0055,
+   "sender_host_cpu0_softirq_s_per_s": 0.0015,
+   "sender_process_us_per_listener_frame": 5.499,
+   "receivers_cpu23_busy_s_per_s": 0.0065,
+   "cpu1_busy_s_per_s": 0.003,
+   "wire": {
+    "tx_bytes_per_s": 741895,
+    "tx_packets_per_s": 1000,
+    "rx_bytes_per_s": 0,
+    "rx_packets_per_s": 0,
+    "tx_bytes_per_listener_s": 7418.9,
+    "rx_bytes_per_listener_s": 0.0,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 4436,
+    "sender_fds": 6,
+    "sender_threads": 4,
+    "receiver_rss_kb": 5188,
+    "slab_delta_kb_both_ends": -264,
+    "sunreclaim_delta_kb_both_ends": -312,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 3
+     },
+     "TCP": {
+      "inuse": 0,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 16,
+      "mem": 360
+     },
+     "UDP": {
+      "inuse": 1,
+      "mem": 256
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": null
+   },
+   "sender": {
+    "mode": "udp",
+    "n": 100,
+    "frames": 280,
+    "syscalls": 280,
+    "messages": 28000,
+    "bytes": 19600000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 376,
+    "enqueue_all_p99_us": 767,
+    "enqueue_all_max_us": 979,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "udp",
+    "n": 100,
+    "attached": 100,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 28000,
+    "bytes": 19600000,
+    "errors": 0
+   },
+   "repeat": 2,
+   "block_order": [
+    "tcp",
+    "idle",
+    "udp",
+    "mcast"
+   ],
+   "position": 2
+  },
+  {
+   "mode": "mcast",
+   "n": 100,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.003,
+   "setup_s": 0.031,
+   "sender_process_cpu_s_per_s": 0.002,
+   "sender_host_cpu0_busy_s_per_s": 0.0015,
+   "sender_host_cpu0_softirq_s_per_s": 0.0005,
+   "sender_process_us_per_listener_frame": 2.0,
+   "receivers_cpu23_busy_s_per_s": 0.0085,
+   "cpu1_busy_s_per_s": 0.0015,
+   "wire": {
+    "tx_bytes_per_s": 7419,
+    "tx_packets_per_s": 10,
+    "rx_bytes_per_s": 0,
+    "rx_packets_per_s": 0,
+    "tx_bytes_per_listener_s": 74.2,
+    "rx_bytes_per_listener_s": 0.0,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 4428,
+    "sender_fds": 6,
+    "sender_threads": 4,
+    "receiver_rss_kb": 5156,
+    "slab_delta_kb_both_ends": -112,
+    "sunreclaim_delta_kb_both_ends": -112,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 3
+     },
+     "TCP": {
+      "inuse": 0,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 16,
+      "mem": 360
+     },
+     "UDP": {
+      "inuse": 1,
+      "mem": 256
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": null
+   },
+   "sender": {
+    "mode": "mcast",
+    "n": 100,
+    "frames": 280,
+    "syscalls": 280,
+    "messages": 280,
+    "bytes": 196000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 40,
+    "enqueue_all_p99_us": 121,
+    "enqueue_all_max_us": 159,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "mcast",
+    "n": 100,
+    "attached": 100,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 28000,
+    "bytes": 19600000,
+    "errors": 0
+   },
+   "repeat": 2,
+   "block_order": [
+    "tcp",
+    "idle",
+    "udp",
+    "mcast"
+   ],
+   "position": 3
+  },
+  {
+   "mode": "tcp",
+   "n": 1000,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.003,
+   "setup_s": 0.418,
+   "sender_process_cpu_s_per_s": 0.11398,
+   "sender_host_cpu0_busy_s_per_s": 0.10798,
+   "sender_host_cpu0_softirq_s_per_s": 0.07299,
+   "sender_process_us_per_listener_frame": 11.398,
+   "receivers_cpu23_busy_s_per_s": 0.17297,
+   "cpu1_busy_s_per_s": 0.008,
+   "wire": {
+    "tx_bytes_per_s": 7668646,
+    "tx_packets_per_s": 10011,
+    "rx_bytes_per_s": 660791,
+    "rx_packets_per_s": 10012,
+    "tx_bytes_per_listener_s": 7668.6,
+    "rx_bytes_per_listener_s": 660.8,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 5268,
+    "sender_fds": 1006,
+    "sender_threads": 4,
+    "receiver_rss_kb": 16700,
+    "slab_delta_kb_both_ends": 8328,
+    "sunreclaim_delta_kb_both_ends": 5296,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 1004
+     },
+     "TCP": {
+      "inuse": 1001,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 2013,
+      "mem": 360
+     },
+     "UDP": {
+      "inuse": 0,
+      "mem": 256
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": {
+     "sockets": 1000,
+     "r": 0,
+     "rb": 131072000,
+     "t": 0,
+     "tb": 69120000,
+     "f": 0,
+     "w": 0,
+     "o": 0,
+     "bl": 0,
+     "d": 0
+    }
+   },
+   "sender": {
+    "mode": "tcp",
+    "n": 1000,
+    "frames": 280,
+    "syscalls": 280000,
+    "messages": 280000,
+    "bytes": 196000000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 11176,
+    "enqueue_all_p99_us": 18301,
+    "enqueue_all_max_us": 21755,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "tcp",
+    "n": 1000,
+    "attached": 1000,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 280000,
+    "bytes": 196000000,
+    "errors": 0
+   },
+   "repeat": 2,
+   "block_order": [
+    "tcp",
+    "idle",
+    "udp",
+    "mcast"
+   ],
+   "position": 0
+  },
+  {
+   "mode": "idle",
+   "n": 1000,
+   "rate": 10,
+   "measure_s": 20.0,
+   "sender_host_cpu0_busy_s_per_s": 0.0045,
+   "cpu_busy_s_per_s": {
+    "cpu0": 0.0045,
+    "cpu1": 0.001,
+    "cpu2": 0.003,
+    "cpu3": 0.004
+   },
+   "slab_delta_kb": -820,
+   "repeat": 2,
+   "block_order": [
+    "tcp",
+    "idle",
+    "udp",
+    "mcast"
+   ],
+   "position": 1
+  },
+  {
+   "mode": "udp",
+   "n": 1000,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.004,
+   "setup_s": 0.088,
+   "sender_process_cpu_s_per_s": 0.03999,
+   "sender_host_cpu0_busy_s_per_s": 0.03999,
+   "sender_host_cpu0_softirq_s_per_s": 0.019,
+   "sender_process_us_per_listener_frame": 3.999,
+   "receivers_cpu23_busy_s_per_s": 0.09248,
+   "cpu1_busy_s_per_s": 0.0075,
+   "wire": {
+    "tx_bytes_per_s": 7431918,
+    "tx_packets_per_s": 10016,
+    "rx_bytes_per_s": 0,
+    "rx_packets_per_s": 0,
+    "tx_bytes_per_listener_s": 7431.9,
+    "rx_bytes_per_listener_s": 0.0,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 4504,
+    "sender_fds": 6,
+    "sender_threads": 4,
+    "receiver_rss_kb": 10080,
+    "slab_delta_kb_both_ends": 2404,
+    "sunreclaim_delta_kb_both_ends": 1264,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 3
+     },
+     "TCP": {
+      "inuse": 0,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 12,
+      "mem": 104
+     },
+     "UDP": {
+      "inuse": 1,
+      "mem": 768
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": null
+   },
+   "sender": {
+    "mode": "udp",
+    "n": 1000,
+    "frames": 280,
+    "syscalls": 280,
+    "messages": 280000,
+    "bytes": 196000000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 3798,
+    "enqueue_all_p99_us": 6623,
+    "enqueue_all_max_us": 8033,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "udp",
+    "n": 1000,
+    "attached": 1000,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 280000,
+    "bytes": 196000000,
+    "errors": 0
+   },
+   "repeat": 2,
+   "block_order": [
+    "tcp",
+    "idle",
+    "udp",
+    "mcast"
+   ],
+   "position": 2
+  },
+  {
+   "mode": "mcast",
+   "n": 1000,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.004,
+   "setup_s": 0.082,
+   "sender_process_cpu_s_per_s": 0.0025,
+   "sender_host_cpu0_busy_s_per_s": 0.008,
+   "sender_host_cpu0_softirq_s_per_s": 0.0025,
+   "sender_process_us_per_listener_frame": 0.25,
+   "receivers_cpu23_busy_s_per_s": 0.011,
+   "cpu1_busy_s_per_s": 0.006,
+   "wire": {
+    "tx_bytes_per_s": 7418,
+    "tx_packets_per_s": 10,
+    "rx_bytes_per_s": 0,
+    "rx_packets_per_s": 0,
+    "tx_bytes_per_listener_s": 7.4,
+    "rx_bytes_per_listener_s": 0.0,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 4436,
+    "sender_fds": 6,
+    "sender_threads": 4,
+    "receiver_rss_kb": 9852,
+    "slab_delta_kb_both_ends": 2024,
+    "sunreclaim_delta_kb_both_ends": 944,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 3
+     },
+     "TCP": {
+      "inuse": 0,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 12,
+      "mem": 104
+     },
+     "UDP": {
+      "inuse": 1,
+      "mem": 1024
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": null
+   },
+   "sender": {
+    "mode": "mcast",
+    "n": 1000,
+    "frames": 280,
+    "syscalls": 280,
+    "messages": 280,
+    "bytes": 196000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 40,
+    "enqueue_all_p99_us": 140,
+    "enqueue_all_max_us": 225,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "mcast",
+    "n": 1000,
+    "attached": 1000,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 280000,
+    "bytes": 196000000,
+    "errors": 0
+   },
+   "repeat": 2,
+   "block_order": [
+    "tcp",
+    "idle",
+    "udp",
+    "mcast"
+   ],
+   "position": 3
+  },
+  {
+   "mode": "idle",
+   "n": 5000,
+   "rate": 10,
+   "measure_s": 20.0,
+   "sender_host_cpu0_busy_s_per_s": 0.0055,
+   "cpu_busy_s_per_s": {
+    "cpu0": 0.0055,
+    "cpu1": 0.0015,
+    "cpu2": 0.003,
+    "cpu3": 0.001
+   },
+   "slab_delta_kb": -464,
+   "repeat": 2,
+   "block_order": [
+    "idle",
+    "udp",
+    "mcast",
+    "tcp"
+   ],
+   "position": 0
+  },
+  {
+   "mode": "udp",
+   "n": 5000,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.006,
+   "setup_s": 0.19,
+   "sender_process_cpu_s_per_s": 0.18145,
+   "sender_host_cpu0_busy_s_per_s": 0.19694,
+   "sender_host_cpu0_softirq_s_per_s": 0.10547,
+   "sender_process_us_per_listener_frame": 3.629,
+   "receivers_cpu23_busy_s_per_s": 0.43687,
+   "cpu1_busy_s_per_s": 0.011,
+   "wire": {
+    "tx_bytes_per_s": 37140109,
+    "tx_packets_per_s": 50054,
+    "rx_bytes_per_s": 0,
+    "rx_packets_per_s": 0,
+    "tx_bytes_per_listener_s": 7428.0,
+    "rx_bytes_per_listener_s": 0.0,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 4832,
+    "sender_fds": 6,
+    "sender_threads": 4,
+    "receiver_rss_kb": 31472,
+    "slab_delta_kb_both_ends": 22744,
+    "sunreclaim_delta_kb_both_ends": 14056,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 3
+     },
+     "TCP": {
+      "inuse": 0,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 12,
+      "mem": 104
+     },
+     "UDP": {
+      "inuse": 1,
+      "mem": 4864
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": null
+   },
+   "sender": {
+    "mode": "udp",
+    "n": 5000,
+    "frames": 280,
+    "syscalls": 1400,
+    "messages": 1400000,
+    "bytes": 980000000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 17215,
+    "enqueue_all_p99_us": 31522,
+    "enqueue_all_max_us": 32529,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "udp",
+    "n": 5000,
+    "attached": 5000,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 1400000,
+    "bytes": 980000000,
+    "errors": 0
+   },
+   "repeat": 2,
+   "block_order": [
+    "idle",
+    "udp",
+    "mcast",
+    "tcp"
+   ],
+   "position": 1
+  },
+  {
+   "mode": "mcast",
+   "n": 5000,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.005,
+   "setup_s": 0.296,
+   "sender_process_cpu_s_per_s": 0.0015,
+   "sender_host_cpu0_busy_s_per_s": 0.018,
+   "sender_host_cpu0_softirq_s_per_s": 0.013,
+   "sender_process_us_per_listener_frame": 0.03,
+   "receivers_cpu23_busy_s_per_s": 0.19345,
+   "cpu1_busy_s_per_s": 0.005,
+   "wire": {
+    "tx_bytes_per_s": 7418,
+    "tx_packets_per_s": 10,
+    "rx_bytes_per_s": 0,
+    "rx_packets_per_s": 0,
+    "tx_bytes_per_listener_s": 1.5,
+    "rx_bytes_per_listener_s": 0.0,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 4544,
+    "sender_fds": 6,
+    "sender_threads": 4,
+    "receiver_rss_kb": 30980,
+    "slab_delta_kb_both_ends": 17132,
+    "sunreclaim_delta_kb_both_ends": 8604,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 3
+     },
+     "TCP": {
+      "inuse": 0,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 12,
+      "mem": 104
+     },
+     "UDP": {
+      "inuse": 1,
+      "mem": 5120
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": null
+   },
+   "sender": {
+    "mode": "mcast",
+    "n": 5000,
+    "frames": 280,
+    "syscalls": 280,
+    "messages": 280,
+    "bytes": 196000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 39,
+    "enqueue_all_p99_us": 146,
+    "enqueue_all_max_us": 384,
+    "late_ticks": 0
+   },
+   "receiver": {
+    "mode": "mcast",
+    "n": 5000,
+    "attached": 5000,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 1400000,
+    "bytes": 980000000,
+    "errors": 0
+   },
+   "repeat": 2,
+   "block_order": [
+    "idle",
+    "udp",
+    "mcast",
+    "tcp"
+   ],
+   "position": 2
+  },
+  {
+   "mode": "tcp",
+   "n": 5000,
+   "rate": 10,
+   "frame_bytes": 700,
+   "measure_s": 20.003,
+   "setup_s": 0.584,
+   "sender_process_cpu_s_per_s": 0.6289,
+   "sender_host_cpu0_busy_s_per_s": 0.6489,
+   "sender_host_cpu0_softirq_s_per_s": 0.42044,
+   "sender_process_us_per_listener_frame": 12.578,
+   "receivers_cpu23_busy_s_per_s": 0.98135,
+   "cpu1_busy_s_per_s": 0.017,
+   "wire": {
+    "tx_bytes_per_s": 38298645,
+    "tx_packets_per_s": 49998,
+    "rx_bytes_per_s": 3300035,
+    "rx_packets_per_s": 50001,
+    "tx_bytes_per_listener_s": 7659.7,
+    "rx_bytes_per_listener_s": 660.0,
+    "tx_dropped": 0
+   },
+   "softnet_drops": 0,
+   "memory": {
+    "sender_rss_kb": 7856,
+    "sender_fds": 5006,
+    "sender_threads": 4,
+    "receiver_rss_kb": 64532,
+    "slab_delta_kb_both_ends": 47652,
+    "sunreclaim_delta_kb_both_ends": 29820,
+    "sockstat_tx": {
+     "sockets": {
+      "used": 5002
+     },
+     "TCP": {
+      "inuse": 5001,
+      "orphan": 0,
+      "tw": 0,
+      "alloc": 10013,
+      "mem": 104
+     },
+     "UDP": {
+      "inuse": 0,
+      "mem": 256
+     },
+     "UDPLITE": {
+      "inuse": 0
+     },
+     "RAW": {
+      "inuse": 0
+     },
+     "FRAG": {
+      "inuse": 0,
+      "memory": 0
+     }
+    },
+    "ss_skmem_tx": {
+     "sockets": 5000,
+     "r": 0,
+     "rb": 655360000,
+     "t": 1532,
+     "tb": 345600000,
+     "f": 46152,
+     "w": 27576,
+     "o": 0,
+     "bl": 0,
+     "d": 0
+    }
+   },
+   "sender": {
+    "mode": "tcp",
+    "n": 5000,
+    "frames": 280,
+    "syscalls": 1400000,
+    "messages": 1400000,
+    "bytes": 980000000,
+    "errors": 0,
+    "short_writes": 0,
+    "enqueue_all_p50_us": 57903,
+    "enqueue_all_p99_us": 121287,
+    "enqueue_all_max_us": 161159,
+    "late_ticks": 12
+   },
+   "receiver": {
+    "mode": "tcp",
+    "n": 5000,
+    "attached": 5000,
+    "min_frames": 280,
+    "max_frames": 280,
+    "frames": 1400000,
+    "bytes": 980000000,
+    "errors": 0
+   },
+   "repeat": 2,
+   "block_order": [
+    "idle",
+    "udp",
+    "mcast",
+    "tcp"
+   ],
+   "position": 3
   }
  ],
  "config": {
@@ -3213,11 +3688,16 @@
    "mcast"
   ],
   "repeats": 3,
-  "warmup": 5.0,
-  "measure": 20.0,
+  "warmup": 5,
+  "measure": 20,
   "rate": 10,
   "size": 700,
-  "binary": "/home/user/binary-canticle/prototype/protocol-dynamics/fanout/fanout"
+  "seed": 1
+ },
+ "build": {
+  "go": "go version go1.24.7 linux/amd64",
+  "flags": "-trimpath -buildvcs=false",
+  "binary_sha256": "eea1bf4d1e11b04946dd0431d14b46a7130fbba5eba2be20e677f139426081ff"
  },
  "env": {
   "kernel": "6.18.44-fc-v37",
@@ -3229,6 +3709,272 @@
   "tcp_rmem": "4096\t131072\t33554432",
   "tcp_wmem": "4096\t16384\t4194304",
   "rmem_max": "4194304",
-  "date": "2026-09-27T18:42:33Z"
- }
+  "date": "2026-09-28T00:06:04Z"
+ },
+ "cost": [
+  {
+   "mode": "mcast",
+   "n": 10,
+   "repeats": 3,
+   "idle_matched": true,
+   "loaded_cpu0_busy_s_per_s": [
+    0.007,
+    0.0045,
+    0.003
+   ],
+   "idle_cpu0_busy_s_per_s": [
+    0.003,
+    0.0035,
+    0.0045
+   ],
+   "accounting_quantum_us": 9.999,
+   "resolved": false,
+   "us_per_listener_frame": null,
+   "resolution_us": 68.413
+  },
+  {
+   "mode": "tcp",
+   "n": 10,
+   "repeats": 3,
+   "idle_matched": true,
+   "loaded_cpu0_busy_s_per_s": [
+    0.012,
+    0.003,
+    0.0025
+   ],
+   "idle_cpu0_busy_s_per_s": [
+    0.003,
+    0.0035,
+    0.0045
+   ],
+   "accounting_quantum_us": 9.999,
+   "resolved": false,
+   "us_per_listener_frame": null,
+   "resolution_us": 148.195
+  },
+  {
+   "mode": "udp",
+   "n": 10,
+   "repeats": 3,
+   "idle_matched": true,
+   "loaded_cpu0_busy_s_per_s": [
+    0.001,
+    0.0005,
+    0.005
+   ],
+   "idle_cpu0_busy_s_per_s": [
+    0.003,
+    0.0035,
+    0.0045
+   ],
+   "accounting_quantum_us": 9.999,
+   "resolved": false,
+   "us_per_listener_frame": null,
+   "resolution_us": 44.787
+  },
+  {
+   "mode": "mcast",
+   "n": 100,
+   "repeats": 3,
+   "idle_matched": true,
+   "loaded_cpu0_busy_s_per_s": [
+    0.0025,
+    0.004,
+    0.0015
+   ],
+   "idle_cpu0_busy_s_per_s": [
+    0.0055,
+    0.0005,
+    0.0025
+   ],
+   "accounting_quantum_us": 1.0,
+   "resolved": false,
+   "us_per_listener_frame": null,
+   "resolution_us": 8.271
+  },
+  {
+   "mode": "tcp",
+   "n": 100,
+   "repeats": 3,
+   "idle_matched": true,
+   "loaded_cpu0_busy_s_per_s": [
+    0.0045,
+    0.0045,
+    0.01
+   ],
+   "idle_cpu0_busy_s_per_s": [
+    0.0055,
+    0.0005,
+    0.0025
+   ],
+   "accounting_quantum_us": 1.0,
+   "resolved": false,
+   "us_per_listener_frame": null,
+   "resolution_us": 10.613
+  },
+  {
+   "mode": "udp",
+   "n": 100,
+   "repeats": 3,
+   "idle_matched": true,
+   "loaded_cpu0_busy_s_per_s": [
+    0.003,
+    0.0025,
+    0.0055
+   ],
+   "idle_cpu0_busy_s_per_s": [
+    0.0055,
+    0.0005,
+    0.0025
+   ],
+   "accounting_quantum_us": 1.0,
+   "resolved": false,
+   "us_per_listener_frame": null,
+   "resolution_us": 7.278
+  },
+  {
+   "mode": "mcast",
+   "n": 1000,
+   "repeats": 3,
+   "idle_matched": true,
+   "loaded_cpu0_busy_s_per_s": [
+    0.0105,
+    0.006,
+    0.008
+   ],
+   "idle_cpu0_busy_s_per_s": [
+    0.0035,
+    0.0025,
+    0.0045
+   ],
+   "accounting_quantum_us": 0.1,
+   "resolved": false,
+   "us_per_listener_frame": null,
+   "resolution_us": 0.502
+  },
+  {
+   "mode": "tcp",
+   "n": 1000,
+   "repeats": 3,
+   "idle_matched": true,
+   "loaded_cpu0_busy_s_per_s": [
+    0.12198,
+    0.11748,
+    0.10798
+   ],
+   "idle_cpu0_busy_s_per_s": [
+    0.0035,
+    0.0025,
+    0.0045
+   ],
+   "accounting_quantum_us": 0.1,
+   "resolved": true,
+   "us_per_listener_frame": {
+    "mean": 11.231,
+    "ci95": [
+     9.282,
+     13.181
+    ]
+   },
+   "resolution_us": 1.95
+  },
+  {
+   "mode": "udp",
+   "n": 1000,
+   "repeats": 3,
+   "idle_matched": true,
+   "loaded_cpu0_busy_s_per_s": [
+    0.04499,
+    0.04049,
+    0.03999
+   ],
+   "idle_cpu0_busy_s_per_s": [
+    0.0035,
+    0.0025,
+    0.0045
+   ],
+   "accounting_quantum_us": 0.1,
+   "resolved": true,
+   "us_per_listener_frame": {
+    "mean": 3.832,
+    "ci95": [
+     3.084,
+     4.581
+    ]
+   },
+   "resolution_us": 0.749
+  },
+  {
+   "mode": "mcast",
+   "n": 5000,
+   "repeats": 3,
+   "idle_matched": true,
+   "loaded_cpu0_busy_s_per_s": [
+    0.01949,
+    0.04599,
+    0.018
+   ],
+   "idle_cpu0_busy_s_per_s": [
+    0.0075,
+    0.017,
+    0.0055
+   ],
+   "accounting_quantum_us": 0.02,
+   "resolved": false,
+   "us_per_listener_frame": null,
+   "resolution_us": 0.481
+  },
+  {
+   "mode": "tcp",
+   "n": 5000,
+   "repeats": 3,
+   "idle_matched": true,
+   "loaded_cpu0_busy_s_per_s": [
+    0.59339,
+    0.60187,
+    0.6489
+   ],
+   "idle_cpu0_busy_s_per_s": [
+    0.0075,
+    0.017,
+    0.0055
+   ],
+   "accounting_quantum_us": 0.02,
+   "resolved": true,
+   "us_per_listener_frame": {
+    "mean": 12.094,
+    "ci95": [
+     10.43,
+     13.759
+    ]
+   },
+   "resolution_us": 1.665
+  },
+  {
+   "mode": "udp",
+   "n": 5000,
+   "repeats": 3,
+   "idle_matched": true,
+   "loaded_cpu0_busy_s_per_s": [
+    0.17297,
+    0.16648,
+    0.19694
+   ],
+   "idle_cpu0_busy_s_per_s": [
+    0.0075,
+    0.017,
+    0.0055
+   ],
+   "accounting_quantum_us": 0.02,
+   "resolved": true,
+   "us_per_listener_frame": {
+    "mean": 3.376,
+    "ci95": [
+     2.324,
+     4.428
+    ]
+   },
+   "resolution_us": 1.052
+  }
+ ]
 }
