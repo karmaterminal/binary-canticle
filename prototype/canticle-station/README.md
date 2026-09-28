@@ -9,7 +9,7 @@ them loop until they expire.
 |---|---|
 | §9 Wire format v2 | `BC` magic, version, kind and key-id header; deterministic CBOR with integer keys; a domain-separated Ed25519 trailer; the ITEM, PLUCK and BEACON key tables; the 1 100 B frame and 1 200 B datagram limits; `crit` and unknown-key handling. |
 | §9.4 Strict parsing | A bounded, strict CBOR decoder (definite lengths, shortest form, sorted and unique keys, depth ≤ 4, ≤ 32 entries, no floats or tags). A bad datagram only ever produces a rejection with a reason. |
-| §9.13 Test vectors | Reproduces the RFC's two illustrative vectors byte for byte, using an independent encoder (not `cbor2`). Ships 31 candidate conformance vectors in `vectors/`. |
+| §9.13 Test vectors | Reproduces the RFC's two illustrative vectors byte for byte, using an independent encoder (not `cbor2`). Ships 32 candidate conformance vectors in `vectors/`. |
 | §5 Identity | Key-id = SHA-256(pubkey)[0:8]; `stream_id` = SHA-256("canticle-stream/v2" ‖ 0 ‖ name)[0:4]; collisions are refused, never rehashed (#38). |
 | §7 Carousel | Signs each item once and resends the same bytes. The expiry is absolute and never reset. A burst goes out at 0, +1, +2 and +4 s, then SAP-style loops with jitter U(2/3, 4/3) and reconsideration. Includes the fair-share regulator with a class floor, the availability ceiling and clamp reasons; supersede-by-key; pluck (a PLUCK loops until the target's expiry); refresh re-issue for keep-on-air; and ring depth. |
 | §8 Carrier-beacon | Signed beacons with per-stream heads, live counts, loop and TTL contracts, `next_beacon_ms` (0 = goodbye) and ±10% jitter. Beyond 24 streams it rotates pages with a catalog digest. |
@@ -86,7 +86,7 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
 - `test_wire.py` covers:
   - strict CBOR, including RFC 8949 core map-key order checked against bytes from an independent encoder (fxamacker/cbor), and the RFC §9.13 vectors byte for byte;
   - the RFC §9.11 size budget (745 / 720 / 1 100 B);
-  - all 31 candidate vectors;
+  - all 32 candidate vectors;
   - a check that the committed vectors file equals the generator's output;
   - a 20 000-case fuzz run (random bytes and mutations of valid frames) in which nothing but a `Reject` ever escapes.
 - `test_station.py` drives the carousel on a virtual clock:
@@ -103,8 +103,8 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
 
 [`vectors/frame-v2-candidates.json`](vectors/frame-v2-candidates.json) contains:
 - 23 parse-level cases (datagram → `accept` or a rejection reason);
-- 8 listener-level sequences (datagrams → events).
+- 9 listener-level sequences (datagrams → events).
 
-It covers the #48 acceptance set (valid, wrong key, tampered, unknown key, revoked, expired, replayed) and every case RFC-0001 §9.13 lists: repeat-as-no-op, equivocation, non-deterministic CBOR, `crit`-unknown, a 1 101-byte frame, a depth bomb, a float in a core key, a future `issued_at` and pluck-before-original. It also includes a regression for the prototype's bug B1 (the 11-byte `{"a":1e400}`).
+It covers the #48 acceptance set (valid, wrong key, tampered, unknown key, revoked, expired, replayed) and every case RFC-0001 §9.13 lists: repeat-as-no-op, tampered-first recovery without dedup poisoning, equivocation, non-deterministic CBOR, `crit`-unknown, a 1 101-byte frame, a depth bomb, a float in a core key, a future `issued_at` and pluck-before-original. It also includes a regression for the prototype's bug B1 (the 11-byte `{"a":1e400}`).
 
 Keys are the RFC 8032 §7.1 test keys. The vectors are **candidates**: they become normative when a second, independent implementation (for example the TypeScript codec planned in S1) reproduces them.
