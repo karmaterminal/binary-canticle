@@ -7,7 +7,7 @@
 
 *It adds the cohort's own evidence on contagion (deferral spread, "goodnight princes") and the guardian-session idea.*
 
-**Revised after review (2026-09-27).** Reviewers of PR #52 found that E1 counted updates that never arrived before the run ended as if they had arrived at the cutoff, and that E4 keyed relay leases by address. Both were fixed and E1 and E4 re-run. Latencies below are now Kaplan–Meier estimates, with the share of updates delivered wherever it is below 100%, and every number comes from the re-run.
+**Revised after review (2026-09-27).** Reviewers of PR #52 found that E1 counted updates that never arrived before the run ended as if they had arrived at the cutoff, and that E4 keyed relay leases by address. Both were fixed. A second review asked for every result to be reproducible from committed source, so all five experiments were re-run from clean commit `971846e`; each result set carries a manifest with its source digest, and `python summarize.py verify` matches all of them to that commit. Latencies below are Kaplan–Meier estimates, with the share of updates delivered wherever it is below 100%, and every number comes from that run. High-loss TCP tails varied a lot between runs (at U = 0.5 s and 30% loss, TCP delivered 29% of updates in one run and 36% in the next), so read them as orders of magnitude.
 
 **Evidence.**
 - Measurements: [`prototype/protocol-dynamics/`](../prototype/protocol-dynamics/) ([SUMMARY](../prototype/protocol-dynamics/SUMMARY.md)). These are real TCP and the real canticle carousel, under packet loss, in Linux network namespaces.
@@ -19,15 +19,15 @@
 - **Don't pick one protocol; pick per plane.** The broadcast edge, where many listeners share a lossy radio of short-lived items, stays a UDP carousel. The places where one healthy link must carry each item once and in order use TCP or QUIC: relay-to-relay, snapshots and replay, the ledger, addressed control, and a guardian's doubt channel.
 - **TCP genuinely wins some of the time, and the spike measured where.**
   - At ≤ 10% loss on one healthy connection, TCP repairs a lost update in one retransmission timeout (≈ 205-212 ms here; about RTT + 200 ms on the internet). The carousel waits for its next copy (the +1 s burst, or the loop).
-  - At 5% loss with updates every 10 s: p99 212 ms for TCP against about 1 s for the carousel.
+  - At 5% loss with updates every 10 s: p99 210 ms for TCP against about 1 s for the carousel.
   - A TCP snapshot also catches up a late joiner in 0.5 ms against 1.1-15 s, as long as nothing is lost.
 - **TCP fails badly, where the carousel only degrades.**
-  - At 20% loss in both directions the result is mixed: TCP's p99 was 0.8-45 s against the carousel's 1-2 s.
-  - At 30%, TCP's exponential backoff and head-of-line blocking stalled connections for minutes (the longest finished stall took 576 s). With updates every 0.5 s, only 29% of updates reached TCP receivers before the 15-minute run ended, half the connections were still stalled at the end, receivers held a superseded value 90% of the time, and TCP delivered 2 698 frames after their own signed expiry.
-  - The carousel delivered every update in every condition. Its worst case under the same loss was 3.5-11 s, set by its schedule rather than its history.
-  - After a 10 s outage, TCP needed 3.9-6.3 s (p95) to resume; the carousel needed 0.5-0.9 s with frequent updates.
+  - At 20% loss in both directions the result is mixed: TCP's p99 ranged from 0.42 s (updates every 10 s) to beyond 306 s (every 0.5 s, with 1.6% of updates never arriving), against the carousel's 1-2 s.
+  - At 30%, TCP's exponential backoff and head-of-line blocking stalled connections for minutes (the longest stall that ended took 606 s). With updates every 0.5 s, only 36% of updates reached TCP receivers before the 15-minute run ended, 11 of 20 connections were still stalled at the end, receivers held a superseded value 87% of the time, and TCP delivered 1 292 frames after their own signed expiry.
+  - The carousel delivered every update in every condition. Its worst case under the same loss was 4.5-10 s, set by its schedule rather than its history.
+  - After a 10 s outage, TCP needed 3.9-6.2 s (p95) to resume; the carousel needed 0.5-0.9 s with frequent updates.
 - **With many listeners, the difference is cost and isolation, not feasibility.**
-  - TCP costs about 2.7× the CPU per listener (11.6-12.0 µs against 4.2-4.4 µs per listener·frame), twice the packets (ACKs), one socket and one queue per listener. Multicast is flat whatever the listener count.
+  - TCP costs about 3× the sender CPU per listener (11.2-12.1 µs against 3.4-3.8 µs per listener·frame at 1 000-5 000 listeners), twice the packets (ACKs), one socket and one queue per listener. Multicast cost could not be told apart from idle at any listener count.
   - One slow TCP listener can stall a naive sender for everyone. A silently vanished TCP listener holds state for 938 s.
   - A UDP listener that is slow or dead costs the sender nothing.
 - **On chemokines, you're half right.** A binding event is specific, one-to-one and changes the receiver's state. But the *communication* is open-loop broadcast: the secreting cell gets no acknowledgement and never retransmits to one receiver. The TCP-like structure in immunity is the **immunological synapse**. That is exactly where this spike puts TCP-like channels: the guardian's doubt channel and addressed work.
@@ -69,20 +69,20 @@ Data for the chart: p99 update latency (Kaplan–Meier) in ms, or s where marked
 
 | Updates every | Arm | 0% | 1% | 5% | 10% | 20% | 30% loss |
 |---|---|---|---|---|---|---|---|
-| 0.5 s | Carousel | 2.7 | 499.7 | 502.3 | 504.7 | 1.0 s | 1.5 s |
-| 0.5 s | TCP stream | 2.7 | 205.6 | 212.1 | 418.1 | 45 s | > 915 s (29% delivered) |
-| 2 s | Carousel | 2.4 | 4.4 | 1.0 s | 1.0 s | 2.0 s | 3.0 s |
-| 2 s | TCP stream | 3.1 | 205.4 | 210.6 | 414.2 | 2.7 s | > 758 s (90% delivered) |
-| 10 s | Carousel | 3.0 | 2.7 | 1.0 s | 1.0 s | 2.0 s | 4.0 s |
-| 10 s | TCP stream | 2.8 | 2.2 | 211.9 | 219.0 | 826.3 | 68 s |
+| 0.5 s | Carousel | 3.0 | 8.6 | 502.1 | 519.1 | 1.0 s | 1.5 s |
+| 0.5 s | TCP stream | 2.6 | 204.8 | 211.3 | 418.5 | > 306 s (98% delivered) | > 856 s (36% delivered) |
+| 2 s | Carousel | 2.4 | 5.4 | 1.0 s | 2.0 s | 2.0 s | 3.0 s |
+| 2 s | TCP stream | 2.9 | 4.5 | 210.4 | 414.2 | 8.9 s (99.9% delivered) | > 646 s (95% delivered) |
+| 10 s | Carousel | 3.3 | 3.0 | 1.0 s | 2.0 s | 2.0 s | 4.0 s |
+| 10 s | TCP stream | 2.7 | 2.5 | 210.3 | 214.1 | 423.7 | 5.0 s |
 
 | Experiment | Result |
 |---|---|
-| **E1 freshness** (900 s per condition, 20 receivers per arm) | TCP is fresher up to about 10% loss: stale 1.3% of the time against 5.4% at U = 2 s, 10% loss. At 30% both ways TCP stalls for minutes (longest finished stall 576 s). At U = 0.5 s, 30% loss, only 29% of updates reached TCP receivers within the run, ten of twenty connections were still stalled at the end, receivers were stale 90% of the time, and 2 698 frames arrived after their expiry; the carousel delivered every update, was stale 30% of the time (the loss rate) and at most 3.5 s. With ACKs spared (data-only loss), TCP delivers everything: p99 1.5-6.6 s at 30%. |
-| **E1 outages** | After 1-3 s outages the two are comparable. After 10 s, TCP resumes in p95 3.9-6.3 s (RTO 408 → 816 → 1 632 → 3 264 → 6 528 ms); the carousel in 0.47-0.91 s with frequent updates, or 1.72 s / 5.14 s (1 s / 5 s loop) at U = 10 s. Nothing was censored. |
-| **E2 fan-out** (N up to 5 000, 10 frames/s of 700 B) | Per listener·frame: TCP 11.6-12.0 µs, UDP `sendmmsg` 4.2-4.4 µs, multicast flat (~2% of a core at any N). TCP adds one ACK per segment (2× packets, +660 B/s in per listener), 5 006 fds against 6, and ≈ 4.8 KB kernel slab per idle socket end. Handing one frame to the kernel for all N listeners takes 56.7 ms (TCP), 18.4 ms (UDP) and 0.04 ms (multicast); that is sender enqueue time, not arrival, which was not measured. Below 1 000 listeners it is all noise. |
-| **E3 slow and dead listeners** (100 listeners) | A blocking TCP writer stalled all 100 listeners 29 s after one stopped reading (64 KiB buffers). With Linux's autotuned receive buffer, the sender never noticed: the stopped reader held 4.1 MB of ten-minute-old data. A silently vanished TCP peer was detected after 938 s; `TCP_USER_TIMEOUT` = 30 s cut that to 30.4 s. UDP: the slow socket overflowed alone, and a dead lease lapsed in 54-74 s with no retransmission and no growing state. |
-| **E4 late joiner** (20 live items; time to hold all 20, Kaplan–Meier) | TCP connect-plus-snapshot takes 0.5 ms at 0% loss, but at 30% lost SYNs leave 17 of 360 joins unfinished at 120 s, so its p99 lies beyond 120 s (p50 2.1 s). A 1 s carousel takes 1.1 s at 0% and 6.6 s p99 at 30%, with no failures. The default 4 kbit/s stream budget sets a 13 s fair-share loop, hence 14.6 s catch-up with no loss: **the budget, not the protocol, decides catch-up time.** With leases keyed by session, every lease join now gets its snapshot (637 of 637 at 5%, 175 of 175 at 30%). |
+| **E1 freshness** (900 s per condition, 20 receivers per arm) | TCP is fresher up to about 10% loss: stale 1.2% of the time against 5.6-5.7% at U = 2 s, 10% loss. At 30% both ways TCP stalls for minutes (longest stall that ended: 606 s). At U = 0.5 s, 30% loss, only 36% of updates reached TCP receivers within the run, 11 of 20 connections were still stalled at the end, receivers were stale 87% of the time, and 1 292 frames arrived after their expiry; the carousel delivered every update, was stale 30% of the time (the loss rate) and at most 4.5 s. With ACKs spared (data-only loss), TCP delivers everything: p99 1.5-9.4 s at 30%. |
+| **E1 outages** | After 1-3 s outages the two are comparable. After 10 s, TCP resumes in p95 3.9-6.2 s (RTO 408 → 816 → 1 632 → 3 264 → 6 528 ms); the carousel in 0.47-0.91 s with frequent updates, or 1.72 s / 5.07 s (1 s / 5 s loop) at U = 10 s. Nothing was censored. |
+| **E2 fan-out** (N up to 5 000, 10 frames/s of 700 B) | Sender CPU per listener·frame, against a matched idle control (mean of 3, 95% interval): TCP 11.2 (9.3-13.2) µs at N = 1 000 and 12.1 (10.4-13.8) µs at 5 000; UDP `sendmmsg` 3.8 (3.1-4.6) and 3.4 (2.3-4.4) µs. Multicast, and every arm below 1 000 listeners, could not be told apart from idle. TCP adds one ACK per segment (2× packets, +660 B/s in per listener), 5 006 fds against 6, and ≈ 4.9 KB kernel slab per socket end. Handing one frame to the kernel for all N listeners takes 56.8 ms (TCP), 17.3 ms (UDP) and 0.04 ms (multicast); that is sender enqueue time, not arrival, which was not measured. |
+| **E3 slow and dead listeners** (100 listeners) | A blocking TCP writer stalled all 100 listeners 29.6 s after one stopped reading (64 KiB buffers). With Linux's autotuned receive buffer, the sender never noticed: the stopped reader held 4.1 MB of ten-minute-old data. A silently vanished TCP peer was detected after 939 s; `TCP_USER_TIMEOUT` = 30 s cut that to 30.3 s. UDP: the slow socket overflowed alone, and a dead lease lapsed in 54-75 s with no retransmission and no growing state. |
+| **E4 late joiner** (20 live items; time to hold all 20, Kaplan–Meier) | TCP connect-plus-snapshot takes 0.5 ms at 0% loss, but at 30% lost SYNs leave 17 of 307 joins unfinished at 120 s, so its p99 lies beyond 120 s (p50 2.2 s). A 1 s carousel takes 1.1 s at 0% and 6.7 s p99 at 30%, with no failures. The default 4 kbit/s stream budget sets a 13 s fair-share loop, hence 14.9 s catch-up with no loss: **the budget, not the protocol, decides catch-up time.** With leases keyed by session, every lease join now gets its snapshot (631 of 631 at 5%, 176 of 176 at 30%). |
 | **E5 relay restart** (1 000 listeners) | TCP with a 4 096 backlog re-served everyone in 0.3 s; with backlog 128, 6.3 s, and SYN-cookie "ghost" connections that hang without a client timeout. UDP leases took 13.2 s every time: a restarted relay can't validate old cookies, so listeners wait out three missed relay beacons. |
 
 ## 3. Why the numbers look like this
@@ -100,8 +100,8 @@ Data for the chart: p99 update latency (Kaplan–Meier) in ms, or s where marked
 - TCP delivers in order. While one segment is being repaired, every later byte waits, **including the newer value that supersedes the lost one**.
 - Data already handed to the kernel cannot be expired or replaced.
 - Measured:
-  - after 10 s outages at U = 0.5 s, TCP replayed 15 440 superseded frames (1 300 with `TCP_NOTSENT_LOWAT` latest-only coalescing);
-  - at 30% loss, 54% of TCP deliveries were already superseded on arrival, and 2 698 had expired.
+  - after 10 s outages at U = 0.5 s, TCP replayed 15 480 superseded frames (1 280 with `TCP_NOTSENT_LOWAT` latest-only coalescing);
+  - at 30% loss, 53% of TCP deliveries were already superseded on arrival, and 1 292 had expired.
 - The carousel has no ordering. The newest item is sent at once and does not wait for anything older. RFC 2887 §4.3 calls this *replication*: "a new position superseding the old one will be sent before any retransmission could take place".
 - Latest-only coalescing removes the replay but not the stall, because the in-flight segment must still be retransmitted first. At high loss it made TCP's tail *worse*: a thinner stream has even fewer segments to trigger fast recovery.
 
@@ -125,19 +125,19 @@ Data for the chart: p99 update latency (Kaplan–Meier) in ms, or s where marked
   - MoQ ends lagging subscriptions with `TOO_FAR_BEHIND`.
   - E3 measured all the options.
 - **Surprise: autotuning hides slow readers.** On Linux 6.18 the kernel kept growing a stopped reader's receive buffer (to 4.1 MB), so backpressure never reached the sender. A slow TCP listener silently becomes a stale one.
-- **Feasibility is not the issue.** Idle TCP connections are cheap: about 4-5 KB each, and servers hold millions. The cost is the queued bytes per slow subscriber, which is exactly what a looping broadcast produces, plus 2.7× CPU and 2× packets.
+- **Feasibility is not the issue.** Idle TCP connections are cheap: about 4-5 KB each, and servers hold millions. The cost is the queued bytes per slow subscriber, which is exactly what a looping broadcast produces, plus about 3× sender CPU and 2× packets.
 
 ### 3.5 Dead listeners
 
 - A killed process sends FIN, and the sender knows in 5 ms.
-- A host that simply disappears keeps a TCP sender retransmitting for about 15 minutes (938 s measured), holding its queue. Every TCP relay needs `TCP_USER_TIMEOUT`.
-- A UDP lease just lapses (54-74 s measured, inside RFC-0001's bound). The only waste is datagrams sent into the void meanwhile.
+- A host that simply disappears keeps a TCP sender retransmitting for about 15 minutes (939 s measured), holding its queue. Every TCP relay needs `TCP_USER_TIMEOUT`.
+- A UDP lease just lapses (54-75 s measured, inside RFC-0001's bound). The only waste is datagrams sent into the void meanwhile.
 
 ### 3.6 Late joiners and restarts
 
-- **TCP connect-plus-snapshot is the fastest way to catch up on a clean path** (0.5 ms). Keep it for dashboards and replay (ringserver, §18).
-- **Under loss, the TCP handshake is the weak point.** A lost SYN costs 1 s, then 3 s, then 7 s. At 30%, p50 was 2.1 s and p90 36 s, and 17 of 360 joins were unfinished at 120 s, so the p99 lies beyond it.
-- **Catch-up time is set by the budget.** 20 items in a 4 kbit/s stream loop every 13 s, so passive catch-up takes about 15 s (14.6 s) even with no loss. The lease snapshot as specified (paced at 32 kbit/s, sent once) is slower than both at 5% loss. It should be repeated or paced faster (A5).
+- **TCP connect-plus-snapshot is the fastest way to catch up on a clean path** (0.5 ms p50). Keep it for dashboards and replay (ringserver, §18).
+- **Under loss, the TCP handshake is the weak point.** A lost SYN costs 1 s, then 3 s, then 7 s. At 30%, p50 was 2.2 s and p90 68 s, and 17 of 307 joins were unfinished at 120 s, so the p99 lies beyond it.
+- **Catch-up time is set by the budget.** 20 items in a 4 kbit/s stream loop every 13 s, so passive catch-up takes about 15 s (14.9 s) even with no loss. The lease snapshot as specified (paced at 32 kbit/s, sent once) is slower than both at 5% loss. It should be repeated or paced faster (A5).
 - **Relay restart: TCP knows at once (FIN).** A lease relay loses its cookie secret and leases, stays silent, and listeners wait three relay beacons (13.2 s). Persisting the cookie secret and lease table, or sending GOAWAY, fixes this (A8).
 
 ### 3.7 What internet round-trip times change
@@ -227,7 +227,7 @@ This builds on the cohort's own design: guardian sessions that read another sess
 
 | Plane (RFC-0001 §3.1) | Transport | Why |
 |---|---|---|
-| **Broadcast edge**: station or relay → listeners | **UDP carousel**: unicast leases, LAN multicast, QUIC DATAGRAM / WebTransport for browsers | Bounded staleness under heavy loss and outages; slow or dead listeners cost nothing; 2.7× cheaper per listener; multicast flat on a LAN |
+| **Broadcast edge**: station or relay → listeners | **UDP carousel**: unicast leases, LAN multicast, QUIC DATAGRAM / WebTransport for browsers | Bounded staleness under heavy loss and outages; slow or dead listeners cost nothing; about 3× cheaper per listener; multicast indistinguishable from idle on a LAN |
 | **Relay ↔ relay backbone** | **TCP or QUIC streams** (D10: NATS beyond cohort scale), latest-only per key, bounded drop-oldest queues, `TCP_USER_TIMEOUT` | Few, usually healthy links; one-RTO repair wins; each item carried once, not looped |
 | **Late-join snapshot, dashboards, replay** | **TCP** (ringserver SeedLink/DataLink/WebSocket, §18) on good paths; carousel as the fallback | 0.5 ms snapshots on clean paths; the carousel survives loss |
 | **Ledger** (findings, promotion) | **TCP** | Reliability and order matter; freshness doesn't |
@@ -255,7 +255,7 @@ This builds on the cohort's own design: guardian sessions that read another sess
 ## 8. Limitations
 
 - No RTT emulation (netem is not in this kernel). Loss is Bernoulli per packet, on one host.
-- Tails at ≥ 20% loss rest on a few long episodes per 900 s run, and vary between runs (`tcp-latest` at U = 0.5 s, 20%: p99 155 s in the first run, 21 s in the re-run). Read them as orders of magnitude.
+- Tails at ≥ 20% loss rest on a few long episodes per 900 s run, and vary between runs (`tcp-latest` at U = 0.5 s, 20%: p99 155 s, then 21 s, then 26 s in three runs; `tcp-stream` at U = 0.5 s, 30%: 29% then 36% delivered). Read them as orders of magnitude.
 - Update latencies and join times are Kaplan–Meier estimates, which assume that when a sample is cut off says nothing about its latency. TCP's long stalls strain that: consecutive updates share one stall. Where fewer than 99% of updates arrived, the p99 is reported only as a lower bound.
 - The Python harness adds about 1 ms to medians. E2's absolute CPU numbers are specific to this VM; the ratios carry over.
 - QUIC was not measured.
