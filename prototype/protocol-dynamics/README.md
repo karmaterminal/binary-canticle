@@ -99,6 +99,8 @@ that are never negative):
 PYTHONPATH=../canticle-station python -m unittest discover -s tests -v
 ```
 
+CI (`.github/workflows/tests.yml`, job `protocol-dynamics-harness-tests`) runs these tests on every pull request to `main`. It does not run `run_all.sh`, and it does not rerun or certify the E1-E5 measurements: those need root, and their evidence is the published generations checked with `python summarize.py verify`.
+
 Code layout:
 
 - `harness/netns.py`: namespaces, nftables loss and outages, `/proc/net/snmp` deltas;

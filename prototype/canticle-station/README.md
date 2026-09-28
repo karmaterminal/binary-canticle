@@ -81,6 +81,8 @@ python -m unittest discover -s tests      # 53 tests, about 6 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
+CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from the repository root with `PYTHONPATH=prototype/canticle-station`, on dependencies locked by hash in `.github/ci/`.
+
 - `test_wire.py` covers:
   - strict CBOR, including RFC 8949 core map-key order checked against bytes from an independent encoder (fxamacker/cbor), and the RFC §9.13 vectors byte for byte;
   - the RFC §9.11 size budget (745 / 720 / 1 100 B);
