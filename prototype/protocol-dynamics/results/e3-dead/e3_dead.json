@@ -1,0 +1,2864 @@
+{
+ "run_id": "20260927T232539Z-9517-7e7b",
+ "experiment": "e3_dead",
+ "n": 100,
+ "rate": 10,
+ "frame_bytes": 700,
+ "event_at_s": 10,
+ "queue_cap_bytes": 65536,
+ "runs": {
+  "tcp-kill": {
+   "mode": "tcp-kill",
+   "relay": {
+    "mode": "tcp-queue",
+    "n": 100,
+    "t0": 1790551544.8375537,
+    "user_timeout_ms": 0,
+    "stalled_at_s": null,
+    "victim": {
+     "error": "EOF",
+     "closed_at_s": 12.32,
+     "dropped": 0,
+     "queue_bytes_end": 0
+    },
+    "healthy_errors": 0,
+    "rss_kb_end": 46480,
+    "timeline": [
+     {
+      "t": 3.33,
+      "rss_kb": 46460,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Open",
+       "rto_ms": 204.0,
+       "backoff": 0,
+       "retransmits": 0,
+       "total_retrans": 0,
+       "unacked": 0,
+       "notsent_bytes": 0,
+       "bytes_retrans": 0
+      }
+     },
+     {
+      "t": 12.33,
+      "rss_kb": 46460,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 13.33,
+      "rss_kb": 46460,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 23.33,
+      "rss_kb": 46468,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 33.33,
+      "rss_kb": 46472,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 43.34,
+      "rss_kb": 46476,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 53.34,
+      "rss_kb": 46476,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 60.34,
+      "rss_kb": 46480,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     }
+    ]
+   },
+   "healthy": {
+    "latency_ms": {
+     "n": 48510,
+     "unit": "ms",
+     "mean": 1.2,
+     "median": 1.1,
+     "p90": 1.7,
+     "p95": 2.0,
+     "p99": 3.0,
+     "p99.9": 8.5,
+     "max": 9.0,
+     "min": 0.2
+    },
+    "max_gap_ms": 108.0,
+    "frames_per_listener_min": 490,
+    "frames_expected_per_listener": 490,
+    "last_frame_at_s_median": 59.43
+   },
+   "snmp": {
+    "Udp.RcvbufErrors": 0,
+    "Udp.InDatagrams": 0,
+    "Udp.OutDatagrams": 0,
+    "Udp.NoPorts": 0,
+    "Tcp.RetransSegs": 0,
+    "Tcp.OutRsts": 0,
+    "Tcp.EstabResets": 0,
+    "TcpExt.TCPTimeouts": 0,
+    "TcpExt.TCPAbortOnTimeout": 0,
+    "TcpExt.TCPAbortOnData": 0,
+    "TcpExt.TCPAbortOnClose": 0
+   },
+   "death_at_s": 12.32,
+   "victim_closed_after_death_s": 0.002
+  },
+  "tcp-silent-uto30s": {
+   "mode": "tcp-silent",
+   "relay": {
+    "mode": "tcp-queue",
+    "n": 100,
+    "t0": 1790551544.6079326,
+    "user_timeout_ms": 30000,
+    "stalled_at_s": null,
+    "victim": {
+     "error": "TimeoutError",
+     "closed_at_s": 42.48,
+     "dropped": 0,
+     "queue_bytes_end": 138600
+    },
+    "healthy_errors": 0,
+    "rss_kb_end": 46564,
+    "timeline": [
+     {
+      "t": 3.14,
+      "rss_kb": 46404,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Open",
+       "rto_ms": 204.0,
+       "backoff": 0,
+       "retransmits": 0,
+       "total_retrans": 0,
+       "unacked": 0,
+       "notsent_bytes": 0,
+       "bytes_retrans": 0
+      }
+     },
+     {
+      "t": 13.14,
+      "rss_kb": 46408,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 816.0,
+       "backoff": 2,
+       "retransmits": 2,
+       "total_retrans": 3,
+       "unacked": 2,
+       "notsent_bytes": 4900,
+       "bytes_retrans": 3500
+      }
+     },
+     {
+      "t": 14.14,
+      "rss_kb": 46408,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 1632.0,
+       "backoff": 3,
+       "retransmits": 3,
+       "total_retrans": 4,
+       "unacked": 2,
+       "notsent_bytes": 11900,
+       "bytes_retrans": 4900
+      }
+     },
+     {
+      "t": 16.14,
+      "rss_kb": 46412,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 3264.0,
+       "backoff": 4,
+       "retransmits": 4,
+       "total_retrans": 5,
+       "unacked": 2,
+       "notsent_bytes": 25900,
+       "bytes_retrans": 6300
+      }
+     },
+     {
+      "t": 19.14,
+      "rss_kb": 46412,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 6528.0,
+       "backoff": 5,
+       "retransmits": 5,
+       "total_retrans": 6,
+       "unacked": 2,
+       "notsent_bytes": 46900,
+       "bytes_retrans": 7700
+      }
+     },
+     {
+      "t": 23.14,
+      "rss_kb": 46412,
+      "blocked": null,
+      "victim_queue_bytes": 3500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 6528.0,
+       "backoff": 5,
+       "retransmits": 5,
+       "total_retrans": 6,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 7700
+      }
+     },
+     {
+      "t": 26.14,
+      "rss_kb": 46416,
+      "blocked": null,
+      "victim_queue_bytes": 24500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 13056.0,
+       "backoff": 6,
+       "retransmits": 6,
+       "total_retrans": 7,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 9100
+      }
+     },
+     {
+      "t": 33.15,
+      "rss_kb": 46468,
+      "blocked": null,
+      "victim_queue_bytes": 73500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 13056.0,
+       "backoff": 6,
+       "retransmits": 6,
+       "total_retrans": 7,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 9100
+      }
+     },
+     {
+      "t": 39.15,
+      "rss_kb": 46520,
+      "blocked": null,
+      "victim_queue_bytes": 115500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 26112.0,
+       "backoff": 7,
+       "retransmits": 7,
+       "total_retrans": 8,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 10500
+      }
+     },
+     {
+      "t": 43.15,
+      "rss_kb": 46548,
+      "blocked": null,
+      "victim_queue_bytes": 138600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 53.16,
+      "rss_kb": 46552,
+      "blocked": null,
+      "victim_queue_bytes": 138600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 63.16,
+      "rss_kb": 46552,
+      "blocked": null,
+      "victim_queue_bytes": 138600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 73.16,
+      "rss_kb": 46560,
+      "blocked": null,
+      "victim_queue_bytes": 138600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 83.17,
+      "rss_kb": 46564,
+      "blocked": null,
+      "victim_queue_bytes": 138600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 90.17,
+      "rss_kb": 46564,
+      "blocked": null,
+      "victim_queue_bytes": 138600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     }
+    ]
+   },
+   "healthy": {
+    "latency_ms": {
+     "n": 78210,
+     "unit": "ms",
+     "mean": 1.4,
+     "median": 1.2,
+     "p90": 2.0,
+     "p95": 2.6,
+     "p99": 6.1,
+     "p99.9": 54.2,
+     "max": 55.0,
+     "min": 0.2
+    },
+    "max_gap_ms": 153.4,
+    "frames_per_listener_min": 790,
+    "frames_expected_per_listener": 790,
+    "last_frame_at_s_median": 89.44
+   },
+   "snmp": {
+    "Udp.RcvbufErrors": 0,
+    "Udp.InDatagrams": 0,
+    "Udp.OutDatagrams": 0,
+    "Udp.NoPorts": 0,
+    "Tcp.RetransSegs": 8,
+    "Tcp.OutRsts": 0,
+    "Tcp.EstabResets": 1,
+    "TcpExt.TCPTimeouts": 8,
+    "TcpExt.TCPAbortOnTimeout": 1,
+    "TcpExt.TCPAbortOnData": 0,
+    "TcpExt.TCPAbortOnClose": 0
+   },
+   "death_at_s": 12.13,
+   "victim_closed_after_death_s": 30.347
+  },
+  "tcp-silent": {
+   "mode": "tcp-silent",
+   "relay": {
+    "mode": "tcp-queue",
+    "n": 100,
+    "t0": 1790551545.0209234,
+    "user_timeout_ms": 0,
+    "stalled_at_s": null,
+    "victim": {
+     "error": "TimeoutError",
+     "closed_at_s": 950.87,
+     "dropped": 0,
+     "queue_bytes_end": 6497400
+    },
+    "healthy_errors": 0,
+    "rss_kb_end": 54068,
+    "timeline": [
+     {
+      "t": 3.13,
+      "rss_kb": 46472,
+      "blocked": null,
+      "victim_queue_bytes": 700,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Open",
+       "rto_ms": 204.0,
+       "backoff": 0,
+       "retransmits": 0,
+       "total_retrans": 0,
+       "unacked": 0,
+       "notsent_bytes": 0,
+       "bytes_retrans": 0
+      }
+     },
+     {
+      "t": 13.14,
+      "rss_kb": 46472,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 816.0,
+       "backoff": 2,
+       "retransmits": 2,
+       "total_retrans": 3,
+       "unacked": 2,
+       "notsent_bytes": 4900,
+       "bytes_retrans": 3500
+      }
+     },
+     {
+      "t": 14.14,
+      "rss_kb": 46476,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 1632.0,
+       "backoff": 3,
+       "retransmits": 3,
+       "total_retrans": 4,
+       "unacked": 2,
+       "notsent_bytes": 11900,
+       "bytes_retrans": 4900
+      }
+     },
+     {
+      "t": 16.14,
+      "rss_kb": 46480,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 3264.0,
+       "backoff": 4,
+       "retransmits": 4,
+       "total_retrans": 5,
+       "unacked": 2,
+       "notsent_bytes": 25900,
+       "bytes_retrans": 6300
+      }
+     },
+     {
+      "t": 19.14,
+      "rss_kb": 46480,
+      "blocked": null,
+      "victim_queue_bytes": 0,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 6528.0,
+       "backoff": 5,
+       "retransmits": 5,
+       "total_retrans": 6,
+       "unacked": 2,
+       "notsent_bytes": 46900,
+       "bytes_retrans": 7700
+      }
+     },
+     {
+      "t": 23.14,
+      "rss_kb": 46480,
+      "blocked": null,
+      "victim_queue_bytes": 3500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 6528.0,
+       "backoff": 5,
+       "retransmits": 5,
+       "total_retrans": 6,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 7700
+      }
+     },
+     {
+      "t": 26.14,
+      "rss_kb": 46488,
+      "blocked": null,
+      "victim_queue_bytes": 24500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 13056.0,
+       "backoff": 6,
+       "retransmits": 6,
+       "total_retrans": 7,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 9100
+      }
+     },
+     {
+      "t": 33.15,
+      "rss_kb": 46536,
+      "blocked": null,
+      "victim_queue_bytes": 73500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 13056.0,
+       "backoff": 6,
+       "retransmits": 6,
+       "total_retrans": 7,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 9100
+      }
+     },
+     {
+      "t": 39.15,
+      "rss_kb": 46584,
+      "blocked": null,
+      "victim_queue_bytes": 115500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 26112.0,
+       "backoff": 7,
+       "retransmits": 7,
+       "total_retrans": 8,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 10500
+      }
+     },
+     {
+      "t": 43.15,
+      "rss_kb": 46620,
+      "blocked": null,
+      "victim_queue_bytes": 143500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 26112.0,
+       "backoff": 7,
+       "retransmits": 7,
+       "total_retrans": 8,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 10500
+      }
+     },
+     {
+      "t": 53.15,
+      "rss_kb": 46696,
+      "blocked": null,
+      "victim_queue_bytes": 213500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 26112.0,
+       "backoff": 7,
+       "retransmits": 7,
+       "total_retrans": 8,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 10500
+      }
+     },
+     {
+      "t": 63.16,
+      "rss_kb": 46784,
+      "blocked": null,
+      "victim_queue_bytes": 283500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 26112.0,
+       "backoff": 7,
+       "retransmits": 7,
+       "total_retrans": 8,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 10500
+      }
+     },
+     {
+      "t": 66.16,
+      "rss_kb": 46808,
+      "blocked": null,
+      "victim_queue_bytes": 304500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 52224.0,
+       "backoff": 8,
+       "retransmits": 8,
+       "total_retrans": 9,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 11900
+      }
+     },
+     {
+      "t": 73.16,
+      "rss_kb": 46868,
+      "blocked": null,
+      "victim_queue_bytes": 353500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 52224.0,
+       "backoff": 8,
+       "retransmits": 8,
+       "total_retrans": 9,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 11900
+      }
+     },
+     {
+      "t": 83.16,
+      "rss_kb": 46948,
+      "blocked": null,
+      "victim_queue_bytes": 423500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 52224.0,
+       "backoff": 8,
+       "retransmits": 8,
+       "total_retrans": 9,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 11900
+      }
+     },
+     {
+      "t": 93.19,
+      "rss_kb": 47028,
+      "blocked": null,
+      "victim_queue_bytes": 493500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 52224.0,
+       "backoff": 8,
+       "retransmits": 8,
+       "total_retrans": 9,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 11900
+      }
+     },
+     {
+      "t": 103.19,
+      "rss_kb": 47116,
+      "blocked": null,
+      "victim_queue_bytes": 563500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 52224.0,
+       "backoff": 8,
+       "retransmits": 8,
+       "total_retrans": 9,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 11900
+      }
+     },
+     {
+      "t": 113.19,
+      "rss_kb": 47192,
+      "blocked": null,
+      "victim_queue_bytes": 633500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 52224.0,
+       "backoff": 8,
+       "retransmits": 8,
+       "total_retrans": 9,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 11900
+      }
+     },
+     {
+      "t": 120.2,
+      "rss_kb": 47244,
+      "blocked": null,
+      "victim_queue_bytes": 682500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 104448.0,
+       "backoff": 9,
+       "retransmits": 9,
+       "total_retrans": 10,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 13300
+      }
+     },
+     {
+      "t": 123.2,
+      "rss_kb": 47272,
+      "blocked": null,
+      "victim_queue_bytes": 703500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 104448.0,
+       "backoff": 9,
+       "retransmits": 9,
+       "total_retrans": 10,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 13300
+      }
+     },
+     {
+      "t": 133.2,
+      "rss_kb": 47356,
+      "blocked": null,
+      "victim_queue_bytes": 773500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 104448.0,
+       "backoff": 9,
+       "retransmits": 9,
+       "total_retrans": 10,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 13300
+      }
+     },
+     {
+      "t": 143.21,
+      "rss_kb": 47436,
+      "blocked": null,
+      "victim_queue_bytes": 843500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 104448.0,
+       "backoff": 9,
+       "retransmits": 9,
+       "total_retrans": 10,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 13300
+      }
+     },
+     {
+      "t": 153.21,
+      "rss_kb": 47520,
+      "blocked": null,
+      "victim_queue_bytes": 913500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 104448.0,
+       "backoff": 9,
+       "retransmits": 9,
+       "total_retrans": 10,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 13300
+      }
+     },
+     {
+      "t": 163.21,
+      "rss_kb": 47600,
+      "blocked": null,
+      "victim_queue_bytes": 983500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 104448.0,
+       "backoff": 9,
+       "retransmits": 9,
+       "total_retrans": 10,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 13300
+      }
+     },
+     {
+      "t": 173.22,
+      "rss_kb": 47684,
+      "blocked": null,
+      "victim_queue_bytes": 1053500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 104448.0,
+       "backoff": 9,
+       "retransmits": 9,
+       "total_retrans": 10,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 13300
+      }
+     },
+     {
+      "t": 183.22,
+      "rss_kb": 47764,
+      "blocked": null,
+      "victim_queue_bytes": 1123500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 104448.0,
+       "backoff": 9,
+       "retransmits": 9,
+       "total_retrans": 10,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 13300
+      }
+     },
+     {
+      "t": 193.22,
+      "rss_kb": 47848,
+      "blocked": null,
+      "victim_queue_bytes": 1193500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 104448.0,
+       "backoff": 9,
+       "retransmits": 9,
+       "total_retrans": 10,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 13300
+      }
+     },
+     {
+      "t": 203.23,
+      "rss_kb": 47928,
+      "blocked": null,
+      "victim_queue_bytes": 1263500,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 104448.0,
+       "backoff": 9,
+       "retransmits": 9,
+       "total_retrans": 10,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 13300
+      }
+     },
+     {
+      "t": 213.23,
+      "rss_kb": 48012,
+      "blocked": null,
+      "victim_queue_bytes": 1334200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 700,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 104448.0,
+       "backoff": 9,
+       "retransmits": 9,
+       "total_retrans": 10,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 13300
+      }
+     },
+     {
+      "t": 223.24,
+      "rss_kb": 48092,
+      "blocked": null,
+      "victim_queue_bytes": 1404200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 104448.0,
+       "backoff": 9,
+       "retransmits": 9,
+       "total_retrans": 10,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 13300
+      }
+     },
+     {
+      "t": 226.24,
+      "rss_kb": 48116,
+      "blocked": null,
+      "victim_queue_bytes": 1425200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 10,
+       "retransmits": 10,
+       "total_retrans": 11,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 14700
+      }
+     },
+     {
+      "t": 233.24,
+      "rss_kb": 48176,
+      "blocked": null,
+      "victim_queue_bytes": 1474200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 10,
+       "retransmits": 10,
+       "total_retrans": 11,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 14700
+      }
+     },
+     {
+      "t": 243.24,
+      "rss_kb": 48256,
+      "blocked": null,
+      "victim_queue_bytes": 1544200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 10,
+       "retransmits": 10,
+       "total_retrans": 11,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 14700
+      }
+     },
+     {
+      "t": 253.25,
+      "rss_kb": 48340,
+      "blocked": null,
+      "victim_queue_bytes": 1614200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 10,
+       "retransmits": 10,
+       "total_retrans": 11,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 14700
+      }
+     },
+     {
+      "t": 263.25,
+      "rss_kb": 48420,
+      "blocked": null,
+      "victim_queue_bytes": 1684200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 10,
+       "retransmits": 10,
+       "total_retrans": 11,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 14700
+      }
+     },
+     {
+      "t": 273.25,
+      "rss_kb": 48504,
+      "blocked": null,
+      "victim_queue_bytes": 1754200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 10,
+       "retransmits": 10,
+       "total_retrans": 11,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 14700
+      }
+     },
+     {
+      "t": 283.26,
+      "rss_kb": 48580,
+      "blocked": null,
+      "victim_queue_bytes": 1824200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 10,
+       "retransmits": 10,
+       "total_retrans": 11,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 14700
+      }
+     },
+     {
+      "t": 293.26,
+      "rss_kb": 48664,
+      "blocked": null,
+      "victim_queue_bytes": 1894200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 10,
+       "retransmits": 10,
+       "total_retrans": 11,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 14700
+      }
+     },
+     {
+      "t": 303.26,
+      "rss_kb": 48748,
+      "blocked": null,
+      "victim_queue_bytes": 1964200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 10,
+       "retransmits": 10,
+       "total_retrans": 11,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 14700
+      }
+     },
+     {
+      "t": 313.27,
+      "rss_kb": 48824,
+      "blocked": null,
+      "victim_queue_bytes": 2034200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 10,
+       "retransmits": 10,
+       "total_retrans": 11,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 14700
+      }
+     },
+     {
+      "t": 323.27,
+      "rss_kb": 48912,
+      "blocked": null,
+      "victim_queue_bytes": 2104200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 10,
+       "retransmits": 10,
+       "total_retrans": 11,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 14700
+      }
+     },
+     {
+      "t": 333.28,
+      "rss_kb": 48992,
+      "blocked": null,
+      "victim_queue_bytes": 2174200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 10,
+       "retransmits": 10,
+       "total_retrans": 11,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 14700
+      }
+     },
+     {
+      "t": 343.28,
+      "rss_kb": 49072,
+      "blocked": null,
+      "victim_queue_bytes": 2244200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 10,
+       "retransmits": 10,
+       "total_retrans": 11,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 14700
+      }
+     },
+     {
+      "t": 347.28,
+      "rss_kb": 49108,
+      "blocked": null,
+      "victim_queue_bytes": 2272200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 11,
+       "retransmits": 11,
+       "total_retrans": 12,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 16100
+      }
+     },
+     {
+      "t": 353.29,
+      "rss_kb": 49156,
+      "blocked": null,
+      "victim_queue_bytes": 2314200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 11,
+       "retransmits": 11,
+       "total_retrans": 12,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 16100
+      }
+     },
+     {
+      "t": 363.29,
+      "rss_kb": 49236,
+      "blocked": null,
+      "victim_queue_bytes": 2384200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 11,
+       "retransmits": 11,
+       "total_retrans": 12,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 16100
+      }
+     },
+     {
+      "t": 373.29,
+      "rss_kb": 49316,
+      "blocked": null,
+      "victim_queue_bytes": 2454200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 11,
+       "retransmits": 11,
+       "total_retrans": 12,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 16100
+      }
+     },
+     {
+      "t": 383.29,
+      "rss_kb": 49404,
+      "blocked": null,
+      "victim_queue_bytes": 2524200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 11,
+       "retransmits": 11,
+       "total_retrans": 12,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 16100
+      }
+     },
+     {
+      "t": 393.3,
+      "rss_kb": 49480,
+      "blocked": null,
+      "victim_queue_bytes": 2594200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 11,
+       "retransmits": 11,
+       "total_retrans": 12,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 16100
+      }
+     },
+     {
+      "t": 403.3,
+      "rss_kb": 49564,
+      "blocked": null,
+      "victim_queue_bytes": 2664200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 11,
+       "retransmits": 11,
+       "total_retrans": 12,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 16100
+      }
+     },
+     {
+      "t": 413.31,
+      "rss_kb": 49652,
+      "blocked": null,
+      "victim_queue_bytes": 2734200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 11,
+       "retransmits": 11,
+       "total_retrans": 12,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 16100
+      }
+     },
+     {
+      "t": 423.31,
+      "rss_kb": 49732,
+      "blocked": null,
+      "victim_queue_bytes": 2804200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 11,
+       "retransmits": 11,
+       "total_retrans": 12,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 16100
+      }
+     },
+     {
+      "t": 433.32,
+      "rss_kb": 49812,
+      "blocked": null,
+      "victim_queue_bytes": 2874200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 11,
+       "retransmits": 11,
+       "total_retrans": 12,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 16100
+      }
+     },
+     {
+      "t": 443.32,
+      "rss_kb": 49896,
+      "blocked": null,
+      "victim_queue_bytes": 2944200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 11,
+       "retransmits": 11,
+       "total_retrans": 12,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 16100
+      }
+     },
+     {
+      "t": 453.32,
+      "rss_kb": 49980,
+      "blocked": null,
+      "victim_queue_bytes": 3014200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 11,
+       "retransmits": 11,
+       "total_retrans": 12,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 16100
+      }
+     },
+     {
+      "t": 463.33,
+      "rss_kb": 50060,
+      "blocked": null,
+      "victim_queue_bytes": 3084200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 11,
+       "retransmits": 11,
+       "total_retrans": 12,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 16100
+      }
+     },
+     {
+      "t": 468.33,
+      "rss_kb": 50100,
+      "blocked": null,
+      "victim_queue_bytes": 3119200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 12,
+       "retransmits": 12,
+       "total_retrans": 13,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 17500
+      }
+     },
+     {
+      "t": 473.33,
+      "rss_kb": 50144,
+      "blocked": null,
+      "victim_queue_bytes": 3154200,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 12,
+       "retransmits": 12,
+       "total_retrans": 13,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 17500
+      }
+     },
+     {
+      "t": 483.33,
+      "rss_kb": 50224,
+      "blocked": null,
+      "victim_queue_bytes": 3224900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 12,
+       "retransmits": 12,
+       "total_retrans": 13,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 17500
+      }
+     },
+     {
+      "t": 493.34,
+      "rss_kb": 50308,
+      "blocked": null,
+      "victim_queue_bytes": 3294900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 12,
+       "retransmits": 12,
+       "total_retrans": 13,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 17500
+      }
+     },
+     {
+      "t": 503.34,
+      "rss_kb": 50388,
+      "blocked": null,
+      "victim_queue_bytes": 3364900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 12,
+       "retransmits": 12,
+       "total_retrans": 13,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 17500
+      }
+     },
+     {
+      "t": 513.34,
+      "rss_kb": 50472,
+      "blocked": null,
+      "victim_queue_bytes": 3434900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 12,
+       "retransmits": 12,
+       "total_retrans": 13,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 17500
+      }
+     },
+     {
+      "t": 523.35,
+      "rss_kb": 50552,
+      "blocked": null,
+      "victim_queue_bytes": 3504900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 12,
+       "retransmits": 12,
+       "total_retrans": 13,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 17500
+      }
+     },
+     {
+      "t": 533.35,
+      "rss_kb": 50632,
+      "blocked": null,
+      "victim_queue_bytes": 3574900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 12,
+       "retransmits": 12,
+       "total_retrans": 13,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 17500
+      }
+     },
+     {
+      "t": 543.35,
+      "rss_kb": 50716,
+      "blocked": null,
+      "victim_queue_bytes": 3644900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 12,
+       "retransmits": 12,
+       "total_retrans": 13,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 17500
+      }
+     },
+     {
+      "t": 553.36,
+      "rss_kb": 50800,
+      "blocked": null,
+      "victim_queue_bytes": 3714900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 12,
+       "retransmits": 12,
+       "total_retrans": 13,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 17500
+      }
+     },
+     {
+      "t": 563.36,
+      "rss_kb": 50876,
+      "blocked": null,
+      "victim_queue_bytes": 3784900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 12,
+       "retransmits": 12,
+       "total_retrans": 13,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 17500
+      }
+     },
+     {
+      "t": 573.36,
+      "rss_kb": 50964,
+      "blocked": null,
+      "victim_queue_bytes": 3854900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 12,
+       "retransmits": 12,
+       "total_retrans": 13,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 17500
+      }
+     },
+     {
+      "t": 583.37,
+      "rss_kb": 51044,
+      "blocked": null,
+      "victim_queue_bytes": 3924900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 12,
+       "retransmits": 12,
+       "total_retrans": 13,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 17500
+      }
+     },
+     {
+      "t": 589.37,
+      "rss_kb": 51088,
+      "blocked": null,
+      "victim_queue_bytes": 3966900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 13,
+       "retransmits": 13,
+       "total_retrans": 14,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 18900
+      }
+     },
+     {
+      "t": 593.37,
+      "rss_kb": 51124,
+      "blocked": null,
+      "victim_queue_bytes": 3994900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 13,
+       "retransmits": 13,
+       "total_retrans": 14,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 18900
+      }
+     },
+     {
+      "t": 603.37,
+      "rss_kb": 51208,
+      "blocked": null,
+      "victim_queue_bytes": 4064900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 13,
+       "retransmits": 13,
+       "total_retrans": 14,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 18900
+      }
+     },
+     {
+      "t": 613.38,
+      "rss_kb": 51292,
+      "blocked": null,
+      "victim_queue_bytes": 4134900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 13,
+       "retransmits": 13,
+       "total_retrans": 14,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 18900
+      }
+     },
+     {
+      "t": 623.38,
+      "rss_kb": 51368,
+      "blocked": null,
+      "victim_queue_bytes": 4204900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 13,
+       "retransmits": 13,
+       "total_retrans": 14,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 18900
+      }
+     },
+     {
+      "t": 633.38,
+      "rss_kb": 51448,
+      "blocked": null,
+      "victim_queue_bytes": 4274900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 13,
+       "retransmits": 13,
+       "total_retrans": 14,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 18900
+      }
+     },
+     {
+      "t": 643.38,
+      "rss_kb": 51532,
+      "blocked": null,
+      "victim_queue_bytes": 4344900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 13,
+       "retransmits": 13,
+       "total_retrans": 14,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 18900
+      }
+     },
+     {
+      "t": 653.39,
+      "rss_kb": 51612,
+      "blocked": null,
+      "victim_queue_bytes": 4414900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 13,
+       "retransmits": 13,
+       "total_retrans": 14,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 18900
+      }
+     },
+     {
+      "t": 663.39,
+      "rss_kb": 51696,
+      "blocked": null,
+      "victim_queue_bytes": 4484900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 13,
+       "retransmits": 13,
+       "total_retrans": 14,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 18900
+      }
+     },
+     {
+      "t": 673.4,
+      "rss_kb": 51776,
+      "blocked": null,
+      "victim_queue_bytes": 4554900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 13,
+       "retransmits": 13,
+       "total_retrans": 14,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 18900
+      }
+     },
+     {
+      "t": 683.4,
+      "rss_kb": 51860,
+      "blocked": null,
+      "victim_queue_bytes": 4624900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 13,
+       "retransmits": 13,
+       "total_retrans": 14,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 18900
+      }
+     },
+     {
+      "t": 693.4,
+      "rss_kb": 51940,
+      "blocked": null,
+      "victim_queue_bytes": 4694900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 13,
+       "retransmits": 13,
+       "total_retrans": 14,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 18900
+      }
+     },
+     {
+      "t": 703.41,
+      "rss_kb": 52024,
+      "blocked": null,
+      "victim_queue_bytes": 4764900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 13,
+       "retransmits": 13,
+       "total_retrans": 14,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 18900
+      }
+     },
+     {
+      "t": 709.41,
+      "rss_kb": 52072,
+      "blocked": null,
+      "victim_queue_bytes": 4806900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 14,
+       "retransmits": 14,
+       "total_retrans": 15,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 20300
+      }
+     },
+     {
+      "t": 713.41,
+      "rss_kb": 52104,
+      "blocked": null,
+      "victim_queue_bytes": 4834900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 14,
+       "retransmits": 14,
+       "total_retrans": 15,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 20300
+      }
+     },
+     {
+      "t": 723.41,
+      "rss_kb": 52188,
+      "blocked": null,
+      "victim_queue_bytes": 4904900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 14,
+       "retransmits": 14,
+       "total_retrans": 15,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 20300
+      }
+     },
+     {
+      "t": 733.41,
+      "rss_kb": 52268,
+      "blocked": null,
+      "victim_queue_bytes": 4974900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 14,
+       "retransmits": 14,
+       "total_retrans": 15,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 20300
+      }
+     },
+     {
+      "t": 743.42,
+      "rss_kb": 52352,
+      "blocked": null,
+      "victim_queue_bytes": 5044900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 14,
+       "retransmits": 14,
+       "total_retrans": 15,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 20300
+      }
+     },
+     {
+      "t": 753.42,
+      "rss_kb": 52432,
+      "blocked": null,
+      "victim_queue_bytes": 5114900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 14,
+       "retransmits": 14,
+       "total_retrans": 15,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 20300
+      }
+     },
+     {
+      "t": 763.42,
+      "rss_kb": 52516,
+      "blocked": null,
+      "victim_queue_bytes": 5184900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 14,
+       "retransmits": 14,
+       "total_retrans": 15,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 20300
+      }
+     },
+     {
+      "t": 773.43,
+      "rss_kb": 52596,
+      "blocked": null,
+      "victim_queue_bytes": 5254900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 14,
+       "retransmits": 14,
+       "total_retrans": 15,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 20300
+      }
+     },
+     {
+      "t": 783.43,
+      "rss_kb": 52676,
+      "blocked": null,
+      "victim_queue_bytes": 5324900,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 14,
+       "retransmits": 14,
+       "total_retrans": 15,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 20300
+      }
+     },
+     {
+      "t": 793.43,
+      "rss_kb": 52756,
+      "blocked": null,
+      "victim_queue_bytes": 5395600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 700,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 14,
+       "retransmits": 14,
+       "total_retrans": 15,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 20300
+      }
+     },
+     {
+      "t": 803.44,
+      "rss_kb": 52840,
+      "blocked": null,
+      "victim_queue_bytes": 5465600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 14,
+       "retransmits": 14,
+       "total_retrans": 15,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 20300
+      }
+     },
+     {
+      "t": 813.44,
+      "rss_kb": 52924,
+      "blocked": null,
+      "victim_queue_bytes": 5535600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 14,
+       "retransmits": 14,
+       "total_retrans": 15,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 20300
+      }
+     },
+     {
+      "t": 823.44,
+      "rss_kb": 53000,
+      "blocked": null,
+      "victim_queue_bytes": 5605600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 14,
+       "retransmits": 14,
+       "total_retrans": 15,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 20300
+      }
+     },
+     {
+      "t": 830.45,
+      "rss_kb": 53064,
+      "blocked": null,
+      "victim_queue_bytes": 5654600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 15,
+       "retransmits": 15,
+       "total_retrans": 16,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 21700
+      }
+     },
+     {
+      "t": 833.45,
+      "rss_kb": 53088,
+      "blocked": null,
+      "victim_queue_bytes": 5675600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 15,
+       "retransmits": 15,
+       "total_retrans": 16,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 21700
+      }
+     },
+     {
+      "t": 843.45,
+      "rss_kb": 53168,
+      "blocked": null,
+      "victim_queue_bytes": 5745600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 15,
+       "retransmits": 15,
+       "total_retrans": 16,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 21700
+      }
+     },
+     {
+      "t": 853.45,
+      "rss_kb": 53252,
+      "blocked": null,
+      "victim_queue_bytes": 5815600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 15,
+       "retransmits": 15,
+       "total_retrans": 16,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 21700
+      }
+     },
+     {
+      "t": 863.46,
+      "rss_kb": 53336,
+      "blocked": null,
+      "victim_queue_bytes": 5885600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 15,
+       "retransmits": 15,
+       "total_retrans": 16,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 21700
+      }
+     },
+     {
+      "t": 873.46,
+      "rss_kb": 53420,
+      "blocked": null,
+      "victim_queue_bytes": 5955600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 15,
+       "retransmits": 15,
+       "total_retrans": 16,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 21700
+      }
+     },
+     {
+      "t": 883.46,
+      "rss_kb": 53500,
+      "blocked": null,
+      "victim_queue_bytes": 6025600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 15,
+       "retransmits": 15,
+       "total_retrans": 16,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 21700
+      }
+     },
+     {
+      "t": 893.47,
+      "rss_kb": 53588,
+      "blocked": null,
+      "victim_queue_bytes": 6095600,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 15,
+       "retransmits": 15,
+       "total_retrans": 16,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 21700
+      }
+     },
+     {
+      "t": 903.55,
+      "rss_kb": 53668,
+      "blocked": null,
+      "victim_queue_bytes": 6166300,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 15,
+       "retransmits": 15,
+       "total_retrans": 16,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 21700
+      }
+     },
+     {
+      "t": 913.57,
+      "rss_kb": 53748,
+      "blocked": null,
+      "victim_queue_bytes": 6236300,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 15,
+       "retransmits": 15,
+       "total_retrans": 16,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 21700
+      }
+     },
+     {
+      "t": 923.6,
+      "rss_kb": 53832,
+      "blocked": null,
+      "victim_queue_bytes": 6306300,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 15,
+       "retransmits": 15,
+       "total_retrans": 16,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 21700
+      }
+     },
+     {
+      "t": 933.63,
+      "rss_kb": 53912,
+      "blocked": null,
+      "victim_queue_bytes": 6376300,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 15,
+       "retransmits": 15,
+       "total_retrans": 16,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 21700
+      }
+     },
+     {
+      "t": 943.64,
+      "rss_kb": 53992,
+      "blocked": null,
+      "victim_queue_bytes": 6447000,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": {
+       "state": "ESTABLISHED",
+       "ca_state": "Loss",
+       "rto_ms": 120000.0,
+       "backoff": 15,
+       "retransmits": 15,
+       "total_retrans": 16,
+       "unacked": 2,
+       "notsent_bytes": 71400,
+       "bytes_retrans": 21700
+      }
+     },
+     {
+      "t": 951.64,
+      "rss_kb": 54052,
+      "blocked": null,
+      "victim_queue_bytes": 6497400,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 953.64,
+      "rss_kb": 54052,
+      "blocked": null,
+      "victim_queue_bytes": 6497400,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 963.65,
+      "rss_kb": 54056,
+      "blocked": null,
+      "victim_queue_bytes": 6497400,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 973.65,
+      "rss_kb": 54064,
+      "blocked": null,
+      "victim_queue_bytes": 6497400,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 983.65,
+      "rss_kb": 54064,
+      "blocked": null,
+      "victim_queue_bytes": 6497400,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 993.66,
+      "rss_kb": 54068,
+      "blocked": null,
+      "victim_queue_bytes": 6497400,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     },
+     {
+      "t": 1000.66,
+      "rss_kb": 54068,
+      "blocked": null,
+      "victim_queue_bytes": 6497400,
+      "victim_dropped": 0,
+      "healthy_queue_bytes": 0,
+      "victim_tcp": null
+     }
+    ]
+   },
+   "healthy": {
+    "latency_ms": {
+     "n": 979110,
+     "unit": "ms",
+     "mean": 1.3,
+     "median": 1.1,
+     "p90": 1.8,
+     "p95": 2.1,
+     "p99": 6.8,
+     "p99.9": 14.4,
+     "max": 52.9,
+     "min": 0.1
+    },
+    "max_gap_ms": 151.3,
+    "frames_per_listener_min": 9890,
+    "frames_expected_per_listener": 9890,
+    "last_frame_at_s_median": 999.43
+   },
+   "snmp": {
+    "Udp.RcvbufErrors": 0,
+    "Udp.InDatagrams": 0,
+    "Udp.OutDatagrams": 0,
+    "Udp.NoPorts": 0,
+    "Tcp.RetransSegs": 16,
+    "Tcp.OutRsts": 0,
+    "Tcp.EstabResets": 1,
+    "TcpExt.TCPTimeouts": 16,
+    "TcpExt.TCPAbortOnTimeout": 1,
+    "TcpExt.TCPAbortOnData": 0,
+    "TcpExt.TCPAbortOnClose": 0
+   },
+   "death_at_s": 12.13,
+   "victim_closed_after_death_s": 938.739
+  },
+  "udp-lease": {
+   "mode": "udp-lease",
+   "relay": {
+    "mode": "udp-lease",
+    "n": 100,
+    "t0": 1790551546.3210394,
+    "frames_scheduled": 1496,
+    "lapsed_at_s": {
+     "0": 94.12,
+     "68": 95.41,
+     "16": 96.81,
+     "72": 96.92,
+     "36": 97.22,
+     "53": 97.91,
+     "23": 112.21,
+     "33": 112.81,
+     "78": 113.92,
+     "88": 113.92,
+     "19": 114.12,
+     "18": 114.82,
+     "75": 115.92,
+     "1": 116.32,
+     "84": 116.62,
+     "29": 118.32,
+     "62": 118.92,
+     "22": 120.51,
+     "40": 121.61,
+     "47": 121.82
+    },
+    "datagrams_to": {
+     "0": 936,
+     "1": 1158,
+     "2": 1496,
+     "3": 1496,
+     "4": 1496,
+     "5": 1496,
+     "6": 1496,
+     "7": 1496,
+     "8": 1496,
+     "9": 1496,
+     "10": 1496,
+     "11": 1496,
+     "12": 1496,
+     "13": 1496,
+     "14": 1496,
+     "15": 1496,
+     "16": 963,
+     "17": 1496,
+     "18": 1143,
+     "19": 1136,
+     "20": 1496,
+     "21": 1496,
+     "22": 1200,
+     "23": 1117,
+     "24": 1496,
+     "25": 1496,
+     "26": 1496,
+     "27": 1496,
+     "28": 1496,
+     "29": 1178,
+     "30": 1496,
+     "31": 1496,
+     "32": 1496,
+     "33": 1123,
+     "34": 1496,
+     "35": 1496,
+     "36": 967,
+     "37": 1496,
+     "38": 1496,
+     "39": 1496,
+     "40": 1211,
+     "41": 1496,
+     "42": 1496,
+     "43": 1496,
+     "44": 1496,
+     "45": 1496,
+     "46": 1496,
+     "47": 1213,
+     "48": 1496,
+     "49": 1496,
+     "50": 1496,
+     "51": 1496,
+     "52": 1496,
+     "53": 974,
+     "54": 1496,
+     "55": 1496,
+     "56": 1496,
+     "57": 1496,
+     "58": 1496,
+     "59": 1496,
+     "60": 1496,
+     "61": 1496,
+     "62": 1184,
+     "63": 1496,
+     "64": 1496,
+     "65": 1496,
+     "66": 1496,
+     "67": 1496,
+     "68": 949,
+     "69": 1496,
+     "70": 1496,
+     "71": 1496,
+     "72": 964,
+     "73": 1496,
+     "74": 1496,
+     "75": 1154,
+     "76": 1496,
+     "77": 1496,
+     "78": 1134,
+     "79": 1496,
+     "80": 1496,
+     "81": 1496,
+     "82": 1496,
+     "83": 1496,
+     "84": 1161,
+     "85": 1496,
+     "86": 1496,
+     "87": 1496,
+     "88": 1134,
+     "89": 1496,
+     "90": 1496,
+     "91": 1496,
+     "92": 1496,
+     "93": 1496,
+     "94": 1496,
+     "95": 1496,
+     "96": 1496,
+     "97": 1496,
+     "98": 1496,
+     "99": 1496
+    },
+    "rss_kb_end": 46328,
+    "timeline": [
+     {
+      "t": 0.53,
+      "leases": 100
+     },
+     {
+      "t": 11.22,
+      "leases": 100
+     },
+     {
+      "t": 21.61,
+      "leases": 100
+     },
+     {
+      "t": 32.32,
+      "leases": 100
+     },
+     {
+      "t": 42.92,
+      "leases": 100
+     },
+     {
+      "t": 53.41,
+      "leases": 100
+     },
+     {
+      "t": 63.72,
+      "leases": 100
+     },
+     {
+      "t": 74.21,
+      "leases": 100
+     },
+     {
+      "t": 84.71,
+      "leases": 100
+     },
+     {
+      "t": 95.21,
+      "leases": 99
+     },
+     {
+      "t": 105.82,
+      "leases": 94
+     },
+     {
+      "t": 116.71,
+      "leases": 85
+     },
+     {
+      "t": 127.22,
+      "leases": 80
+     },
+     {
+      "t": 137.82,
+      "leases": 80
+     },
+     {
+      "t": 148.31,
+      "leases": 80
+     },
+     {
+      "t": 149.31,
+      "leases": 80
+     }
+    ]
+   },
+   "healthy": {
+    "latency_ms": {
+     "n": 111200,
+     "unit": "ms",
+     "mean": 1.1,
+     "median": 1.0,
+     "p90": 1.6,
+     "p95": 2.2,
+     "p99": 3.6,
+     "p99.9": 21.8,
+     "max": 24.1,
+     "min": 0.2
+    },
+    "max_gap_ms": 123.0,
+    "frames_per_listener_min": 1390,
+    "frames_expected_per_listener": 1390,
+    "last_frame_at_s_median": 149.41
+   },
+   "snmp": {
+    "Udp.RcvbufErrors": 0,
+    "Udp.InDatagrams": 129261,
+    "Udp.OutDatagrams": 142222,
+    "Udp.NoPorts": 12955,
+    "Tcp.RetransSegs": 0,
+    "Tcp.OutRsts": 0,
+    "Tcp.EstabResets": 0,
+    "TcpExt.TCPTimeouts": 0,
+    "TcpExt.TCPAbortOnTimeout": 0,
+    "TcpExt.TCPAbortOnData": 0,
+    "TcpExt.TCPAbortOnClose": 0
+   },
+   "leases": {
+    "died": 20,
+    "lapsed": 20,
+    "healthy_lapsed": 0,
+    "lapse_after_death_s": {
+     "n": 20,
+     "unit": "s",
+     "mean": 64.8,
+     "median": 65.1,
+     "p90": 72.3,
+     "p95": 74.1,
+     "p99": 74.8,
+     "p99.9": 75.0,
+     "max": 75.0,
+     "min": 53.7
+    },
+    "datagrams_after_death_approx": {
+     "n": 20,
+     "unit": "datagrams",
+     "mean": 648.5,
+     "median": 651.5,
+     "p90": 722.9,
+     "p95": 740.5,
+     "p99": 748.1,
+     "p99.9": 749.8,
+     "max": 750.0,
+     "min": 537.0
+    }
+   }
+  }
+ },
+ "env": {
+  "kernel": "6.18.44-fc-v37",
+  "cpus": 4,
+  "python": "3.11.15",
+  "hz": 250,
+  "tcp_retries2": "15",
+  "tcp_congestion_control_ns": "bbr",
+  "tcp_rmem": "4096\t131072\t33554432",
+  "tcp_wmem": "4096\t16384\t4194304",
+  "rmem_max": "4194304",
+  "date": "2026-09-27T23:42:31Z"
+ }
+}

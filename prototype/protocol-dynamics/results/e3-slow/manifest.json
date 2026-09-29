@@ -1,0 +1,125 @@
+{
+ "experiment": "e3_slow",
+ "unit": "e3-slow",
+ "run_id": "20260927T232539Z-9516-e2aa",
+ "argv": [
+  "e3_consumers.py",
+  "slow"
+ ],
+ "python": "/tmp/claude-0/-home-user/7ffdb3f5-3450-5c9e-85e0-bb8e0a1fd279/scratchpad/cvenv/bin/python",
+ "started": "2026-09-27T23:25:39Z",
+ "finished": "2026-09-27T23:35:56Z",
+ "git_commit": "971846eab06025d29b72633bb45fa8f25e6ee501",
+ "git_dirty": false,
+ "allow_dirty": false,
+ "source_sha256": "b01f11fa57bab214759464cf03e0efe44ce0bb63231f4bb979fc2374ff69f698",
+ "source": {
+  "method": "sha256 over the lines '<sha256(file)>  <path>\\n', one per source file, path relative to the repository root, sorted bytewise (= sha256sum $(paths | LC_ALL=C sort) | sha256sum)",
+  "patterns": [
+   "prototype/protocol-dynamics/e3_consumers.py",
+   "prototype/protocol-dynamics/harness/*.py",
+   "prototype/canticle-station/canticle/*.py"
+  ],
+  "files": {
+   "prototype/canticle-station/canticle/__init__.py": "0a107800b0812c8513049b9e0051c12b4a49f24f3009b4b26b0255820298e95e",
+   "prototype/canticle-station/canticle/__main__.py": "912e3960cccfa400ed6729dc97e9f00ea778452d8665928b3aef44bd6f2fb693",
+   "prototype/canticle-station/canticle/cbor.py": "a1d59171a4b0933bbd7ca3ec3e18d376ee255038a18d75cb843205da17f427aa",
+   "prototype/canticle-station/canticle/ids.py": "5fb1b6b613476f9dee0094c5fba2e9c58321cc4c275a48c3aebf8faa37a235d4",
+   "prototype/canticle-station/canticle/listener.py": "3bebaeefad699648bf27d8a69ebcd3f7729bf3129094df9b88f6be5b1b946d43",
+   "prototype/canticle-station/canticle/manifest.py": "30c85d334fb09fb2d9347ea23871b1186fc521abce9bd01315d0235859905e60",
+   "prototype/canticle-station/canticle/runner.py": "323f7e305ebe6c9d3694056c974cdcc1506339ee41cd19531a72856923bdd2cd",
+   "prototype/canticle-station/canticle/station.py": "8b75d3c622f58c3782cd5b54b92062685f2a8cde25b62d9a38e2aed65cd2b359",
+   "prototype/canticle-station/canticle/vectors.py": "de18343e1269bf261387e063be13c06caec739fe0081b15c44be112b62df4877",
+   "prototype/canticle-station/canticle/wire.py": "d6351b87e5a53201e392d259db0e70a0a3aa694adc4d2004efb630cffa63cdbe",
+   "prototype/protocol-dynamics/e3_consumers.py": "40847dec6d43fc7f399ec062f3c68fdb32868186fc290431cc5adb7c9aeca9f5",
+   "prototype/protocol-dynamics/harness/__init__.py": "01a24e18ef1469d7d7e18204e79582d5b73c8dcd048bb54903de9bf8ad9ce3e4",
+   "prototype/protocol-dynamics/harness/arms.py": "2a5613eb81b20bd4aedaff79f6dc09c6803bbd42023c858c409b1170b84c5cf8",
+   "prototype/protocol-dynamics/harness/netns.py": "ee286d81a3095b711b5208a9943ef87152566bd65dd38a577ba72c34b7241d0b",
+   "prototype/protocol-dynamics/harness/runs.py": "1ddf52b20b14f1129927235da8c6a26ed2b7620f1e6ba3087dc45a02a9bfc198",
+   "prototype/protocol-dynamics/harness/stats.py": "b7870aacb798f709cb461b50167d40dd4b48a731e0c7d740ab0f5c4ca67e2c37",
+   "prototype/protocol-dynamics/harness/tcpinfo.py": "6dc7340a07c90e6a43be907141df368fbb5ffd6cafada28da3fe9ef61d72f340"
+  },
+  "dirty_files": [],
+  "patch": null
+ },
+ "canticle_imported_from": "/home/user/binary-canticle/prototype/canticle-station/canticle/__init__.py",
+ "config": {
+  "n": 100,
+  "variants": [
+   [
+    "tcp-blocking",
+    0,
+    600,
+    65536
+   ],
+   [
+    "tcp-queue",
+    0,
+    600,
+    65536
+   ],
+   [
+    "tcp-drop",
+    0,
+    600,
+    65536
+   ],
+   [
+    "tcp-disconnect",
+    0,
+    600,
+    65536
+   ],
+   [
+    "udp",
+    0,
+    600,
+    65536
+   ],
+   [
+    "tcp-blocking",
+    0,
+    600,
+    0
+   ],
+   [
+    "udp",
+    0,
+    600,
+    0
+   ]
+  ]
+ },
+ "conditions": [
+  "tcp-blocking",
+  "tcp-queue",
+  "tcp-drop",
+  "tcp-disconnect",
+  "udp",
+  "tcp-blocking",
+  "udp"
+ ],
+ "env": {
+  "kernel": "6.18.44-fc-v37",
+  "cpus": 4,
+  "python": "3.11.15",
+  "hz": 250,
+  "tcp_retries2": "15",
+  "tcp_congestion_control_ns": "bbr",
+  "tcp_rmem": "4096\t131072\t33554432",
+  "tcp_wmem": "4096\t16384\t4194304",
+  "rmem_max": "4194304",
+  "date": "2026-09-27T23:25:39Z"
+ },
+ "aggregate": "e3_slow.json",
+ "outputs": {
+  "e3_slow.json": "47d08b1b21450fb515d4455c97747fb510a27badee583842657ba00bad4d15bb",
+  "raw/tcp-blocking-autotuned.json": "280a9e3b4c2e355525f1fc87925ae120124c6081f7afa393521c4a5e419d3cd6",
+  "raw/tcp-blocking.json": "147b2ce782247adb8f3db16235f8f00ae8065e5b7a58236194165f2402aed567",
+  "raw/tcp-disconnect.json": "d17cfd8b5aef29f73f659143ac7f1b947e2a1f839bde708768d71082feb71e59",
+  "raw/tcp-drop.json": "5fea77d978c735099776adeabf6d490c8aa93c1ba8c6041f494ff210c387e85a",
+  "raw/tcp-queue.json": "fea4577f2195b3fd44cbe33be8934f77158eb2780a7aa742c9ab2833b8a8fd9f",
+  "raw/udp-autotuned.json": "50125c52a6abd4d6d799502f583323b6df69e7f06803d95c9bbf4259e1c8b03d",
+  "raw/udp.json": "de31ba0f22ef88040c922d0e8eec701a75dcecb38628e5f58dfd68c0319f3cf2"
+ }
+}

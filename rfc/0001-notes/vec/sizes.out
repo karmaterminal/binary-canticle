@@ -1,0 +1,14 @@
+public key d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a
+key_id     21fe31dfa154a261
+600B body, text ctype: total 745 header 12 cbor 669 sig 64
+600B body, registered ctype=1: total 720
+max body with 4 lineage tuples + root + state_key + 64B purpose + text ctype: 799
+max body minimal fields, registered ctype: 980
+beacon 5 streams: 243 per-stream entry bytes ~ 23
+beacon max streams per page (worst-case entry sizes): 27 entry bytes 35
+beacon max streams per page (worst case, with lens): 26
+aspect body 704 aspect frame 869
+vector1 len 127
+vector1 hex 4243020121fe31dfa154a261aa010102010301041b000001a0c4506c00051b000001a0c451566006010701084e68656c6c6f2c2073746174696f6e0b000d0142be28e29d744b8c39af187c179f430993f3860f16256da2c310555fd2d8823b9d40314ea094af3ae24d30dd0775c37db4b094c494398f6770fb7c401b5b2607
+pluck len 107
+pluck hex 4243020321fe31dfa154a261a7010102010302041b000001a0c4507f88051b000001a0c45156600d011401fbd962295d5f8d6274f105d6f0b6d265a613bd54c224781dcdc9a9a764756a73e81365e0003e23413b6504b5f8c9b329867db7d2afb80ef584b1fdc4cdff8c05

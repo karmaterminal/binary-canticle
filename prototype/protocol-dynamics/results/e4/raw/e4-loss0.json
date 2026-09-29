@@ -1,0 +1,240 @@
+{
+ "experiment": "e4_late_joiner",
+ "run_id": "20260927T232539Z-9518-adbb",
+ "tag": "loss0",
+ "loss_permille": 0,
+ "duration_s": 600.0,
+ "items": 20,
+ "trial_timeout_s": 120,
+ "slots_per_arm": 10,
+ "frame_bytes": 327,
+ "sing": {
+  "slow": {
+   "stream": "lens.state",
+   "seq": 1,
+   "epoch": 1790551540,
+   "issued_at": 1790551540691,
+   "expires_at": 1790552440691,
+   "ttl_s": 900.0,
+   "loop_ms": 5000,
+   "clamp": "none",
+   "size": 327,
+   "kind": "item"
+  },
+  "fast": {
+   "stream": "ctl.state",
+   "seq": 1,
+   "epoch": 1790551540,
+   "issued_at": 1790551540692,
+   "expires_at": 1790552440692,
+   "ttl_s": 900.0,
+   "loop_ms": 1000,
+   "clamp": "none",
+   "size": 327,
+   "kind": "item"
+  }
+ },
+ "loop_ms": {
+  "slow": [
+   13080
+  ],
+  "fast": [
+   1000
+  ]
+ },
+ "relay_snapshots": 1388,
+ "relay_renewals": 0,
+ "tcp_snapshots": 2136,
+ "granted_bps": 32000,
+ "nft": {
+  "offered": 274728,
+  "dropped_loss": 0,
+  "measured_loss": 0.0
+ },
+ "arms": {
+  "carousel-4kbps": {
+   "trials": 342,
+   "completed": 335,
+   "timeouts": 0,
+   "errors": 0,
+   "cut_at_end": 7,
+   "t_full_km_ms": {
+    "n": 342,
+    "events": 335,
+    "censored": 7,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 14874.0,
+    "p90": 16361.6,
+    "p95": 16665.6,
+    "p99": 17002.8,
+    "p99.9": 17355.8,
+    "max_event": 17355.8
+   },
+   "t_full_completed_ms": {
+    "n": 335,
+    "unit": "ms",
+    "mean": 14673.0,
+    "median": 14874.0,
+    "p90": 16346.0,
+    "p95": 16664.6,
+    "p99": 16997.2,
+    "p99.9": 17274.5,
+    "max": 17355.8,
+    "min": 8607.7,
+    "conditional_on": "completion: timed-out and cut-off joins excluded"
+   }
+  },
+  "carousel-1s": {
+   "trials": 1529,
+   "completed": 1529,
+   "timeouts": 0,
+   "errors": 0,
+   "cut_at_end": 0,
+   "t_full_km_ms": {
+    "n": 1529,
+    "events": 1529,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 1130.0,
+    "p90": 1254.0,
+    "p95": 1279.0,
+    "p99": 1307.1,
+    "p99.9": 1326.6,
+    "max_event": 1328.6
+   },
+   "t_full_completed_ms": {
+    "n": 1529,
+    "unit": "ms",
+    "mean": 1118.0,
+    "median": 1130.0,
+    "p90": 1254.0,
+    "p95": 1278.7,
+    "p99": 1307.0,
+    "p99.9": 1326.1,
+    "max": 1328.6,
+    "min": 695.0,
+    "conditional_on": "completion: timed-out and cut-off joins excluded"
+   }
+  },
+  "tcp-snapshot": {
+   "trials": 2136,
+   "completed": 2136,
+   "timeouts": 0,
+   "errors": 0,
+   "cut_at_end": 0,
+   "t_full_km_ms": {
+    "n": 2136,
+    "events": 2136,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 0.5,
+    "p90": 0.8,
+    "p95": 1.2,
+    "p99": 2.7,
+    "p99.9": 6.6,
+    "max_event": 20.4
+   },
+   "t_full_completed_ms": {
+    "n": 2136,
+    "unit": "ms",
+    "mean": 0.6,
+    "median": 0.5,
+    "p90": 0.8,
+    "p95": 1.2,
+    "p99": 2.7,
+    "p99.9": 6.5,
+    "max": 20.4,
+    "min": 0.3,
+    "conditional_on": "completion: timed-out and cut-off joins excluded"
+   },
+   "connect_ms": {
+    "n": 2136,
+    "unit": "ms",
+    "mean": 0.6,
+    "median": 0.5,
+    "p90": 0.8,
+    "p95": 1.2,
+    "p99": 2.7,
+    "p99.9": 6.5,
+    "max": 20.4,
+    "min": 0.3
+   },
+   "error_kinds": []
+  },
+  "lease-snapshot": {
+   "trials": 1388,
+   "completed": 1388,
+   "timeouts": 0,
+   "errors": 0,
+   "cut_at_end": 0,
+   "t_full_km_ms": {
+    "n": 1388,
+    "events": 1388,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 1570.1,
+    "p90": 1576.1,
+    "p95": 1578.8,
+    "p99": 1584.1,
+    "p99.9": 1629.7,
+    "max_event": 1631.7
+   },
+   "t_full_completed_ms": {
+    "n": 1388,
+    "unit": "ms",
+    "mean": 1561.8,
+    "median": 1570.1,
+    "p90": 1576.0,
+    "p95": 1578.7,
+    "p99": 1583.9,
+    "p99.9": 1622.3,
+    "max": 1631.7,
+    "min": 1253.3,
+    "conditional_on": "completion: timed-out and cut-off joins excluded"
+   },
+   "handshake_ms": {
+    "n": 1388,
+    "unit": "ms",
+    "mean": 0.4,
+    "median": 0.2,
+    "p90": 0.6,
+    "p95": 1.0,
+    "p99": 3.7,
+    "p99.9": 7.9,
+    "max": 8.2,
+    "min": 0.1
+   },
+   "hello_sent": {
+    "n": 1388,
+    "unit": "datagrams",
+    "mean": 1.0,
+    "median": 1.0,
+    "p90": 1.0,
+    "p95": 1.0,
+    "p99": 1.0,
+    "p99.9": 1.0,
+    "max": 1.0,
+    "min": 1.0
+   },
+   "renew_sent": 0,
+   "timeout_stages": [],
+   "sessions_with_listen_ok": 1388
+  }
+ },
+ "env": {
+  "kernel": "6.18.44-fc-v37",
+  "cpus": 4,
+  "python": "3.11.15",
+  "hz": 250,
+  "tcp_retries2": "15",
+  "tcp_congestion_control_ns": "bbr",
+  "tcp_rmem": "4096\t131072\t33554432",
+  "tcp_wmem": "4096\t16384\t4194304",
+  "rmem_max": "4194304",
+  "date": "2026-09-27T23:35:46Z"
+ }
+}

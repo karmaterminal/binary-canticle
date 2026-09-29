@@ -1,0 +1,69 @@
+{
+ "repeat": 1,
+ "strace_pass": false,
+ "mode": "tcp",
+ "n": 1000,
+ "backlog": 128,
+ "new_relay_ready_after_kill_s": 0.123,
+ "all_served_after_kill_s": 6.2298,
+ "served_after_kill_s": {
+  "n": 1000,
+  "unit": "s",
+  "mean": 1.2,
+  "median": 0.2,
+  "p90": 6.2,
+  "p95": 6.2,
+  "p99": 6.2,
+  "p99.9": 6.2,
+  "max": 6.2,
+  "min": 0.2
+ },
+ "served_within_s": {
+  "0.5": 666,
+  "1": 666,
+  "2": 864,
+  "4": 864,
+  "8": 1000,
+  "16": 1000,
+  "32": 1000
+ },
+ "listener_attempts_during": {
+  "connect": 1136,
+  "refused": 1000,
+  "snapshot_timeout": 136
+ },
+ "initial_attempts": {
+  "up": true,
+  "connect": 1040,
+  "refused": 0,
+  "snapshot_timeout": 40,
+  "all_served_after_start_s": 6.303,
+  "kernel": {
+   "TcpExt.ListenOverflows": 339,
+   "TcpExt.SyncookiesSent": 45,
+   "TcpExt.TCPSynRetrans": 299,
+   "Udp.RcvbufErrors": 0
+  }
+ },
+ "new_relay_syscalls": null,
+ "new_relay_cpu_s": 0.32,
+ "packets_offered": 13412,
+ "snmp": {
+  "Tcp.ActiveOpens": 2136,
+  "Tcp.PassiveOpens": 1136,
+  "Tcp.AttemptFails": 1000,
+  "Tcp.OutRsts": 1804,
+  "Tcp.OutSegs": 17070,
+  "TcpExt.ListenOverflows": 470,
+  "TcpExt.ListenDrops": 470,
+  "TcpExt.TCPSynRetrans": 334,
+  "TcpExt.SyncookiesSent": 140,
+  "TcpExt.TCPReqQFullDrop": 0,
+  "TcpExt.TCPReqQFullDoCookies": 140,
+  "TcpExt.TCPTimeouts": 334,
+  "Udp.InDatagrams": 0,
+  "Udp.OutDatagrams": 0,
+  "Udp.RcvbufErrors": 0,
+  "Udp.NoPorts": 0
+ }
+}

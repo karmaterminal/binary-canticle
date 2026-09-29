@@ -1,0 +1,665 @@
+{
+ "mode": "tcp-kill",
+ "relay": {
+  "mode": "tcp-queue",
+  "n": 100,
+  "t0": 1790551544.8375537,
+  "user_timeout_ms": 0,
+  "stalled_at_s": null,
+  "victim": {
+   "error": "EOF",
+   "closed_at_s": 12.32,
+   "dropped": 0,
+   "queue_bytes_end": 0
+  },
+  "healthy_errors": 0,
+  "rss_kb_end": 46480,
+  "timeline": [
+   {
+    "t": 3.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": {
+     "state": "ESTABLISHED",
+     "ca_state": "Open",
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "total_retrans": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "bytes_retrans": 0
+    }
+   },
+   {
+    "t": 4.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 700,
+    "victim_tcp": {
+     "state": "ESTABLISHED",
+     "ca_state": "Open",
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "total_retrans": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "bytes_retrans": 0
+    }
+   },
+   {
+    "t": 5.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": {
+     "state": "ESTABLISHED",
+     "ca_state": "Open",
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "total_retrans": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "bytes_retrans": 0
+    }
+   },
+   {
+    "t": 6.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 700,
+    "victim_tcp": {
+     "state": "ESTABLISHED",
+     "ca_state": "Open",
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "total_retrans": 0,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "bytes_retrans": 0
+    }
+   },
+   {
+    "t": 7.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": {
+     "state": "ESTABLISHED",
+     "ca_state": "Open",
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "total_retrans": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "bytes_retrans": 0
+    }
+   },
+   {
+    "t": 8.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": {
+     "state": "ESTABLISHED",
+     "ca_state": "Open",
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "total_retrans": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "bytes_retrans": 0
+    }
+   },
+   {
+    "t": 9.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": {
+     "state": "ESTABLISHED",
+     "ca_state": "Open",
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "total_retrans": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "bytes_retrans": 0
+    }
+   },
+   {
+    "t": 10.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": {
+     "state": "ESTABLISHED",
+     "ca_state": "Open",
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "total_retrans": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "bytes_retrans": 0
+    }
+   },
+   {
+    "t": 11.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": {
+     "state": "ESTABLISHED",
+     "ca_state": "Open",
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "total_retrans": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "bytes_retrans": 0
+    }
+   },
+   {
+    "t": 12.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 13.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 14.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 15.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 16.33,
+    "rss_kb": 46460,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 17.33,
+    "rss_kb": 46464,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 18.33,
+    "rss_kb": 46464,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 19.33,
+    "rss_kb": 46464,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 20.33,
+    "rss_kb": 46468,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 21.33,
+    "rss_kb": 46468,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 22.33,
+    "rss_kb": 46468,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 23.33,
+    "rss_kb": 46468,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 24.33,
+    "rss_kb": 46468,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 25.33,
+    "rss_kb": 46468,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 26.33,
+    "rss_kb": 46468,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 27.33,
+    "rss_kb": 46468,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 28.33,
+    "rss_kb": 46468,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 29.33,
+    "rss_kb": 46468,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 30.33,
+    "rss_kb": 46468,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 31.33,
+    "rss_kb": 46468,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 32.33,
+    "rss_kb": 46468,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 33.33,
+    "rss_kb": 46472,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 34.33,
+    "rss_kb": 46472,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 35.34,
+    "rss_kb": 46472,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 36.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 37.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 38.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 39.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 40.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 41.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 42.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 43.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 44.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 45.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 46.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 47.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 48.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 49.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 50.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 51.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 52.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 53.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 54.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 55.34,
+    "rss_kb": 46476,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 56.34,
+    "rss_kb": 46480,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 57.34,
+    "rss_kb": 46480,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 58.34,
+    "rss_kb": 46480,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 59.34,
+    "rss_kb": 46480,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   },
+   {
+    "t": 60.34,
+    "rss_kb": 46480,
+    "blocked": null,
+    "victim_queue_bytes": 0,
+    "victim_dropped": 0,
+    "healthy_queue_bytes": 0,
+    "victim_tcp": null
+   }
+  ]
+ },
+ "healthy": {
+  "latency_ms": {
+   "n": 48510,
+   "unit": "ms",
+   "mean": 1.2,
+   "median": 1.1,
+   "p90": 1.7,
+   "p95": 2.0,
+   "p99": 3.0,
+   "p99.9": 8.5,
+   "max": 9.0,
+   "min": 0.2
+  },
+  "max_gap_ms": 108.0,
+  "frames_per_listener_min": 490,
+  "frames_expected_per_listener": 490,
+  "last_frame_at_s_median": 59.43
+ },
+ "snmp": {
+  "Udp.RcvbufErrors": 0,
+  "Udp.InDatagrams": 0,
+  "Udp.OutDatagrams": 0,
+  "Udp.NoPorts": 0,
+  "Tcp.RetransSegs": 0,
+  "Tcp.OutRsts": 0,
+  "Tcp.EstabResets": 0,
+  "TcpExt.TCPTimeouts": 0,
+  "TcpExt.TCPAbortOnTimeout": 0,
+  "TcpExt.TCPAbortOnData": 0,
+  "TcpExt.TCPAbortOnClose": 0
+ },
+ "death_at_s": 12.32,
+ "victim_closed_after_death_s": 0.002
+}

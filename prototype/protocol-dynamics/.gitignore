@@ -1,0 +1,6 @@
+fanout/fanout
+__pycache__/
+# a run's working directory, and old generations of an interrupted publication (harness/runs.py)
+results/.staging/
+# worker logs are kept next to their generation but not versioned (manifest.json does not list them)
+results/*/raw/*.log

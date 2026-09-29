@@ -1,0 +1,78 @@
+{
+ "repeat": 0,
+ "strace_pass": true,
+ "mode": "udp-lease",
+ "n": 1000,
+ "backlog": null,
+ "new_relay_ready_after_kill_s": 0.117,
+ "all_served_after_kill_s": 20.1735,
+ "served_after_kill_s": {
+  "n": 1000,
+  "unit": "s",
+  "mean": 14.8,
+  "median": 14.3,
+  "p90": 16.2,
+  "p95": 16.3,
+  "p99": 20.2,
+  "p99.9": 20.2,
+  "max": 20.2,
+  "min": 13.3
+ },
+ "served_within_s": {
+  "0.5": 0,
+  "1": 0,
+  "2": 0,
+  "4": 0,
+  "8": 0,
+  "16": 691,
+  "32": 1000
+ },
+ "listener_attempts_during": {
+  "hello": 1628,
+  "listen": 1536,
+  "renew": 0
+ },
+ "initial_attempts": {
+  "up": true,
+  "hello": 1000,
+  "listen": 1000,
+  "renew": 0,
+  "all_served_after_start_s": 1.932,
+  "kernel": {
+   "TcpExt.ListenOverflows": 0,
+   "TcpExt.SyncookiesSent": 0,
+   "TcpExt.TCPSynRetrans": 0,
+   "Udp.RcvbufErrors": 0
+  }
+ },
+ "new_relay_syscalls": {
+  "total": 51422,
+  "by_call": {
+   "sendto": 23956,
+   "getpid": 20004,
+   "epoll_wait": 5446,
+   "recvfrom": 2015,
+   "mmap": 1
+  }
+ },
+ "new_relay_cpu_s": 1.93,
+ "packets_offered": 27120,
+ "snmp": {
+  "Tcp.ActiveOpens": 0,
+  "Tcp.PassiveOpens": 0,
+  "Tcp.AttemptFails": 0,
+  "Tcp.OutRsts": 0,
+  "Tcp.OutSegs": 0,
+  "TcpExt.ListenOverflows": 0,
+  "TcpExt.ListenDrops": 0,
+  "TcpExt.TCPSynRetrans": 0,
+  "TcpExt.SyncookiesSent": 0,
+  "TcpExt.TCPReqQFullDrop": 0,
+  "TcpExt.TCPReqQFullDoCookies": 0,
+  "TcpExt.TCPTimeouts": 0,
+  "Udp.InDatagrams": 25956,
+  "Udp.OutDatagrams": 27120,
+  "Udp.RcvbufErrors": 1164,
+  "Udp.NoPorts": 0
+ }
+}
