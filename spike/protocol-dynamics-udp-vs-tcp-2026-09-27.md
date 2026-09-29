@@ -205,6 +205,8 @@ This is the red team's worm and echo-chamber risk ([`challenge-redteam.md`](../r
 
 ### Guardian sessions and the doubt channel
 
+*Disposition (#54):* deferred from normative v1 (A12). A guardian's transcript access is a new, high-value trust boundary, so the design needs its own trust and privacy mini-RFC first. RFC-0001 §14.17 lists the conditions any design must meet.
+
 This builds on the cohort's own design: guardian sessions that read another session's log for bad chain-of-thought steering, and that the ward trusts when they get in touch to doubt its thinking.
 
 - **Role.** A *guardian* is authorised in the fleet manifest to **read** a ward's transcript and to send the ward **doubt** messages. Prefer a guardian that differs from its ward in model family and principal (D21).
@@ -236,21 +238,23 @@ This builds on the cohort's own design: guardian sessions that read another sess
 
 ## 7. Proposed RFC-0001 amendments
 
-| Id | Amendment | RFC section |
-|---|---|---|
-| A1 | Add `trail_seq` (oldest live seq) beside `head_seq` in each beacon stream entry. Receivers can then tell "lost, will loop again" from "expired". (PGM `TXW_TRAIL`, Nanometrics oldest-seq, SCREAM `OLDEST`.) | §8.2, §9.8 |
-| A2 | **Relay-side repair**: a lease-scoped, cookie-validated REPAIR request for missing `(key_id, stream_id, seq)` ranges, answered from the relay's verified live set within the lease budget. NORM discipline applies: one request per beacon interval, holdoff (K+2)·RTT, rate-limited "gone" (SQUELCH) replies. It is never sent to the station. Needs a scoped exception to non-goal 1, like the lease exception. | §7.10, §11.3, §21 |
-| A3 | RENEW carries a **receiver report** (frames received and expected per stream, largest gap). Relays use it to adjust per-lease decimation and to trip an RFC 8084-style circuit breaker. | §11.3.5, §12.3 |
-| A4 | A **MoQ-style egress scheduler** at relays. Order: listener priority, then class, then first copies, supersedes and plucks before repeats, then newest first within a key. Drop frames whose remaining life falls below a class minimum; cap per-lease queues; keep kernel send buffers small. | §12.2-§12.3 |
-| A5 | A LISTEN `join` mode: `live` \| `live+fill` \| `fill-only`, with a fill budget. Repeat the snapshot, or pace it faster than 32 kbit/s, because E4 showed a single paced snapshot is slow under loss. | §7.10, §11.3.2 |
-| A6 | **Backbone rules for TCP/QUIC links**: latest-only per key (`TCP_NOTSENT_LOWAT`); bounded drop-oldest queues; `TCP_USER_TIMEOUT` ≤ 30 s; a receiver-side `expires_at` check (TCP delivered expired frames). | §12.4, §20 |
-| A7 | State that the class loop floors (1-30 s) deliberately depart from SAP's 300 s floor, and why: RFC 8085 §3.6 on the LAN, relay budgets and receiver reports on the internet. | §7.5 |
-| A8 | Relay restart: persist the cookie secret and lease table across restarts, and add a signed `RELAY_GOAWAY{next}`. Restart detection is 13 s today. | §11.3 |
-| A9 | Receptor gating by **kinetic proofreading** (persistence across *k* revolutions, or independent principals, before any wake) and **Mora–Nemenman** window sizing. Two consumption modes: *raw* (land as soon as verified) and *completed* (wait up to one loop for gaps to fill), as in Nanometrics NAQS. | §14.6-§14.10 |
-| A10 | WebTransport binding: datagrams for repeats and beacons; one short stream per first copy of alarm, control and pluck. Refuse the HTTP/2 capsule fallback as "lossy", because it retransmits. | §11.5 |
-| A11 | **Contagion controls**: election to listen as the only door; turn-boundary and desynchronised landing for behavioural cues; the stance-first susceptibility measure; typed control rather than tone. | §14 |
-| A12 | **Guardian role and doubt channel**: a manifest capability, read access to the ward's transcript, and addressed, durable, advisory doubts that are rate-limited, logged, and have hop limit 0. | new §14.14, §10.4 |
-| A13 | Budget sets catch-up: document that a stream's `B_stream` and live count, not its class floor, determine late-join time. Consider a per-stream "catch-up" budget for streams that need fast joins. | §7.5, §7.10 |
+Silas gave each amendment a disposition on #54 on 2026-09-28 (figs delegated the owner decisions to the princes), and RFC-0001 applies them. Where this table and the RFC differ, the RFC's text governs (its §23.1 lists every binding condition).
+
+| Id | Amendment | RFC section | Disposition (#54) |
+|---|---|---|---|
+| A1 | Add `trail_seq` (oldest live seq) beside `head_seq` in each beacon stream entry. Receivers can then tell "lost, will loop again" from "expired". (PGM `TXW_TRAIL`, Nanometrics oldest-seq, SCREAM `OLDEST`.) | §8.2, §9.8 | Accepted; the paging proof is in RFC §8.4 |
+| A2 | **Relay-side repair**: a lease-scoped, cookie-validated REPAIR request for missing `(key_id, stream_id, seq)` ranges, answered from the relay's verified live set within the lease budget. NORM discipline applies: one request per beacon interval, holdoff (K+2)·RTT, rate-limited "gone" (SQUELCH) replies. It is never sent to the station. Needs a scoped exception to non-goal 1, like the lease exception. | §7.10, §11.3, §21 | Accepted |
+| A3 | RENEW carries a **receiver report** (frames received and expected per stream, largest gap). Relays use it to adjust per-lease decimation and to trip an RFC 8084-style circuit breaker. | §11.3.5, §12.3 | Accepted with amendments: aggregate counts only, never trust or admission |
+| A4 | A **MoQ-style egress scheduler** at relays. Order: listener priority, then class, then first copies, supersedes and plucks before repeats, then newest first within a key. Drop frames whose remaining life falls below a class minimum; cap per-lease queues; keep kernel send buffers small. | §12.2-§12.3 | Accepted |
+| A5 | A LISTEN `join` mode: `live` \| `live+fill` \| `fill-only`, with a fill budget. Repeat the snapshot, or pace it faster than 32 kbit/s, because E4 showed a single paced snapshot is slow under loss. | §7.10, §11.3.2 | Accepted |
+| A6 | **Backbone rules for TCP/QUIC links**: latest-only per key (`TCP_NOTSENT_LOWAT`); bounded drop-oldest queues; `TCP_USER_TIMEOUT` ≤ 30 s; a receiver-side `expires_at` check (TCP delivered expired frames). | §12.4, §20 | Accepted with amendments: bounded unacknowledged lifetime as the portable outcome |
+| A7 | State that the class loop floors (1-30 s) deliberately depart from SAP's 300 s floor, and why: RFC 8085 §3.6 on the LAN, relay budgets and receiver reports on the internet. | §7.5 | Accepted |
+| A8 | Relay restart: persist the cookie secret and lease table across restarts, and add a signed `RELAY_GOAWAY{next}`. Restart detection is 13 s today. | §11.3 | Accepted with amendments: GOAWAY, retry bounds, optional cookie-secret persistence and a restart SLO; no lease-table persistence |
+| A9 | Receptor gating by **kinetic proofreading** (persistence across *k* revolutions, or independent principals, before any wake) and **Mora–Nemenman** window sizing. Two consumption modes: *raw* (land as soon as verified) and *completed* (wait up to one loop for gaps to fill), as in Nanometrics NAQS. | §14.6-§14.10 | Accepted with amendments: gates wake only; parameters open |
+| A10 | WebTransport binding: datagrams for repeats and beacons; one short stream per first copy of alarm, control and pluck. Refuse the HTTP/2 capsule fallback as "lossy", because it retransmits. | §11.5 | Accepted with amendments: experimental only |
+| A11 | **Contagion controls**: election to listen as the only door; turn-boundary and desynchronised landing for behavioural cues; the stance-first susceptibility measure; typed control rather than tone. | §14 | Accepted with amendments: stance-first is telemetry only |
+| A12 | **Guardian role and doubt channel**: a manifest capability, read access to the ward's transcript, and addressed, durable, advisory doubts that are rate-limited, logged, and have hop limit 0. | new §14.14, §10.4 | Deferred to a trust and privacy mini-RFC |
+| A13 | Budget sets catch-up: document that a stream's `B_stream` and live count, not its class floor, determine late-join time. Consider a per-stream "catch-up" budget for streams that need fast joins. | §7.5, §7.10 | Accepted |
 
 ## 8. Limitations
 

@@ -54,24 +54,35 @@ if __name__ == "__main__":
         if len(f) > 1100:
             print("max body minimal fields, registered ctype:", n - 1)
             break
-    # stream-entry per RFC-0001 section 9.8:
-    # [stream_id, head_seq, live, loop_ms, loop_max_ms, default_ttl_s, max_ttl_s, b_stream, ?lens]
-    streams = [[0x1A2B3C00 + i, 100 + i, 3, 5000, 5000, 60, 300, 4000] for i in range(5)]
+    # stream-entry per RFC-0001 section 9.8 (trail_seq added by amendment A1):
+    # [stream_id, head_seq, trail_seq, live, loop_ms, loop_max_ms, default_ttl_s, max_ttl_s, b_stream, ?lens]
+    streams = [[0x1A2B3C00 + i, 100 + i, 98 + i, 3, 5000, 5000, 60, 300, 4000] for i in range(5)]
     bm = {1: 7, 2: 123456, 3: 1_790_000_000_000, 4: 1000, 5: "canticle-regulation/1", 6: streams, 8: 16000}
     f, h, b = frame(KIND_BEACON, bm)
     print("beacon 5 streams:", len(f), "per-stream entry bytes ~", len(det(streams[0])))
-    for n in range(1, 200):
-        s = [[0x1A2B3C00 + i, 1_000_000 + i, 300, 120000, 300000, 3600, 86400, 4000] for i in range(n)]
-        f, _, _ = frame(KIND_BEACON, {**bm, 6: s, 7: [0, 1], 9: b"\x00" * 8})
-        if len(f) > 1100:
-            print("beacon max streams per page (worst-case entry sizes):", n - 1, "entry bytes", len(det(s[0])))
-            break
-    for n in range(1, 200):
-        s = [[0x1A2B3C00 + i, 1_000_000 + i, 300, 120000, 300000, 3600, 86400, 4000, 20] for i in range(n)]
-        f, _, _ = frame(KIND_BEACON, {**bm, 6: s, 7: [0, 1], 9: b"\x00" * 8})
-        if len(f) > 1100:
-            print("beacon max streams per page (worst case, with lens):", n - 1)
-            break
+    # Worst case at the bounds the section 9.8 CDDL allows: u64 bseq, wallclock, head_seq and trail_seq;
+    # u32 everywhere else; a 32-byte profile; paging on. This is the A1 size proof.
+    U32, U64 = 2**32 - 1, 2**64 - 1
+    entry = [U32, U64, U64, U32, U32, U32, U32, U32, U32]
+    fixed = {1: U32, 2: U64, 3: U64, 4: U32, 5: "p" * 32, 7: [7, 8], 8: U32, 9: b"\x00" * 8}
+    # capsid in the suggested shape of section 8.7, every field at its largest, 32 buckets (section 9.4 cap)
+    capsid = {1: U32, 2: U32, 3: {U32 - i: 3 for i in range(32)}, 4: b"\x00" * 32, 5: b"\x00" * 16}
+    relay = {1: 2, 2: 2, 3: [[KID, U32]] * 32, 4: U32}
+
+    def per_page(extra, e):
+        n = 0
+        while n < 32 and len(frame(KIND_BEACON, {**fixed, **extra, 6: [e] * (n + 1)})[0]) <= 1100:
+            n += 1
+        return n
+
+    print("beacon worst case, no streams:", len(frame(KIND_BEACON, {**fixed, 6: []})[0]),
+          "entry bytes", len(det(entry)), "with lens", len(det(entry + [U32])))
+    for label, extra in (("no capsid", {}), ("worst capsid", {10: capsid})):
+        a, b2 = per_page(extra, entry), per_page(extra, entry + [U32])
+        print(f"beacon worst case, {label}: entries per page {a} (with lens {b2});"
+              f" 8-page catalog floor {8 * a} ({8 * b2})")
+    print("relay beacon worst case (32 relay entries, no streams):",
+          len(frame(KIND_BEACON, {**fixed, 6: [], 11: relay})[0]))
     # aspect item (bio note section 6.2 CDDL), synthesis 512 B, 6 evidence refs
     ev=[[KID, 7, 0x1A2B3C4D, 1000+i] for i in range(6)]
     aspect={1:1,2:2,3:2,4:1,5:"s"*512,6:ev,7:{1:1_790_000_000_000,2:1_790_000_300_000,3:4,4:6},8:b"\x11"*32,9:3}

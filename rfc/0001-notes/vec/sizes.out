@@ -4,9 +4,11 @@ key_id     21fe31dfa154a261
 600B body, registered ctype=1: total 720
 max body with 4 lineage tuples + root + state_key + 64B purpose + text ctype: 799
 max body minimal fields, registered ctype: 980
-beacon 5 streams: 243 per-stream entry bytes ~ 23
-beacon max streams per page (worst-case entry sizes): 27 entry bytes 35
-beacon max streams per page (worst case, with lens): 26
+beacon 5 streams: 253 per-stream entry bytes ~ 25
+beacon worst case, no streams: 166 entry bytes 54 with lens 59
+beacon worst case, no capsid: entries per page 17 (with lens 15); 8-page catalog floor 136 (120)
+beacon worst case, worst capsid: entries per page 12 (with lens 11); 8-page catalog floor 96 (88)
+relay beacon worst case (32 relay entries, no streams): 661
 aspect body 704 aspect frame 869
 vector1 len 127
 vector1 hex 4243020121fe31dfa154a261aa010102010301041b000001a0c4506c00051b000001a0c451566006010701084e68656c6c6f2c2073746174696f6e0b000d0142be28e29d744b8c39af187c179f430993f3860f16256da2c310555fd2d8823b9d40314ea094af3ae24d30dd0775c37db4b094c494398f6770fb7c401b5b2607

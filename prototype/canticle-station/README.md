@@ -28,6 +28,7 @@ Not implemented here, and still open work (see RFC-0001 §23.3):
 - the capsid (§8.7)
 - work-conserving budget redistribution and burst budget accounting (§7.5-§7.6)
 - IPv6 groups and `canticle doctor`
+- `trail_seq` in beacon stream entries (amendment A1, added to RFC-0001 §9.8 after this spike). The beacons and candidate vectors here still use the 8-field entry.
 
 The decoder is stricter than the RFC in one place: it rejects floats and tags under every key, not only core keys 1-31.
 
