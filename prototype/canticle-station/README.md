@@ -16,6 +16,8 @@ them loop until they expire.
 | §7.4-§7.8, §8.6 Listener | Dedup on the identity tuple: a repeat is a no-op, different bytes are an equivocation. Also sticky-pluck, supersession high-water marks, epoch regression, class capability, granted scope, binding scope (a `host` frame heard over UDP is a `scope-violation`) and per-class hop limits from the manifest, all checked before any state changes so a rejected frame is state-neutral; safety state (epochs, dedup digests, sticky PLUCKs, high-water marks) persisted atomically and re-loaded at start, by default (the CLI derives a state file and holds a lease on it; `--ephemeral` is an explicit, warned opt-out, and the library requires `state_path` or `ephemeral=True`), and the §7.8 warm-up for live-state keys, per-key dedup quotas that refuse new tuples rather than evict live ones, and local expiry per RFC §14.6.3: clamped to the class max TTL, moved onto the receiver clock by δ̂, and never longer than the full TTL from first hearing. Presence covers ROOT_UNKNOWN, EQUIPPED_QUIET, EQUIPPED_SPEAKING, UNEQUIPPED_PRESENT and UNOBSERVABLE (with a `signed_off` reason). |
 | §10.4 Publisher grants | The station signs only the classes, scopes and streams its manifest entry grants, checked before a `seq` is allocated. The control socket has its own grant, narrower than the key's (`--socket-class`), and never accepts `regulatory`, `alarm` or `control`, because their op-level and typed-body checks (§10.4, §15.4) are not implemented here; `host` scope is refused because this station only speaks UDP; one station per key (an exclusive lease on the key file); epochs from a locked, fsynced counter. |
 | §11.1-§11.2 Bindings | Host-local submission over a unix socket (mode 0600, peer uid checked); UDP unicast and LAN multicast (`239.255.13.13:9999`, provisional per D22, IP TTL 1, don't-fragment). |
+| §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
+| §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only gateway over one listener, and a read-only page to pick a station:stream and watch its live ring, with expiry and gaps shown honestly. |
 
 Not implemented here, and still open work (see RFC-0001 §23.3):
 - relay leases for internet listeners (§11.3)
@@ -74,10 +76,52 @@ The station keeps its epoch counter next to its key (`cael.key.epoch`; `--epoch-
 
 Do not pipe heard text straight into a session. RFC-0001 §14 and §16 require a banner outside the external-content wrapper, taint after hearing, and receiver-local wake policy. That landing layer is work item S3.
 
+### Background emitter (#58, RFC §15.8)
+
+```sh
+canticle station --key room.key --manifest fleet.json --stream hymn:ambient --multicast --control ./room.sock &
+canticle ambient --control ./room.sock --stream hymn --fixture proofs/web-lanes/hymn.txt \
+  --ttl 60 --min-gap 2 --max-gap 10 --breath 0.2 --duration 600 --log emit.jsonl
+```
+
+- **One process, one job.** The emitter is a separate process that talks to the station's control socket. It never signs, listens or learns who hears; the station keeps the carousel.
+- **Cadence.** Each tick, after a random 2-10 s, it either sings one fixture line with a 60 s TTL, or takes a breath and sends nothing (`--breath` is the chance of a breath). Lines may repeat: a repeat is a new item with the same body, which adds no weight (RFC §12.1).
+- **Bounds.** Only `ambient` or `chatter`. At most `--max-per-minute` items, no line longer than `--max-bytes`, and at most one tick a second. The run ends after `--duration` seconds (at most 3 600) or on SIGINT/SIGTERM.
+- **Stopping.** Items already on air are not plucked; they loop until they expire naturally. The emitter also gives up after three consecutive failures to reach the station.
+- **Log.** Each tick writes one JSON line (`sing` with `seq`, `size`, `loop_ms` and the text; `breath`; `capped`; `refused`). The first and last lines record `model_calls: 0`.
+- **Sources.** Only a fixture file. A source derived from session logs would be a separate opt-in boundary (RFC §15.4, §15.8), and is not implemented.
+
+### Web tuner (#57, RFC §18.9)
+
+```sh
+canticle tuner --manifest fleet.json --multicast --http 127.0.0.1:8765
+# then open http://127.0.0.1:8765/
+```
+
+- **What it shows.** The gateway runs one listener, which hears and verifies every stream its manifest names. The page lists the stations whose beacons verified (key, epoch, presence, beacon age) and their streams (head, live count, loop). Tune a named stream to watch its live ring. Each item shows its text, `seq`, copies heard and a countdown to local expiry. Items that just left the air are listed for 60 s, labelled expired, withdrawn or superseded. Sequence numbers up to the head that this listener never heard are listed as gaps.
+- **What it is not.** Tuning is local to the gateway, and nothing is sent to a station. It is not a session tune: nothing lands anywhere. The gateway has no control socket and cannot sing or hush. A late page sees only what is on air now.
+- **Trust boundary.**
+  - It binds loopback only, and refuses any other address.
+  - It answers only requests whose `Host` is its own address, which blocks DNS rebinding, and refuses cross-origin POSTs and non-JSON bodies.
+  - It serves a strict CSP (`script-src 'self'`, no inline script), plus `nosniff`, `no-referrer` and `no-store`.
+  - Heard text is set with `textContent` only, never parsed as markup.
+  - Unverified datagrams are counted, never shown or attributed to a station.
+- **Budget.**
+  - Channels: at most 16 tuned at once; each lapses after 30 s without a poll.
+  - Polling: at most 4 ring polls a second per channel (the page polls every second).
+  - Responses: at most 64 items, with 512 characters of text each; up to 32 tombstones and 64 gap checks.
+  - Memory: the listener's own per-key quotas bound it (RFC §7.4).
+
+Unnamed streams (not in the manifest) are verified and listed, but can't be tuned (RFC §5.4). The beacons in this spike carry no `trail_seq`, so a gap can't be told apart from an item that is still looping.
+
+### Same-host proof for #57 and #58
+
+[`proofs/web-lanes/`](proofs/web-lanes/) holds a bounded run as root (`run.sh`), its analysis (`analyze.py`) and the results. The station and emitters run in one network namespace; the listeners, tuner and headless Chromium run in another, joined by a veth pair over LAN multicast. That is **same-host** evidence, on one kernel and one clock. It is not a second host.
+
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 53 tests, about 6 s
+python -m unittest discover -s tests      # 73 tests, about 6 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -98,6 +142,14 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
   - the persisted epoch counter: strictly increasing across same-second restarts and a clock that steps back.
 - `test_listener.py` covers the presence state machine, local expiry, the §14.6.3 clock rule (including a station clock an hour behind), state-neutral capability rejection, per-key dedup quotas, garbage input and station restarts (a new epoch's beacons count from 1 again; two starts in one second never reuse an identity tuple).
 - `test_udp_e2e.py` runs a real station and listener over loopback UDP and the unix control socket: sing, listen, hush, status and goodbye.
+- `test_ambient.py` runs the emitter on a virtual clock: tick gaps, breaths and repeats, exact requests, the per-minute cap, stop by signal and by duration, refusals, an unreachable station, bounds and fixture loading.
+- `test_tuner.py` covers the tuner's view and gateway:
+  - verified stations with heads, and unnamed streams that can't be tuned;
+  - the live ring, then labelled expiry and withdrawal;
+  - a late view that sees only what is on air, with the missed `seq` as a gap;
+  - a lost burst repaired by the next loop copy;
+  - subscriptions (leave, retune, idle lapse, the cap);
+  - the HTTP boundary: headers and CSP, tune, ring, leave and retune, the poll limit, `Host` and `Origin` checks, content type, methods, no write endpoints, loopback only.
 
 ## Vectors
 

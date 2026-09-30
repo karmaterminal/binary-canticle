@@ -1940,7 +1940,29 @@ The publish tool MUST:
 
 ### 15.7 Command line
 
-The daemon ships a CLI with the same verbs plus operations: `canticle sing`, `canticle hush`, `canticle tune`, `canticle listen`, `canticle doctor` (§11.2), `canticle keygen` (keys stay in the daemon's store), `canticle manifest verify|show`, `canticle status` (local station and receptor state; never a listener list).
+The daemon ships a CLI with the same verbs plus operations: `canticle sing`, `canticle hush`, `canticle tune`, `canticle listen`, `canticle doctor` (§11.2), `canticle keygen` (keys stay in the daemon's store), `canticle manifest verify|show`, `canticle status` (local station and receptor state; never a listener list). Two further tools are optional: `canticle ambient`, a background emitter (§15.8), and `canticle tuner`, a local web observer (§18.9).
+
+### 15.8 Background emitters
+
+A **background emitter** puts paced, short-lived items on a station without an agent composing a turn for each one (#58). Uses include presence texture, a hymn, or a slow status line. It is a client of the host socket (§11.1), like any publish tool, and these rules apply:
+
+- **Elected source.** It sings only from a source the operator explicitly chose, such as a fixture file.
+  - It MUST NOT derive items from session transcripts or logs by default. Such a source is a separate opt-in boundary, under the content policy and clamping of §15.4.
+  - If the session feeding such a source has heard canticle content, taint applies (§14.12).
+  - An emitter makes no model call per item.
+- **Classes.** An emitter sings `ambient` or `chatter` only. It never sings live-state, advisory, regulatory, alarm or control.
+- **Bounded runs.**
+  - A run has a declared end and stops on a signal. The reference spike allows at most one hour.
+  - Items already on air are left to expire naturally.
+  - Cadence has a floor, at most one item a second, and a per-minute cap. Item size is capped before signing.
+  - The station's own budgets (§7.5) still regulate what loops.
+- **Repetition and silence.**
+  - Repeating a line sings a new item: a new tuple, but the same lineage root for the same principal and body (R-INT-2), so it adds no weight.
+  - A tick that sends nothing (a "breath") is carrier state, not a value (I-9).
+  - Neither repetition nor presence is a delivery guarantee, or evidence about content.
+- **Separation.** Emission, discovery, reception and any session ingestion stay separate processes and grants. The emitter never listens and never learns who hears (I-1). It has no path into any session or memory (I-10).
+
+Reference: `prototype/canticle-station/canticle/ambient.py` (`canticle ambient`), and the same-host proof in `prototype/canticle-station/proofs/web-lanes/`.
 
 ---
 
@@ -2231,6 +2253,31 @@ DECISION D8 (recommended: ews for the fastest demo — it already has the SeedLi
 - Show aggregates: lens levels and votes, keeper health, station carrier states, loop and budget telemetry, signer/principal and verification state.
 - Never show listener sets, per-session postures or taint states of other operators' sessions (§19.3, Never 15).
 - Render UNOBSERVABLE as "not observable since *t*", STALE as stale (not calm), and EXERCISE visibly.
+
+### 18.9 Web tuner: a local observer
+
+A **web tuner** shows a person what one local listener hears (#57): the stations it has verified, their streams, and the live ring of a channel the person picks. It is a dashboard under §18.8, with these further rules:
+
+- **The browser stays off the wire.** A browser never joins a multicast group, holds a canticle key or verifies frames itself. It talks to a local gateway, which runs a listener (§7.4-§7.8) and serves that listener's verified view. In this version the gateway:
+  - binds a loopback address only;
+  - refuses requests whose `Host` is not that address, which blocks DNS rebinding, and refuses cross-origin writes;
+  - serves a strict content-security policy.
+
+  Serving beyond the host needs an authenticated front end, and is out of scope for v1.
+- **Tuning is local observation.**
+  - Picking a channel in the tuner is a gateway-local subscription. It MUST NOT send anything to a station or relay (I-1, I-2).
+  - It is not a session tune (§14.6.1): it grants no landing consent, and nothing the tuner shows lands in any session or memory.
+  - The gateway has no control socket. It cannot sing, hush, or change what its listener admits.
+- **Truth of the ring.**
+  - The tuner shows an item only while its listener holds it, until local expiry (§14.6.3).
+  - A page that opens late sees only what is on air now. Items that just left the air may be listed briefly, labelled expired, withdrawn or superseded, never as live.
+  - Sequence numbers up to the beacon's `head_seq` that the listener never heard are shown as gaps, never filled in.
+  - Presence follows the rendering rules of §8.6.
+- **Verification is shown, not assumed.** A station appears only after a beacon verifies against its manifest key. Datagrams that fail verification are counted, but never attributed to a station and never shown.
+- **Heard text is data.** The page renders heard content as text, never as markup, and truncates it for display.
+- **Budget.** The gateway bounds how many channels it serves, how often each is polled, and how many items and characters each response carries. The reference allows 16 channels, at most 4 polls a second each, and 64 items of 512 characters.
+
+Reference: `prototype/canticle-station/canticle/tuner.py` (`canticle tuner`), and the same-host proof in `prototype/canticle-station/proofs/web-lanes/`.
 
 ---
 
@@ -2726,6 +2773,8 @@ Status values: **superseded** — normative text replaced by this RFC; the file 
 | #38 stream_id collisions | §5.4 |
 | #48 trust envelope | §10.11 |
 | #51 disposition frames | §6.6, §22.5 |
+| #57 web tuner | §18.9 |
+| #58 background ambient emitter | §15.8 |
 
 ---
 

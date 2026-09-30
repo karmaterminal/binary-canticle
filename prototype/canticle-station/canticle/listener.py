@@ -73,6 +73,7 @@ class _StationState:
     presence: str = ""  # nothing reported yet
     first_beacon_at: Optional[int] = None  # first beacon heard since this listener started (warm-up, §7.8)
     stream_loop_max: dict = field(default_factory=dict)  # stream_id -> advertised loop_max_ms
+    stream_entries: dict = field(default_factory=dict)  # stream_id -> latest beacon StreamEntry (heads, live)
 
     @property
     def offset_ms(self) -> int:
@@ -154,6 +155,7 @@ class Listener:
             # station counts beacons from 1 again and may loop different streams.
             st.bseq = 0
             st.stream_loops.clear()
+            st.stream_entries.clear()
         return True
 
     def _beacon(self, f: wire.Frame, now_ms: int) -> list[Event]:
@@ -174,6 +176,7 @@ class Listener:
         for e in b.streams:
             st.stream_loops[e.stream_id] = e.loop_ms
             st.stream_loop_max[e.stream_id] = e.loop_max_ms
+            st.stream_entries[e.stream_id] = e
         events.extend(self._presence(f.key_id, now_ms))
         return events
 
