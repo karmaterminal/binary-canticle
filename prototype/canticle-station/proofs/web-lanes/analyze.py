@@ -91,16 +91,29 @@ for s in ("hymn", "lens.weather"):
           f"{early[s]['distinct_items']} of {n}")
     check(f"{s}: tuner gateway heard every distinct signed item", tuner[s]["distinct_items"] == n,
           f"{tuner[s]['distinct_items']} of {n}")
-    # Late join: only items still on air at its start can be heard, and nothing older.
-    live_at = {q for q, r in emitted[s].items() if r["t_ms"] + TTL_MS > late_start}
+    # Late join. Items that expired before it started must never be heard. Items on air at its start
+    # are heard from the carousel within one loop (x 4/3 jitter), unless they expire before their next
+    # copy; items sung after its start are heard like any other.
+    first = late[s]["first"]
     gone_before = {q for q, r in emitted[s].items() if r["t_ms"] + TTL_MS + 5_000 <= late_start}
-    heard = set(late[s]["first"])
-    catch = [late[s]["first"][q]["t_ms"] - late_start for q in heard if emitted[s][q]["t_ms"] < late_start]
-    late[s]["catch_up_ms"] = dist(catch)
-    check(f"{s}: late listener heard nothing that had expired before it started", not (heard & gone_before),
-          f"{len(gone_before)} items had expired; {len(heard & gone_before)} heard")
-    check(f"{s}: late listener caught up on every item still on air", {q for q in live_at if emitted[s][q]["t_ms"] + TTL_MS - late_start > 30_000} <= heard,
-          f"{len(heard & live_at)} of {len(live_at)} live at its start heard; catch-up {late[s]['catch_up_ms']}")
+    on_air = {q: r for q, r in emitted[s].items() if r["t_ms"] <= late_start < r["t_ms"] + TTL_MS}
+    after = {q for q, r in emitted[s].items() if r["t_ms"] > late_start}
+    bound = {q: r["loop_ms"] * 4 / 3 for q, r in on_air.items()}
+    must = {q for q, r in on_air.items() if r["t_ms"] + TTL_MS - late_start > bound[q]}
+    catch = {q: first[q]["t_ms"] - late_start for q in on_air if q in first}
+    missed = {q: round((r["t_ms"] + TTL_MS - late_start) / 1000, 1) for q, r in on_air.items() if q not in first}
+    late[s].update({"on_air_at_start": len(on_air), "heard_of_on_air": len(catch), "catch_up_ms": dist(list(catch.values())),
+                    "missed_with_remaining_life_s": missed,
+                    "time_to_hear_ms": dist([first[q]["t_ms"] - first[q]["issued_at"] for q in after if q in first]),
+                    "sung_after_start": len(after), "heard_of_sung_after": len(after & set(first))})
+    check(f"{s}: late listener heard nothing that had expired before it started", not (set(first) & gone_before),
+          f"{len(gone_before)} items had expired; {len(set(first) & gone_before)} heard")
+    check(f"{s}: late listener caught up on every on-air item with more than one loop of life left, within loop x 4/3",
+          must <= set(catch) and all(catch[q] <= bound[q] + 1_000 for q in catch),
+          {"on_air": len(on_air), "heard": len(catch), "catch_up_ms": late[s]["catch_up_ms"],
+           "missed (remaining life at start, s)": missed})
+    check(f"{s}: late listener heard every item sung after it started", after <= set(first),
+          f"{len(after & set(first))} of {len(after)}")
 
 # ---- natural expiry, from the gateway's timed events
 exp = [e for e in jl("tuner-events.jsonl") if e.get("event") == "expired"]

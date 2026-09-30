@@ -1,0 +1,4 @@
+{"process": "station", "cpu_s": 0.79}
+{"process": "tuner", "cpu_s": 1.48}
+{"process": "listen-early", "cpu_s": 1.22}
+{"process": "listen-late", "cpu_s": 0.77}
