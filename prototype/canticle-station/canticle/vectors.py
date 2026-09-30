@@ -121,6 +121,8 @@ def sequence_cases() -> list[dict]:
     chat = stream_id("chatter")
     threat = stream_id("lens.threat")
     v1 = wire.sign_frame(wire.KIND_ITEM, s1, _item())
+    tampered_v1 = bytearray(v1)
+    tampered_v1[v1.index(b"hello")] = ord("j")
     v1_other = wire.sign_frame(wire.KIND_ITEM, s1, _item({8: b"a different body"}))
     pl = wire.sign_frame(wire.KIND_PLUCK, s1, {1: 1, 2: chat, 3: 2, 4: T0 + 5_000, 5: T0 + 60_000, 13: 1, 20: 1})
     ls = lambda seq, t, text: wire.sign_frame(wire.KIND_ITEM, s1, _item({2: threat, 3: seq, 4: t, 5: t + 120_000, 6: 3, 10: "now", 8: text}))
@@ -129,6 +131,8 @@ def sequence_cases() -> list[dict]:
     epoch2 = wire.sign_frame(wire.KIND_ITEM, s1, _item({1: 2}))
     seqs = [
         ("repeat-is-no-op", [v1, v1, v1], ["item"]),
+        ("tampered-first-authentic-later-quiet-repeat", [bytes(tampered_v1), v1, v1],
+         ["evidence:bad-signature", "item"]),
         ("equivocation", [v1, v1_other], ["item", "evidence:equivocation"]),
         ("pluck-after-original", [v1, pl], ["item", "withdrawn"]),
         ("pluck-before-original", [pl, v1], ["evidence:plucked"]),
