@@ -294,8 +294,8 @@ class PerKeyBoundsTest(unittest.TestCase):
     def pluck(self, seq, target, t, expires, scope=1):
         return wire.sign_frame(wire.KIND_PLUCK, SK, {1: 1, 2: self.CHAT, 3: seq, 4: t, 5: expires, 13: scope, 20: target})
 
-    def beacon(self, bseq, streams, page=None, epoch=1):
-        m = {1: epoch, 2: bseq, 3: T0, 4: 1000, 5: "p", 6: streams, 8: 16000}
+    def beacon(self, bseq, streams, page=None, epoch=1, wallclock=T0):
+        m = {1: epoch, 2: bseq, 3: wallclock, 4: 1000, 5: "p", 6: streams, 8: 16000}
         if page:
             m[7] = list(page)
         return wire.sign_frame(wire.KIND_BEACON, SK, m)
@@ -374,7 +374,7 @@ class PerKeyBoundsTest(unittest.TestCase):
         # The #60 review: marks drawn from the dedup share refused an honest key minting a new live-state
         # key every 3 s at the §7.4 floor of 256. Marks have their own, longer-scaled limit instead.
         lst = self.lst(quota=256, warmup=False)
-        self.assertEqual(lst._mark_quota(SK_ID), 256 * 6)                            # classes 1, 3, 9: ⌈905/180⌉ = 6
+        self.assertEqual(lst._mark_quota(SK_ID), 256 * 7)                            # classes 1, 3, 9: ⌈1085/180⌉ = 7
         refused, peak = 0, 0
         for i in range(500):
             t = T0 + i * 3_000
@@ -384,7 +384,7 @@ class PerKeyBoundsTest(unittest.TestCase):
             peak = max(peak, len(lst.hwm))
         self.assertEqual(refused, 0)
         self.assertGreater(peak, 256)                                                # more marks than dedup entries
-        self.assertLessEqual(peak, 256 * 6)
+        self.assertLessEqual(peak, 256 * 7)
 
     def test_mark_retention_never_shrinks(self):
         # The #60 review, with mixed classes under one state_key: a shorter-class newer value must not
@@ -407,6 +407,69 @@ class PerKeyBoundsTest(unittest.TestCase):
         evs = lst.hear(v2, T0 + 400_000)
         self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["superseded"])
         self.assertGreaterEqual(lst.hwm[(SK_ID, self.CHAT, "a")][3], T0 + 200 + 86_400_000)
+
+    def test_mark_survives_a_later_rise_in_the_clock_offset(self):
+        # Second #60 review: the newer value is heard before any beacon (δ̂ = 0), then a beacon shows the
+        # station 60 s behind. A replayed older value, still admissible under the new δ̂, must not land.
+        lst = self.lst(scopes=None, warmup=False)
+        d = 60_000                                                                   # receiver minus station
+        o = self.item(1, T0 + 500, cls=3, ttl=900_000, extra={10: "now", 8: b"threat high"})
+        n = self.item(2, T0 + 600, cls=3, ttl=180_000, extra={10: "now", 8: b"all clear"})
+        lst.hear(n, T0 + 600 + d)
+        lst.hear(self.beacon(1, [], wallclock=T0 + 1_000), T0 + 1_000 + d)
+        self.assertEqual(lst.stations[SK_ID].offset_ms, d)
+        lst.tick(T0 + 930_000)
+        evs = lst.hear(o, T0 + 930_000)
+        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["superseded"])
+
+    def test_classes_heard_stay_covered_when_the_mark_moves(self):
+        # Second #60 review: a short regulatory value A is heard, a later long one O is lost, and a
+        # live-state N supersedes. O was issued before N, so it must stay dropped while it is valid.
+        entry = StationEntry("cael", wire.public_key_bytes(SK), frozenset({3, 6}), ("chatter",))
+        lst = Listener(Manifest([entry]), ephemeral=True, warmup=False)
+        reg = lambda seq, t, ttl: self.item(seq, t, cls=6, ttl=ttl, extra={10: "notice", 11: 0})
+        lst.hear(reg(1, T0 + 1_000, 60_000), T0 + 1_000)
+        o = reg(2, T0 + 100_000, 3_600_000)                                          # never heard live
+        lst.hear(self.item(3, T0 + 110_000, cls=3, ttl=180_000, extra={10: "notice"}), T0 + 110_000)
+        lst.tick(T0 + 3_680_000)
+        evs = lst.hear(o, T0 + 3_680_000)
+        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["superseded"])
+
+    def test_a_plucked_newer_value_still_supersedes(self):
+        # Second #60 review: the PLUCK for N arrives before N. N is dropped, but it still superseded O.
+        lst = self.lst(warmup=False)
+        o = self.item(1, T0, cls=3, ttl=600_000, extra={10: "notice"})
+        n = self.item(2, T0 + 1_000, cls=3, ttl=600_000, extra={10: "notice"})
+        lst.hear(o, T0)
+        lst.hear(self.pluck(3, 2, T0 + 2_000, T0 + 601_000), T0 + 2_000)
+        evs = lst.hear(n, T0 + 2_000)
+        self.assertEqual([(e.kind, e.seq) for e in evs if e.kind != "evidence"], [("superseded", 1)])
+        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["plucked"])
+        self.assertEqual(lst.on_air(), [])
+        self.assertEqual(lst.hwm[(SK_ID, self.CHAT, "notice")][:3], (T0 + 1_000, 1, 2))
+
+    def test_sticky_pluck_uses_the_current_clock_offset(self):
+        # Second #60 review: the target was heard before any beacon (δ̂ = 0); the PLUCK after one (δ̂ =
+        # 60 s). The sticky mark must last as long as the target can still be admitted.
+        lst = self.lst()
+        d = 60_000
+        target = self.item(1, T0, ttl=120_000, extra={8: b"meet at gate 4"})
+        lst.hear(target, T0 + d)
+        lst.hear(self.beacon(1, [], wallclock=T0 + 1_000), T0 + 1_000 + d)
+        lst.hear(self.pluck(2, 1, T0 + 2_000, T0 + 120_000), T0 + 2_000 + d)
+        lst.tick(T0 + 160_000)
+        evs = lst.hear(target, T0 + 160_000)
+        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["plucked"])
+
+    def test_refusals_do_not_advance_the_epoch(self):
+        lst = self.lst(quota=1)
+        lst.hear(self.item(1, T0), T0)
+        st = lst.stations[SK_ID]
+        evs = lst.hear(self.item(1, T0, extra={1: 2}), T0)                           # new epoch, over quota
+        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["over-quota"])
+        self.assertEqual((st.epoch_hwm, list(st.last_stream_item)), (1, [self.CHAT]))
+        lst.hear(self.item(5, T0, ttl=60_000), T0 + 36_000)                           # epoch 1 still accepted
+        self.assertNotIn("epoch-regression", lst.evidence_counts)
 
     def test_catalog_newest_copy_of_a_stream_wins(self):
         # §8.4 lets a changed stream ride the next beacon whatever its page, so one stream can sit on
@@ -462,7 +525,7 @@ class PerKeyBoundsTest(unittest.TestCase):
         self.assertEqual(len(lst.current), 1)
         evs = lst.hear(self.pluck(2, 1, T0 + 1, T0 + 60_000), T0 + 1)
         self.assertEqual([e.kind for e in evs], ["withdrawn"])
-        self.assertEqual(lst.sticky_pluck[(SK_ID, 1, self.CHAT, 1)], lst.dedup[(SK_ID, 1, self.CHAT, 1)][1])
+        self.assertEqual(lst.sticky_pluck[(SK_ID, 1, self.CHAT, 1)], lst.dedup[(SK_ID, 1, self.CHAT, 1)][1])  # equal expiry
 
     def test_state_v2_round_trip_and_v1_still_loads(self):
         with tempfile.TemporaryDirectory() as d:

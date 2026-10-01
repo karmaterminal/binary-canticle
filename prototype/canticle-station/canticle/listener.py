@@ -151,12 +151,12 @@ class Listener:
         self._save_if_dirty()
         return events
 
-    def _epoch_ok(self, kid: bytes, epoch: int, now_ms: int, events: list) -> bool:
+    def _epoch_ok(self, kid: bytes, epoch: int, now_ms: int, events: list, advance: bool = True) -> bool:
         st = self._st(kid)
         if epoch < st.epoch_hwm:
             events.append(self._evidence("epoch-regression", kid, f"{epoch} < {st.epoch_hwm}"))
             return False
-        if epoch > st.epoch_hwm:
+        if advance and epoch > st.epoch_hwm:
             st.epoch_hwm, st.epoch_seen_at = epoch, now_ms
             self._dirty = True
             # bseq, the advertised catalog and the per-stream hearing times belong to the previous
@@ -227,7 +227,9 @@ class Listener:
             events.append(self._evidence("hop-limit", kid, f"hop {body.hop} > {CLASSES[body.cls].hop_limit} for "
                                          f"{CLASSES[body.cls].name}", stream=sname, seq=body.seq))
             return events
-        if not self._epoch_ok(kid, body.epoch, now_ms, events):
+        # Regression is checked now; a higher epoch is adopted only once the frame is admitted, so an
+        # over-quota or mismatched frame cannot advance it (§10.9: refusals are state-neutral).
+        if not self._epoch_ok(kid, body.epoch, now_ms, events, advance=False):
             return events
         ident = f.identity
         digest = hashlib.sha256(f.raw).digest()
@@ -274,9 +276,8 @@ class Listener:
                 events.append(self._evidence("over-quota", kid, "per-key supersession mark limit full; live "
                                              "marks kept", stream=self._stream_name(kid, body.stream), seq=body.seq))
                 return events
+            self._epoch_ok(kid, body.epoch, now_ms, events)
             retain = wire.local_expiry_ms(body, st.offset_ms, first_heard_ms=now_ms) + SKEW_MS
-            if target is not None:
-                retain = min(retain, target[1])  # kept until the target's local expiry plus skew (§7.7)
             self._remember(ident, digest, retain,
                            (body.expires_at, body.scope) if f.kind == wire.KIND_ITEM else None)
             self._heard_on(st, body.stream, now_ms)
@@ -296,7 +297,10 @@ class Listener:
                                     {"by_seq": body.seq, "reason": body.reason}))
             return events
         it: wire.Item = body
-        if ident in self.sticky_pluck:
+        # A keyed item that arrives after its own PLUCK still superseded what came before it at the
+        # station (§7.8, whatever the arrival order), so it moves the mark before it is dropped.
+        plucked = ident in self.sticky_pluck
+        if plucked and (it.state_key is None or it.cls not in CLASSES):
             events.append(self._evidence("plucked", kid, "item arrived after its pluck", stream=name, seq=it.seq))
             return events
         if it.cls not in CLASSES:
@@ -306,32 +310,42 @@ class Listener:
             hkey = (kid, it.stream, it.state_key)
             order = (it.issued_at, it.epoch, it.seq)
             prev = self.hwm.get(hkey)
-            # A mark must outlive every older item for its key (§7.8). Each is issued no later than the
-            # mark, so it has expired by the mark's issued_at + its class max TTL (receiver clock, plus
-            # skew). The class is known only for items heard, so the mark takes the longest class max
-            # among them, and its retention never goes down (#60 review: a shorter-class newer value
-            # must not shorten it).
+            # A mark must outlive every older item for its key (§7.8). Its horizon starts at each admitted
+            # item's local expiry + skew + its class max TTL, and never goes down (#60 review): a newer
+            # value moves it forward by the issued_at gap, so classes heard while the mark is held stay
+            # covered up to the new mark; an older item dropped against it raises it for that item's class.
+            # A mark whose horizon has passed is dropped first, as tick() would, so results do not depend
+            # on tick cadence: every older item of a class heard for the key has expired by then.
+            if prev is not None and prev[3] <= now_ms:
+                del self.hwm[hkey]
+                self.hwm_per_key[kid] -= 1
+                self._dirty = True
+                prev = None
             class_max_ms = CLASSES[it.cls].max_ttl_s * 1000
             # Equal order is only possible for the same identity, i.e. a re-surface after restart.
             if prev is not None and (order < prev[:3] or (order == prev[:3] and not resurface)):
-                until = max(prev[3], prev[0] + st.offset_ms + class_max_ms + SKEW_MS)
+                lag = min(prev[0] - it.issued_at, class_max_ms + SKEW_MS)
+                until = max(prev[3], retain + class_max_ms + lag)
                 if until > prev[3]:
                     self.hwm[hkey] = (*prev[:3], until)
                     self._dirty = True
                 events.append(self._evidence("superseded", kid, "older than the high-water mark", stream=name, seq=it.seq))
                 return events
             if prev is None or order > prev[:3]:
-                until = it.issued_at + st.offset_ms + class_max_ms + SKEW_MS
+                until = retain + class_max_ms
                 if prev is None:
                     self.hwm_per_key[kid] = self.hwm_per_key.get(kid, 0) + 1
                 else:
-                    until = max(until, prev[3])
+                    until = max(until, prev[3] + (it.issued_at - prev[0]))
                 self.hwm[hkey] = (*order, until)
                 self._dirty = True
             for other_ident, h in list(self.current.items()):
                 if other_ident[0] == kid and h.item.stream == it.stream and h.item.state_key == it.state_key:
                     del self.current[other_ident]
                     events.append(Event("superseded", self._name(kid), kid.hex(), name, h.item.seq, {"by_seq": it.seq}))
+        if plucked:
+            events.append(self._evidence("plucked", kid, "item arrived after its pluck", stream=name, seq=it.seq))
+            return events
         if name is None or (self.tuned is not None and name not in self.tuned):
             return events  # untuned or unnamed streams are held, not surfaced (§5.4)
         if it.cls == LIVE_STATE and self.warmup and not self._warm(kid, it.stream, now_ms):
@@ -381,18 +395,18 @@ class Listener:
         """Would admitting this frame add a supersession mark? (the conditions of the hwm step below)"""
         it = f.body
         return (f.kind == wire.KIND_ITEM and it.state_key is not None and it.cls in CLASSES
-                and ident not in self.sticky_pluck and (f.key_id, it.stream, it.state_key) not in self.hwm)
+                and (f.key_id, it.stream, it.state_key) not in self.hwm)
 
     def _mark_quota(self, kid: bytes) -> int:
         """Per-key limit on supersession marks, counted apart from dedup entries (§7.4). A dedup entry
-        lasts about one TTL; a mark lasts the class max TTL from its issued_at (§7.8). So the limit is the
-        dedup share scaled by the longest (max TTL + skew) / default TTL among the key's granted classes:
-        a key churning state_keys at its class default TTLs within its dedup share fits."""
+        lasts about one TTL; a mark lasts that TTL + skew + the class max TTL (§7.8). So the limit is the
+        dedup share scaled by the largest ⌈(default TTL + max TTL + skew) / default TTL⌉ among the key's
+        granted classes: a key churning state_keys at its class default TTLs within its share fits."""
         if self.per_key_mark_quota is not None:
             return max(1, self.per_key_mark_quota)
         entry = self.manifest.entry(kid)
         specs = [CLASSES[c] for c in (entry.classes if entry else ()) if c in CLASSES] or list(CLASSES.values())
-        factor = max(-(-(c.max_ttl_s * 1000 + SKEW_MS) // (c.default_ttl_s * 1000)) for c in specs)
+        factor = max(-(-((c.default_ttl_s + c.max_ttl_s) * 1000 + SKEW_MS) // (c.default_ttl_s * 1000)) for c in specs)
         return self._quota() * factor
 
     def _hwm_room(self, kid: bytes, now_ms: int) -> bool:
@@ -453,6 +467,11 @@ class Listener:
             self.dedup_per_key[k[0]] -= 1
             self._restored.discard(k)
             self._dirty = True
+        # A sticky-pluck mark has its PLUCK's retention (§7.7): purging them together keeps the marks
+        # within the dedup quota between ticks too (#60).
+        for k in [k for k, v in self.sticky_pluck.items() if v <= now_ms]:
+            del self.sticky_pluck[k]
+            self._dirty = True
 
     def _purge_hwm(self, now_ms: int) -> None:
         for k in [k for k, v in self.hwm.items() if v[3] <= now_ms]:
@@ -470,9 +489,6 @@ class Listener:
                 events.append(Event("expired", self._name(ident[0]), ident[0].hex(),
                                     self._stream_name(ident[0], ident[2]), ident[3]))
         self._purge_dedup(now_ms)
-        for k in [k for k, v in self.sticky_pluck.items() if v <= now_ms]:
-            del self.sticky_pluck[k]
-            self._dirty = True
         self._purge_hwm(now_ms)
         events.extend(self._release_held(now_ms))
         self._save_if_dirty()
