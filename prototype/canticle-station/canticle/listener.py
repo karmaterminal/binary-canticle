@@ -28,7 +28,7 @@ SKEW_MS = 5_000
 OFFSET_SAMPLES = 16
 SCOPE_NAMES = {v: k for k, v in SCOPES.items()}
 LIVE_STATE = CLASS_BY_NAME["live-state"].code
-STATE_VERSION = 2  # 2: dedup rows carry the item's (expires_at, scope) for the §9.7 PLUCK check (#60)
+STATE_VERSION = 3  # 2: dedup rows carry (expires_at, scope) for the §9.7 PLUCK check (#60); 3: marks carry their class (§23.2 q21)
 
 
 @dataclass
@@ -135,7 +135,7 @@ class Listener:
         self.dedup: dict[tuple, tuple] = {}   # identity -> (sha256(frame), retain_until, (expires_at, scope) | None)
         self.dedup_per_key: dict[bytes, int] = {}
         self.sticky_pluck: dict[tuple, int] = {}
-        self.hwm: dict[tuple, tuple] = {}     # (kid, stream, state_key) -> (issued_at, epoch, seq, retain_until)
+        self.hwm: dict[tuple, tuple] = {}     # (kid, stream, state_key) -> (issued_at, epoch, seq, retain_until, class)
         self.hwm_per_key: dict[bytes, int] = {}
         self._dedup_due, self._sticky_due, self._hwm_due = _Expiries(), _Expiries(), _Expiries()
         self.current: dict[tuple, _Heard] = {}  # identity -> heard item (on air, from this listener's view)
@@ -349,6 +349,14 @@ class Listener:
                 self.hwm_per_key[kid] -= 1
                 self._dirty = True
                 prev = None
+            # One class per state_key within an epoch (§7.8, §23.2 q21): a change of class in the mark's
+            # epoch is dropped and does not move the mark. A new epoch may change it.
+            if prev is not None and prev[4] is not None and it.epoch == prev[1] and it.cls != prev[4]:
+                reason = "plucked" if plucked else "class-change"   # §7.7: a plucked tuple reports plucked
+                events.append(self._evidence(reason, kid, f"class {it.cls} for a key marked with class {prev[4]} "
+                                             f"in epoch {prev[1]}" if reason == "class-change"
+                                             else "item arrived after its pluck", stream=name, seq=it.seq))
+                return events
             # Equal order is only possible for the same identity, i.e. a re-surface after restart.
             if prev is not None and (order < prev[:3] or (order == prev[:3] and not resurface)):
                 reason = "plucked" if plucked else "superseded"   # §7.7: a plucked tuple reports plucked
@@ -361,7 +369,7 @@ class Listener:
                     self.hwm_per_key[kid] = self.hwm_per_key.get(kid, 0) + 1
                 else:
                     until = max(until, prev[3])
-                self.hwm[hkey] = (*order, until)
+                self.hwm[hkey] = (*order, until, it.cls)
                 self._hwm_due.push(until, hkey)
                 self._dirty = True
             for other_ident, h in list(self.current.items()):
@@ -568,7 +576,7 @@ class Listener:
         with open(path) as f:
             state = json.load(f)
         version = state.get("version")
-        if version not in (1, STATE_VERSION):
+        if version not in (1, 2, STATE_VERSION):
             raise ValueError(f"listener state {path}: unsupported version {version!r}")
         for kid_hex, (epoch, seen_at) in state["epochs"].items():
             st = self._st(bytes.fromhex(kid_hex))
@@ -586,9 +594,11 @@ class Listener:
             target = (bytes.fromhex(kid_hex), epoch, stream, seq)
             self.sticky_pluck[target] = retain
             self._sticky_due.push(retain, target)
-        for kid_hex, stream, state_key, issued_at, epoch, seq, retain in state["hwm"]:
+        for row in state["hwm"]:
+            # rows before version 3 have no class: those marks skip the class-change check
+            kid_hex, stream, state_key, issued_at, epoch, seq, retain = row[:7]
             kid = bytes.fromhex(kid_hex)
-            self.hwm[(kid, stream, state_key)] = (issued_at, epoch, seq, retain)
+            self.hwm[(kid, stream, state_key)] = (issued_at, epoch, seq, retain, row[7] if len(row) > 7 else None)
             self._hwm_due.push(retain, (kid, stream, state_key))
             self.hwm_per_key[kid] = self.hwm_per_key.get(kid, 0) + 1
 

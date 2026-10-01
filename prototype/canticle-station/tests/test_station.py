@@ -75,6 +75,19 @@ class CarouselTest(unittest.TestCase):
         self.assertFalse(items(later, seq=a.seq))
         self.assertTrue(items(later, seq=b.seq))
 
+    def test_one_class_per_state_key_within_an_epoch(self):
+        # §7.8, §23.2 q21: a state_key keeps its class for the epoch; a new epoch may change it.
+        st = Station(SK, [StreamConfig("chatter")], epoch=1, rng=random.Random(1), now_ms=T0)
+        st.sing(T0, "chatter", text="a", cls="live-state", state_key="k")
+        head = st.streams["chatter"].head_seq
+        with self.assertRaises(ValueError):
+            st.sing(T0 + 1, "chatter", text="b", cls="chatter", state_key="k")
+        self.assertEqual(st.streams["chatter"].head_seq, head)                    # refused before a seq is used
+        st.sing(T0 + 2, "chatter", text="c", cls="live-state", state_key="k")     # same class: fine
+        st.sing(T0 + 3, "chatter", text="d", cls="chatter", state_key="other")    # keys are independent
+        later = Station(SK, [StreamConfig("chatter")], epoch=2, rng=random.Random(2), now_ms=T0 + 4)
+        later.sing(T0 + 4, "chatter", text="e", cls="chatter", state_key="k")     # a new epoch may change it
+
     def test_pluck_stops_target_and_loops_until_target_expiry(self):
         st = station()
         a = st.sing(T0, "chatter", text="oops", ttl_s=60)

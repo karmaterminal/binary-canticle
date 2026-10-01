@@ -94,6 +94,9 @@ class _Stream:
     sid: int
     head_seq: int = 0
     ring: dict = field(default_factory=dict)  # seq -> _OnAir, in seq order
+    # state_key -> class code, for this epoch (a Station is one epoch). One class per state_key within an
+    # epoch (§7.8, §23.2 q21): one entry per key the station has sung, cleared by the next epoch's restart.
+    key_classes: dict = field(default_factory=dict)
 
 
 def next_epoch(path, now_s: Optional[int] = None) -> int:
@@ -264,6 +267,10 @@ class Station:
             raise ValueError(f"class {spec.name} requires a state_key")
         if keep_on_air_s and not state_key:
             raise ValueError("only keyed items can be kept on air by refresh (§7.9)")
+        if state_key is not None and st.key_classes.get(state_key, spec.code) != spec.code:
+            have = CLASSES[st.key_classes[state_key]].name
+            raise ValueError(f"state_key {state_key!r} already carries class {have} in this epoch; a class "
+                             "change needs a new epoch (§7.8)")
         ttl_ms = int(min(ttl_s if ttl_s is not None else st.cfg.default_ttl_s, st.cfg.default_ttl_s) * 1000)
         if ttl_ms <= STOP_BEFORE_EXPIRY_MS:
             raise ValueError("ttl too short")
@@ -287,6 +294,8 @@ class Station:
             oa.reissue = dict(stream=stream, body=body, body_ref=body_ref, cls=spec.name, ctype=it.ctype,
                               ttl_s=ttl_ms / 1000, state_key=state_key, loop=loop, scope=scope,
                               purpose=purpose, intensity=intensity, hop=hop, flags=flags)
+        if state_key is not None:
+            st.key_classes[state_key] = spec.code
         self._admit(st, oa, now_ms)
         return SingResult(stream=stream, seq=it.seq, epoch=self.epoch, issued_at=it.issued_at,
                           expires_at=it.expires_at, ttl_s=ttl_ms / 1000, loop_ms=oa.loop_ms, clamp=oa.clamp,
