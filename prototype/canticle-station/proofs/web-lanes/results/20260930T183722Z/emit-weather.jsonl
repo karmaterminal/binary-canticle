@@ -1,0 +1,33 @@
+{"event": "start", "t_ms": 1790793456427, "stream": "lens.weather", "class": "ambient", "ttl_s": 60.0, "gap_s": [5.0, 15.0], "breath": 0.3, "max_per_minute": 20, "max_bytes": 256, "duration_s": 300.0, "fixture_lines": 5, "model_calls": 0}
+{"event": "sing", "t_ms": 1790793456427, "seq": 1, "size": 154, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "wind 12 kt from the west, steady"}
+{"event": "sing", "t_ms": 1790793461853, "seq": 2, "size": 141, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "clear overhead, cold"}
+{"event": "sing", "t_ms": 1790793469102, "seq": 3, "size": 141, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "clear overhead, cold"}
+{"event": "sing", "t_ms": 1790793477005, "seq": 4, "size": 142, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "fog in the low valley"}
+{"event": "sing", "t_ms": 1790793482202, "seq": 5, "size": 141, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "clear overhead, cold"}
+{"event": "sing", "t_ms": 1790793496326, "seq": 6, "size": 142, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "fog in the low valley"}
+{"event": "sing", "t_ms": 1790793511096, "seq": 7, "size": 142, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "fog in the low valley"}
+{"event": "breath", "t_ms": 1790793522928}
+{"event": "sing", "t_ms": 1790793529322, "seq": 8, "size": 142, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "fog in the low valley"}
+{"event": "sing", "t_ms": 1790793538126, "seq": 9, "size": 143, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "light rain moving east"}
+{"event": "sing", "t_ms": 1790793552468, "seq": 10, "size": 142, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "fog in the low valley"}
+{"event": "breath", "t_ms": 1790793563363}
+{"event": "breath", "t_ms": 1790793573517}
+{"event": "sing", "t_ms": 1790793587528, "seq": 11, "size": 154, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "wind 12 kt from the west, steady"}
+{"event": "sing", "t_ms": 1790793599225, "seq": 12, "size": 141, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "clear overhead, cold"}
+{"event": "sing", "t_ms": 1790793610608, "seq": 13, "size": 142, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "fog in the low valley"}
+{"event": "sing", "t_ms": 1790793616116, "seq": 14, "size": 142, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "fog in the low valley"}
+{"event": "sing", "t_ms": 1790793628724, "seq": 15, "size": 144, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "pressure falling slowly"}
+{"event": "sing", "t_ms": 1790793639448, "seq": 16, "size": 142, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "fog in the low valley"}
+{"event": "breath", "t_ms": 1790793647941}
+{"event": "breath", "t_ms": 1790793660008}
+{"event": "sing", "t_ms": 1790793671756, "seq": 17, "size": 143, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "light rain moving east"}
+{"event": "sing", "t_ms": 1790793683435, "seq": 18, "size": 143, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "light rain moving east"}
+{"event": "sing", "t_ms": 1790793688456, "seq": 19, "size": 154, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "wind 12 kt from the west, steady"}
+{"event": "breath", "t_ms": 1790793694924}
+{"event": "sing", "t_ms": 1790793709626, "seq": 20, "size": 142, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "fog in the low valley"}
+{"event": "sing", "t_ms": 1790793717779, "seq": 21, "size": 154, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "wind 12 kt from the west, steady"}
+{"event": "breath", "t_ms": 1790793725253}
+{"event": "sing", "t_ms": 1790793735997, "seq": 22, "size": 141, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "clear overhead, cold"}
+{"event": "breath", "t_ms": 1790793742071}
+{"event": "breath", "t_ms": 1790793752445}
+{"event": "stop", "t_ms": 1790793756428, "reason": "duration", "sing": 22, "breath": 9, "capped": 0, "refused": 0, "model_calls": 0}

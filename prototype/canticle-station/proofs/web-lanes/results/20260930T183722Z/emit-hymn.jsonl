@@ -1,0 +1,52 @@
+{"event": "start", "t_ms": 1790793456431, "stream": "hymn", "class": "ambient", "ttl_s": 60.0, "gap_s": [2.0, 10.0], "breath": 0.2, "max_per_minute": 20, "max_bytes": 256, "duration_s": 300.0, "fixture_lines": 7, "model_calls": 0}
+{"event": "sing", "t_ms": 1790793456431, "seq": 1, "size": 138, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the carrier holds"}
+{"event": "sing", "t_ms": 1790793463077, "seq": 2, "size": 148, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "breathe in, the ring turns"}
+{"event": "sing", "t_ms": 1790793472937, "seq": 3, "size": 138, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "quiet on the hill"}
+{"event": "sing", "t_ms": 1790793478532, "seq": 4, "size": 136, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the lamp is lit"}
+{"event": "sing", "t_ms": 1790793486976, "seq": 5, "size": 138, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "rest here a while"}
+{"event": "breath", "t_ms": 1790793495407}
+{"event": "sing", "t_ms": 1790793502048, "seq": 6, "size": 136, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the lamp is lit"}
+{"event": "sing", "t_ms": 1790793505756, "seq": 7, "size": 138, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "quiet on the hill"}
+{"event": "sing", "t_ms": 1790793512184, "seq": 8, "size": 138, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "rest here a while"}
+{"event": "breath", "t_ms": 1790793514679}
+{"event": "sing", "t_ms": 1790793517757, "seq": 9, "size": 141, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "a slow bell, far off"}
+{"event": "sing", "t_ms": 1790793526702, "seq": 10, "size": 138, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the carrier holds"}
+{"event": "breath", "t_ms": 1790793533544}
+{"event": "breath", "t_ms": 1790793542851}
+{"event": "sing", "t_ms": 1790793548438, "seq": 11, "size": 138, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "quiet on the hill"}
+{"event": "sing", "t_ms": 1790793556190, "seq": 12, "size": 136, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the lamp is lit"}
+{"event": "sing", "t_ms": 1790793564829, "seq": 13, "size": 141, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "a slow bell, far off"}
+{"event": "sing", "t_ms": 1790793570658, "seq": 14, "size": 138, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "quiet on the hill"}
+{"event": "breath", "t_ms": 1790793574811}
+{"event": "sing", "t_ms": 1790793581484, "seq": 15, "size": 148, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "breathe in, the ring turns"}
+{"event": "sing", "t_ms": 1790793585542, "seq": 16, "size": 141, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "a slow bell, far off"}
+{"event": "sing", "t_ms": 1790793592421, "seq": 17, "size": 136, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the lamp is lit"}
+{"event": "sing", "t_ms": 1790793595157, "seq": 18, "size": 138, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the carrier holds"}
+{"event": "sing", "t_ms": 1790793601098, "seq": 19, "size": 136, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the lamp is lit"}
+{"event": "sing", "t_ms": 1790793606674, "seq": 20, "size": 136, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the lamp is lit"}
+{"event": "sing", "t_ms": 1790793609687, "seq": 21, "size": 136, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the lamp is lit"}
+{"event": "breath", "t_ms": 1790793612715}
+{"event": "breath", "t_ms": 1790793617009}
+{"event": "breath", "t_ms": 1790793623613}
+{"event": "sing", "t_ms": 1790793625998, "seq": 22, "size": 138, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the carrier holds"}
+{"event": "sing", "t_ms": 1790793635477, "seq": 23, "size": 141, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "a slow bell, far off"}
+{"event": "sing", "t_ms": 1790793641357, "seq": 24, "size": 139, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "rest here a while"}
+{"event": "sing", "t_ms": 1790793646011, "seq": 25, "size": 139, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "rest here a while"}
+{"event": "sing", "t_ms": 1790793655160, "seq": 26, "size": 149, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "breathe in, the ring turns"}
+{"event": "sing", "t_ms": 1790793658202, "seq": 27, "size": 137, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the lamp is lit"}
+{"event": "sing", "t_ms": 1790793665512, "seq": 28, "size": 137, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the lamp is lit"}
+{"event": "sing", "t_ms": 1790793673464, "seq": 29, "size": 139, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the carrier holds"}
+{"event": "sing", "t_ms": 1790793676672, "seq": 30, "size": 137, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the lamp is lit"}
+{"event": "sing", "t_ms": 1790793683251, "seq": 31, "size": 137, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the lamp is lit"}
+{"event": "sing", "t_ms": 1790793686405, "seq": 32, "size": 139, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "rest here a while"}
+{"event": "breath", "t_ms": 1790793691281}
+{"event": "sing", "t_ms": 1790793699843, "seq": 33, "size": 142, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "a slow bell, far off"}
+{"event": "sing", "t_ms": 1790793707769, "seq": 34, "size": 139, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "rest here a while"}
+{"event": "sing", "t_ms": 1790793712949, "seq": 35, "size": 139, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "rest here a while"}
+{"event": "sing", "t_ms": 1790793718150, "seq": 36, "size": 142, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "a slow bell, far off"}
+{"event": "sing", "t_ms": 1790793723495, "seq": 37, "size": 139, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "rest here a while"}
+{"event": "sing", "t_ms": 1790793731919, "seq": 38, "size": 139, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "rest here a while"}
+{"event": "breath", "t_ms": 1790793736944}
+{"event": "sing", "t_ms": 1790793739920, "seq": 39, "size": 137, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "the lamp is lit"}
+{"event": "sing", "t_ms": 1790793747025, "seq": 40, "size": 142, "ttl_s": 60.0, "loop_ms": 20000, "clamp": "none", "text": "a slow bell, far off"}
+{"event": "stop", "t_ms": 1790793756431, "reason": "duration", "sing": 40, "breath": 10, "capped": 0, "refused": 0, "model_calls": 0}

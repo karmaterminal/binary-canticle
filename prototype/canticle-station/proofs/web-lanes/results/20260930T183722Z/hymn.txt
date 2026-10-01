@@ -1,0 +1,8 @@
+# Fixture for the ambient emitter (#58). Public text; repeated lines are allowed.
+the lamp is lit
+breathe in, the ring turns
+quiet on the hill
+the lamp is lit
+a slow bell, far off
+the carrier holds
+rest here a while

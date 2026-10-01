@@ -1,0 +1,9 @@
+18:37:33 station pid 2928 up; tuner pid 2926; early listener pid 2925
+18:37:36 emitters started (hymn pid 2936, lens.weather pid 2937) for 300s
+18:37:56 browser 1: tune hymn, leave, retune lens.weather, retune hymn
+18:40:06 late listener starts (T+150 s)
+18:40:56 browser 2: a late page tunes hymn (T+200 s)
+18:42:36 emitters stopped; items already on air now expire naturally
+18:43:51 browser 3: after natural expiry
+18:44:06 station pid 2928 still the same process at the end
+18:44:09 done: /home/user/binary-canticle/prototype/canticle-station/proofs/web-lanes/results/20260930T183722Z
