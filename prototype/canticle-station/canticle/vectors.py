@@ -127,6 +127,17 @@ def sequence_cases() -> list[dict]:
     newer, older = ls(2, T0 + 1_000, b"threat: high"), ls(1, T0, b"threat: low")
     alarm = wire.sign_frame(wire.KIND_ITEM, s1, _item({6: 7, 10: "a-1"}))
     epoch2 = wire.sign_frame(wire.KIND_ITEM, s1, _item({1: 2}))
+    # #60: a PLUCK must carry its held target's expires_at (§9.7), and one that claims a later expiry
+    # than any class allows holds its dedup slot for at most the largest class max TTL (one day).
+    pl_late = wire.sign_frame(wire.KIND_PLUCK, s1, {1: 1, 2: chat, 3: 2, 4: T0 + 5_000, 5: T0 + 3_600_000, 13: 1, 20: 1})
+    day = 86_400_000
+    pl_far = wire.sign_frame(wire.KIND_PLUCK, s1, {1: 1, 2: chat, 3: 2, 4: T0 + 5_000, 5: T0 + 50 * 365 * day, 13: 1, 20: 1})
+    after_day = wire.sign_frame(wire.KIND_ITEM, s1, _item({3: 3, 4: NOW + day + 9_000, 5: NOW + day + 69_000}))
+    # #60: supersession marks outlive their dedup slots by the class max TTL (§7.8), so they count
+    # against the key's share on their own: a new state_key waits, a new value for a held one does not.
+    ks = lambda seq, t, key: wire.sign_frame(wire.KIND_ITEM, s1, _item({2: threat, 3: seq, 4: t, 5: t + 30_000, 6: 3, 10: key}))
+    k1, k2 = ks(1, NOW - 1_000, "k1"), ks(2, NOW - 1_000, "k2")
+    k3, k1_new = ks(3, NOW + 39_000, "k3"), ks(4, NOW + 39_500, "k1")
     seqs = [
         ("repeat-is-no-op", [v1, v1, v1], ["item"]),
         ("equivocation", [v1, v1_other], ["item", "evidence:equivocation"]),
@@ -136,8 +147,18 @@ def sequence_cases() -> list[dict]:
         ("older-after-newer-dropped", [newer, older], ["item", "evidence:superseded"]),
         ("capability-not-granted", [alarm], ["evidence:capability"]),
         ("epoch-regression", [epoch2, v1], ["item", "evidence:epoch-regression"]),
+        ("pluck-expiry-mismatch", [v1, pl_late], ["item", "evidence:pluck-mismatch"]),
     ]
-    return [{"name": n, "datagrams_hex": [d.hex() for d in ds], "now_ms": NOW, "expect": e} for n, ds, e in seqs]
+    out = [{"name": n, "datagrams_hex": [d.hex() for d in ds], "now_ms": NOW, "expect": e} for n, ds, e in seqs]
+    # Timed sequences: datagram i is heard at at_ms[i], with a fixed per-key quota (§7.4).
+    timed = [
+        ("pluck-expiry-clamped", [pl_far, after_day], [NOW, NOW + day + 10_000], 1, ["item"]),
+        ("supersession-marks-share-the-key-quota", [k1, k2, k3, k1_new], [NOW, NOW, NOW + 40_000, NOW + 40_000], 2,
+         ["item", "item", "evidence:over-quota", "superseded", "item"]),
+    ]
+    out += [{"name": n, "datagrams_hex": [d.hex() for d in ds], "now_ms": NOW, "at_ms": at,
+             "per_key_quota": q, "expect": e} for n, ds, at, q, e in timed]
+    return out
 
 
 def run_parse_case(case: dict, m: Manifest) -> str:
@@ -151,10 +172,12 @@ def run_parse_case(case: dict, m: Manifest) -> str:
 def run_sequence_case(case: dict, m: Manifest) -> list[str]:
     # Sequence vectors check wire semantics (dedup, pluck, supersession) at one instant, so the
     # receiver-local warm-up hold (§7.8 rule 4, a timing policy) is off here.
-    lst = Listener(m, warmup=False, ephemeral=True)
+    # Optional fields: at_ms (when each datagram is heard; default now_ms for all) and per_key_quota.
+    lst = Listener(m, warmup=False, ephemeral=True, per_key_quota=case.get("per_key_quota"))
+    at = case.get("at_ms") or [case["now_ms"]] * len(case["datagrams_hex"])
     out = []
-    for d in case["datagrams_hex"]:
-        for ev in lst.hear(bytes.fromhex(d), case["now_ms"]):
+    for d, t in zip(case["datagrams_hex"], at):
+        for ev in lst.hear(bytes.fromhex(d), t):
             if ev.kind == "presence":
                 continue
             out.append(f"evidence:{ev.data['reason']}" if ev.kind == "evidence" else ev.kind)

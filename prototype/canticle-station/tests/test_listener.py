@@ -1,3 +1,4 @@
+import json
 import random
 import tempfile
 import unittest
@@ -6,12 +7,14 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from canticle import cbor, vectors, wire
+from canticle.ids import stream_id
 from canticle.listener import Listener
 from canticle.manifest import Manifest, StationEntry
 from canticle.station import Station, StreamConfig, next_epoch
 
 T0 = 1_790_000_000_000
 SK = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(vectors.TEST1))
+SK_ID = wire.key_id(wire.public_key_bytes(SK))
 
 
 def setup():
@@ -271,6 +274,145 @@ class PersistenceTest(unittest.TestCase):
             lst.hear(f, T0 + 600)
         evs = [e for t in range(T0 + 600, T0 + 30_000, 250) for e in lst.tick(t)]
         self.assertEqual([e.data.get("text") for e in evs if e.kind == "item"], ["new"])
+
+
+class PerKeyBoundsTest(unittest.TestCase):
+    """#60: every per-key structure stays within the key's share, whatever a granted key sends."""
+
+    CHAT = stream_id("chatter")
+
+    def lst(self, quota=10, scopes=None, **kw):
+        entry = StationEntry("cael", wire.public_key_bytes(SK), frozenset({1, 3, 9}), ("chatter", "root"),
+                             **({"scopes": scopes} if scopes else {}))
+        return Listener(Manifest([entry]), ephemeral=True, per_key_quota=quota, **kw)
+
+    def item(self, seq, t, stream=None, cls=1, ttl=30_000, extra=None):
+        m = {1: 1, 2: stream or self.CHAT, 3: seq, 4: t, 5: t + ttl, 6: cls, 7: 1, 8: b"x", 11: 0, 13: 1}
+        m.update(extra or {})
+        return wire.sign_frame(wire.KIND_ITEM, SK, m)
+
+    def pluck(self, seq, target, t, expires, scope=1):
+        return wire.sign_frame(wire.KIND_PLUCK, SK, {1: 1, 2: self.CHAT, 3: seq, 4: t, 5: expires, 13: scope, 20: target})
+
+    def beacon(self, bseq, streams, page=None, epoch=1):
+        m = {1: epoch, 2: bseq, 3: T0, 4: 1000, 5: "p", 6: streams, 8: 16000}
+        if page:
+            m[7] = list(page)
+        return wire.sign_frame(wire.KIND_BEACON, SK, m)
+
+    def test_stream_hearing_is_admitted_frames_only_and_capped(self):
+        lst = self.lst()
+        for i in range(2000):  # distinct stream ids: 10 admitted, 1 990 over quota
+            lst.hear(self.item(1, T0, stream=0x10000 + i), T0)
+        st = lst.stations[SK_ID]
+        self.assertEqual(len(lst.dedup), 10)
+        self.assertEqual(len(st.last_stream_item), 10)
+        st.last_stream_item.clear()
+        evs = lst.hear(self.item(1, T0, stream=0x10000, extra={8: b"other bytes"}), T0)  # equivocation
+        self.assertEqual([e.data["reason"] for e in evs], ["equivocation"])
+        self.assertEqual(st.last_stream_item, {})
+        lst.hear(self.item(1, T0, stream=0x10000), T0)                               # a benign repeat counts
+        self.assertEqual(list(st.last_stream_item), [0x10000])
+
+    def test_over_quota_frames_do_not_make_a_station_speak(self):
+        lst = self.lst(quota=2)
+        lst.hear(self.beacon(1, [[self.CHAT, 1, 1, 5000, 5000, 60, 300, 4000]]), T0)
+        root = wire.sign_frame(wire.KIND_ITEM, SK, {1: 1, 2: stream_id("root"), 3: 1, 4: T0, 5: T0 + 600_000, 6: 9,
+                                                    7: 7, 8: cbor.encode({1: "watch"}), 10: "root", 11: 0, 13: 1})
+        lst.hear(root, T0)
+        lst.hear(self.item(1, T0, stream=0x99), T0)                                  # fills the share
+        self.assertEqual(lst.presence_state(SK_ID, T0), "EQUIPPED_QUIET")
+        evs = lst.hear(self.item(2, T0), T0)                                         # refused on chatter
+        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["over-quota"])
+        self.assertEqual(lst.presence_state(SK_ID, T0), "EQUIPPED_QUIET")
+
+    def test_beacon_maps_hold_one_catalog(self):
+        lst = self.lst()
+        entry = lambda sid: [sid, 1, 1, 5000, 5000, 60, 300, 4000]
+        for b in range(1, 201):                                                      # unpaged: each is the whole catalog
+            lst.hear(self.beacon(b, [entry(0x20000 + b * 32 + j) for j in range(32)]), T0)
+        st = lst.stations[SK_ID]
+        self.assertEqual([len(st.stream_loops), len(st.stream_loop_max), len(st.stream_entries)], [32, 32, 32])
+        self.assertIn(0x20000 + 200 * 32, st.stream_loops)                           # the latest catalog
+        for p in range(4):                                                           # four pages of 32
+            lst.hear(self.beacon(201 + p, [entry(0x30000 + p * 32 + j) for j in range(32)], page=(p, 4)), T0)
+        self.assertEqual(len(st.stream_loop_max), 128)
+        lst.hear(self.beacon(205, [entry(0x40000 + j) for j in range(32)], page=(0, 2)), T0)  # catalog shrinks
+        self.assertEqual(sorted(st.catalog_pages), [0, 1])
+        self.assertEqual(len(st.stream_loop_max), 64)
+        lst.hear(self.item(1, T0, extra={1: 2}), T0)                                 # epoch advance clears all of it
+        self.assertEqual([len(st.catalog_pages), len(st.stream_loops), len(st.stream_loop_max),
+                          len(st.stream_entries)], [0, 0, 0, 0])
+        self.assertEqual(list(st.last_stream_item), [self.CHAT])                     # only the new epoch's item
+
+    def test_supersession_marks_count_against_the_key_share(self):
+        lst = self.lst(warmup=False)
+        refused = 0
+        for i in range(500):                                                         # new state_key every 3.5 s
+            t = T0 + i * 3_500
+            evs = lst.hear(self.item(i + 1, t, cls=3, extra={10: f"k{i}"}), t)
+            refused += sum(e.kind == "evidence" and e.data["reason"] == "over-quota" for e in evs)
+            self.assertLessEqual(len(lst.hwm), 10)
+            self.assertEqual(sum(lst.hwm_per_key.values()), len(lst.hwm))
+        self.assertGreater(refused, 0)
+        # Marks are never evicted early (§7.4, §7.8): the first ten were kept until they expired.
+        lst = self.lst(quota=3, warmup=False)
+        for i, key in enumerate(("a", "b", "c")):
+            lst.hear(self.item(i + 1, T0, cls=3, extra={10: key}), T0)
+        t = T0 + 40_000                                                              # dedup slots expired, marks live
+        evs = lst.hear(self.item(4, t, cls=3, extra={10: "d"}), t)
+        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["over-quota"])
+        self.assertEqual(sorted(k[2] for k in lst.hwm), ["a", "b", "c"])
+        evs = lst.hear(self.item(5, t, cls=3, extra={10: "a"}), t)                   # a held key needs no new mark
+        self.assertIn("item", [e.kind for e in evs])
+        self.assertNotIn((SK_ID, 1, self.CHAT, 4), lst.dedup)                       # the refused frame left no slot
+        later = max(v[3] for v in lst.hwm.values()) + 1
+        evs = lst.hear(self.item(6, later, cls=3, extra={10: "d"}), later)           # room again once marks expire
+        self.assertIn("item", [e.kind for e in evs])
+
+    def test_pluck_expiry_is_clamped(self):
+        lst = self.lst(quota=1)
+        lst.hear(self.pluck(2, 1, T0, T0 + 50 * 365 * 86_400_000), T0)               # a far-future PLUCK
+        day = 86_400_000
+        self.assertEqual(max(lst.sticky_pluck.values()), T0 + day + 5_000)
+        self.assertEqual(max(v[1] for v in lst.dedup.values()), T0 + day + 5_000)
+        t = T0 + day + 5_001
+        evs = lst.hear(self.item(3, t), t)                                            # its slot is free after one day
+        self.assertIn("item", [e.kind for e in evs])
+
+    def test_pluck_must_match_a_held_target(self):
+        lst = self.lst(scopes=frozenset({1, 2}))
+        lst.hear(self.item(1, T0, ttl=60_000), T0)
+        before = (dict(lst.dedup), dict(lst.sticky_pluck))
+        for bad in (self.pluck(2, 1, T0 + 1, T0 + 3_600_000), self.pluck(2, 1, T0 + 1, T0 + 60_000, scope=2)):
+            evs = lst.hear(bad, T0 + 1)
+            self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["pluck-mismatch"])
+            self.assertEqual((dict(lst.dedup), dict(lst.sticky_pluck)), before)     # state-neutral
+        self.assertEqual(len(lst.current), 1)
+        evs = lst.hear(self.pluck(2, 1, T0 + 1, T0 + 60_000), T0 + 1)
+        self.assertEqual([e.kind for e in evs], ["withdrawn"])
+        self.assertEqual(lst.sticky_pluck[(SK_ID, 1, self.CHAT, 1)], lst.dedup[(SK_ID, 1, self.CHAT, 1)][1])
+
+    def test_state_v2_round_trip_and_v1_still_loads(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "listener.json"
+            entry = StationEntry("cael", wire.public_key_bytes(SK), frozenset({1, 3}), ("chatter",))
+            lst = Listener(Manifest([entry]), state_path=path, warmup=False)
+            lst.hear(self.item(1, T0, ttl=60_000), T0)
+            lst.hear(self.item(2, T0, cls=3, extra={10: "k"}), T0)
+            fresh = Listener(Manifest([entry]), state_path=path, warmup=False)
+            self.assertEqual(fresh.dedup, lst.dedup)
+            self.assertEqual(fresh.hwm_per_key, {SK_ID: 1})
+            evs = fresh.hear(self.pluck(3, 1, T0 + 1, T0 + 3_600_000), T0 + 1)        # the check survives restart
+            self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["pluck-mismatch"])
+            state = json.loads(path.read_text())
+            state["version"] = 1
+            state["dedup"] = [row[:6] for row in state["dedup"]]
+            path.write_text(json.dumps(state))
+            old = Listener(Manifest([entry]), state_path=path, warmup=False)
+            self.assertEqual({v[2] for v in old.dedup.values()}, {None})              # v1 rows: no target check
+            evs = old.hear(self.pluck(3, 1, T0 + 1, T0 + 3_600_000), T0 + 1)
+            self.assertNotIn("evidence", [e.kind for e in evs])
 
 
 class RobustnessTest(unittest.TestCase):

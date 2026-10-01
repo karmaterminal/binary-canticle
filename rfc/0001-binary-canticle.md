@@ -444,6 +444,11 @@ Every transmission of the item MUST carry exactly the same bytes. A station MUST
 - Dedup entries MUST be retained until local expiry plus 5 s skew and then evicted, and MUST NOT be evicted earlier under capacity pressure: a live entry holds the equivocation evidence (§10.8) and the record that stops a repeat from counting as new or waking again. The same holds for sticky-pluck and supersession marks.
 - Capacity is enforced per key, at admission, instead. When a key's share of the store is full, new tuples from that key are refused with evidence `over-quota` (never landed, never wake-eligible) until its own entries expire. The store never fails closed as a whole: a flooding key locks out only itself. The prototype's 24-hour, global, fail-closed replay table (bug B4: full after about 13 s at 783 accepts/s, locked out for about 25 h, `review/prototype §6`) is the failure this prevents.
 - Capacity [PROPOSED DEFAULT]: size the store at `Σ(rate × TTL)` over tuned streams, with a per-key quota of max(256, 4 × the live count that key's beacon advertises). The floor lets a key that is idle, or has not beaconed yet, land its first items; the spike gives each manifest key an equal share of the store.
+- **Every per-key structure is bounded by that share** (#60, found by frond-scribe's review of the TypeScript receive-path port). A granted key, misbehaving or compromised, must not grow receiver memory past its quota through any side table:
+  - Supersession marks outlive their dedup entries by the class maximum TTL (§7.8), so they take a slot of their own in the key's share. A frame that would open a new `(key-id, stream_id, state_key)` mark while the key's marks fill its share is refused `over-quota` at admission, state-neutral; a new value for a key already marked needs no new slot. Marks are never evicted early.
+  - Sticky-pluck marks share their PLUCK's dedup entry and its retention (§7.7), so the dedup quota bounds them.
+  - Per-stream presence state (§8.6) is updated only by admitted frames (new or benign repeats; never an equivocation or an `over-quota` refusal) and holds at most one share of streams, oldest dropped first.
+  - Per-stream state learned from beacons (loop periods, heads, catalog entries) holds one advertised catalog: each beacon replaces its own page and drops pages past its `count` (§8.4), and an epoch advance clears all of it (§9.8).
 
 ### 7.5 The loop-rate regulator
 
@@ -515,6 +520,7 @@ On a new item, a supersede (§7.8), a pluck (§7.7) or an UNEQUIP (§8.5), the s
 - **Receivers.** On a valid PLUCK, a receiver MUST remove the target from every current surface and MUST add `(key-id, epoch, stream_id, target_seq)` to its **sticky-pluck set**, retained until the target's local expiry plus skew. If the target arrives after the pluck — UDP reorders (`proto/protocol-spec-v0.1.md:59`) — it MUST be suppressed with evidence `plucked`. This is frond-scribe's review refinement on PR #32 (`issuecomment-4735695826`), which never landed on `main` (`review/prs §4.3`).
 - A pluck can only shorten visibility. It cannot extend a TTL or promise global erasure (#51 invariant 7). Text already drained into a session transcript cannot be recalled; for items it has landed, the receptor SHOULD put a one-line "withdrawn by station" note in the digest slot (`review/challenge-redteam T4(f)`).
 - A pluck whose target the receiver never heard is still recorded in the sticky-pluck set.
+- **Checking a PLUCK against its target** (#60). While a receiver still holds its target's dedup entry, it MUST check the §9.7 rule: a PLUCK whose `expires_at` or `scope` differs from its target's is refused with evidence `pluck-mismatch`, and the refusal is state-neutral. An accepted PLUCK's sticky-pluck mark and dedup entry are kept until the target's local expiry plus skew. A target the receiver never heard cannot be checked; because a PLUCK does not carry its target's class, its local expiry (§14.6.3) clamps to the largest class maximum TTL after its own `issued_at`, so a far-future `expires_at` cannot pin receiver state.
 - The station's obligation is to keep the PLUCK on air until the target expires (§7.1). Whether a given receiver hears it stays best-effort, as on every lossy path; that is PR #32's contract for hearers that already surfaced the target, and the digest note above is the remedy.
 
 ### 7.8 Supersede by key
@@ -1078,6 +1084,8 @@ The admission result answers #48 Q3. Every frame gets exactly one:
 | `capability_exceeded` | Class, op, scope or stream beyond the key's capability | `ringbuffer_only`; zero accord |
 | `expired` / `not_yet_valid` | Outside the time window | drop |
 | `superseded` / `plucked` | Older keyed item; sticky-plucked tuple | drop; evidence |
+| `over_quota` | The key's per-key share is full (dedup or supersession marks, §7.4) | drop; evidence; never landed, never wake-eligible |
+| `pluck_mismatch` | PLUCK `expires_at` or `scope` differs from its held target's (§7.7, §9.7) | drop; evidence |
 | `equivocation` | Same tuple, different bytes | local key quarantine; evidence |
 | `scope_violation` | Scope not allowed on this binding or tier | drop |
 | `malformed` / `crit_unknown` / `version` | Parse, `crit` or version failure | drop silently |
@@ -1712,6 +1720,7 @@ local_expiry = min(expires_eff + δ̂, first_heard + (expires_eff − issued_at)
 
 - The receiver clock fails closed (#51 invariant 8): an item never lives locally longer than its full TTL counted from first hearing, and δ̂ (§8.2) can only bring expiry earlier than that.
 - Without a beacon from the station, δ̂ = 0 and the TTL cap governs. Receivers SHOULD keep their clocks synchronised.
+- For a PLUCK, the effective max TTL is the largest class maximum TTL, since a PLUCK does not carry its target's class (§7.7).
 - At local expiry an item MUST lose all current-state authority in every surface, and any modulation it caused MUST enter the lapse path (§14.7.2).
 - Emeric's test "a replayed frame with 2 seconds remaining disappears after 2 seconds" (#51) is test EM-01.
 
@@ -2921,7 +2930,7 @@ figs delegated the owner decisions to the cohort's princes. Silas decided D1, D4
 17. **WebTransport in practice** (A10): do datagrams plus short streams behave consistently across the browser, CDN and proxy paths the project will use (§11.5)?
 18. **Guardian mini-RFC** (A12): the trust and privacy design for guardians (§14.17). Its open questions include Elliott's two from #54: can colluding guardians manufacture independent doubt, and can a single guardian exhaust a ward's attention despite rate limits?
 19. **Relay restart SLO** (A8): confirm or replace the proposed 20 s p99 in S4, before any lease state is persisted (§11.3.9).
-20. **Normative vectors**: the 31 candidate vectors of `prototype/canticle-station/vectors/` remain candidates until the independent TypeScript codec reproduces them (§9.13). They, and that spike's beacons, predate `trail_seq` (A1).
+20. **Normative vectors**: the 34 candidate vectors of `prototype/canticle-station/vectors/` remain candidates until the independent TypeScript codec reproduces them (§9.13). They, and that spike's beacons, predate `trail_seq` (A1).
 
 ### 23.3 Work items
 
