@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import fcntl
 import hashlib
+import heapq
 import os
 import random
 import statistics
@@ -23,6 +24,7 @@ from . import cbor, wire
 from .ids import CLASS_BY_NAME, CLASS_PRIORITY, CLASSES, CTYPES, SCOPES, key_id, stream_ids
 
 STOP_BEFORE_EXPIRY_MS = 100      # §7.3
+KEY_CLASS_MARGIN_MS = 10_000     # §7.8: receiver skew (5 s) plus transit, past a key's last possible mark
 BURST_OFFSETS_MS = (1_000, 2_000, 4_000)  # §7.6
 K_AVAIL = 3                      # §7.5
 CLASS_MAX_LOOP_MS = 300_000      # §7.5
@@ -94,6 +96,10 @@ class _Stream:
     sid: int
     head_seq: int = 0
     ring: dict = field(default_factory=dict)  # seq -> _OnAir, in seq order
+    # state_key -> [class code, forget_at]. One class per state_key within an epoch while a receiver may
+    # still hold a mark for the key (§7.8, §23.2 q21); after forget_at the entry is dropped, so the table
+    # holds only keys sung within about one TTL + class max TTL, not every key of the epoch.
+    key_classes: dict = field(default_factory=dict)
 
 
 def next_epoch(path, now_s: Optional[int] = None) -> int:
@@ -167,6 +173,7 @@ class Station:
         if len(configs) > BEACON_ENTRIES_PER_PAGE * MAX_PAGES:
             raise ValueError("too many streams for beacon rotation (§8.4)")
         self.streams: dict[str, _Stream] = {}
+        self._key_due: list = []  # heap of (forget_at, stream name, state_key), lazily invalidated
         for c in configs:
             if c.cls not in CLASS_BY_NAME:
                 raise ValueError(f"unknown class {c.cls!r}")
@@ -264,6 +271,12 @@ class Station:
             raise ValueError(f"class {spec.name} requires a state_key")
         if keep_on_air_s and not state_key:
             raise ValueError("only keyed items can be kept on air by refresh (§7.9)")
+        self._forget_keys(now_ms)
+        held = st.key_classes.get(state_key) if state_key is not None else None
+        if held is not None and held[0] != spec.code:
+            raise ValueError(f"state_key {state_key!r} still carries class {CLASSES[held[0]].name} in this "
+                             "epoch; a class change waits until no receiver can hold its mark, or a new "
+                             "epoch (§7.8)")
         ttl_ms = int(min(ttl_s if ttl_s is not None else st.cfg.default_ttl_s, st.cfg.default_ttl_s) * 1000)
         if ttl_ms <= STOP_BEFORE_EXPIRY_MS:
             raise ValueError("ttl too short")
@@ -287,6 +300,14 @@ class Station:
             oa.reissue = dict(stream=stream, body=body, body_ref=body_ref, cls=spec.name, ctype=it.ctype,
                               ttl_s=ttl_ms / 1000, state_key=state_key, loop=loop, scope=scope,
                               purpose=purpose, intensity=intensity, hop=hop, flags=flags)
+        if state_key is not None:
+            # A receiver's mark lasts its local expiry (at most first hearing + TTL) + 5 s + class max TTL
+            # (§7.8); first hearing is at most this item's expiry plus transit.
+            forget_at = it.expires_at + ttl_ms + spec.max_ttl_s * 1000 + KEY_CLASS_MARGIN_MS
+            held = st.key_classes.get(state_key)
+            if held is None or forget_at > held[1]:
+                st.key_classes[state_key] = [spec.code, max(forget_at, held[1] if held else 0)]
+                heapq.heappush(self._key_due, (forget_at, stream, state_key))
         self._admit(st, oa, now_ms)
         return SingResult(stream=stream, seq=it.seq, epoch=self.epoch, issued_at=it.issued_at,
                           expires_at=it.expires_at, ttl_s=ttl_ms / 1000, loop_ms=oa.loop_ms, clamp=oa.clamp,
@@ -330,8 +351,17 @@ class Station:
 
     # ------------------------------------------------------------ carousel
 
+    def _forget_keys(self, now_ms: int) -> None:
+        """Drop class entries no receiver can still hold a mark for (§7.8). Cost follows what expires."""
+        while self._key_due and self._key_due[0][0] <= now_ms:
+            forget_at, stream, key = heapq.heappop(self._key_due)
+            held = self.streams[stream].key_classes.get(key)
+            if held is not None and held[1] <= now_ms:
+                del self.streams[stream].key_classes[key]
+
     def poll(self, now_ms: int) -> list[bytes]:
         """Frames due at ``now_ms``: beacons, bursts and loop repeats, in that order."""
+        self._forget_keys(now_ms)
         out: list[bytes] = []
         if now_ms >= self.next_beacon_at:
             out.append(self._beacon(now_ms))
