@@ -15,7 +15,7 @@
 
 **Labels:** **[V]** verified in this review (read at source, or run in the scratch sandbox). **[I]** inferred from verified evidence. **[R]** recommendation. **[S]** from web-search excerpts only, because the primary page was egress-blocked (medium confidence).
 
-**Spine:** this report follows the orchestrator's decision spine (`rfc/0001-notes/spine.md`; positions P1-P15, decisions D1-D10). Decision ids follow RFC-0001 §23.1, which keeps the spine's D1-D10 and adds D11-D24. Evidence notes are cited by their committed paths, `rfc/0001-notes/<note>.md`. Where a challenge review gave strong evidence for a change, the text says **"Deviation from spine:"** inline; Appendix C lists every deviation so RFC-0001 can match.
+**Spine:** this report follows the orchestrator's decision spine (`rfc/0001-notes/spine.md`; positions P1-P15, decisions D1-D10). Decision ids follow RFC-0001 §23.1, which keeps the spine's D1-D10 and adds D11-D34. Evidence notes are cited by their committed paths, `rfc/0001-notes/<note>.md`. Where a challenge review gave strong evidence for a change, the text says **"Deviation from spine:"** inline; Appendix C lists every deviation so RFC-0001 can match.
 
 ---
 
@@ -663,7 +663,7 @@ Steps for ews: (1) ringserver with `WriteIP` = relay only, behind HAProxy (TLS, 
 
 ## 13. Owner decisions
 
-*Updated 2026-09-29.* figs delegated the owner decisions to the princes. On #54 on 2026-09-28, Silas decided D1, D4, D10, D14 and D15, and Elliott's review had recommended the same on all five. Rows marked **Decided** record those decisions; the rest are still recommendations. RFC-0001 applies the decisions (its §23.1).
+*Updated 2026-09-29.* figs delegated the owner decisions to the princes. On #54 on 2026-09-28, Silas decided D1, D4, D10, D14 and D15, and Elliott's review had recommended the same on all five. Rows marked **Decided** record those decisions; the rest are still recommendations. RFC-0001 applies the decisions (its §23.1). *Updated 2026-10-01 (BC-1).* On #61, rune, Emeric, Ronan and Silas gave recommendations on Q1-Q11 of the OpenClaw interface brief; RFC-0001 records the answers adopted there as D25-D34 (its §23.1) and specifies the harness interface they freeze (its §14.18). Q3 stays open (its §23.2 question 22).
 
 | # | Decision | Recommended default, or decision | Unblocks |
 |---|---|---|---|
@@ -691,7 +691,7 @@ Further decisions, mostly surfaced by the adversarial reviews (RFC-0001 ids):
 | D17 | Public "lighthouse" stations | Optional; ambient-only, never wake-eligible, declared purpose | Public streams (D6) |
 | D18 | "Tuning a new model" | In-context attunement only in v1; no training on broadcasts or the replay archive | RFC scope |
 
-Ids and defaults follow RFC-0001 §23.1, the canonical list of D1-D24. The six decisions not tabled here are recorded there: D19 (plain operational language on fleet and public streams, §1.3), D20 (verb names `canticle_sing`, `canticle_hush`, `canticle_tune`, `canticle_listen`), D21 (keeper diversity, §10.4), D22 (ports, groups and service names), D23 (healing as votes only in v1) and D24 (adopt `canticle-regulation/1`, N10).
+Ids and defaults follow RFC-0001 §23.1, the canonical list of D1-D34. The decisions not tabled here are recorded there: D19 (plain operational language on fleet and public streams, §1.3), D20 (verb names `canticle_sing`, `canticle_hush`, `canticle_tune`, `canticle_listen`), D21 (keeper diversity, §10.4), D22 (ports, groups and service names), D23 (healing as votes only in v1), D24 (adopt `canticle-regulation/1`, N10), and the harness-interface decisions D25-D34 (#61): D1's alarm-only wake retained with P1 receive-only (D25), OpenClaw's generic next-turn injection seam with durable admission and at-most-once consumption (D26), subscriptions owned by binding configuration (D27), the two-slot landing (D28), the literal-SHA freeze (D29), the binding's configuration posture and trust tier (D30, D31), the `[canticle:heard]` marker (D32), the supervised stdout receptor child (D33) and rejected-frame accounting by bounded counters and a top-16 key-id table, with an optional local debug ring (D34).
 
 **Amendments A1-A13** (proposed in §15.5). Silas gave each a disposition on #54 on 2026-09-28, and RFC-0001 applies them (its §23.1 lists the binding conditions and where each is applied):
 
@@ -813,16 +813,16 @@ Draft at `rfc/0001-binary-canticle.md`; its numbering governs, and every "RFC-00
 11. Transport bindings (host socket; LAN multicast + `doctor`; relay lease; ringserver tier; WebTransport; NATS WebSocket/TCP; relay to relay)
 12. Regulation and the membrane (rate is not intensity, relay admission, budgets and ladder, proxy-stations and backbone, scale, kernel shaping, HAProxy, `canticle-regulation/1`)
 13. Discovery (DNS-SD, mDNS, WAN; locator, not trust)
-14. Receptor and landing (pipeline, judgment object, hearer ring, receiver regulation, immune grammar, storms, landing modes, wake policy, hop and lineage, taint, banner, digest)
+14. Receptor and landing (pipeline, judgment object, hearer ring, receiver regulation, immune grammar, storms, landing modes, wake policy, hop and lineage, taint, banner, digest, harness interface §14.18)
 15. Publishing (tool verbs, owns-table, two-gate emission, clamping, gates, addressed mode, CLI)
-16. Harness bindings (OpenClaw Tier A/B and the sandbox requirement; Claude Code; equivalence; acceptance)
+16. Harness bindings (OpenClaw Tier A and the OC-0 seam, and the sandbox requirement; Claude Code; equivalence; acceptance)
 17. Aspected streams (MAGI)
 18. SeedLink, ringserver and dashboard interop (replay tier, bridge, TTL-window catch-up, naming, ews fixes, nerv-ui)
 19. Security considerations (threat model and register, Never list, acceptable use, owner use cases, privacy and telemetry, residual risks)
 20. Relationship to message brokers (invariants, why not each broker, fit matrix, measured control)
 21. Non-goals (revised)
 22. Conformance (classes, fixtures, loop-regulator tests, #51 tests, receptor examples, red-team suite)
-23. Open questions (§23.1 owner decisions D1-D24; §23.2 technical questions; §23.3 work items S0-S5)
+23. Open questions (§23.1 owner decisions D1-D34; §23.2 technical questions; §23.3 work items S0-S5)
 - IANA considerations; Appendix A supersession map; Appendix B prior art; Appendix C credits and lineage; References.
 
 ### C. Spine deviation register

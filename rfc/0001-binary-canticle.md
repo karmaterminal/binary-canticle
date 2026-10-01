@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft (2026-09-27; revised 2026-09-29 to apply the decisions of #54) |
+| **Status** | Draft (2026-09-27; revised 2026-09-29 to apply the decisions of #54; revised 2026-10-01 to record the harness-interface decisions of #61, BC-1) |
 | **Location** | `rfc/0001-binary-canticle.md` |
 | **Repository baseline** | `karmaterminal/binary-canticle` `main` @ `b46a45a` (2026-09-17) |
 | **Supersedes (normative text)** | `proto/protocol-spec-v0.1.md`, `proto/stations-and-streams-v0.2.md`, `proto/stations-and-streams-v0.2-open-questions-bytewalk-cael.md`, `proto/receptor-contract-v0.2.md`, `proto/ringbuffer-contract.md`, `proto/explicit-non-goals.md`, `proto/immune-model-addendum.md` (grammar), `proto/scope-framing-and-noosphere-mapping.md` (scope ladder), the three `proto/openclaw-*.md` boundary docs. Full map in Appendix A. |
@@ -35,6 +35,8 @@ The draft was built from a 2026-09-27 review of every document, issue, pull requ
 
 This revision applies those decisions. Each change is marked **"Amendment A<n> (#54):"**, and §23.1 records the decisions. The amendment ids are the spike's. They are unrelated to the attenuation-ladder steps A1-A5 of §12.3.
 
+**Revision of 2026-10-01 (BC-1).** On PR #61, rune, Emeric, Ronan and Silas gave recommendations on questions Q1-Q11 of the princes' brief "OpenClaw ↔ binary-canticle interface: implementation demands", as assessed in `reports/2026-10-01-openclaw-interface-demands.md`. This revision records the answers adopted on #61 as D25-D34 (§23.1): unanimous except D28, where the tally on #61 adopted Ronan's and Silas's position over rune's and Emeric's, and D30, which rests on Emeric's and Silas's recommendations. It specifies the interface they freeze: §14.18, frozen against binary-canticle `a15fb9f0d215a2471fbe44b5ad0757804e2e2667` (the merge of #62) and OpenClaw `main` @ `6e6458a98ff3894117b0449a64b6dbfd1ca348d1`. Q3 (taint) stays open (§23.2 question 22). Each change is marked **"Amendment BC-1 (#61):"**.
+
 ### Conventions
 
 The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **SHOULD**, **SHOULD NOT**, **RECOMMENDED**, **NOT RECOMMENDED**, **MAY** and **OPTIONAL** are to be interpreted as described in BCP 14 [RFC 2119] [RFC 8174] when, and only when, they appear in all capitals.
@@ -42,7 +44,8 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **
 - Sections marked *(Non-normative)* explain; they impose no requirement.
 - **DECISION D<n> (recommended: …)** marks a choice only the owner can make. The draft proceeds with the recommended option; all decisions are collected in §23.1. **DECIDED D<n> (…)** marks one that has been made; §23.1 records who decided it and where.
 - **[PROPOSED DEFAULT]** numbers are starting values for the `canticle-regulation/1` profile (§12.8). They are to be tuned at cohort scale before fleet use (D5).
-- Citations: repository paths are relative to the repository root at `b46a45a` (for example `proto/stations-and-streams-v0.2.md:79`). Files added by PR #52 (`spike/protocol-dynamics-udp-vs-tcp-2026-09-27.md`, `prototype/protocol-dynamics/`, `prototype/canticle-station/`, `rfc/0001-notes/proto-dynamics-research.md`) are cited at `main` @ `25081b3`. `OC-RFC:<n>` is a line of the OpenClaw continuation RFC at `9eb655afa`. OpenClaw source paths are on that same branch unless marked `main`.
+- Citations: repository paths are relative to the repository root at `b46a45a` (for example `proto/stations-and-streams-v0.2.md:79`). Files added by PR #52 (`spike/protocol-dynamics-udp-vs-tcp-2026-09-27.md`, `prototype/protocol-dynamics/`, `prototype/canticle-station/`, `rfc/0001-notes/proto-dynamics-research.md`) are cited at `main` @ `25081b3`. `OC-RFC:<n>` is a line of the OpenClaw continuation RFC at `9eb655afa`. OpenClaw source paths are on that same branch unless marked `main`, except in §14.18 and §16.1-§16.4, where they are on OpenClaw `main` @ `6e6458a98ff3894117b0449a64b6dbfd1ca348d1` unless marked `gates` (amendment BC-1).
+- Phases: in amendment BC-1, **P1-P4** name the harness rollout phases of §14.18 (receive-only, publish, alarm wake, fleet canary), as on #61. They are unrelated to the spine positions P1-P15 cited in "Deviation from spine" notes.
 
 ### Scope of this document
 
@@ -219,7 +222,7 @@ The repository listed planes four ways: four in `proto/TASK-BRIEF.md:25-29`, fiv
                                         │                 └──▶ other relays (D10: TCP/QUIC; NATS only after S4a)
                                         ▼
                             ringserver (DataLink write) ──▶ SeedLink v3/v4, DataLink, WebSocket ──▶ dashboards
-  harness bindings: OpenClaw plugin (enqueueSystemEvent + wrapExternalContent + requestHeartbeatNow)
+  harness bindings: OpenClaw plugin (receptor child + next-turn injection with OC-0; no wake in P1, alarm-only wake from P3 (D25), §16)
                     Claude Code (MCP tools, hook additionalContext, channel for alarms)
   discovery: DNS-SD (mDNS on LAN; DNSSEC unicast zone on WAN) = locators only; trust = fleet manifest
 ```
@@ -1086,10 +1089,10 @@ The admission result answers #48 Q3. Every frame gets exactly one:
 | Result | Meaning | Disposition |
 |---|---|---|
 | `verified` | New, valid, capable, fresh | continue to the receptor |
-| `duplicate` | Already-accepted tuple, same bytes | no-op (§7.4) |
-| `unknown_key` | `key_id` not in the manifest | debug ring only; never quarantine, never a receipt (prototype B11) |
-| `bad_signature` | Signature fails | debug ring only |
-| `revoked` | Key revoked | drop; evidence |
+| `duplicate` | Already-accepted tuple, same bytes. Amendment BC-1 (#61): except the first hearing in a receptor run of a tuple accepted before a restart, which is reported once as `verified` with `dedup: resurfaced` (§14.18.3) and counts toward nothing (§14.18.4) | no-op (§7.4) |
+| `unknown_key` | `key_id` not in the manifest | counted (D34); MAY enter the debug ring; never quarantine, never a receipt (prototype B11) |
+| `bad_signature` | Signature fails | counted (D34); MAY enter the debug ring; never a receipt |
+| `revoked` | Key revoked | drop; counted (D34) |
 | `capability_exceeded` | Class, op, scope or stream beyond the key's capability | `ringbuffer_only`; zero accord |
 | `expired` / `not_yet_valid` | Outside the time window | drop |
 | `superseded` / `plucked` | Older keyed item; sticky-plucked tuple | drop; evidence |
@@ -1097,7 +1100,12 @@ The admission result answers #48 Q3. Every frame gets exactly one:
 | `pluck_mismatch` | PLUCK `expires_at` or `scope` differs from its held target's (§7.7, §9.7) | drop; evidence |
 | `equivocation` | Same tuple, different bytes | local key quarantine; evidence |
 | `scope_violation` | Scope not allowed on this binding or tier | drop |
+| `hop_limit` | `hop` above the class hop limit (§6.2, §14.11). Amendment BC-1 (#61) | drop; evidence |
 | `malformed` / `crit_unknown` / `version` | Parse, `crit` or version failure | drop silently |
+
+**Amendment BC-1 (#61): lower epochs.** A lower epoch is evidence, not an admission result. A frame whose epoch is lower than the highest seen for its key within the class maximum TTL records evidence `epoch-regression`, supersedes nothing and advances no epoch (§5.2), and is otherwise admitted as any frame is. A repeat of an already-accepted tuple is `duplicate` (§7.4), which takes precedence and records no new evidence. A new tuple is `verified`, with reason `epoch_regression` and disposition `ringbuffer_only`: a station's persisted old-epoch live set (§7.3) is kept but does not surface or supersede at a receiver that has heard the station's newer epoch.
+
+**Amendment BC-1 (#61): rejected-frame accounting (D34).** A frame that is not verified against a manifest key — results decided at the cheap checks or the signature check of §14.1 (steps 1-2), such as `unknown_key`, `bad_signature`, `revoked`, a time-window failure, or `malformed` / `crit_unknown` / `version` — gets no per-frame record and no receipt. The receptor counts such frames in fixed per-reason aggregates plus a table of at most 16 key ids by count with an `other` bucket, and MAY keep them in the bounded local debug ring (§14.1). They are never deliverable to a session or model, and never attributed to a station, principal or manifest name: their key ids are chosen by the sender. No receptor structure is keyed by a sender-chosen value without a fixed bound (§14.18.3).
 
 ### 10.10 The prototype as donor
 
@@ -1635,6 +1643,10 @@ The static configuration file (`~/.binary-canticle/stations.toml`) remains REQUI
 
 The receptor is the deterministic judgment core between the wire and the sessions. It absorbs `proto/receptor-contract-v0.2.md` (Tables A/B/C, §9 transitions, §13 examples) and `proto/ringbuffer-contract.md`, with the changes listed here. One receptor daemon runs per host and serves every session on it (§4.2).
 
+**Amendment BC-1 (#61): harness-embedded receptor (D27, D33).** For P1, a harness binding MAY instead run a receptor as its own supervised child, subject to the proof gate of §14.18.2. It MAY do so only where that receptor is the host's one listener (§4.2): a child's records reach only its own binding, so where a host runs several gateways, they share one receptor, the host daemon, which carries the records of §14.18.3 over the host socket (§11.1), and none of them embeds its own. A second listener on the port would receive part of the unicast traffic, or none (§4.2). No receptor opens a relay lease per session.
+
+The receptor emits facts; session policy — subscriptions, target sessions, landing posture — belongs to the binding's configuration (§14.18.1). Under a harness binding, this section is split between them. The receptor implements §14.1-§14.5, the receptor-side parts of §14.6-§14.8 and §14.11, and §14.18.2-§14.18.3. The binding implements the per-session parts of §14.6, the per-session wake bucket and canticle token budget of §14.8.2, §14.9-§14.10, §14.12-§14.14 and §14.16 items 1-3; in those parts, "the receptor" reads "the binding". The host wake budget keeps exactly one accountable owner across all gateways on the host: a per-host receptor, or an equivalent shared budget (§14.18.1). P1 has no wake, so this gates P3, not P1.
+
 ### 14.1 Pipeline
 
 A receptor MUST process each datagram in this order:
@@ -1649,7 +1661,7 @@ A receptor MUST process each datagram in this order:
 8. **Judge**: produce the judgment object and write the receipt record (§14.3, §14.5).
 9. **Expose**: rebuild digests, land, decide wake (§14.9-§14.14).
 
-Frames that fail steps 1-3 go to a separate, small, bounded **debug ring**. They MUST NOT displace verified frames and MUST NOT land (`review/challenge-redteam C19`).
+Frames that fail steps 1-3 go to a separate, small, bounded **debug ring**. They MUST NOT displace verified frames and MUST NOT land (`review/challenge-redteam C19`). **Amendment BC-1 (#61) (D34):** frames that fail steps 1-2 are counted (§10.9) and MAY enter the debug ring. Frames that fail step 3 keep their §10.9 result and, under a harness binding, produce a `frame` record without a body (§10.4, §14.18.3).
 
 **Deviation from spine:** P9 said "the hearer ring appends raw frames BEFORE judgment". That holds, but "raw" means *after* syntax, signature and freshness verification: if it meant before verification, a flood of junk would evict verified frames. Evidence: `review/challenge-redteam T12(g), amendment 4(e)`. This order also resolves the old contradiction in which storage came *after* the threshold step (`proto/receptor-contract-v0.2.md:100`, `:215-216`; `review/spec-core C12`): raw receipt no longer depends on judgment ("Raw receipt is truth. Atmosphere is use.", `:319-320`).
 
@@ -1699,6 +1711,7 @@ Normalized input (Table A, `:117-137`) maps to v2 as follows: `frameId` → iden
 - A frame on a stream the session has not tuned MUST NOT surface to that session ("no receptor, no response"). It stays `ringbuffer_only` for that session.
 - `tune()` is a receiver-side filter, never a wire subscription (`proto/protocol-spec-v0.1.md:386-391`). Self-broadcast is filtered by default, with an explicit `include_self` override (`:408-412`).
 - Tuning is standing consent to **silent** landing from verified sources. It replaces v0.1 §7.4's "not auto-injected" (`:393-398`) (§21).
+- **Amendment BC-1 (#61) (D27).** Under a harness binding, the tune table is the binding's configured subscriptions: the binding's (host or plugin) configuration owns subscriptions and the mapping from subscription to target sessions, and applies the per-session parts of §14.6 to the receptor's records. The receptor holds no session policy, and its judgments for the binding are session-independent (§14.18.4). Whether a session may also tune itself through `canticle_tune` (§15.1) is open (§23.2 question 23). A receptor embedded in a harness (§14) owns no host wake budget unless it is the host's single accountable owner (§14.18.1).
 
 #### 14.6.2 Salience and squelch
 
@@ -1866,7 +1879,7 @@ alarm-body = {
 ```
 
 - Expiry is mandatory (the class maximum is 3 600 s); the `exercise` flag (flag bit 2) marks drills, which render as EXERCISE.
-- A receiver's **automatic** response to a verified alarm MUST be limited to reversible tightening of its own receptor: restrict surfacing to manifest-pinned signers, pause non-alarm wakes, apply stricter taint, and show the banner. Alarms MUST NOT trigger automated remediation, destructive actions, credential changes, network changes or physical actuation.
+- A receiver's **automatic** response to a verified alarm MUST be limited to reversible tightening of its own receptor: restrict surfacing to manifest-pinned signers, apply stricter taint, and show the banner. (Amendment BC-1 (#61) (D25): the former "pause non-alarm wakes" is removed, since only alarms can wake, §14.10 item 3.) Alarms MUST NOT trigger automated remediation, destructive actions, credential changes, network changes or physical actuation.
 - An all-clear MUST carry authority at least equal to the alarm's.
 - Alarm-capable principals have a panic budget: at most 3 alarms per 15 minutes each.
 
@@ -1908,11 +1921,21 @@ This follows RFC 8084: a circuit breaker "removes traffic from the network, eith
 
 The listener elects the landing mode. The sender does not. This is the orphan branch's receive-side design (`origin/ronan/20260614/send-receive-threshold-landing:proto/receive-side-draft.md:24-44`): "The election is the LISTENER's". A sender's urgency or suggested "fire level" is a hint.
 
-| Mode | Effect | OpenClaw analogue (`OC-RFC:244-255`) | Claude Code analogue | v1 |
+| Mode | Effect | OpenClaw continuation analogue (`gates`, `OC-RFC:244-255`; canticle's binding: §16) | Claude Code analogue | v1 |
 |---|---|---|---|---|
 | `silent` (default) | Lands in the session's digest slot; colors its next turn; no wake | `continue_delegate` mode `silent`: `enqueueSystemEvent`, no wake | hook `additionalContext` from the receptor digest | **default** |
 | `silent-wake` | Lands and wakes the session, only under §14.10 | mode `silent-wake`: `requestHeartbeatNow` | channel notification; `asyncRewake` hook; inbox-socket message | alarm class only |
 | `post-compaction` | Staged to rehydrate after the listener's compaction | mode `post-compaction` | `SessionStart` hook with matcher `compact` | **reserved: MUST NOT be used for heard remote content** |
+
+**Amendment BC-1 (#61): configuration names.** A binding's configuration MAY name a subscription's posture with operator-facing delivery names (§14.18.7). They map one-to-one onto the tune postures of §14.6.1 and the landing modes above, and mean nothing else:
+
+| Delivery (configuration) | Tune posture (§14.6.1) | Landing mode | v1 |
+|---|---|---|---|
+| `ringbuffer_only` | `off` | none: the binding's local ring only | default |
+| `ambient` | `silent` | `silent` | yes; in OpenClaw over OC-0 (§16.4) |
+| `wake` | `wake-on-alarm` | `silent-wake` | `alarm` class only (D1, D25); not in P1 (§14.18) |
+
+The delivery name `ringbuffer_only` is not the §14.3 disposition, and `ambient` is not the class of §6.2. No delivery name maps to `post-compaction` (D13). The OpenClaw column of the first table is the continuation feature of the `gates` branch, kept as an analogue; canticle's own OpenClaw binding is §16, where canticle content never lands as a system event and no heartbeat call is a wake path (§16.2).
 
 **Deviation from spine:** P9 offered `post-compaction` as a landing mode for heard items. Staging heard remote content into a successor context is a persistence carrier for injected content — the "write → exposed-read re-entry → high-risk action" chain (Zha & Wang, arXiv 2605.02812) and AgentWorm's persistence through agent bootstrap files (arXiv 2603.15727). In v1 only ledger-promoted content (§6.4) may be staged across compaction, through the harness's own mechanisms. Evidence: `review/challenge-redteam §0 item 5, amendment 4(a)`. DECISION D13 (recommended: `post-compaction` reserved in v1; revisit after the red-team suite passes).
 
@@ -1984,6 +2007,10 @@ A session that has drained any canticle item is **tainted** until it is reset or
 
 Hosts SHOULD show the taint state to the session and to operators. This is the capability-attenuation pattern of CaMeL (arXiv 2503.18813) and RTW-A (arXiv 2605.02812). Prompt-level warnings alone left a 37% attack success rate in AgentWorm (arXiv 2603.15727), and OpenClaw's own injection-pattern detector only logs (`src/security/external-content.ts:21-22`); a structural control is required.
 
+**Proposed amendment (open, §23.2 question 22).** *Not adopted: the rule above, item 4 included, is unchanged until the owners revise it.* Emeric and rune proposed on #61 (Q3), and Silas judged worth testing, that item 4 not count the session's own already-bound reply route, used under that channel's ordinary policy, as an off-host target. Heard content would still render as host-authored external data (§14.13); a new outbound target off that route, and any `fleet` or `public` publish escalation (item 5), would stay denied once canticle content has landed. External-data wrapping (§14.13) is a separate control from this outbound and publish taint. Neither blanket denial nor a broad relaxation is to be inferred from this paragraph. **Test gate before adoption:** in a tainted session, (a) a reply on the bound route passes under ordinary channel policy; (b) a send to any other target, a cross-session or cross-channel send, and a `fleet` or `public` sing are each denied and logged; (c) a heard payload that asks for any of (b) changes nothing.
+
+**Amendment BC-1 (#61): interim delivery rule.** Until §23.2 question 22 is settled, ambient delivery (§14.18.4) MUST NOT target a session that has an off-host channel route. A session has an **off-host channel route** when its reply or channel route delivers to an off-host target in the sense of item 4: for example a session bound to a Discord or other channel conversation, or a main session that direct chats from such channels share (in OpenClaw, `agent:main:main` under the default `session.dmScope=main`; `main` @ `6e6458a`: `docs/channels/discord/messaging.md:20`).
+
 **Deviation from spine:** the spine had no taint rule. Evidence: `review/challenge-redteam C10, §4, amendment 4(b)`. Harness enforcement seams are in §16.
 
 ### 14.13 Arrival banner
@@ -2021,6 +2048,8 @@ From: magi-threat 21fe31dfa154a261
 - The digest holds at most 5 items and 1.5 KB per turn, ranked by salience and remaining life; each entry is one line with the condensed banner fields. Full text is available on demand through `canticle_listen` (§15.1).
 - A superseded, plucked, revoked or expired item disappears from the next digest; items that were already drained get a one-line "withdrawn/expired" note once.
 
+**Amendment BC-1 (#61): implementation over OC-0 (D28).** The two slots stay: they are a safety invariant that keeps broadcast traffic from occupying or evicting other context in the session. Per-frame records stay inside the receptor and the binding's local ring (§14.18.3); only the slots reach the session boundary. Over OpenClaw's next-turn injection seam (§16.4), the binding keeps **at most two pending entries per session**, one per supersede key (`canticle:digest`, `canticle:alarm`), each rebuilt in place by supersession, never queued behind itself. A rebuild carries the still-live items of the entry it supersedes forward without settling them (§14.18.5). Settled tombstones and absolute expiry apply to each entry (§14.18.5); an entry expires no later than the earliest local expiry of the items it carries, and the binding rebuilds it by then. Host drain caps (§16.4 item 5) are defence in depth for the dose of §14.6.5, not its enforcement. **Proof gate:** under a flood of distinct frames, and under supersession, PLUCK and expiry, every observation finds at most two pending canticle entries per session, and no other producer's entries are evicted (extends RT-112, §22.7).
+
 **Deviation from spine:** P11 used one `contextKey` per `canticle:<station>:<stream>`. OpenClaw's per-session system-event queue holds 20 events and drops the oldest (`MAX_EVENTS = 20`, `src/infra/system-events.ts:66`, `:318-320`), so per-stream keys would let broadcast traffic evict continuation returns and channel events. Evidence: `review/challenge-redteam C20, amendment 5`; test RT-112.
 
 ### 14.15 Local session API
@@ -2055,6 +2084,178 @@ Any future guardian design must at least provide:
 - doubts that are addressed, hop 0 and never broadcast;
 - no authority to wake, command, assign tasks or tools, change policy, suppress ordinary input or veto. A doubt is advisory data;
 - no reading of silence as evidence: a guardian that raises no doubt certifies nothing.
+
+### 14.18 Harness interface (receptor → binding) (amendment BC-1, #61)
+
+**Freeze (D29).** This section is frozen against binary-canticle `a15fb9f0d215a2471fbe44b5ad0757804e2e2667` (the merge of #62) and OpenClaw `main` @ `6e6458a98ff3894117b0449a64b6dbfd1ca348d1`. OpenClaw paths in this section are at that commit. A change on either side that alters a rule here needs a further amendment naming new literal SHAs; a branch name or "latest" is never a freeze point.
+
+This section records the princes' recommendations on #61 (2026-10-01) on questions Q1-Q11 of the brief "OpenClaw ↔ binary-canticle interface: implementation demands", as assessed in `reports/2026-10-01-openclaw-interface-demands.md` (cited as `report §n`). It specifies what a receptor gives a harness binding and what the binding does with it. The implementation slices start from it: BC-2 (the receptor's record emitter), OC-0 (OpenClaw's generic seam, §16.4) and the OpenClaw P1 plugin. Phases (harness phases, unrelated to the spine positions P1-P15; see Conventions): **P1** receives only, with no publish and no wake; **P2** adds publishing (§15); **P3** adds the alarm wake (§14.10); **P4** is a fleet canary.
+
+| Q | Topic | Recorded as | Specified in |
+|---|---|---|---|
+| Q1 | Wake | D25 | §14.18.9; §14.10 unchanged |
+| Q2 | Seam and delivery guarantee | D26 | §14.18.5, §16.4 |
+| Q3 | Taint and bound reply routes | **open** | §14.12 (proposed amendment); §23.2 question 22 |
+| Q4 | Ownership | D27 | §14.18.1; §14, §14.6.1 |
+| Q5 | Landing | D28 | §14.18.6; §14.14 |
+| Q6 | Freeze | D29 | above |
+| Q7 | Configuration posture | D30 | §14.18.7 |
+| Q8 | Trust tier | D31 | §14.18.7 |
+| Q9 | Banner marker | D32 | §14.18.8; §14.13 |
+| Q10 | Receptor transport | D33 | §14.18.2 |
+| Q11 | Rejected frames | D34 | §14.18.3; §10.9 |
+
+#### 14.18.1 Ownership (Q4, D27)
+
+- The **receptor** emits facts: per-frame records with their admission result, disposition and evidence; retractions; its receptor-wide landing state (MUTE, circuit breaker, regulatory modulation); presence; health (§14.18.3). It holds no session policy: no subscriptions, target sessions, landing posture or wake grant.
+- The **binding** (a harness plugin, or a host adapter) owns, in its own configuration: the subscriptions; the mapping from each subscription to target sessions; each subscription's posture (§14.9); per-subscription budgets; and the per-session parts of §14.6. It tracks taint (§14.12).
+- **Determinism.** §14.2 extends to the binding: given the same records, configuration, session state and `now`, it makes the same deliveries.
+- **Host-wide budgets.** The host wake budget (§14.10 item 6), with the per-host wake allowance of the circuit breaker (§14.8.3), has exactly one accountable owner across all gateways and bindings on a host: a per-host receptor, or an equivalent shared budget. Two gateways on one host MUST NOT each enforce a private copy of it. P1 has no wake, so this gates P3, not P1.
+
+#### 14.18.2 Transport (Q10, D33)
+
+For P1 a binding MAY run the receptor as a supervised child process that writes records (§14.18.3) as JSON lines on stdout, but only where that receptor is the host's one listener (§4.2, §14). A host with several gateways runs one shared receptor, the host daemon, which carries the same records over the host socket (§11.1). The child's stdout replaces the host socket of §14.15 for receptor-to-binding records only; publishing still goes through the host socket (§11.1).
+
+- **Framing.** One JSON object per line, with non-ASCII characters escaped. At most 64 KiB per line and nesting depth 8 [PROPOSED DEFAULT]. The binding discards an over-long line up to its newline, rejects deeper nesting before parsing completes, and counts both. Stderr carries diagnostics only and is read into a bounded buffer (64 KiB [PROPOSED DEFAULT]).
+- **Backpressure.** The binding's queue of unprocessed records is bounded (1 024 [PROPOSED DEFAULT]). When it is full the binding stops reading, so the pipe pushes back on the receptor. The receptor never buffers records without bound: a `frame`, `presence` or `health` record it cannot write is dropped and counted, and its `rec_seq` is not reused, so the binding sees the gap. A `retract`, `landing_state`, `hello`, `fatal` or `bye` record is never dropped: the receptor blocks until it can write it, and datagrams that arrive meanwhile are lost at the socket, as on any lossy path. A gap therefore never hides a withdrawal. Nothing in the pipe is unbounded.
+- **Supervision.** The binding starts the receptor from an absolute path, with an explicit argument vector (no shell, no `PATH` search) and an allow-listed environment. Readiness is the `hello` record, never the spawn. After `fatal`, or an exit without `bye`, the binding marks receive health failed and restarts the receptor with jittered exponential backoff, opening a breaker after repeated exits ([PROPOSED DEFAULT]: 1 s doubling to 60 s, jitter 0.2, breaker after 5 exits in 300 s). Before starting, it reaps any receptor left over from an earlier run.
+- **Teardown.** Stop sends TERM, then KILL within the host's stop grace. Disable or rollback leaves no receptor process or socket, and no canticle tools.
+- **Proof gate.** Before P1 runs anywhere but a test host, proofs MUST show: framing (an over-long line, a nesting-depth bomb, a partial line at end of file); backpressure (a stalled binding keeps memory bounded on both sides, reports `records_lost`, and loses no `retract`); supervision (crash, hang, `fatal`, exit without `bye`); restart (a record re-emitted by a new run delivers nothing twice, §14.18.5); and teardown (above).
+- **Pinning.** The proof packet for a literal-SHA freeze pins the Python interpreter version and the hash of every receptor dependency (for example `cryptography`), beside the binary-canticle and OpenClaw SHAs. The prototype's static version string (`prototype/canticle-station/pyproject.toml`, `0.1.0`) is not an identity.
+
+#### 14.18.3 Receptor record v1
+
+Every record is one JSON object carrying `v: "canticle-receptor-record/1"`, `type`, `rec_seq` (strictly increasing within one run, never reused) and `run` (random hex chosen at process start). Times are integer ms since the Unix epoch. A binding MUST ignore unknown fields; a new required field, or a changed meaning, needs a new major version.
+
+| `type` | Emitted | Content |
+|---|---|---|
+| `hello` | Once, after the UDP bind, any multicast join and the state load. It is the readiness receipt | wire and record versions, `pid`, `bind`, `multicast` (or null), `transport` (the §11 transport binding, for example `lan`), `manifest_sha256`, `manifest_label`, `state_version` |
+| `frame` | For every ITEM or PLUCK verified against a manifest key, whatever its admission result and disposition, except a benign repeat (`duplicate`, counted in `health`) and an admitted PLUCK (which emits `retract`) | below |
+| `retract` | For every valid PLUCK; every supersession of a surfaced tuple; the local expiry of every surfaced tuple, including tuples surfaced before a restart and not heard since; a held item dropped before release; the revocation or quarantine of a key with surfaced tuples; and, after a restart, the target of a re-heard PLUCK or superseding item when that target was surfaced before the restart (the receptor persists which tuples it surfaced) | `target` (identity tuple), `idem`, `reason` (`plucked`, `superseded`, `expired`, `revoked`, `quarantined`, `held_expired`, `held_plucked`, `held_superseded`), `by` (the PLUCK's or superseding item's tuple, or null) |
+| `landing_state` | Right after `hello`, and whenever any part changes | `mute`: null, or the active MUTE's `{until, by}` (§10.6); `breaker`: `closed`, `open` or `half_open`, with `until` (§14.8.3); `modulation`: the active receiver-local effects by stream, each with its op (§14.7), its Δθ or weight factor, and `until` (§14.7.1, §14.7.7, §14.7.8) |
+| `presence` | When a station's presence state changes (§8.6) | manifest station name, state |
+| `health` | Periodically (10 s [PROPOSED DEFAULT]) | counters per admission result and disposition, over a fixed set of reasons; the unverified-datagram table (below); dedup occupancy; beacon age per manifest key; records dropped; `state` `ok` or `degraded`, with reasons such as `clock_skew` and `records_lost` |
+| `fatal` | Before any non-zero exit | `reason`, for example `state_corrupt`, `manifest_invalid`, `bind_failed`; never a bare traceback |
+| `bye` | On clean shutdown | — |
+
+**The `frame` record.**
+
+| Field | Content |
+|---|---|
+| `frame` | `{key_id, epoch, stream_id, seq, kind, sha256, bytes}`: the identity tuple (§5.6), `item` or `pluck`, and the SHA-256 and size of the raw frame. For a frame appended to the hearer ring at §14.1 step 5, they point at its hearer-ring copy (I-5); a frame refused before that step has none |
+| `idem` | `canticle:<key_id>:<epoch>:<stream_id>:<seq>`, the frame's part of the idempotency key (§14.18.5) |
+| `station` | `{name, principal}`, from the manifest only (§14.13). `principal` is `null` when the manifest names none |
+| `stream`, `class`, `scope`, `hop`, `state_key`, `purpose`, `intensity`, `lens` | From the frame (§9.6). `stream` is the name the receptor knows for `stream_id` (§5.4); `class` and `scope` are names |
+| `flags` | `{refresh, wake_derived, exercise}` (§9.6 key 15) |
+| `lineage` | `{derived_from, root}` (§14.11) |
+| `times` | `issued_at`, `expires_at`, `received_at`, `heard_at`, `offset_ms` (δ̂), `local_expiry_at` (§14.6.3), `age_ms` (§6.3 item 3). `heard_at` is the first hearing the receptor knows of; after a restart without persisted first-hearing times it is this run's, and `dedup` says so |
+| `gap` | Gap state from `trail_seq` (§7.10); `"unavailable"` until beacons carry it (A1) |
+| `admission` | The §10.9 result |
+| `dedup` | `first`, or `resurfaced` for a tuple re-heard after a receptor restart |
+| `disposition`, `reasons` | The §14.3 disposition (session-independent, §14.18.4) and machine reason codes |
+| `body` or `body_ref` | Present only when `admission` is `verified` and `disposition` is `surface` or `ringbuffer_only`: content type, text or base64, size and SHA-256, or the §9.6 reference. Always untrusted |
+| `versions` | `manifest_sha256`, `manifest_label`, the receptor's rule version and state version |
+
+**Disposition mapping.** Each receptor outcome has one admission result (§10.9) and one disposition (§14.3), and emits what the last column says. The prototype's evidence names are in parentheses.
+
+| Outcome | Admission | Disposition | Record |
+|---|---|---|---|
+| New item, verified, on a stream the receptor is configured to hear | `verified` | `surface` | `frame` |
+| Verified item on any other stream | `verified` | `ringbuffer_only`, reason `untuned` | `frame` |
+| Live-state item held in warm-up (§6.3 item 4) | `verified` | `ringbuffer_only`, reason `warmup_hold`; `surface` on release | `frame`, then a second `frame` with the same `idem` |
+| Held item expired, plucked or superseded before release | — | — | `retract` (`held_*`) |
+| Repeat of an accepted tuple, same bytes | `duplicate` | no-op | `health` counter |
+| Item re-heard after a receptor restart | `verified` | as when first heard | `frame` with `dedup: "resurfaced"`; a settled key delivers nothing (§14.18.5) |
+| PLUCK re-heard after a receptor restart | `duplicate` | no-op | `retract` for its target when the target was surfaced before the restart; otherwise a `health` counter |
+| Older or repeated beacon | — | no-op | `health` counter |
+| Class, op, scope or stream beyond the key's grant (`capability`, `scope-violation`) | `capability_exceeded` | `ringbuffer_only` (§10.4) | `frame`, no body |
+| Frame's scope narrower than the transport binding (§11) or tier it arrived on, for example a `host` frame heard over UDP (`scope-violation`; `listener.py:243-246`; §4.3) | `scope_violation` | `drop` | `frame`, no body |
+| Unknown class code (`unknown-class`) | `verified` | `ringbuffer_only` (§6.2) | `frame` |
+| Hop above the class limit (`hop-limit`) | `hop_limit` | `drop` | `frame`, no body |
+| Lower epoch for the key (`epoch-regression`), new tuple | `verified`, reason `epoch_regression` | `ringbuffer_only`; supersedes nothing (§5.2, §10.9) | `frame` |
+| Lower epoch for the key, repeat of an accepted tuple | `duplicate` (takes precedence, §10.9) | no-op | `health` counter |
+| Key at its dedup or mark quota (`over-quota`) | `over_quota` | `drop` | `frame`, no body |
+| PLUCK that does not match its held target (`pluck-mismatch`) | `pluck_mismatch` | `drop` | `frame`, no body |
+| Item after its PLUCK (`plucked`) | `plucked` | `drop` | `frame`, no body |
+| Item older than the key's supersession mark (`superseded`) | `superseded` | `drop` | `frame`, no body |
+| Same tuple, different bytes (`equivocation`) | `equivocation` | `quarantine_set` (§10.8) | `frame`, no body; the key is quarantined locally |
+| Not verified: `unknown_key`, `bad_signature`, `revoked`, time window, `malformed`, `crit_unknown`, `version` | as §10.9 | — | `health` counters only (below) |
+| Quarantine ops of control frames | — | `quarantine_strengthen` / `quarantine_rescind` | reserved |
+
+Prototype paths in this mapping are `prototype/canticle-station/canticle/` at `a15fb9f`. At that commit the listener emits none of record v1, and several rows are changes that BC-2 makes (`report §5.4` marks them **New**): the `untuned` and `warmup_hold` records (untuned, unnamed and warming-up items are silent there, `listener.py:374-378`); the `held_*` retractions (held items are dropped silently, `:318-320`, `:466-468`, `:473-474`); the `retract` after a restart for the target of a re-heard PLUCK or superseding item; the local quarantine on equivocation (the listener records evidence only, `:265-268`); the `verified` and `duplicate` handling of lower epochs (the listener drops them, `:257`); and counter-only handling of unverified frames (the listener attributes a reject from a known key id to its manifest name, `:172-174`). An item on a stream the manifest does not name is `capability_exceeded` once BC-2 enforces manifest stream grants; until then, since the prototype's manifest `streams` list only names streams (`manifest.py:30`), it is `untuned`.
+
+**Unverified datagrams (Q11, D34).** They produce no per-frame record and no receipt (§10.9). `health` carries:
+
+- one fixed aggregate counter per reason;
+- a table of at most 16 key ids (hex) by count, kept by a bounded algorithm (for example space-saving), with an `other` bucket for the rest.
+
+A flood of distinct key ids then grows neither receptor memory nor the `health` record. A receptor MAY also keep per-frame rejects in its bounded local debug ring (§14.1) for an operator on the host. None of this is ever deliverable to a session or model, attributed to a station before verification, or keyed by a sender-chosen value without a fixed bound.
+
+**Fail-closed rules (binding).**
+
+- An unknown major `v`: stop delivering; receive health `failed`, reason `record_version`.
+- An unknown `type` within v1: count it and ignore it.
+- A missing required field or a wrong type: drop the record, count `malformed_record`, never deliver it.
+- A `rec_seq` gap: receive health `degraded`, reason `records_lost`. A gap never hides a `retract` or `landing_state` (§14.18.2).
+- Before a run's first `landing_state`, nothing from that run is delivered.
+- `fatal`, or an exit without `bye`: receive health `failed` with the reason, then restart (§14.18.2).
+- A `frame` without `local_expiry_at`, or already past it, is never delivered.
+
+#### 14.18.4 Judgment and delivery
+
+- The receptor's judgment for a binding is session-independent. `disposition: surface` means eligible to surface to a session whose subscription matches; it does not mean landed. The §14.3 `landing` field is null, and landing is the binding's.
+- Only a `frame` record with `admission: verified` and `disposition: surface` is deliverable. Every other record reaches at most the binding's local ring and its status surfaces.
+- The binding delivers a deliverable record to a session only when all of these hold: a subscription whose posture is not `off` names the session and matches the record's station, stream, class, scope and lens; the subscription's budget has room; `local_expiry_at` has not passed; any A11 delay for the item has matured (§14.16 item 3); and, until §23.2 question 22 is settled, the session has no off-host channel route (§14.12).
+- A record whose `frame.key_id` is the binding's own station key is not delivered unless self-broadcast is explicitly included (§14.6.1).
+- A `frame` record with `dedup: "resurfaced"` never counts toward any §14.6 rate, budget or salience quantity: not desensitization's surfacings, the AGC share or homeostasis's R_obs (I-4, §12.1).
+- The binding applies the receptor's `landing_state` to every session. While `mute` is active, it withdraws every pending canticle entry and delivers nothing (§10.6, §14.16 item 3). While `breaker` is `open`, it collapses the digest to one line per stream and delivers no wake, and while it is `half_open` it holds the digest to 25% (§14.8.3). It applies `modulation` to the weights and thresholds of the matching subscriptions (§14.7.1, §14.7.7, §14.7.8).
+
+#### 14.18.5 Idempotency and delivery guarantee (Q2, D26)
+
+- **Key.** The idempotency key for one frame in one session is the key of §15.6 and §16.4: `canticle:<key_id>:<epoch>:<stream_id>:<seq>:<sessionKey>`, with the harness's canonical session key. A subscription id is metadata only, never part of the key, so two subscriptions that match one frame for one session deliver it once.
+- **Durable admission.** The binding keeps each frame key, and its settled tombstone, in its own durable state. Once a key has been admitted to a session (put into a pending slot entry), a repeat is refused: while it is pending, and after it settles, through a settled tombstone kept until the frame's local expiry plus 5 s skew [PROPOSED DEFAULT]. A frame key settles only when a slot entry carrying it is consumed at drain or discarded by the host, or when the frame itself is retracted (pluck, supersession, revocation, quarantine or expiry, §14.18.3) or reaches its local expiry.
+- **Rebuilds.** Superseding a slot entry with its rebuild (§14.14, §16.4 item 2) settles none of the frame keys the old entry carried: the still-live ones are carried forward as pending. Each slot entry has its own host idempotency key, unique per rebuild, so the host's tombstone for an earlier rebuild never refuses a later one. The binding rebuilds an entry no later than the earliest local expiry of the items it carries. If an entry expires anyway (for example while the binding is not loaded), only the frame keys whose own local expiry has passed settle; the rest stay pending for the next rebuild.
+- **Restarts.** Pending frame keys survive gateway and receptor restarts; settled tombstones also survive session reset and plugin disable, which clear pending entries; session delete clears both. Re-emitted and resurfaced records therefore deliver nothing twice.
+- **Consumption.** At most once, at prompt assembly. A drained entry is consumed whether or not the model or the transcript later shows it; consumption is not a receipt that the model saw anything (`docs/plugins/hooks/prompt-and-session.md:316-330`).
+- **No exactly-once promise.** No binding promises exactly-once model or transcript behaviour.
+
+#### 14.18.6 Landing (Q5, D28)
+
+Per-frame records stay inside the receptor and the binding's local ring; they never become per-frame session entries. The session boundary keeps the two bounded, replaceable slots of §14.14. Over OpenClaw's seam, the binding keeps at most two pending entries per session, one per supersede key, rebuilt in place under settled tombstones and absolute expiry; §14.14 states the rule and its proof gate. The digest carries the dose of §14.6.5. A chatter, ambient or advisory item enters the digest only after its A11 delay has matured (§14.16 item 3): the binding rebuilds the digest with matured items only, and does not set OC-0's not-before (§16.4 item 1), which cannot express per-item delays in an entry that carries several items. The binding keeps each held item's drawn eligibility time in its durable state, beside its frame key, so a gateway restart neither drops the item nor draws its delay again; at maturity it re-checks every cancellation condition of §14.16 item 3. The binding rebuilds an entry on every `retract` that touches it, the seam re-checks expiry at drain (§16.4 item 1), and an item withdrawn after it was consumed gets the one-line note of §14.14 once.
+
+#### 14.18.7 Configuration (Q7, D30) and trust tier (Q8, D31)
+
+- **Location and format.** OpenClaw configuration is JSON5 (`src/config/io.load.ts:118`), and `plugins.entries.<id>` is a strict object (`src/config/zod-schema.root-support.ts:135-186`), so every canticle key lives under `plugins.entries.<id>.config`.
+- **Explicit `enabled: false`.** `plugins.entries.<id>.enabled` is OpenClaw's form of §15.5's `canticle.enabled`, and on OpenClaw its `false` default holds only when written explicitly (D30). Operators write `plugins.entries.<id>.enabled: false` explicitly. An installed non-bundled plugin with no entry is enabled by default (`src/plugins/config-activation-shared.ts:226-232`), and a `.config` block for a plugin that declares tools and omits `enabled` is auto-enabled (`src/config/plugin-auto-enable.shared.ts:108-121`, `:455-473`).
+- **Shallow boot-time schema.** A schema-invalid block refuses Gateway boot even while the plugin is disabled (`src/config/validation-plugin-config.ts:345-395`). The schema therefore checks shape, bounds and constants only. Semantic, filesystem and runtime checks (the manifest digest, paths and permissions, the receptor executable and its version, station identity, target sessions, the wake restriction) run when the service starts, and a failure fails the canticle service, never Gateway boot. Operators MUST NOT deploy a canticle configuration that can refuse Gateway boot.
+- **Trust tier.** The binding is a third-party, least-privileged plugin. It MUST NOT depend on bundled-only or trusted-only privilege: the keyed and blob stores and trusted hook dispatch (gated at `src/plugins/registry-runtime.ts:202-219`; applied at `:251`, `:255`, `:262`, `:410`), or bundled doctor health checks (`src/flows/bundled-health-checks.ts:105-111`). What it needs from the host comes from the generic seam (§16.4); it keeps its own state in its own state directory. It needs no conversation access (`hooks.allowConversationAccess`): it learns that an entry was consumed from OC-0's settlement notification or settled-state query (§16.4 item 2), not from a conversation hook such as `agent_turn_prepare`.
+- **Prompt injection.** Ambient landing uses next-turn injection, which is allowed unless the entry sets `hooks.allowPromptInjection: false` (`src/plugins/hook-policy-decisions.ts:6-8`).
+- **Delivery names.** `ringbuffer_only` → `off`, `ambient` → `silent`, `wake` → `silent-wake` (§14.9). `wake` is valid only with classes exactly `alarm` (D1, D25), and a P1 binding refuses it.
+- **Defaults.** Each value below restates a rule of this RFC and is not a new decision. Key names are illustrative; `report §6` drafts a full schema and configuration.
+
+| Setting | Default | Rule |
+|---|---|---|
+| Plugin `enabled` | `false`, written explicitly | §15.5; D30 |
+| Subscription delivery | `ringbuffer_only` | sessions start untuned (§14.16 item 1) |
+| Wake | absent; `alarm` only when present | D1, D25, §14.10 |
+| Publishing beyond the host | disabled | §15.5 |
+| Multicast (join or send) | off; on only after `canticle doctor` passes | §11 binding (b), §11.2 |
+| Self-broadcast | filtered | §14.6.1 |
+| Consumption mode | `raw` | §14.6.8 (`completed` needs `trail_seq`) |
+| Per-turn dose | 5 items, 1.5 KB | §14.6.5 |
+
+#### 14.18.8 Banner (Q9, D32)
+
+- Every document and implementation uses the §14.13 marker `[canticle:heard]`, and no other. The strip rule and drain accounting of §14.13 depend on the `[canticle:` prefix.
+- `principal` comes from the manifest. While the manifest names none (the prototype's manifests have no principal field), the banner reads `principal="unavailable"`; missing provenance is never fabricated (§14.13).
+- The banner is host-authored and outside the untrusted-content wrapper wherever it is rendered, including by OC-0's provenance rendering (§16.4 item 6).
+
+#### 14.18.9 Phases and gates (Q1, D25)
+
+- **P1, receive-only.** No publish, no wake. `ringbuffer_only` can run against BC-2's records. `ambient` waits for OC-0 (§16.4), because the guarantee of §14.18.5 needs it, and does not target sessions with an off-host channel route until §23.2 question 22 is settled (§14.12).
+- **P2, publish.** §15 in full, including every check of §15.4 and the gates of §15.5.
+- **P3, wake.** D1 is retained: verified `alarm` frames only, under the whole §14.10 conjunction. A binding adds wake only after a concrete operator alarm producer exists (human-held alarm keys and an operator publish path, D14, §15.7) and the §14.10 proofs pass, with the host wake budget owned as §14.18.1 requires. OC-0 carries no wake (D26); the P3 wake seam is open (§23.2 question 23).
+- **Order (recommended on #61).** Emeric: this amendment first; then BC-2 and OC-0, independently; then a proven receive-only P1; only then enabling publishing and wake. rune: OC-0, BC-3 and BC-4 (`report §7`) may proceed independently once their own proof gates are defined.
 
 ---
 
@@ -2206,76 +2407,78 @@ Reference: `prototype/canticle-station/canticle/ambient.py` (`canticle ambient`)
 
 ### 16.1 OpenClaw: what exists where
 
-- The continuation feature — `continue_work`, `continue_delegate` with `silent` / `silent-wake` / `post-compaction`, targeted returns, fan-out — exists only on the karmaterminal branch `codeagent/85651-upstream-1ba243c8-gates` (`9eb655afa`), not on `origin/main` (`14ead1fc9`): for example `enqueueContinuationReturnDeliveries` and `silentAnnounce` have zero hits on main (`review/openclaw-rfc §1`).
-- On both refs: `enqueueSystemEvent` with `contextKey` and `replace`, `requestHeartbeat`, `wrapExternalContent`, the plugin API (`registerService`, `registerTool`), and the `/hooks/wake` endpoint. The gates branch adds `trusted` and `traceparent` to system events.
-- Tier A below needs only what exists on both. Tier B depends on the gates branch landing upstream.
+**Amendment BC-1 (#61):** re-grounded at OpenClaw `main` @ `6e6458a98ff3894117b0449a64b6dbfd1ca348d1`. Paths in §16.1-§16.4 are at that commit unless marked `gates`.
+
+- The continuation feature — `continue_work`, `continue_delegate` with `silent` / `silent-wake` / `post-compaction`, targeted returns, fan-out — exists only on the karmaterminal branch `codeagent/85651-upstream-1ba243c8-gates` (`9eb655afa`, cited as `gates`) and has not landed on `main`. At `6e6458a`, `enqueueContinuationReturnDeliveries`, `markTrustedContinuationHeartbeatWake`, `sessionDeliveryAckId`, `awaitPromptAdoption` and `silentAnnounce` have no hits under `src/`, `extensions/` or `packages/`. The former Tier B depended on them; OC-0 replaces it (§16.4). The host "continuation chain budget" of §14.8.2 is not on `main` either; canticle's own budgets (§14.8.2, §14.10) apply regardless.
+- What `main` offers a third-party plugin:
+  - `api.runtime.system.enqueueSystemEvent`, with `contextKey` and `replace` (SDK facade `src/plugins/runtime/system-events.ts:26-33`; queue `src/infra/system-events.ts:63-70`, `:152-161`). The queue is in memory only (`src/infra/system-events.ts:1-3`), holds 20 events per session and drops the oldest (`:39`, `:182-185`). A `SystemEvent` carries text, `contextKey` and an optional `deliveryContext`; it has no `trusted`, provenance, `traceparent` or expiry field (`:25-37`).
+  - `api.session.workflow.enqueueNextTurnInjection` (`src/plugins/plugin-api.types.ts:107-111`). It is durable in the session store, with `ttlMs` and an `idempotencyKey` that deduplicates pending entries only; it holds at most 32 entries of up to 32 768 characters (UTF-16 code units) per plugin and session, and refuses when full or for an unknown session (`src/plugins/host-hook-state.ts:27-29`, `:85-144`). It has no absolute expiry, `notBefore`, supersede or withdraw. Its text is joined raw into the active user prompt, with no host banner (`src/agents/embedded-agent-runner/run/attempt-llm-boundary.ts:342-350`). A drain discards the entries of every plugin that is not `loaded` at that moment, then deletes the whole map (`host-hook-state.ts:170-182`, `:196`). It is not drained on Codex or Copilot (`docs/plugins/hooks/prompt-and-session.md:68-72`), and a drain is consumption, not a receipt (`:316-330`).
+  - `requestHeartbeat`, whose caller chooses source and intent; no wake source is reserved for plugins (`src/infra/heartbeat-wake-contracts.ts:6-22`). `requestHeartbeatNow` is a deprecated alias with `removeAfter` 2026-10-01 (`docs/plugins/sdk-runtime/state-and-system.md:56`; `src/plugins/runtime/runtime-system.ts:19-28`).
+  - `wrapExternalContent` (`src/security/external-content.ts:323`), exported through `src/plugin-sdk/security-runtime.ts:28-32`. Its source type has no `broadcast` value and is not exported (`src/security/external-content.ts:47-55`).
+  - `registerTool` and `registerService` (`src/plugins/plugin-api.types.ts:213`, `:273`; service shape `src/plugins/plugin-registration.types.ts:424-430`), `before_tool_call` block and approval results (`src/plugins/hook-before-tool-call-result.ts:14-35`), and the `/hooks/wake` endpoint.
+- Not reachable from plugins: the durable session-delivery queue (`enqueueSessionDelivery`, `src/infra/session-delivery-queue-storage.ts:153`) is core-only, so §15.6's addressed mode has no plugin path on `main`.
+- Tier A (§16.2) uses only what `main` offers a third-party plugin (D31). OC-0 (§16.4) is the one core change the binding needs, for ambient landing.
 
 ### 16.2 OpenClaw Tier A (no core change)
 
-**Receptor.** Preferably the out-of-process host daemon, connected to a thin OpenClaw plugin over the host socket (§11.1). Alternatively in-process: `api.registerService({ id: "canticle-receptor", start(ctx), stop(ctx) })` (`src/plugins/plugin-registration.types.ts:416-422`). OpenClaw has no UDP listener today (no `node:dgram` imports).
+**Amendment BC-1 (#61):** Tier A is P1 before OC-0 (§14.18.9): receive, `ringbuffer_only`, no landing, no wake.
 
-**Silent landing.**
+**Receptor.** A supervised child of the plugin's `canticle-receptor` service (`api.registerService`), speaking record v1 (§14.18.2, §14.18.3), or the out-of-process host daemon over the host socket (§11.1). OpenClaw has no UDP listener (no `node:dgram` import on `main`).
 
-```ts
-const text = banner + "\n" + wrapExternalContent(payload, {
-  source: "api",                                   // no "broadcast" source exists yet (external-content.ts:91-99)
-  sender: `${stationName} ${keyIdHex}`,
-  taskName: `canticle ${streamName}`,
-});
-runtime.system.enqueueSystemEvent(text, {
-  sessionKey,
-  contextKey: "canticle:digest",                   // or "canticle:alarm" (§14.14)
-  replace: true,                                   // one keyed source owns one queue slot (system-events.ts:395-460)
-});
-```
+**Landing.** None in Tier A. Subscriptions run `ringbuffer_only` (§14.9), and records reach only the binding's local ring and status surfaces. `ambient` needs OC-0 (§16.4), because the guarantee of §14.18.5 needs durable pending entries and settled tombstones. `enqueueSystemEvent` has neither and keeps only the newest 20 events (§16.1), and drained events render as `System: [ts] …` lines whose look-alikes are deliberately left alone: "Role separation plus external-content wrapping is the boundary" (`src/auto-reply/reply/session-system-events.ts:121-122`). Canticle content therefore does not land as a system event. Wherever it lands, the payload is wrapped (`wrapExternalContent`) and the host-authored banner sits outside the wrapper (§14.13).
 
-- `wrapExternalContent` is `src/security/external-content.ts:382`, exported to plugins through `src/plugin-sdk/security-runtime.ts:30`. The banner is outside the wrapper (§14.13).
-- The SDK path forces `trusted: false` and strips ack fields and `traceparent` (`src/plugins/runtime/system-events.ts:28-49`). `contextKey` and `replace` survive.
-- Drained events render as `System: [ts] …` lines, and look-alike `System:` lines are deliberately not neutralized: "Role separation plus external-content wrapping is the boundary" (`src/auto-reply/reply/session-system-events.ts:594-596`). Hence the mandatory wrapper and the stripping rule of §14.13.
+**Wake.** None (D25). `requestHeartbeatNow` is a deprecated alias with `removeAfter` 2026-10-01, and `requestHeartbeat` lets the caller choose source and intent (§16.1). Neither is a canticle wake path. P3's wake needs a constrained core wake seam that satisfies §14.10 in full; it is not specified here (§23.2 question 23).
 
-**Wake (alarm only, §14.10).**
+**Publisher (P2).** `api.registerTool(factory)`. The tool factory context supplies `sessionKey` and `agentId` (`src/plugins/tool-types.ts:31-32`), which the tool uses for provenance, rate limits and taint tracking.
 
-```ts
-runtime.system.requestHeartbeatNow({ sessionKey, agentId, reason: "canticle:alarm", coalesceMs: 5000 });
-```
+**Targets.** Only the sessions that the binding's configured subscriptions name (§14.18.1). "All sessions" is never a default.
 
-This is `src/plugins/runtime/runtime-system.ts:19-47` (source `"other"`, intent `"immediate"`). Plugin wakes are ordinary heartbeats, subject to heartbeat busy-skip gates; a plugin cannot mark a trusted continuation wake.
+**Out-of-process `/hooks/wake`.** `POST /hooks/wake` with `{text, mode, sessionKey}` enqueues a system event and, with `mode: "now"`, requests a wake (`src/gateway/server/hooks.ts:245-272`). A caller-selected `sessionKey` is accepted only with `mode: "now"` (`src/gateway/hooks.ts:262-264`, "sessionKey requires mode=now"), and deferred wakes use the main session (`docs/automation/cron-jobs/webhooks.md:157`). It needs `hooks.enabled`, a hook token and `allowRequestSessionKey`, does not wrap content, and takes no `contextKey`. It is not a canticle path in v1: it cannot land silently in a chosen session, what it lands is a system event (above), and P1 has no wake. A hook token grants ingress; it is not a sender identity.
 
-**Publisher.** `api.registerTool(factory)`. The tool factory context supplies `sessionKey` and `agentId` (`src/plugins/tool-types.ts`), which the tool uses for provenance, rate limits and taint tracking.
-
-**Targets.** Land only in sessions whose tune table opted in. The core's "all known sessions on host" helper is module-private (`src/agents/subagent-announce.continuation-return.ts:35-47`), and "all sessions" is the wrong default anyway.
-
-**Out-of-process alternative.** `POST /hooks/wake` with `{text, mode: "next-heartbeat" | "now", sessionKey}` (`src/gateway/server/hooks.ts:262-290`; `docs/gateway/config-hooks.md`) needs `hooks.enabled`, a hook token, and `allowRequestSessionKey` with `allowedSessionKeyPrefixes`. A caller-selected `sessionKey` is accepted only with `mode: "now"`, which always requests a wake (`src/gateway/hooks.ts:290-291`, "sessionKey requires mode=now"; the same check is on `main`); `next-heartbeat` lands only in the agent's main session (`docs/automation/cron-jobs/webhooks.md:158`). This path therefore cannot land silently in a chosen session; it can land silently only in the main session. It **does not wrap content and takes no `contextKey`**, so the receptor MUST pre-wrap (banner outside) and deduplicate and coalesce itself; identical pending text returns `eventOutcome: "coalesced"`. A hook token grants ingress; it is not a sender identity.
-
-**Configuration** (names illustrative), default off:
+**Configuration** (names illustrative; §14.18.7), default off:
 
 ```json5
-plugins: { entries: { canticle: { config: {
-  enabled: false,
-  receive: { wake: "off" },            // "off" | "alarm"   (D1)
-  publish: { crossHost: "disabled" },  // mirrors continuation.crossSessionTargeting
-  slots: 2                              // canticle:digest, canticle:alarm
-} } } }
+plugins: { entries: { "binary-canticle": {
+  enabled: false,                          // written explicitly (D30)
+  config: {
+    mode: "receive",                       // P1: no publish
+    receive: {
+      multicast: false,                    // only after `canticle doctor` passes (§11.2)
+      includeSelf: false,                  // §14.6.1
+      subscriptions: [{
+        id: "fleet-advisories", stations: ["cael"], streams: ["lens.threat"],
+        targets: [{ sessionKey: "agent:main:main" }],  // shares channel DMs under the default session.dmScope
+        delivery: "ringbuffer_only"        // "ambient" after OC-0, only for a target with no off-host channel
+                                           // route until §23.2 question 22 is settled (§14.12); "wake" never in P1
+      }]
+    },
+    station: { crossHost: false }          // publishing beyond the host disabled (§15.5)
+  }
+} } }
 ```
 
-**Limits of Tier A.** The system-event queue is in memory (acceptable for a lossy radio), holds 20 events per session with drop-oldest, and carries no `traceparent` from plugins. Internal delivery bypasses mention gating (`OC-RFC:1464`), so canticle's own admission gate is the only gate. Tier A cannot deny arbitrary tools to a tainted session. Therefore Tier A MUST NOT enable wake unless the agent runs sandboxed (§16.3), and the publish tool itself enforces the canticle parts of taint (§15.4 item 4).
+**Limits of Tier A.** It lands nothing, by design. Internal delivery bypasses mention gating (`OC-RFC:1464`; on `main`, `requireMention` only selects the activation label, `src/auto-reply/reply/get-reply-directives.ts:319-323`), so canticle's own admission gate is the only gate. `before_tool_call` can block a call or require approval (`src/plugins/hook-before-tool-call-result.ts:14-35`), which covers part of §14.12, but the Codex app server rejects turn-scoped tool narrowing (`extensions/codex/src/app-server/run-attempt-prompt.ts:294-298`); §23.2 question 5 stays open. Wake MUST NOT be enabled unless the agent runs sandboxed (§16.3), and the publish tool itself enforces the canticle parts of taint (§15.4 item 4).
 
 ### 16.3 OpenClaw sandbox requirement
 
 Any agent with canticle wake enabled MUST run with sandboxing on (`agents.defaults.sandbox`) and sealed bootstrap files. Sandboxing is "off by default" (`docs/gateway/sandboxing.md:9`). In AgentWorm's study of OpenClaw 2026.3.12, the Docker sandbox was the only control that broke propagation, and none of 104 public configurations enabled it (arXiv 2603.15727). DECISION D16 (recommended: required).
 
-### 16.4 OpenClaw Tier B (upstream pull request)
+### 16.4 OpenClaw core seam OC-0 (replaces Tier B)
 
-A core **addressed bridge**, modelled on `enqueueContinuationReturnDeliveries` (`src/auto-reply/continuation/targeting.ts:123-305`). Per tuned session:
+**Amendment BC-1 (#61) (D26).** Tier B was a core addressed bridge modelled on `enqueueContinuationReturnDeliveries` (`gates`: `src/auto-reply/continuation/targeting.ts:123-305`). It depended on the gates branch landing on `main`, which it has not. On `main` the functions it named do not exist (§16.1), so its `awaitPromptAdoption` and `sessionDeliveryAckId` acknowledgement and its `markTrustedContinuationHeartbeatWake` wake cannot be built, and its wake call, `requestHeartbeatNow`, is a deprecated alias with `removeAfter` 2026-10-01. Tier B is replaced by **OC-0**: one generic, additive extension of next-turn injection (§16.1). OC-0 carries no canticle logic (no UDP, CBOR, Ed25519, station, stream or manifest) and no wake, and an entry that uses none of the new fields behaves as today. The binding needs the properties below; OC-0's pull request defines the API (`report §4.2` drafts one) and its own proof gate (`report §7` drafts it).
 
-1. `enqueueSessionDelivery({ kind: "systemEvent", sessionKey, agentId, text, traceparent, idempotencyKey: "canticle:<key_id>:<epoch>:<stream_id>:<seq>:<sessionKey>", awaitPromptAdoption: true })`. The sha256-derived entry id (`session-delivery-queue.records.ts:71-75`) makes a looping frame enqueue once per recipient, even across restarts.
-2. `enqueueSystemEvent(text, { sessionKey, trusted: true, sessionDeliveryAckId, contextKey, replace: true, traceparent })`, so the durable row is acked only when a turn adopts it.
-3. For a granted wake: `requestHeartbeatNow(markTrustedContinuationHeartbeatWake({ sessionKey, agentId, reason: "canticle-alarm" }))`.
-4. Emit `continuation.queue.enqueue.delivery` and, for fan-out, `continuation.queue.fanout` spans (`OC-RFC:1328-1374`). §6.7 of the OpenClaw RFC calls these "an observability substrate for an inter-node ringbuffer `station:stream` broadcast layer" (`OC-RFC:1324`).
+1. **Absolute expiry and `notBefore`.** An entry may carry an absolute deadline. It is refused at enqueue if the deadline has passed, dropped unrendered at drain if it has passed, and never extended (I-3). It may carry a not-before time, re-checked at drain; a not-before at or after the deadline is refused. Canticle's slot entries do not use the not-before time: a digest carries several items, so the binding holds A11's per-item delays itself and rebuilds the digest with matured items only (§14.18.6).
+2. **Supersede and withdraw.** Accepting an entry withdraws the same plugin's pending entry with the same supersede key in that session; this yields the two slots of §14.14, rebuilt in place. A withdraw call reports the settled state (consumed, withdrawn, expired or discarded) when nothing is pending, so the binding can add the one-line post-drain note of §14.14 once. The plugin can query an entry's settled state by idempotency key, and receives a metadata-only notification when its entry settles (idempotency key, session, outcome, time); neither needs conversation access.
+3. **Settled tombstones.** At drain, withdrawal, expiry or discard, the host records the entry's idempotency key as settled until its deadline plus 5 s skew [PROPOSED DEFAULT]; a later enqueue with that key is a duplicate. Tombstones survive gateway restart, session reset and plugin disable (which clear pending entries); session delete clears them. Live tombstones are never evicted: a full table refuses new keys, as §7.4 refuses rather than evicts.
+4. **Retention at drain.** An entry with a deadline whose plugin is not loaded, or not allowed prompt injection, at a drain (a restart or reload) is kept until its deadline, not discarded.
+5. **Host-owned drain caps.** Per-plugin entry and byte caps for each drain, set by the operator in core configuration, never by the plugin.
+6. **Host-rendered provenance.** An entry that declares provenance renders as external data: a host-authored banner outside the untrusted-content wrapper, then the wrapped payload (§14.13). It is never a trusted `System:` line and never joined raw into the user prompt, marker look-alikes in the payload are neutralised, and the payload never frames itself.
+7. **Refusal, not eviction.** Every cap refuses with a reason; nothing is dropped oldest-first. Enqueue is refused for an agent whose harness does not drain injections (Codex and Copilot today, §16.1).
+8. **No routing or wake inputs.** No delivery context, heartbeat target, wake source or intent, and no facts rendered as instructions.
 
-Tier B also adds: an `ExternalContentSource` value `"broadcast"` and a `HeartbeatWakeSource` value `"broadcast"`; a per-session taint flag checked by the gateway's tool policy (§14.12); clearing of taint and pending canticle wakes on session reset; and canticle payloads declared under the `enrichment` redaction key, with spans carrying only hashes and lengths (`OC-RFC:1141`, `:1282`, `:1313`).
+**How the binding uses OC-0.** Per target session (§14.18.4), the binding keeps the two slot entries of §14.14, with supersede keys `canticle:digest` and `canticle:alarm`. Each frame it delivers has the idempotency key `canticle:<key_id>:<epoch>:<stream_id>:<seq>:<sessionKey>` (as in §15.6), which the binding keeps, with its tombstone, in its own durable state; each slot entry has its own host idempotency key, unique per rebuild, and a rebuild carries still-live frames forward without settling them (§14.18.5). The subscription id is metadata only. The binding learns that a session consumed a canticle entry from OC-0's settlement notification or settled-state query (item 2), and uses that for taint (§14.12) and the publish check of §15.4 item 4. It does not use `agent_turn_prepare`, which receives the drained injections (`src/agents/embedded-agent-runner/run/attempt-prompt-helpers.ts:85-95`): that is a conversation hook, which a non-bundled plugin may register only with `plugins.entries.<id>.hooks.allowConversationAccess: true` (`src/plugins/registry-registrars-tools-hooks.ts:52-62`, `:399-407`; `docs/plugins/hooks.md:125-130`), and the grant would also hand the binding the raw prompt and messages and every other plugin's drained injections, against D31.
 
-`trusted: true` is used only for frames verified against the manifest, and those frames are still wrapped: `trusted` gates which provenance fields may be attached; it grants no instruction authority (`src/infra/system-events.ts:102-111`).
+**Kept from Tier B.** Canticle payloads appear in spans and diagnostics only as hashes and lengths (`OC-RFC:1141`, `:1282`, `:1313`). **Not in OC-0, and open:** a gateway tool-policy seam for taint (§23.2 question 5) and the P3 wake seam (§23.2 question 23).
 
 **Deviation from spine:** P11's idempotency key (`canticle:<sid>:<epoch>:<seq>:<sessionKey>`) omitted `stream_id`; since `seq` is per stream (§5.5), it is included here, as in §15.6.
 
@@ -2301,14 +2504,16 @@ Facts below come from the Claude Code documentation as fetched on 2026-09-27 (ho
 
 | Canticle | OpenClaw | Claude Code |
 |---|---|---|
-| silent landing | `enqueueSystemEvent` into `canticle:digest` (Tier A) or durable bridge (Tier B) | `UserPromptSubmit`/`SessionStart` hook `additionalContext` from the digest |
-| silent-wake (alarm) | `requestHeartbeatNow`; `/hooks/wake mode=now` | channel notification; `asyncRewake` hook; inbox-socket message |
-| addressed, same host | `enqueueSessionDelivery` | cross-session messaging |
+| silent landing | next-turn injection with OC-0: at most two entries per session, `canticle:digest` and `canticle:alarm` (§16.4); none in Tier A | `UserPromptSubmit`/`SessionStart` hook `additionalContext` from the digest |
+| silent-wake (alarm) | none in P1 or P2 (D25); P3: alarm only, needs a core wake seam (§16.2, §23.2 question 23) | channel notification; `asyncRewake` hook; inbox-socket message |
+| addressed, same host | `enqueueSessionDelivery` (core-only on `main`, §16.1) | cross-session messaging |
 | post-compaction (reserved) | post-compaction staging | `SessionStart` matcher `compact` |
-| receptor host | plugin `registerService` or the host daemon | the host daemon |
+| receptor host | a receptor child supervised by a plugin service (§14.18.2), or the host daemon | the host daemon |
 | publisher | plugin `registerTool` | MCP tools |
-| default-deny gates | `canticle.enabled`, `crossHost`, `crossSessionTargeting` pattern | `--channels` opt-in, `channelsEnabled`, `crossSessionInbound` |
-| arrival banner | host-authored banner + `wrapExternalContent` | banner + `<channel source=… meta>` / hook text |
+| default-deny gates | explicit `plugins.entries.<id>.enabled: false`, `crossHost`, multicast off (§14.18.7) | `--channels` opt-in, `channelsEnabled`, `crossSessionInbound` |
+| arrival banner | host-authored banner + `wrapExternalContent`; with OC-0, host-rendered provenance (§16.4 item 6) | banner + `<channel source=… meta>` / hook text |
+
+**Amendment BC-1 (#61):** the OpenClaw column follows the re-grounded §16.1-§16.4.
 
 ### 16.7 Acceptance for bindings
 
@@ -2788,8 +2993,8 @@ An implementation claims one or more classes, the scopes it supports (§4.1), th
 |---|---|
 | **Station** | §5, §7, §8, §9 (emit), §10.5, §12.3 (station side), §15.4 |
 | **Relay** | §9 (verify), §11.3, §12.2-§12.6, §8.3 (decimation), §10.1-§10.9 |
-| **Receptor** | §9 (verify), §10, §14 in full |
-| **Harness binding** | §14.9-§14.14 as landed, §15, §16 for its harness |
+| **Receptor** | §9 (verify), §10, §14 in full; under a harness binding, §14 minus the parts the §14 introduction assigns to the binding (amendment BC-1) |
+| **Harness binding** | §14.9-§14.14 as landed, the per-session parts of §14.6 and §14.8.2, §14.16 items 1-3, §14.18, §15, §16 for its harness (amendment BC-1) |
 | **Bridge** | §18.3-§18.4, plus Receptor verification |
 
 ### 22.2 Evidence rule
@@ -2863,7 +3068,7 @@ The eight examples of `proto/receptor-contract-v0.2.md` §13 remain required, re
 
 ### 22.7 Red-team suite
 
-The suite runs on a "worm range": at least 20 simulated sessions (an OpenClaw gates build with the Tier A plugin, plus a Claude Code MCP/hook binding) on at least 3 hosts behind one relay, a test manifest, a seeded content-injection page, and packet capture at the relay; a scale variant uses 1 000 synthetic receptors. Groups: RT-01..RT-09 (worm, taint, MUTE), RT-10..RT-16 (amplification, downgrade), RT-20..RT-25 (Sybil and accord), RT-30..RT-35 (staleness), RT-40..RT-43 (echo chambers, dose), RT-50..RT-54 (storms, budgets), RT-60..RT-64 (exfiltration, privacy), RT-70..RT-73 (training and promotion), RT-80..RT-86 (alarms), RT-90..RT-94 (third-party components), RT-100..RT-103 (discovery), RT-110..RT-114 (receiver DoS), RT-120..RT-123 (insider misuse), RT-130..RT-131 (malicious relays). Stimuli and pass criteria are in `review/challenge-redteam §9`. Among them: RT-03 (propagation stops at hop 2; no wakes; denied tool calls logged), RT-10 (bytes to a spoofed victim ≤ bytes sent before cookie validation), RT-52 (the canticle cost budget stops wakes even though OpenClaw's chain counter resets), RT-110 (fuzz corpus including `{"a":1e400}`: zero crashes), RT-112 (a continuation return survives 100 canticle items; canticle uses at most 2 slots). D14's automated alarm issuer stays off until this range shows that correlated evidence, re-sung lineage and colluding keepers cannot manufacture apparent independence (RT-20..RT-25, RT-80..RT-86).
+The suite runs on a "worm range": at least 20 simulated sessions (OpenClaw `main` @ `6e6458a` with OC-0 and the canticle binding of §14.18 and §16.4, plus a Claude Code MCP/hook binding; amendment BC-1) on at least 3 hosts behind one relay, a test manifest, a seeded content-injection page, and packet capture at the relay; a scale variant uses 1 000 synthetic receptors. Groups: RT-01..RT-09 (worm, taint, MUTE), RT-10..RT-16 (amplification, downgrade), RT-20..RT-25 (Sybil and accord), RT-30..RT-35 (staleness), RT-40..RT-43 (echo chambers, dose), RT-50..RT-54 (storms, budgets), RT-60..RT-64 (exfiltration, privacy), RT-70..RT-73 (training and promotion), RT-80..RT-86 (alarms), RT-90..RT-94 (third-party components), RT-100..RT-103 (discovery), RT-110..RT-114 (receiver DoS), RT-120..RT-123 (insider misuse), RT-130..RT-131 (malicious relays). Stimuli and pass criteria are in `review/challenge-redteam §9`. Among them: RT-03 (propagation stops at hop 2; no wakes; denied tool calls logged), RT-10 (bytes to a spoofed victim ≤ bytes sent before cookie validation), RT-52 (the canticle cost budget stops wakes even though OpenClaw's chain counter resets), RT-110 (fuzz corpus including `{"a":1e400}`: zero crashes), RT-112 (another producer's next-turn entries survive 100 canticle items, and each session holds at most two pending canticle entries; amendment BC-1, §14.14). D14's automated alarm issuer stays off until this range shows that correlated evidence, re-sung lineage and colluding keepers cannot manufacture apparent independence (RT-20..RT-25, RT-80..RT-86).
 
 ---
 
@@ -2871,7 +3076,7 @@ The suite runs on a "worm range": at least 20 simulated sessions (an OpenClaw ga
 
 ### 23.1 Owner decisions
 
-figs delegated the owner decisions to the cohort's princes. Silas decided D1, D4, D10, D14 and D15 on #54 on 2026-09-28; Elliott's review had recommended the same on every one. Rows marked **Decided** record those decisions. The other rows are still recommendations.
+figs delegated the owner decisions to the cohort's princes. Silas decided D1, D4, D10, D14 and D15 on #54 on 2026-09-28; Elliott's review had recommended the same on every one. Rows marked **Decided** record those decisions. The other rows are still recommendations. **Amendment BC-1 (#61):** on PR #61 on 2026-10-01, rune, Emeric, Ronan and Silas gave recommendations on questions Q1-Q11 of the harness-interface brief; D25-D34 record the answers adopted on #61 as decisions, frozen against literal SHAs (§14.18). They were unanimous except D28, where the tally on #61 adopted Ronan's and Silas's position over rune's and Emeric's, and D30, which rests on Emeric's and Silas's recommendations. Q3 is not decided (§23.2 question 22).
 
 | Id | Decision | Recommended, or decided | Where |
 |---|---|---|---|
@@ -2899,6 +3104,16 @@ figs delegated the owner decisions to the cohort's princes. Silas decided D1, D4
 | D22 | Ports, groups, service names | Advertise via SRV; 9999 and `239.255.13.13` provisional for development; check and register with IANA before public use | §11.2, §13.7 |
 | D23 | Healing as continuous counterweight | Votes only in v1; continuous DCA-style mode behind a flag | §17.5 |
 | D24 | Regulation profile | Adopt `canticle-regulation/1` for the cohort test, retune for the fleet | §12.8 |
+| D25 | Wake in the harness interface (Q1) | **Decided (#61, princes' recommendations):** D1 is retained: alarm-only wake, receiver-local, under the whole §14.10 conjunction. P1 is receive-only, with no wake. A binding adds wake (P3) only after a concrete operator alarm producer exists and the §14.10 proofs pass | §14.10, §14.18.9 |
+| D26 | Landing seam and delivery guarantee (Q2) | **Decided (#61, princes' recommendations):** extend OpenClaw's generic next-turn injection seam (OC-0), not a canticle-specific inbox, with no wake in OC-0. The guarantee is durable admission (a settled tombstone prevents repeat admission) plus at-most-once consumption at prompt assembly. Exactly-once model or transcript behaviour is not promised | §14.18.5, §16.4 |
+| D27 | Ownership of subscriptions and budgets (Q4) | **Decided (#61, princes' recommendations):** the binding's (host or plugin) configuration owns subscriptions and the mapping to target sessions; the receptor emits facts, not session policy. A host-wide wake budget has one accountable owner across all gateways on a host (a per-host receptor, or an equivalent shared budget). P1 has no wake, so this gates P3, not P1 | §14, §14.6.1, §14.18.1 |
+| D28 | Landing model (Q5) | **Decided (#61; Ronan's and Silas's position, adopted in the tally on #61):** per-frame records stay inside the receptor and its binding (§14.18.3) and never become per-frame session entries. The session boundary keeps §14.14's two bounded, replaceable slots (`canticle:digest`, `canticle:alarm`) as a safety invariant. Over OC-0 the binding keeps at most two pending entries per session, one per supersede key, rebuilt in place; settled tombstones and absolute expiry apply. Proof gate: at most two pending canticle entries per session under flood, supersession, PLUCK and expiry, and no other producer's entries evicted. rune and Emeric had proposed per-frame rows with the dose enforced by drain caps; the two-slot default was kept | §14.14, §14.18.6 |
+| D29 | Freeze point (Q6) | **Decided (#61, princes' recommendations):** freeze only against literal commit SHAs. #62 landed first, so §14.18 is frozen at binary-canticle `a15fb9f0d215a2471fbe44b5ad0757804e2e2667` (the merge of #62) and OpenClaw `6e6458a98ff3894117b0449a64b6dbfd1ca348d1` | §14.18 |
+| D30 | Binding configuration posture (Q7) | **Decided (#61, from Emeric's and Silas's recommendations):** JSON5 under `plugins.entries.<id>.config`; `enabled: false` written explicitly; a shallow boot-time schema (shape, bounds, constants); semantic, filesystem and runtime failures fail the canticle service, never Gateway boot; never deploy a configuration that can refuse Gateway boot | §14.18.7 |
+| D31 | Binding trust tier (Q8) | **Decided (#61, princes' recommendations):** third-party and least-privileged. P1 does not depend on bundled-only privilege (keyed store, bundled doctor checks) | §14.18.7 |
+| D32 | Banner marker (Q9) | **Decided (#61, princes' recommendations):** keep `[canticle:heard]` across documents and code | §14.13, §14.18.8 |
+| D33 | Receptor transport for P1 (Q10) | **Decided (#61, princes' recommendations):** a bounded, supervised stdout JSON-lines child is acceptable for P1 if framing and backpressure, supervision, restart and teardown are proof-gated. Python and dependency hashes are pinned in the exact-SHA proof packet | §14.18.2 |
+| D34 | Rejected frames (Q11) | **Decided (#61, princes' recommendations):** fixed aggregate counters per reason plus a bounded top-16 key-id table with an `other` bucket by default; optionally a bounded local debug ring for per-frame rejects. Never model-deliverable, never station-attributed before verification, never attacker-keyed unbounded maps | §10.9, §14.18.3 |
 
 **Amendments A1-A13.** The protocol-dynamics spike proposed thirteen amendments (`spike/protocol-dynamics-udp-vs-tcp-2026-09-27.md` §7). Silas gave each a disposition on #54 on 2026-09-28, and this revision applies them. Where Elliott's review and Silas's text differed (A6's portable wording, A12's deferral), Silas's text is used.
 
@@ -2924,7 +3139,7 @@ figs delegated the owner decisions to the cohort's princes. Silas decided D1, D4
 2. **The death seam** (`proto/threshold-fire-taxonomy-v2.md` §G): a choir-minted fourth landing mode for "a song its singer never sang". Deferred, following the lamp's lean (b): "build the wire that works before the wire that grieves".
 3. **Receiving near one's own compaction** (orphan receive draft, open item 2): should a listener buffer recent items to fold into its post-compaction shard? Blocked on D13.
 4. **"Adopt posture of defense"** (#6; `spike/silas-teams-context.md:23`): this RFC maps it to a human-signed regulatory `tighten-frond-discriminator` (§14.7.1), optionally with an alarm. The posture vocabulary and its mapping to tune postures remain open.
-5. **Taint enforcement seams**: OpenClaw needs a gateway tool-policy seam (Tier B); Claude Code's `PreToolUse` denial path is to be verified (§16.5).
+5. **Taint enforcement seams**: OpenClaw needs a gateway tool-policy seam, which OC-0 does not provide; `before_tool_call` block and approval cover part of §14.12 (§16.2, §16.4, amendment BC-1). Claude Code's `PreToolUse` denial path is to be verified (§16.5).
 6. **Canticle token accounting**: how a receptor reads per-session token usage from each harness (§14.10 item 7).
 7. **Principal definition** for accord: host, operator or model family (`review/challenge-redteam §11 Q2`).
 8. **Convergence detector** metric and thresholds (§14.7.8; RT-40's diversity metric).
@@ -2941,6 +3156,13 @@ figs delegated the owner decisions to the cohort's princes. Silas decided D1, D4
 19. **Relay restart SLO** (A8): confirm or replace the proposed 20 s p99 in S4, before any lease state is persisted (§11.3.9).
 20. **Normative vectors**: the 34 candidate vectors of `prototype/canticle-station/vectors/` remain candidates until the independent TypeScript codec reproduces them (§9.13). They, and that spike's beacons, predate `trail_seq` (A1).
 21. **Class changes under one `state_key`** (#60 review): a §7.8 mark lasts for the longest-lived class among the items a receiver admitted for the key. An older item of a longer-lived class that the receiver did not hear (a late join, or a lost copy), or one issued after the longer-lived items it did hear had expired, can outlive the mark and land as current once a shorter-lived newer value expires. Carrying horizons forward or extending them on each refused item was tried in review and rejected: both let a clock offset or a stepped-back station clock hold marks far past their bound. Either receivers hold marks for the largest class maximum TTL the key is granted (simple, but up to a day per mark for a key granted `finding-ref`), or stations MUST keep one class per `state_key` within an epoch and receivers drop a class change with evidence. The second is recommended.
+22. **Taint and bound reply routes** (Q3 of the harness-interface brief, #61; amendment BC-1). An open fork. Emeric and rune: render heard content as host-authored external data; keep the session's already-bound reply route under ordinary channel policy; deny new off-route outbound and fleet or public publish escalation after canticle data lands; do not make §14.12's blanket denial a prerequisite for routing to a channel such as Discord. Silas: keep §14.12 as written until the owners explicitly revise it; the bound-reply exception is worth testing; neither blanket denial nor broad relaxation should be silently inferred. Ronan: external-data wrapping is separate from publish taint. Until it is settled, §14.12 stands, the exception is a proposed amendment with a test gate (§14.12), and ambient delivery, from P1 on, does not target sessions with an off-host channel route (§14.12, §14.18.4).
+23. **Harness-interface conflicts BC-1 does not decide** (`reports/2026-10-01-openclaw-interface-demands.md` §3). The RFC text stands on each until the owners decide; where BC-1 has already settled part of one, the bullet says so:
+    - **Tool set** (C16): §15.1 is unchanged. Under a binding, delivery follows the configured subscriptions (D27, §14.6.1, §14.18.4). Whether `canticle_tune` is offered there, and whether it may narrow or add to those subscriptions, is open, as is whether `canticle_listen` `view: "raw"` is removed from the model-callable tool and left to the operator CLI (§15.1, §15.7, D20).
+    - **Authenticated control UI** (C23): §18.9 keeps the tuner's gateway on loopback in v1; serving it beyond the host behind authentication needs an amendment to §18.9.
+    - **Multicast before `canticle doctor`** (C18): §11.2 allows multicast only after the doctor passes, and the prototype has no doctor. A spike exemption would need an amendment to §11.2.
+    - **The P3 wake seam** (C8; report §4.5): wake source and deferral rule, mention gating, outbound hooks and duplicate suppression for woken turns, all under §14.10.
+    - **Observability** (I2): canticle spans need either a generic core diagnostics event or the binding's own exporter; record v1 reserves no trace field (§14.18.3).
 
 ### 23.3 Work items
 
@@ -2951,7 +3173,7 @@ The spine's work plan, refined; the RFC cites these by number.
 | **S0** Housekeeping | Close PRs #50, #32, #29; merge #34 after light edits; request changes on #44; post the #30 HAProxy correction (§12.7); issue triage per the review; rewrite the README (#35); regenerate `proto/INDEX.md`; fix the dangling link in `spike/two-planes-the-ledger-and-the-binary.md:5`; deduplicate reference PDFs; lineage PR for the orphan branch's drafts (`proto/lineage/`); retitle #49 and close it once `prototype/ringserver-proofs/` is on `main` (§18.2); review notes, vectors and broker scripts are committed under `rfc/0001-notes/` (done with this draft) | #21, #35, #49 |
 | **S1** Frame v2 | Codec in Python and TypeScript (D9), deterministic-CBOR checks, COSE_Sign1 comparison (D12), manifest format and verifier, normative test vectors (§9.13), the prototype's bug fixes if its verify stage is reused (§10.10) | #27, #48, #38 |
 | **S2** Station daemon | Carousel and regulator (§7), carrier-beacon (§8) with `trail_seq` and paging at actual encoded sizes (A1, §8.4), host socket (§11.1), LAN multicast and `canticle doctor` (§11.2), DNS-SD records (§13), CLI (§15.7); bring `prototype/canticle-station/` and its candidate vectors up to A1 | #2, #37, #39, #40 |
-| **S3** Receptor and bindings | Receptor daemon (§14), OpenClaw Tier A plugin (§16.2), Claude Code MCP server and hooks (§16.5), taint seams, blind-enrichment acceptance (§16.7); silent-only until the whole §14.10 conjunction is implemented and tested (D1); proofreading and consumption modes (A9, §14.6.8); contagion controls (A11, §14.16) | #5, #11, #24, #51 |
+| **S3** Receptor and bindings | Receptor daemon (§14) and its record emitter BC-2 (§14.18.3), OpenClaw's seam OC-0 (§16.4) and the OpenClaw P1 plugin (§14.18; amendment BC-1), Claude Code MCP server and hooks (§16.5), taint seams, blind-enrichment acceptance (§16.7); silent-only until the whole §14.10 conjunction is implemented and tested (D1); proofreading and consumption modes (A9, §14.6.8); contagion controls (A11, §14.16) | #5, #11, #24, #51 |
 | **S4** Relay and replay tier | Go or Rust relay: lease, cookie, admission, budgets, attenuation, proxy-loop (§11.3, §12); join modes and fill (A5), REPAIR (A2), receiver reports (A3), the egress scheduler (A4), RELAY_GOAWAY, retry bounds and the restart SLO (A8); backbone rules for relay-to-relay links (A6, §12.4); ringserver DataLink bridge (§18.3), with HAProxy in front of ringserver on the TCP tier (§12.7); ews fixes and a live carrier trace (§18.6); spike S4a for D10 (§12.4); validate the WebTransport path before relying on it (A10, §11.5) | #30, #12 |
 | **S5** MAGI and hardening | Keepers for threat, healing and purpose with a dashboard panel (§17, §18.7); the red-team worm range (§22.7), which gates D14's automated alarm issuer; revocation and MUTE drills (§10.5, §10.6); the switch to 2-of-3 roots with backup and recovery documented (D15); a 1 000-receptor scale test | #7 |
 
