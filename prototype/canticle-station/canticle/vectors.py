@@ -139,6 +139,9 @@ def sequence_cases() -> list[dict]:
         wire.KIND_ITEM, s1, _item({2: threat, 3: seq, 4: t, 5: t + ttl, 6: 3, 10: key}))
     k1, k2 = ks(1, NOW - 1_000, "k1", 60_000), ks(2, NOW - 1_000, "k2")
     k3, k1_new = ks(3, NOW + 39_000, "k3"), ks(4, NOW + 39_500, "k1")
+    # §7.8, §23.2 q21: one class per state_key within an epoch, dropped as class-change; a new epoch may change it.
+    kc = lambda seq, t, cls, epoch=1: wire.sign_frame(
+        wire.KIND_ITEM, s1, _item({1: epoch, 2: threat, 3: seq, 4: t, 5: t + 60_000, 6: cls, 10: "k"}))
     seqs = [
         ("repeat-is-no-op", [v1, v1, v1], ["item"]),
         ("equivocation", [v1, v1_other], ["item", "evidence:equivocation"]),
@@ -149,6 +152,9 @@ def sequence_cases() -> list[dict]:
         ("capability-not-granted", [alarm], ["evidence:capability"]),
         ("epoch-regression", [epoch2, v1], ["item", "evidence:epoch-regression"]),
         ("pluck-expiry-mismatch", [v1, pl_late], ["item", "evidence:pluck-mismatch"]),
+        ("class-change-in-one-epoch", [kc(1, T0, 3), kc(2, T0 + 1_000, 1)], ["item", "evidence:class-change"]),
+        ("class-change-older-in-one-epoch", [kc(2, T0 + 1_000, 3), kc(1, T0, 1)], ["item", "evidence:class-change"]),
+        ("class-change-across-epochs", [kc(1, T0, 3), kc(1, T0 + 1_000, 1, epoch=2)], ["item", "superseded", "item"]),
     ]
     out = [{"name": n, "datagrams_hex": [d.hex() for d in ds], "now_ms": NOW, "expect": e} for n, ds, e in seqs]
     # Timed sequences: time advances to at_ms[i] (local expiry applied, its events not listed) before

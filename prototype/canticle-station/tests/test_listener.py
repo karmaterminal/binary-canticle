@@ -600,6 +600,83 @@ class PerKeyBoundsTest(unittest.TestCase):
             self.assertNotIn("evidence", [e.kind for e in evs])
 
 
+class ClassPerStateKeyTest(unittest.TestCase):
+    """§7.8, §23.2 q21: one class per state_key within an epoch; receivers drop a change."""
+
+    CHAT = stream_id("chatter")
+
+    def manifest(self):
+        return Manifest([StationEntry("cael", wire.public_key_bytes(SK), frozenset({1, 3, 5}), ("chatter",))])
+
+    def item(self, seq, t, cls, epoch=1, ttl=60_000):
+        return wire.sign_frame(wire.KIND_ITEM, SK, {1: epoch, 2: self.CHAT, 3: seq, 4: t, 5: t + ttl, 6: cls, 7: 1,
+                                                    8: b"x", 10: "k", 11: 0, 13: 1})
+
+    def reasons(self, evs):
+        return [e.data["reason"] for e in evs if e.kind == "evidence"]
+
+    def test_a_class_change_in_one_epoch_is_dropped(self):
+        lst = Listener(self.manifest(), ephemeral=True, warmup=False)
+        lst.hear(self.item(1, T0, 5, ttl=3_600_000), T0)                           # finding-ref
+        mark = lst.hwm[(SK_ID, self.CHAT, "k")]
+        evs = lst.hear(self.item(2, T0 + 1_000, 1), T0 + 1_000)                    # newer, chatter
+        self.assertEqual(self.reasons(evs), ["class-change"])
+        self.assertNotIn("superseded", [e.kind for e in evs])
+        self.assertEqual(lst.hwm[(SK_ID, self.CHAT, "k")], mark)                    # the mark did not move
+        self.assertEqual([x["seq"] for x in lst.on_air()], [1])                     # the current value stands
+        evs = lst.hear(self.item(3, T0 - 1_000, 1), T0 + 1_000)                    # older, chatter
+        self.assertEqual(self.reasons(evs), ["class-change"])
+
+    def test_a_new_epoch_may_change_the_class(self):
+        lst = Listener(self.manifest(), ephemeral=True, warmup=False)
+        lst.hear(self.item(1, T0, 5, ttl=3_600_000), T0)
+        old_until = lst.hwm[(SK_ID, self.CHAT, "k")][3]
+        evs = lst.hear(self.item(1, T0 + 1_000, 1, epoch=2), T0 + 1_000)
+        self.assertEqual([e.kind for e in evs if e.kind != "presence"], ["superseded", "item"])
+        issued, epoch, _, until, cls = lst.hwm[(SK_ID, self.CHAT, "k")]
+        self.assertEqual((epoch, cls), (2, 1))
+        self.assertEqual(until, old_until)                                          # the horizon never shrinks
+
+    def test_a_plucked_class_change_reports_plucked(self):
+        lst = Listener(self.manifest(), ephemeral=True, warmup=False)
+        lst.hear(self.item(1, T0, 5, ttl=3_600_000), T0)
+        pluck = wire.sign_frame(wire.KIND_PLUCK, SK, {1: 1, 2: self.CHAT, 3: 3, 4: T0 + 500, 5: T0 + 61_000,
+                                                      13: 1, 20: 2})
+        lst.hear(pluck, T0 + 500)
+        evs = lst.hear(self.item(2, T0 + 1_000, 1), T0 + 1_000)
+        self.assertEqual(self.reasons(evs), ["plucked"])
+
+    def test_marks_keep_their_class_across_restart(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "listener.json"
+            lst = Listener(self.manifest(), state_path=path, warmup=False)
+            lst.hear(self.item(1, T0, 5, ttl=3_600_000), T0)
+            fresh = Listener(self.manifest(), state_path=path, warmup=False)
+            self.assertEqual(self.reasons(fresh.hear(self.item(2, T0 + 1_000, 1), T0 + 1_000)), ["class-change"])
+            state = json.loads(path.read_text())                                   # version 2: marks without class
+            state["version"] = 2
+            state["hwm"] = [row[:7] for row in state["hwm"]]
+            path.write_text(json.dumps(state))
+            old = Listener(self.manifest(), state_path=path, warmup=False)
+            self.assertIsNone(old.hwm[(SK_ID, self.CHAT, "k")][4])
+            evs = old.hear(self.item(2, T0 + 1_000, 1), T0 + 1_000)                 # no class known: no check
+            self.assertIn("item", [e.kind for e in evs])
+
+    def test_a_mark_from_older_state_learns_its_class_on_resurface(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "listener.json"
+            first = self.item(1, T0, 5, ttl=3_600_000)
+            Listener(self.manifest(), state_path=path, warmup=False).hear(first, T0)
+            state = json.loads(path.read_text())
+            state["version"] = 2
+            state["hwm"] = [row[:7] for row in state["hwm"]]
+            path.write_text(json.dumps(state))
+            old = Listener(self.manifest(), state_path=path, warmup=False)
+            old.hear(first, T0 + 500)                                               # its own item re-surfaces
+            self.assertEqual(old.hwm[(SK_ID, self.CHAT, "k")][4], 5)
+            self.assertEqual(self.reasons(old.hear(self.item(2, T0 + 1_000, 1), T0 + 1_000)), ["class-change"])
+
+
 class RobustnessTest(unittest.TestCase):
     def test_garbage_never_escapes(self):
         _, lst = setup()
