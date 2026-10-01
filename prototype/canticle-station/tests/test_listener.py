@@ -345,8 +345,8 @@ class PerKeyBoundsTest(unittest.TestCase):
                           len(st.stream_entries)], [0, 0, 0, 0])
         self.assertEqual(list(st.last_stream_item), [self.CHAT])                     # only the new epoch's item
 
-    def test_supersession_marks_count_against_the_key_share(self):
-        lst = self.lst(warmup=False)
+    def test_supersession_marks_have_their_own_key_limit(self):
+        lst = self.lst(warmup=False, per_key_mark_quota=10)
         refused = 0
         for i in range(500):                                                         # new state_key every 3.5 s
             t = T0 + i * 3_500
@@ -355,20 +355,91 @@ class PerKeyBoundsTest(unittest.TestCase):
             self.assertLessEqual(len(lst.hwm), 10)
             self.assertEqual(sum(lst.hwm_per_key.values()), len(lst.hwm))
         self.assertGreater(refused, 0)
-        # Marks are never evicted early (§7.4, §7.8): the first ten were kept until they expired.
-        lst = self.lst(quota=3, warmup=False)
+        # Marks are never evicted early (§7.4, §7.8), and the limit is separate from dedup entries.
+        lst = self.lst(quota=3, per_key_mark_quota=3, warmup=False)
         for i, key in enumerate(("a", "b", "c")):
             lst.hear(self.item(i + 1, T0, cls=3, extra={10: key}), T0)
-        t = T0 + 40_000                                                              # dedup slots expired, marks live
+        t = T0 + 40_000                                                              # dedup entries expired, marks live
         evs = lst.hear(self.item(4, t, cls=3, extra={10: "d"}), t)
         self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["over-quota"])
         self.assertEqual(sorted(k[2] for k in lst.hwm), ["a", "b", "c"])
-        evs = lst.hear(self.item(5, t, cls=3, extra={10: "a"}), t)                   # a held key needs no new mark
+        evs = lst.hear(self.item(5, t, cls=3, extra={10: "a"}), t)                   # a marked key needs no new mark
         self.assertIn("item", [e.kind for e in evs])
         self.assertNotIn((SK_ID, 1, self.CHAT, 4), lst.dedup)                       # the refused frame left no slot
         later = max(v[3] for v in lst.hwm.values()) + 1
         evs = lst.hear(self.item(6, later, cls=3, extra={10: "d"}), later)           # room again once marks expire
         self.assertIn("item", [e.kind for e in evs])
+
+    def test_default_mark_limit_fits_honest_state_key_churn(self):
+        # The #60 review: marks drawn from the dedup share refused an honest key minting a new live-state
+        # key every 3 s at the §7.4 floor of 256. Marks have their own, longer-scaled limit instead.
+        lst = self.lst(quota=256, warmup=False)
+        self.assertEqual(lst._mark_quota(SK_ID), 256 * 6)                            # classes 1, 3, 9: ⌈905/180⌉ = 6
+        refused, peak = 0, 0
+        for i in range(500):
+            t = T0 + i * 3_000
+            evs = lst.hear(self.item(i + 1, t, cls=3, ttl=180_000, extra={10: f"incident-{i}"}), t)
+            evs += lst.tick(t)
+            refused += sum(e.kind == "evidence" and e.data["reason"] == "over-quota" for e in evs)
+            peak = max(peak, len(lst.hwm))
+        self.assertEqual(refused, 0)
+        self.assertGreater(peak, 256)                                                # more marks than dedup entries
+        self.assertLessEqual(peak, 256 * 6)
+
+    def test_mark_retention_never_shrinks(self):
+        # The #60 review, with mixed classes under one state_key: a shorter-class newer value must not
+        # shorten the mark, and an older item refused against it extends the mark to cover its class.
+        entry = StationEntry("cael", wire.public_key_bytes(SK), frozenset({1, 5}), ("chatter",))
+        fr = lambda seq, t, text: self.item(seq, t, cls=5, ttl=3_600_000, extra={10: "a", 8: text})
+        v1, v2 = fr(1, T0, b"threat high"), fr(2, T0 + 100, b"threat high")
+        v3 = self.item(3, T0 + 200, cls=1, ttl=60_000, extra={10: "a", 8: b"all clear"})
+        lst = Listener(Manifest([entry]), ephemeral=True, warmup=False)
+        lst.hear(v2, T0 + 300)
+        lst.hear(v3, T0 + 400)
+        lst.tick(T0 + 400_000)                                                       # purges marks that ran out
+        evs = lst.hear(v1, T0 + 400_000)                                             # replayed after v3's class max
+        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["superseded"])
+        self.assertNotIn("item", [e.kind for e in evs])
+        lst = Listener(Manifest([entry]), ephemeral=True, warmup=False)
+        lst.hear(v3, T0 + 400)
+        lst.hear(v1, T0 + 500)                                                       # refused, extends the mark
+        lst.tick(T0 + 400_000)
+        evs = lst.hear(v2, T0 + 400_000)
+        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["superseded"])
+        self.assertGreaterEqual(lst.hwm[(SK_ID, self.CHAT, "a")][3], T0 + 200 + 86_400_000)
+
+    def test_catalog_newest_copy_of_a_stream_wins(self):
+        # §8.4 lets a changed stream ride the next beacon whatever its page, so one stream can sit on
+        # two held pages; the entry from the more recent beacon must win (#60 review).
+        lst = self.lst()
+        b = lambda head, loop: [self.CHAT, head, 1, loop, loop, 60, 300, 4000]   # stream-entry, §9.8 order
+        other = [0x77, 1, 1, 5000, 5000, 60, 300, 4000]
+        lst.hear(self.beacon(1, [b(5, 10_000)], page=(1, 3)), T0)
+        lst.hear(self.beacon(2, [other, b(6, 12_000)], page=(0, 3)), T0)
+        st = lst.stations[SK_ID]
+        self.assertEqual((st.stream_entries[self.CHAT].head_seq, st.stream_loop_max[self.CHAT]), (6, 12_000))
+        lst.hear(self.beacon(3, [other], page=(2, 3)), T0)                          # an unrelated page
+        self.assertEqual(st.stream_entries[self.CHAT].head_seq, 6)
+        lst.hear(self.beacon(4, [b(7, 15_000)], page=(1, 3)), T0)
+        self.assertEqual((st.stream_entries[self.CHAT].head_seq, st.stream_loops[self.CHAT]), (7, 15_000))
+
+    def test_resurface_after_restart_needs_a_mark_slot(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "listener.json"
+            entry = StationEntry("cael", wire.public_key_bytes(SK), frozenset({1, 3}), ("chatter",))
+            lst = Listener(Manifest([entry]), state_path=path, warmup=False, per_key_mark_quota=2)
+            keyed = self.item(1, T0, cls=3, ttl=600_000, extra={10: "a"})
+            lst.hear(keyed, T0)
+            lst.hear(self.item(2, T0, cls=3, extra={10: "b"}), T0)
+            state = json.loads(path.read_text())                                    # mark "a" lost, "c" held
+            state["hwm"] = [r for r in state["hwm"] if r[2] != "a"] + [[SK_ID.hex(), self.CHAT, "c", T0, 1, 3,
+                                                                        T0 + 10**9]]
+            path.write_text(json.dumps(state))
+            fresh = Listener(Manifest([entry]), state_path=path, warmup=False, per_key_mark_quota=2)
+            evs = fresh.hear(keyed, T0 + 1_000)
+            self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["over-quota"])
+            self.assertLessEqual(len(fresh.hwm), 2)
+            self.assertIn((SK_ID, 1, self.CHAT, 1), fresh._restored)                # may still surface later
 
     def test_pluck_expiry_is_clamped(self):
         lst = self.lst(quota=1)

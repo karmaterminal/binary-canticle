@@ -133,10 +133,11 @@ def sequence_cases() -> list[dict]:
     day = 86_400_000
     pl_far = wire.sign_frame(wire.KIND_PLUCK, s1, {1: 1, 2: chat, 3: 2, 4: T0 + 5_000, 5: T0 + 50 * 365 * day, 13: 1, 20: 1})
     after_day = wire.sign_frame(wire.KIND_ITEM, s1, _item({3: 3, 4: NOW + day + 9_000, 5: NOW + day + 69_000}))
-    # #60: supersession marks outlive their dedup slots by the class max TTL (§7.8), so they count
-    # against the key's share on their own: a new state_key waits, a new value for a held one does not.
-    ks = lambda seq, t, key: wire.sign_frame(wire.KIND_ITEM, s1, _item({2: threat, 3: seq, 4: t, 5: t + 30_000, 6: 3, 10: key}))
-    k1, k2 = ks(1, NOW - 1_000, "k1"), ks(2, NOW - 1_000, "k2")
+    # #60: supersession marks outlive their dedup entries (§7.8), so they have their own per-key limit:
+    # a new state_key waits for a mark, a new value for a marked key does not. k1 is still live at +40 s.
+    ks = lambda seq, t, key, ttl=30_000: wire.sign_frame(
+        wire.KIND_ITEM, s1, _item({2: threat, 3: seq, 4: t, 5: t + ttl, 6: 3, 10: key}))
+    k1, k2 = ks(1, NOW - 1_000, "k1", 60_000), ks(2, NOW - 1_000, "k2")
     k3, k1_new = ks(3, NOW + 39_000, "k3"), ks(4, NOW + 39_500, "k1")
     seqs = [
         ("repeat-is-no-op", [v1, v1, v1], ["item"]),
@@ -150,14 +151,15 @@ def sequence_cases() -> list[dict]:
         ("pluck-expiry-mismatch", [v1, pl_late], ["item", "evidence:pluck-mismatch"]),
     ]
     out = [{"name": n, "datagrams_hex": [d.hex() for d in ds], "now_ms": NOW, "expect": e} for n, ds, e in seqs]
-    # Timed sequences: datagram i is heard at at_ms[i], with a fixed per-key quota (§7.4).
+    # Timed sequences: time advances to at_ms[i] (local expiry applied, its events not listed) before
+    # datagram i is heard, with fixed per-key limits for dedup entries and for marks (§7.4).
     timed = [
-        ("pluck-expiry-clamped", [pl_far, after_day], [NOW, NOW + day + 10_000], 1, ["item"]),
-        ("supersession-marks-share-the-key-quota", [k1, k2, k3, k1_new], [NOW, NOW, NOW + 40_000, NOW + 40_000], 2,
-         ["item", "item", "evidence:over-quota", "superseded", "item"]),
+        ("pluck-expiry-clamped", [pl_far, after_day], [NOW, NOW + day + 10_000], 1, 1, ["item"]),
+        ("supersession-marks-have-their-own-key-limit", [k1, k2, k3, k1_new],
+         [NOW, NOW, NOW + 40_000, NOW + 40_000], 2, 2, ["item", "item", "evidence:over-quota", "superseded", "item"]),
     ]
     out += [{"name": n, "datagrams_hex": [d.hex() for d in ds], "now_ms": NOW, "at_ms": at,
-             "per_key_quota": q, "expect": e} for n, ds, at, q, e in timed]
+             "per_key_quota": q, "per_key_mark_quota": mq, "expect": e} for n, ds, at, q, mq, e in timed]
     return out
 
 
@@ -170,13 +172,18 @@ def run_parse_case(case: dict, m: Manifest) -> str:
 
 
 def run_sequence_case(case: dict, m: Manifest) -> list[str]:
-    # Sequence vectors check wire semantics (dedup, pluck, supersession) at one instant, so the
-    # receiver-local warm-up hold (§7.8 rule 4, a timing policy) is off here.
-    # Optional fields: at_ms (when each datagram is heard; default now_ms for all) and per_key_quota.
-    lst = Listener(m, warmup=False, ephemeral=True, per_key_quota=case.get("per_key_quota"))
-    at = case.get("at_ms") or [case["now_ms"]] * len(case["datagrams_hex"])
+    # Sequence vectors check wire semantics (dedup, pluck, supersession), so the receiver-local
+    # warm-up hold (§7.8 rule 4, a timing policy) is off here. Optional fields: at_ms (time advances to
+    # at_ms[i], with local expiry applied and its events not listed, before datagram i is heard; default
+    # now_ms for every datagram), per_key_quota and per_key_mark_quota (§7.4).
+    lst = Listener(m, warmup=False, ephemeral=True, per_key_quota=case.get("per_key_quota"),
+                   per_key_mark_quota=case.get("per_key_mark_quota"))
+    timed = "at_ms" in case
+    at = case["at_ms"] if timed else [case["now_ms"]] * len(case["datagrams_hex"])
     out = []
     for d, t in zip(case["datagrams_hex"], at):
+        if timed:
+            lst.tick(t)
         for ev in lst.hear(bytes.fromhex(d), t):
             if ev.kind == "presence":
                 continue

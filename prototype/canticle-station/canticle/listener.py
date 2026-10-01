@@ -74,8 +74,9 @@ class _StationState:
     first_beacon_at: Optional[int] = None  # first beacon heard since this listener started (warm-up, §7.8)
     stream_loop_max: dict = field(default_factory=dict)  # stream_id -> advertised loop_max_ms
     stream_entries: dict = field(default_factory=dict)  # stream_id -> latest beacon StreamEntry (heads, live)
-    # page index -> that page's stream entries. The three stream maps above are rebuilt from these,
-    # so they hold one advertised catalog (at most 8 pages, §8.4), not every stream id ever beaconed (#60).
+    # page index -> (bseq heard at, that page's stream entries). The three stream maps above are rebuilt
+    # from these, so they hold one advertised catalog (at most 8 pages, §8.4), not every stream id ever
+    # beaconed (#60). A stream on two held pages takes its entry from the more recent beacon.
     catalog_pages: dict = field(default_factory=dict)
 
     @property
@@ -86,7 +87,7 @@ class _StationState:
 class Listener:
     def __init__(self, manifest: Manifest, tuned: Optional[set] = None, dedup_capacity: int = 100_000,
                  binding: str = "lan", state_path=None, warmup: bool = True, ephemeral: bool = False,
-                 per_key_quota: Optional[int] = None):
+                 per_key_quota: Optional[int] = None, per_key_mark_quota: Optional[int] = None):
         # Restart safety is the default: without state_path a restarted listener could surface a
         # stale or withdrawn item (§7.4-§7.8). Tests and experiments must opt out explicitly.
         if state_path is None and not ephemeral:
@@ -106,6 +107,7 @@ class Listener:
         self.tuned = tuned                    # stream names to surface; None = every named stream
         self.dedup_capacity = dedup_capacity
         self.per_key_quota = per_key_quota    # fixed per-key share; None = an equal share of dedup_capacity
+        self.per_key_mark_quota = per_key_mark_quota  # fixed per-key mark limit; None = derived (_mark_quota)
         self.dedup: dict[tuple, tuple] = {}   # identity -> (sha256(frame), retain_until, (expires_at, scope) | None)
         self.dedup_per_key: dict[bytes, int] = {}
         self.sticky_pluck: dict[tuple, int] = {}
@@ -188,12 +190,14 @@ class Listener:
         index, count = b.page or (0, 1)
         for p in [p for p in st.catalog_pages if p >= count]:
             del st.catalog_pages[p]
-        st.catalog_pages[index] = b.streams
+        st.catalog_pages[index] = (b.bseq, b.streams)
         st.stream_loops.clear()
         st.stream_loop_max.clear()
         st.stream_entries.clear()
-        for p in sorted(st.catalog_pages):
-            for e in st.catalog_pages[p]:
+        # bseq order, so the newest copy wins: §8.4 lets a changed stream ride the next beacon, whatever
+        # its page. bseq only rises within an epoch, and an epoch advance clears the pages.
+        for _, entries in sorted(st.catalog_pages.values(), key=lambda v: v[0]):
+            for e in entries:
                 st.stream_loops[e.stream_id] = e.loop_ms
                 st.stream_loop_max[e.stream_id] = e.loop_max_ms
                 st.stream_entries[e.stream_id] = e
@@ -244,6 +248,10 @@ class Listener:
                 return events  # a repeat is a benign no-op (§7.4)
             # Accepted before a restart: its dedup, pluck and supersession state was kept, but this
             # process has not surfaced it yet. Surface it once, through the same checks.
+            if self._needs_hwm_slot(f, ident) and not self._hwm_room(kid, now_ms):
+                events.append(self._evidence("over-quota", kid, "per-key supersession mark limit full; live "
+                                             "marks kept", stream=self._stream_name(kid, body.stream), seq=body.seq))
+                return events
             self._restored.discard(ident)
             resurface = True
             retain = seen[1]
@@ -263,8 +271,8 @@ class Listener:
                                              stream=self._stream_name(kid, body.stream), seq=body.seq))
                 return events
             if self._needs_hwm_slot(f, ident) and not self._hwm_room(kid, now_ms):
-                events.append(self._evidence("over-quota", kid, "per-key supersession quota full; live marks kept",
-                                             stream=self._stream_name(kid, body.stream), seq=body.seq))
+                events.append(self._evidence("over-quota", kid, "per-key supersession mark limit full; live "
+                                             "marks kept", stream=self._stream_name(kid, body.stream), seq=body.seq))
                 return events
             retain = wire.local_expiry_ms(body, st.offset_ms, first_heard_ms=now_ms) + SKEW_MS
             if target is not None:
@@ -298,15 +306,27 @@ class Listener:
             hkey = (kid, it.stream, it.state_key)
             order = (it.issued_at, it.epoch, it.seq)
             prev = self.hwm.get(hkey)
+            # A mark must outlive every older item for its key (§7.8). Each is issued no later than the
+            # mark, so it has expired by the mark's issued_at + its class max TTL (receiver clock, plus
+            # skew). The class is known only for items heard, so the mark takes the longest class max
+            # among them, and its retention never goes down (#60 review: a shorter-class newer value
+            # must not shorten it).
+            class_max_ms = CLASSES[it.cls].max_ttl_s * 1000
             # Equal order is only possible for the same identity, i.e. a re-surface after restart.
             if prev is not None and (order < prev[:3] or (order == prev[:3] and not resurface)):
+                until = max(prev[3], prev[0] + st.offset_ms + class_max_ms + SKEW_MS)
+                if until > prev[3]:
+                    self.hwm[hkey] = (*prev[:3], until)
+                    self._dirty = True
                 events.append(self._evidence("superseded", kid, "older than the high-water mark", stream=name, seq=it.seq))
                 return events
             if prev is None or order > prev[:3]:
-                class_max_ms = CLASSES[it.cls].max_ttl_s * 1000
+                until = it.issued_at + st.offset_ms + class_max_ms + SKEW_MS
                 if prev is None:
                     self.hwm_per_key[kid] = self.hwm_per_key.get(kid, 0) + 1
-                self.hwm[hkey] = (*order, retain + class_max_ms)
+                else:
+                    until = max(until, prev[3])
+                self.hwm[hkey] = (*order, until)
                 self._dirty = True
             for other_ident, h in list(self.current.items()):
                 if other_ident[0] == kid and h.item.stream == it.stream and h.item.state_key == it.state_key:
@@ -363,13 +383,25 @@ class Listener:
         return (f.kind == wire.KIND_ITEM and it.state_key is not None and it.cls in CLASSES
                 and ident not in self.sticky_pluck and (f.key_id, it.stream, it.state_key) not in self.hwm)
 
+    def _mark_quota(self, kid: bytes) -> int:
+        """Per-key limit on supersession marks, counted apart from dedup entries (§7.4). A dedup entry
+        lasts about one TTL; a mark lasts the class max TTL from its issued_at (§7.8). So the limit is the
+        dedup share scaled by the longest (max TTL + skew) / default TTL among the key's granted classes:
+        a key churning state_keys at its class default TTLs within its dedup share fits."""
+        if self.per_key_mark_quota is not None:
+            return max(1, self.per_key_mark_quota)
+        entry = self.manifest.entry(kid)
+        specs = [CLASSES[c] for c in (entry.classes if entry else ()) if c in CLASSES] or list(CLASSES.values())
+        factor = max(-(-(c.max_ttl_s * 1000 + SKEW_MS) // (c.default_ttl_s * 1000)) for c in specs)
+        return self._quota() * factor
+
     def _hwm_room(self, kid: bytes, now_ms: int) -> bool:
-        """Supersession marks outlive their dedup entries by the class maximum TTL (§7.8), so they
-        count against the key's share on their own, at admission, and are never evicted early (#60)."""
-        if self.hwm_per_key.get(kid, 0) < self._quota():
+        """Marks outlive dedup entries, so they have their own per-key limit, checked at admission and
+        never met by evicting a live mark (§7.4, #60)."""
+        if self.hwm_per_key.get(kid, 0) < self._mark_quota(kid):
             return True
         self._purge_hwm(now_ms)
-        return self.hwm_per_key.get(kid, 0) < self._quota()
+        return self.hwm_per_key.get(kid, 0) < self._mark_quota(kid)
 
     def _heard_on(self, st: _StationState, stream: int, now_ms: int) -> None:
         """Note an admitted copy on a stream, for presence (§8.6). Capped at the key's share, oldest
