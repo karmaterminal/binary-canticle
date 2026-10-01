@@ -34,6 +34,8 @@ RING_LIMIT = 64             # items per ring response
 TOMBSTONE_MS = 60_000       # how long an expired, withdrawn or superseded item stays listed (labelled)
 TOMBSTONE_LIMIT = 32
 UNHEARD_WINDOW = 64         # sequence numbers below the head checked for gaps
+SEEN_WINDOW = 2 * UNHEARD_WINDOW   # heard seqs kept per channel: the gap window, with room for items
+                                   # heard ahead of the last beacon's head
 MAX_SUBS = 16
 SUB_IDLE_MS = 30_000
 MIN_POLL_MS = 250
@@ -59,7 +61,9 @@ def _now_ms() -> int:
 
 @dataclass
 class _Channel:
-    seen: dict = field(default_factory=dict)        # epoch -> set of seq this gateway has heard
+    epoch: int = -1                                 # the station epoch that seen and floor belong to
+    seen: set = field(default_factory=set)          # heard seqs >= floor, at most SEEN_WINDOW of them
+    floor: int = 0                                  # seqs below this were dropped and are never shown as gaps
     tombstones: deque = field(default_factory=lambda: deque(maxlen=TOMBSTONE_LIMIT))
 
 
@@ -89,26 +93,38 @@ class TunerView:
         sid = self._sid(kid, ev.stream)
         if sid is None:
             return
-        ch = self._chan(kid, sid)
-        epoch = self.listener.stations[kid].epoch_hwm if kid in self.listener.stations else 0
-        seen = ch.seen.setdefault(epoch, set())
-        for other in list(ch.seen):
-            if other < epoch:
-                del ch.seen[other]
-        if ev.seq is not None:
-            seen.add(ev.seq)
-        if "by_seq" in ev.data:
-            seen.add(ev.data["by_seq"])
+        ch = self._note(kid, sid, [s for s in (ev.seq, ev.data.get("by_seq")) if s is not None])
         if ev.kind in ("expired", "withdrawn", "superseded"):
             ch.tombstones.append({"seq": ev.seq, "reason": ev.kind, "at_ms": now_ms,
                                   **({"by_seq": ev.data["by_seq"]} if "by_seq" in ev.data else {})})
 
-    def _seen(self, kid: bytes, sid: int, epoch: int) -> set:
-        """Every seq of this channel's epoch the listener accepted (items and PLUCKs, from its dedup
-        table, which keeps each until local expiry), plus those this view saw in events."""
-        seen = self._chan(kid, sid).seen.setdefault(epoch, set())
-        seen.update(i[3] for i in self.listener.dedup if i[0] == kid and i[2] == sid and i[1] == epoch)
-        return seen
+    def _note(self, kid: bytes, sid: int, seqs) -> _Channel:
+        """Record heard seqs of the station's current epoch, keeping only a bounded window.
+
+        The window is the SEEN_WINDOW seqs below the higher of the beacon's head and the highest seq
+        heard. It moves up as the stream advances and starts afresh at an epoch change, so memory stays
+        bounded however long a stream runs (Silas's review of #59).
+        """
+        ch = self._chan(kid, sid)
+        st = self.listener.stations.get(kid)
+        epoch = st.epoch_hwm if st else 0
+        if ch.epoch != epoch:
+            ch.epoch, ch.seen, ch.floor = epoch, set(), 0
+        ch.seen.update(s for s in seqs if s >= ch.floor)
+        e = st.stream_entries.get(sid) if st else None
+        top = max(e.head_seq if e else 0, max(ch.seen, default=0))
+        if top - SEEN_WINDOW + 1 > ch.floor:
+            ch.floor = top - SEEN_WINDOW + 1
+            ch.seen = {s for s in ch.seen if s >= ch.floor}
+        return ch
+
+    def _seen(self, kid: bytes, sid: int) -> _Channel:
+        """Add what the listener accepted for this channel's current epoch (items and PLUCKs, from its
+        dedup table, which keeps each until local expiry) to the bounded window, and return it."""
+        st = self.listener.stations.get(kid)
+        epoch = st.epoch_hwm if st else 0
+        return self._note(kid, sid, [i[3] for i in self.listener.dedup
+                                     if i[0] == kid and i[2] == sid and i[1] == epoch])
 
     # ------------------------------------------------------------ snapshots
 
@@ -170,8 +186,9 @@ class TunerView:
         e = st.stream_entries.get(sid) if st else None
         if e is not None:
             head = e.head_seq
-            seen = self._seen(kid, sid, st.epoch_hwm)
-            unheard = [s for s in range(max(1, head - UNHEARD_WINDOW + 1), head + 1) if s not in seen]
+            ch = self._seen(kid, sid)
+            # Never report a seq below the retained floor as unheard: it was dropped, not missed.
+            unheard = [s for s in range(max(1, head - UNHEARD_WINDOW + 1, ch.floor), head + 1) if s not in ch.seen]
         return {"now_ms": now_ms, "station": entry.name, "key_id": kid.hex(), "stream": entry.stream_names[sid],
                 "stream_id": f"{sid:08x}", "epoch": st.epoch_hwm if st else None,
                 "presence": lst.presence_state(kid, now_ms),

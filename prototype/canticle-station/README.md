@@ -110,7 +110,7 @@ canticle tuner --manifest fleet.json --multicast --http 127.0.0.1:8765
   - Channels: at most 16 tuned at once; each lapses after 30 s without a poll.
   - Polling: at most 4 ring polls a second per channel (the page polls every second).
   - Responses: at most 64 items, with 512 characters of text each; up to 32 tombstones and 64 gap checks.
-  - Memory: the listener's own per-key quotas bound it (RFC §7.4).
+  - Memory: per channel, the gateway keeps at most 128 heard `seq` values (the gap window, moving up with the head and reset at each epoch) and 32 tombstones. The listener's own per-key quotas bound the rest (RFC §7.4).
 
 Unnamed streams (not in the manifest) are verified and listed, but can't be tuned (RFC §5.4). The beacons in this spike carry no `trail_seq`, so a gap can't be told apart from an item that is still looping.
 
@@ -121,7 +121,7 @@ Unnamed streams (not in the manifest) are verified and listed, but can't be tune
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 73 tests, about 6 s
+python -m unittest discover -s tests      # 75 tests, about 7 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -149,6 +149,7 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
   - a late view that sees only what is on air, with the missed `seq` as a gap;
   - a lost burst repaired by the next loop copy;
   - subscriptions (leave, retune, idle lapse, the cap);
+  - bounded memory on a long stream (600 items, at most 128 heard `seq` values kept, the one lost recent item still shown as the only gap), and a fresh window after an epoch change;
   - the HTTP boundary: headers and CSP, tune, ring, leave and retune, the poll limit, `Host` and `Origin` checks, content type, methods, no write endpoints, loopback only.
 
 ## Vectors

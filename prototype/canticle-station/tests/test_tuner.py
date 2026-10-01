@@ -10,8 +10,8 @@ from canticle.ids import stream_id
 from canticle.listener import Listener
 from canticle.manifest import Manifest, StationEntry
 from canticle.station import Station, StreamConfig
-from canticle.tuner import (MAX_SUBS, SECURITY_HEADERS, TOMBSTONE_MS, Subscriptions, TunerHttp, TunerView,
-                            is_loopback)
+from canticle.tuner import (MAX_SUBS, SEEN_WINDOW, SECURITY_HEADERS, TOMBSTONE_MS, Subscriptions, TunerHttp,
+                            TunerView, is_loopback)
 
 T0 = 1_790_000_000_000
 SK = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(vectors.TEST1))
@@ -113,6 +113,41 @@ class TunerViewTest(unittest.TestCase):
         _, _, view = setup()
         self.assertIsNone(view.ring(KID, stream_id("unnamed.here"), T0))
         self.assertIsNone(view.ring(b"\x00" * 8, HYMN, T0))
+
+
+class TunerBoundsTest(unittest.TestCase):
+    """The gateway's per-channel memory stays bounded however long a stream runs (Silas, #59)."""
+
+    def test_long_stream_keeps_a_bounded_seq_window_and_honest_recent_gaps(self):
+        st, lst, view = setup()
+        n, dropped, peak, t = 600, {}, 0, T0
+        for i in range(1, n + 1):
+            r = st.sing(t, "chatter", text=f"line {i}", ttl_s=20, loop="fast")
+            if i == n - 5:   # lose every copy of one recent item: it must show as a gap, and only it
+                dropped[r.seq] = st.streams["chatter"].ring[r.seq].frame
+            feed(st, lst, view, t, t + 1_000, drop=lambda f: f in dropped.values())
+            peak = max(peak, len(view.channels[(KID, CHAT)].seen))
+            t += 1_000
+        feed(st, lst, view, t, t + 25_000, drop=lambda f: f in dropped.values())   # everything expires
+        self.assertLessEqual(peak, SEEN_WINDOW)
+        r = view.ring(KID, CHAT, t + 25_000)
+        self.assertEqual(r["head_seq"], n)
+        self.assertEqual(r["unheard_seq"], list(dropped))
+        self.assertLessEqual(len(view.channels[(KID, CHAT)].seen), SEEN_WINDOW)
+
+    def test_a_new_epoch_starts_a_fresh_window(self):
+        st, lst, view = setup()
+        for i in range(5):
+            st.sing(T0 + i * 1_000, "chatter", text=f"a{i}", ttl_s=30)
+            feed(st, lst, view, T0 + i * 1_000, T0 + (i + 1) * 1_000)
+        t1 = T0 + 10_000
+        st2 = Station(SK, [StreamConfig("hymn", cls="ambient"), StreamConfig("chatter")], epoch=2,
+                      rng=random.Random(2), now_ms=t1)
+        st2.sing(t1, "chatter", text="after restart", ttl_s=30)
+        feed(st2, lst, view, t1, t1 + 3_000)
+        ch = view.channels[(KID, CHAT)]
+        self.assertEqual((ch.epoch, ch.seen), (2, {1}))
+        self.assertEqual(view.ring(KID, CHAT, t1 + 3_000)["unheard_seq"], [])
 
 
 class SubscriptionsTest(unittest.TestCase):

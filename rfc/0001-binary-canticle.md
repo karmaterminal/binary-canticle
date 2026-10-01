@@ -2275,7 +2275,7 @@ A **web tuner** shows a person what one local listener hears (#57): the stations
   - Presence follows the rendering rules of §8.6.
 - **Verification is shown, not assumed.** A station appears only after a beacon verifies against its manifest key. Datagrams that fail verification are counted, but never attributed to a station and never shown.
 - **Heard text is data.** The page renders heard content as text, never as markup, and truncates it for display.
-- **Budget.** The gateway bounds how many channels it serves, how often each is polled, and how many items and characters each response carries. The reference allows 16 channels, at most 4 polls a second each, and 64 items of 512 characters.
+- **Budget.** The gateway bounds how many channels it serves, how often each is polled, and how many items and characters each response carries. The reference allows 16 channels, at most 4 polls a second each, and 64 items of 512 characters. Its own state per channel is bounded too, however long a stream runs: the reference keeps at most 128 heard sequence numbers, a window that moves up with the head and restarts at each epoch, and 32 tombstones. It never reports a sequence number below that window as a gap.
 
 Reference: `prototype/canticle-station/canticle/tuner.py` (`canticle tuner`), and the same-host proof in `prototype/canticle-station/proofs/web-lanes/`.
 
