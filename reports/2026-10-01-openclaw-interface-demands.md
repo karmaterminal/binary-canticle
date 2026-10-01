@@ -5,9 +5,9 @@
 **Citation prefixes**
 - `oc/` is karmaterminal/openclaw at `6e6458a`.
 - `bc/` is this repository at `234464a`; `bc/.../` abbreviates `bc/prototype/canticle-station/`.
-- `rfc:` is `rfc/0001-binary-canticle.md` at `234464a`. `rfc@#60:` cites the #60 listener fix (PR pending at the time of writing), which changes RFC §7.4, §7.7, §7.8, §10.9, §14.6.3 and adds §23.2 question 21.
+- `rfc:` is `rfc/0001-binary-canticle.md` at `234464a`. `rfc@#62:` cites PR #62, the listener fix for issue #60 (open at the time of writing), which changes RFC §7.4, §7.7, §7.8, §10.9, §14.6.3 and adds §23.2 question 21.
 
-**Freeze point.** The brief and this assessment read `234464a`. The #60 fix changes listener internals and the RFC sections above, but not the listener's output format; it adds the `over_quota` and `pluck_mismatch` admission results to §10.9 and §23.2 question 21 ("Class changes under one `state_key`"). Q6 asks which of the two to freeze against.
+**Freeze point.** The brief and this assessment read `234464a`. PR #62 (the fix for issue #60) changes listener internals and the RFC sections above, but not the listener's output format; it adds the `over_quota` and `pluck_mismatch` admission results to §10.9 and §23.2 question 21 ("Class changes under one `state_key`"). Q6 asks which of the two to freeze against.
 
 **How claims are marked**
 - "Read" means seen in source.
@@ -104,7 +104,7 @@
     - Missing provenance, including principal, must read "unavailable" (rfc:1976-1979, 1992).
     - The demands want per-frame "why rejected" records. §10.9 sends unknown_key and bad_signature to the "debug ring only; never a receipt" (rfc:1075-1076).
     - The demands allow an authenticated Control UI; §18.9 puts that out of scope for v1 (rfc:2484).
-  - **#60.** §23.2 question 21 (class changes under one state_key) affects keyed replacement (rfc@#60 §23.2).
+  - **#62.** §23.2 question 21 (class changes under one state_key) affects keyed replacement (rfc@#62 §23.2).
 
 - **Conflicts inside the demands**
   - 5.2 says "non-surface cannot reach model context", but 10 offers a model-facing `canticle_recent`.
@@ -243,7 +243,7 @@ Rule for every item below: where the solution departs from RFC-0001, the RFC mus
 - Demand: "drop_oldest forbidden for live safety state; default refuse/newest-drop".
 - RFC: dedup, sticky-pluck and supersession marks "MUST NOT be evicted earlier under capacity pressure", and the receiver refuses with over-quota (rfc:444-445). That matches the demand.
 - But for keyed items "the item with the greatest `(issued_at, epoch, seq)` is current" (rfc:522), and the alarm slot is "replaced in place" (rfc:2002). Newest-drop would keep a superseded value current.
-- With #60, §23.2 question 21 adds a twist: an older item of a longer-lived class under the same state_key can outlive the mark and land as current. The recommended fix is "one class per `state_key` within an epoch", with receivers dropping class changes (rfc@#60 §23.2).
+- With #62, §23.2 question 21 adds a twist: an older item of a longer-lived class under the same state_key can outlive the mark and land as current. The recommended fix is "one class per `state_key` within an epoch", with receivers dropping class changes (rfc@#60 §23.2).
 - Recommendation:
   - `refuse_newest` for unkeyed items and safety state.
   - `replace_keyed` (supersede in place) for state_key items.
@@ -633,8 +633,8 @@ How each field maps to demand 5.1, and whether the prototype can fill it today:
 | `unknown-class` (:256-258) | `verified` | `ringbuffer_only` | frame |
 | `hop-limit` (:202-205) | not in §10.9 | `drop`, reason `hop_limit` | frame. **RFC: add a row.** |
 | `epoch-regression` (:146-149) | not in §10.9 | `drop`, reason `epoch_regression` | frame. **RFC: add a row.** |
-| `over-quota` (:231-234) | `over_quota` (rfc@#60 §10.9) | `drop` | frame |
-| PLUCK whose `expires_at` or scope differs from its held target (#60) | `pluck_mismatch` (rfc@#60 §10.9) | `drop` | frame |
+| `over-quota` (:231-234) | `over_quota` (rfc@#62 §10.9) | `drop` | frame |
+| PLUCK whose `expires_at` or scope differs from its held target (#62) | `pluck_mismatch` (rfc@#62 §10.9) | `drop` | frame |
 | `plucked` (:253-254) | `plucked` | `drop` | frame |
 | `superseded`, older than the hwm (:264-266) | `superseded` | `drop` | frame |
 | `equivocation` (:213-216) | `equivocation` | `quarantine_set` (rfc:1081) | frame. **New:** quarantine the key; the prototype does not (verified by probe). |
@@ -789,7 +789,7 @@ plugins: { entries: { "binary-canticle": {
 
 | # | Scope | Files | Proof gate | Now? |
 |---|---|---|---|---|
-| BC-1 | RFC amendment: a new §14.18 "Harness interface (receptor → binding)", or RFC-0002 to resolve §23.2 item 14 (rfc:2918). **Freezes:** record v1 (section 5), the disposition mapping (5.4), the subscription shape (section 6), the delivery-mode mapping (C5), and idempotency plus expiry (C10). **Amends:** §10.9 (add `hop_limit` and `epoch_regression`; rejected-frame records per C22); §14.6.1 (harness-embedded receptor, C14); §14.9; §14.12 (C7 decision); §14.13 (C6, C21); §14.14 (C11); §15.1 and D20 (C16); §15.5 (C17); §11.2 (C18, if exempted); §18.9 (C23, if adopted); §16.1-§16.4 (re-ground at oc 6e6458a, replace Tier B, C12/C24); §14.7.6 vs §14.10; resolution of §23.2 item 21 (C9). Names the commit it freezes against: 234464a or the #60 merge. | `rfc/0001-binary-canticle.md` (or `rfc/0002-…`), `reports/2026-09-27-survey-and-path.md` §13 | Review receipt from the princes; every quoted OpenClaw line re-cited at 6e6458a | Yes. Do it first, once Q6 picks the freeze point (§10.9 differs between them). |
+| BC-1 | RFC amendment: a new §14.18 "Harness interface (receptor → binding)", or RFC-0002 to resolve §23.2 item 14 (rfc:2918). **Freezes:** record v1 (section 5), the disposition mapping (5.4), the subscription shape (section 6), the delivery-mode mapping (C5), and idempotency plus expiry (C10). **Amends:** §10.9 (add `hop_limit` and `epoch_regression`; rejected-frame records per C22); §14.6.1 (harness-embedded receptor, C14); §14.9; §14.12 (C7 decision); §14.13 (C6, C21); §14.14 (C11); §15.1 and D20 (C16); §15.5 (C17); §11.2 (C18, if exempted); §18.9 (C23, if adopted); §16.1-§16.4 (re-ground at oc 6e6458a, replace Tier B, C12/C24); §14.7.6 vs §14.10; resolution of §23.2 item 21 (C9). Names the commit it freezes against: 234464a or the merge of PR #62. | `rfc/0001-binary-canticle.md` (or `rfc/0002-…`), `reports/2026-09-27-survey-and-path.md` §13 | Review receipt from the princes; every quoted OpenClaw line re-cited at 6e6458a | Yes. Do it first, once Q6 picks the freeze point (§10.9 differs between them). |
 | BC-2 | Listener record emitter `--records v1`. **Records:** `hello` after bind, with the 5.2 fields; records for every verified outcome; `retract` for every valid PLUCK, supersede and expiry (including restored tuples) and for held-item drops; counters for resurfaced PLUCKs and stale beacons; `health` with degraded states (`clock_skew`, `records_lost`); `fatal` instead of tracebacks for a corrupt state file and an unknown manifest class; `bye`. **Frame fields:** `lens`, `station.principal:null`, `gap:"unavailable"`, `heard_at` (or persisted first_heard). **Behaviour:** distinct reasons for scope-not-granted (`capability_exceeded`) vs binding-narrower (`scope_violation`); unverified datagrams counted without station attribution; equivocation quarantine; manifest `streams` grant enforced. | new `canticle/records.py`; `canticle/listener.py`; `canticle/runner.py`; `canticle/__main__.py`; `canticle/manifest.py`; `tests/test_records.py`; golden `vectors/records/*.jsonl` | Golden vectors. Property test: every `hear()` and `tick()` outcome maps to exactly one record or counter. Restart test: a PLUCK after restart yields a `retract`. No record names a station for an unverified frame. `hello` comes strictly after the UDP bind. A corrupt state file and an unknown class yield `fatal`, not a traceback. | Yes (small to medium) |
 | BC-3 | Station hardening for P2. **Validation:** size and field-range checks before `head_seq += 1` (station.py:270-275; wire.py:259-296); hush reason ≤ 2. **Socket protocol:** error codes; always reply (runner.py:119-123); server read timeout; `request_id` idempotency map. **Receipt** gains `key_id`, `stream_id`, `class`, `scope`, `hop`, `frame_sha256`, `requested_ttl_s` and `ttl_clamp`. **Lineage:** tool-set socket fields `hop`, `derived_from`, `root` and `wake_derived`; `Station.sing` gains `derived_from` and `root` (station.py:236-240). **Shutdown and network:** refuse `sing` once stop is set, so no acked-but-unsent items (runner.py:148-165); `IP_TTL=1` on unicast sends (runner.py:107-110). **Readiness:** JSON ready line on stderr after bind; `canticle version --json`. | `canticle/station.py`, `canticle/runner.py`, `canticle/__main__.py`, tests | Adversarial control-socket tests (non-object JSON, 70 KB line, bad loop, intensity 999). A retry with the same `request_id` returns the original receipt. Lineage fields round-trip into the frame. A sing during stop is refused, never acked and lost. Unicast frames carry TTL 1. | Yes (small) |
 | BC-4 | Key and lease safety. Lease and epoch keyed by key_id in a 0700 runtime dir. Key opened with `O_NOFOLLOW`, plus mode, owner and `nlink == 1` checks. Refuse to unlink a non-socket or a live socket. Fail closed when peer credentials are unavailable (`getpeereid` on BSD and macOS). | `canticle/__main__.py`, `canticle/runner.py`, `canticle/station.py`, tests | A hardlinked, symlinked or copied key cannot start a second station, whatever the start timing. A regular file at `--control` survives. A wrong-UID peer is refused. | Yes (small) |
@@ -819,7 +819,7 @@ plugins: { entries: { "binary-canticle": {
 5. **Q5. Landing model.** Per-frame durable rows with the per-turn dose enforced by drain caps (recommended), or the §14.14 two-slot digest (C11)?
 6. **Q6. Freeze point.** Which commit do we freeze against?
    - 234464a (main when the brief was written): §10.9 has no `over_quota` or `pluck_mismatch`.
-   - The #60 merge: adds both, gives supersession marks their own per-key limit (§7.4), restates mark retention (§7.8), checks a PLUCK against its held target (§7.7), and adds §23.2 question 21.
+   - The merge of PR #62 (issue #60): adds both, gives supersession marks their own per-key limit (§7.4), restates mark retention (§7.8), checks a PLUCK against its held target (§7.7), and adds §23.2 question 21.
 7. **Q7. Config posture.** Do you accept JSON5 under `.config`, and Gateway boot refusal when a canticle block is schema-invalid? The alternative is a core change that disables just that plugin (oc/src/config/validation-plugin-config.ts:345-395).
 8. **Q8. Trust tier.** Third-party install, or bundled/trusted official? This decides access to `openKeyedStore`, doctor health checks and the trusted diagnostics channel (oc/src/plugins/registry-runtime.ts:202-220; oc/src/flows/bundled-health-checks.ts:105-111).
 9. **Q9. Banner marker.** `[canticle:heard]` (RFC) or `[binary-canticle]` (demand) (C6)?
