@@ -5,9 +5,10 @@
 **Citation prefixes**
 - `oc/` is karmaterminal/openclaw at `6e6458a`.
 - `bc/` is this repository at `234464a`; `bc/.../` abbreviates `bc/prototype/canticle-station/`.
-- `rfc:` is `rfc/0001-binary-canticle.md` at `234464a`. `rfc@#62:` cites PR #62, the listener fix for issue #60 (open at the time of writing), which changes RFC §7.4, §7.7, §7.8, §10.9, §14.6.3 and adds §23.2 question 21.
+- `rfc:` is `rfc/0001-binary-canticle.md` at `234464a`.
+- `rfc@c9fe9cd:` is the same file at `c9fe9cdc0a401c9875aa1bf9dea46d5c52bcc041` ([permalink](https://github.com/karmaterminal/binary-canticle/blob/c9fe9cdc0a401c9875aa1bf9dea46d5c52bcc041/rfc/0001-binary-canticle.md)). That is the head of PR #62, the listener fix for issue #60, when this report was written. It changes RFC §7.4, §7.7, §7.8, §10.9, §14.6.3 and adds §23.2 question 21. Citations are pinned to that commit, so they do not move if #62 changes; if it does, re-pin before using this report as a freeze packet.
 
-**Freeze point.** The brief and this assessment read `234464a`. PR #62 (the fix for issue #60) changes listener internals and the RFC sections above, but not the listener's output format; it adds the `over_quota` and `pluck_mismatch` admission results to §10.9 and §23.2 question 21 ("Class changes under one `state_key`"). Q6 asks which of the two to freeze against.
+**Freeze point.** The brief and this assessment read `234464a`. PR #62 at `c9fe9cd` (the fix for issue #60) changes listener internals and the RFC sections above, but not the listener's output format; it adds the `over_quota` and `pluck_mismatch` admission results to §10.9 and §23.2 question 21 ("Class changes under one `state_key`"). Q6 asks which of the two to freeze against.
 
 **How claims are marked**
 - "Read" means seen in source.
@@ -104,7 +105,7 @@
     - Missing provenance, including principal, must read "unavailable" (rfc:1976-1979, 1992).
     - The demands want per-frame "why rejected" records. §10.9 sends unknown_key and bad_signature to the "debug ring only; never a receipt" (rfc:1075-1076).
     - The demands allow an authenticated Control UI; §18.9 puts that out of scope for v1 (rfc:2484).
-  - **#62.** §23.2 question 21 (class changes under one state_key) affects keyed replacement (rfc@#62 §23.2).
+  - **#62.** §23.2 question 21 (class changes under one state_key) affects keyed replacement (rfc@c9fe9cd §23.2).
 
 - **Conflicts inside the demands**
   - 5.2 says "non-surface cannot reach model context", but 10 offers a model-facing `canticle_recent`.
@@ -243,7 +244,7 @@ Rule for every item below: where the solution departs from RFC-0001, the RFC mus
 - Demand: "drop_oldest forbidden for live safety state; default refuse/newest-drop".
 - RFC: dedup, sticky-pluck and supersession marks "MUST NOT be evicted earlier under capacity pressure", and the receiver refuses with over-quota (rfc:444-445). That matches the demand.
 - But for keyed items "the item with the greatest `(issued_at, epoch, seq)` is current" (rfc:522), and the alarm slot is "replaced in place" (rfc:2002). Newest-drop would keep a superseded value current.
-- With #62, §23.2 question 21 adds a twist: an older item of a longer-lived class under the same state_key can outlive the mark and land as current. The recommended fix is "one class per `state_key` within an epoch", with receivers dropping class changes (rfc@#60 §23.2).
+- With #62 (at c9fe9cd), §23.2 question 21 adds a twist: an older item of a longer-lived class under the same state_key can outlive the mark and land as current. The recommended fix is "one class per `state_key` within an epoch", with receivers dropping class changes (rfc@c9fe9cd §23.2).
 - Recommendation:
   - `refuse_newest` for unkeyed items and safety state.
   - `replace_keyed` (supersede in place) for state_key items.
@@ -322,7 +323,7 @@ Rule for every item below: where the solution departs from RFC-0001, the RFC mus
 **C22. Rejected frames (5.1, 5.2)**
 - The demand asks for "signature and manifest/grant result" and "why accepted/rejected".
 - §10.9: `unknown_key` is "debug ring only; never quarantine, never a receipt", and `bad_signature` is "debug ring only" (rfc:1075-1076).
-- Section 5 follows the RFC: counters only, keyed by key-id hex.
+- Section 5 follows the RFC: counters only, as fixed per-reason aggregates plus a bounded top-16 key-id table with an `other` bucket. Key ids on unverified frames are sender-chosen, so an unbounded per-key-id map would let any LAN sender grow receptor memory.
 - If the princes want per-frame rejection records (Q11), those records go to a local debug ring and are never deliverable or attributed to a station. **Amend §10.9 to say so.**
 
 **C23. Control UI (10)**
@@ -543,7 +544,7 @@ Every record carries `v:"canticle-receptor-record/1"`, `type`, `rec_seq` (monoto
 | `frame` | Every **verified** item, whatever its disposition | Partial: today's `item` event |
 | `retract` | Every valid PLUCK or supersede; local expiry of every tuple ever surfaced, **including pre-restart tuples not yet re-heard**; every held item dropped in `_release_held` | Partial: emitted only when the target is in `current` (listener.py:247-250,271-274,327,362-368) |
 | `presence` | Station presence changes | Yes (listener.py:464) |
-| `health` | Periodic (default 10 s): counters by admission and disposition, dedup occupancy per key, beacon age per key, records dropped, `state: ok\|degraded` with reasons (`clock_skew`, `records_lost`) | New. `evidence_counts` exists in process only (listener.py:125). |
+| `health` | Periodic (default 10 s): counters by admission and disposition (a fixed set of reasons), dedup occupancy and beacon age per manifest key (bounded by the manifest), a bounded table for unverified datagrams (below), records dropped, `state: ok\|degraded` with reasons (`clock_skew`, `records_lost`) | New. `evidence_counts` exists in process only (listener.py:125). |
 | `fatal` | Before a non-zero exit: `reason` is `state_corrupt`, `manifest_invalid`, `bind_failed` or similar | New. Today these are tracebacks (JSONDecodeError, KeyError; bc-proto) |
 | `bye` | Clean shutdown | New |
 
@@ -554,7 +555,10 @@ Every record carries `v:"canticle-receptor-record/1"`, `type`, `rec_seq` (monoto
 - `state_version` (listener.py:30), `state_path`.
 
 **Unverified datagrams** produce **no per-frame record**. This covers `unknown_key`, `bad_signature`, `malformed`, `expired` or `not_yet_valid` at parse, and `revoked`.
-- They are only counted in `health`, keyed by reason and at most by key-id hex, never by station name.
+- They are only counted in `health`, never by station name. Key ids on unverified datagrams are chosen by the sender, so nothing is keyed by them without a bound:
+  - one fixed aggregate counter per reason;
+  - at most a top-16 table of key-id hex by count (space-saving or LRU), with an `other` bucket for the rest.
+  - A flood of distinct key ids then grows neither receptor memory nor the `health` record, which stays far below the 64 KiB line limit.
 - This follows rfc:1075-1076 and fixes listener.py:134-141.
 - It conflicts with demands 5.1 and 5.2 (C22, Q11).
 
@@ -633,12 +637,12 @@ How each field maps to demand 5.1, and whether the prototype can fill it today:
 | `unknown-class` (:256-258) | `verified` | `ringbuffer_only` | frame |
 | `hop-limit` (:202-205) | not in §10.9 | `drop`, reason `hop_limit` | frame. **RFC: add a row.** |
 | `epoch-regression` (:146-149) | not in §10.9 | `drop`, reason `epoch_regression` | frame. **RFC: add a row.** |
-| `over-quota` (:231-234) | `over_quota` (rfc@#62 §10.9) | `drop` | frame |
-| PLUCK whose `expires_at` or scope differs from its held target (#62) | `pluck_mismatch` (rfc@#62 §10.9) | `drop` | frame |
+| `over-quota` (:231-234) | `over_quota` (rfc@c9fe9cd §10.9) | `drop` | frame |
+| PLUCK whose `expires_at` or scope differs from its held target (#62 at c9fe9cd) | `pluck_mismatch` (rfc@c9fe9cd §10.9) | `drop` | frame |
 | `plucked` (:253-254) | `plucked` | `drop` | frame |
 | `superseded`, older than the hwm (:264-266) | `superseded` | `drop` | frame |
 | `equivocation` (:213-216) | `equivocation` | `quarantine_set` (rfc:1081) | frame. **New:** quarantine the key; the prototype does not (verified by probe). |
-| Unverified datagram (listener.py:134-141) | `unknown_key`, `bad_signature`, `malformed`, `revoked`, … | — | health counter only, by key-id hex (rfc:1075-1076; C22) |
+| Unverified datagram (listener.py:134-141) | `unknown_key`, `bad_signature`, `malformed`, `revoked`, … | — | health counter only: per-reason aggregate plus the bounded top-16 key-id table (rfc:1075-1076; C22) |
 | Control-frame quarantine ops | — | `quarantine_strengthen` / `quarantine_rescind` | reserved; not implemented |
 
 **Delivery mapping, plugin side**
@@ -789,11 +793,17 @@ plugins: { entries: { "binary-canticle": {
 
 | # | Scope | Files | Proof gate | Now? |
 |---|---|---|---|---|
-| BC-1 | RFC amendment: a new §14.18 "Harness interface (receptor → binding)", or RFC-0002 to resolve §23.2 item 14 (rfc:2918). **Freezes:** record v1 (section 5), the disposition mapping (5.4), the subscription shape (section 6), the delivery-mode mapping (C5), and idempotency plus expiry (C10). **Amends:** §10.9 (add `hop_limit` and `epoch_regression`; rejected-frame records per C22); §14.6.1 (harness-embedded receptor, C14); §14.9; §14.12 (C7 decision); §14.13 (C6, C21); §14.14 (C11); §15.1 and D20 (C16); §15.5 (C17); §11.2 (C18, if exempted); §18.9 (C23, if adopted); §16.1-§16.4 (re-ground at oc 6e6458a, replace Tier B, C12/C24); §14.7.6 vs §14.10; resolution of §23.2 item 21 (C9). Names the commit it freezes against: 234464a or the merge of PR #62. | `rfc/0001-binary-canticle.md` (or `rfc/0002-…`), `reports/2026-09-27-survey-and-path.md` §13 | Review receipt from the princes; every quoted OpenClaw line re-cited at 6e6458a | Yes. Do it first, once Q6 picks the freeze point (§10.9 differs between them). |
-| BC-2 | Listener record emitter `--records v1`. **Records:** `hello` after bind, with the 5.2 fields; records for every verified outcome; `retract` for every valid PLUCK, supersede and expiry (including restored tuples) and for held-item drops; counters for resurfaced PLUCKs and stale beacons; `health` with degraded states (`clock_skew`, `records_lost`); `fatal` instead of tracebacks for a corrupt state file and an unknown manifest class; `bye`. **Frame fields:** `lens`, `station.principal:null`, `gap:"unavailable"`, `heard_at` (or persisted first_heard). **Behaviour:** distinct reasons for scope-not-granted (`capability_exceeded`) vs binding-narrower (`scope_violation`); unverified datagrams counted without station attribution; equivocation quarantine; manifest `streams` grant enforced. | new `canticle/records.py`; `canticle/listener.py`; `canticle/runner.py`; `canticle/__main__.py`; `canticle/manifest.py`; `tests/test_records.py`; golden `vectors/records/*.jsonl` | Golden vectors. Property test: every `hear()` and `tick()` outcome maps to exactly one record or counter. Restart test: a PLUCK after restart yields a `retract`. No record names a station for an unverified frame. `hello` comes strictly after the UDP bind. A corrupt state file and an unknown class yield `fatal`, not a traceback. | Yes (small to medium) |
+| BC-1 | RFC amendment: a new §14.18 "Harness interface (receptor → binding)", or RFC-0002 to resolve §23.2 item 14 (rfc:2918). **Freezes:** record v1 (section 5), the disposition mapping (5.4), the subscription shape (section 6), the delivery-mode mapping (C5), and idempotency plus expiry (C10). **Amends:** §10.9 (add `hop_limit` and `epoch_regression`; rejected-frame records per C22); §14.6.1 (harness-embedded receptor, C14); §14.9; §14.12 (C7 decision); §14.13 (C6, C21); §14.14 (C11); §15.1 and D20 (C16); §15.5 (C17); §11.2 (C18, if exempted); §18.9 (C23, if adopted); §16.1-§16.4 (re-ground at oc 6e6458a, replace Tier B, C12/C24); §14.7.6 vs §14.10; resolution of §23.2 item 21 (C9). Names the commit it freezes against: 234464a, or `c9fe9cdc0a401c9875aa1bf9dea46d5c52bcc041` (PR #62's head) re-pinned to its merge commit once #62 lands. | `rfc/0001-binary-canticle.md` (or `rfc/0002-…`), `reports/2026-09-27-survey-and-path.md` §13 | Review receipt from the princes; every quoted OpenClaw line re-cited at 6e6458a | Yes. Do it first, once Q6 picks the freeze point (§10.9 differs between them). |
+| BC-2 | Listener record emitter `--records v1`. **Records:** `hello` after bind, with the 5.2 fields; records for every verified outcome; `retract` for every valid PLUCK, supersede and expiry (including restored tuples) and for held-item drops; counters for resurfaced PLUCKs and stale beacons; `health` with degraded states (`clock_skew`, `records_lost`); `fatal` instead of tracebacks for a corrupt state file and an unknown manifest class; `bye`. **Frame fields:** `lens`, `station.principal:null`, `gap:"unavailable"`, `heard_at` (or persisted first_heard). **Behaviour:** distinct reasons for scope-not-granted (`capability_exceeded`) vs binding-narrower (`scope_violation`); unverified datagrams counted without station attribution; equivocation quarantine; manifest `streams` grant enforced. | new `canticle/records.py`; `canticle/listener.py`; `canticle/runner.py`; `canticle/__main__.py`; `canticle/manifest.py`; `tests/test_records.py`; golden `vectors/records/*.jsonl` | Golden vectors. Property test: every `hear()` and `tick()` outcome maps to exactly one record or counter. Restart test: a PLUCK after restart yields a `retract`. No record names a station for an unverified frame. `hello` comes strictly after the UDP bind. A corrupt state file and an unknown class yield `fatal`, not a traceback. Adversarial distinct-key flood: 10⁶ datagrams with distinct random key ids leave receptor memory and every `health` record within fixed bounds (each line ≤ 64 KiB). | Yes (small to medium) |
 | BC-3 | Station hardening for P2. **Validation:** size and field-range checks before `head_seq += 1` (station.py:270-275; wire.py:259-296); hush reason ≤ 2. **Socket protocol:** error codes; always reply (runner.py:119-123); server read timeout; `request_id` idempotency map. **Receipt** gains `key_id`, `stream_id`, `class`, `scope`, `hop`, `frame_sha256`, `requested_ttl_s` and `ttl_clamp`. **Lineage:** tool-set socket fields `hop`, `derived_from`, `root` and `wake_derived`; `Station.sing` gains `derived_from` and `root` (station.py:236-240). **Shutdown and network:** refuse `sing` once stop is set, so no acked-but-unsent items (runner.py:148-165); `IP_TTL=1` on unicast sends (runner.py:107-110). **Readiness:** JSON ready line on stderr after bind; `canticle version --json`. | `canticle/station.py`, `canticle/runner.py`, `canticle/__main__.py`, tests | Adversarial control-socket tests (non-object JSON, 70 KB line, bad loop, intensity 999). A retry with the same `request_id` returns the original receipt. Lineage fields round-trip into the frame. A sing during stop is refused, never acked and lost. Unicast frames carry TTL 1. | Yes (small) |
-| BC-4 | Key and lease safety. Lease and epoch keyed by key_id in a 0700 runtime dir. Key opened with `O_NOFOLLOW`, plus mode, owner and `nlink == 1` checks. Refuse to unlink a non-socket or a live socket. Fail closed when peer credentials are unavailable (`getpeereid` on BSD and macOS). | `canticle/__main__.py`, `canticle/runner.py`, `canticle/station.py`, tests | A hardlinked, symlinked or copied key cannot start a second station, whatever the start timing. A regular file at `--control` survives. A wrong-UID peer is refused. | Yes (small) |
+| BC-4 | Key and lease safety. Lease and epoch keyed by key_id in a 0700 runtime dir. Key opened with `O_NOFOLLOW`, plus mode, owner and `nlink == 1` checks. Refuse to unlink a non-socket or a live socket. Fail closed when peer credentials are unavailable (`getpeereid` on BSD and macOS). | `canticle/__main__.py`, `canticle/runner.py`, `canticle/station.py`, tests | **On one host**, a hardlinked, symlinked or copied key cannot start a second station, whatever the start timing; the key_id lease lives in a host-local runtime dir and excludes nothing elsewhere. A regular file at `--control` survives. A wrong-UID peer is refused. **Across hosts** see the note below the table. | Yes (small) |
 | BC-5 | P3/P4, bc side only. A1 `trail_seq` with an explicit version rule (rfc:748 vs A1). Signed manifest with principal, genesis pin and reload. `canticle doctor` (rfc:1153). Operator alarm-body publish path (C3). | wire, station, listener, manifest, CLI, RFC | A9 proofreading vectors; revocation while live; doctor pass and fail; two-host proof | Later |
+
+**Cross-host duplicate keys (BC-4 note).** No local mechanism stops a copied key from starting a station on another host. The invariant there is detection, not exclusion:
+- Two stations signing with one key are seen by any receiver that hears both, as `equivocation` (same epoch and tuple, different bytes, §10.8) or as `epoch-regression` (different epochs: the prototype's epoch is max(previous + 1, Unix seconds) per host, bc/.../station.py:99-106, so two hosts that start in different seconds hold different epochs).
+- `equivocation` quarantines the key locally (rfc:1081; BC-2 adds the quarantine the prototype lacks). Revocation fleet-wide is the operator's signed-manifest reload (BC-5).
+- Gap: `epoch-regression` alone does not quarantine, and an honest restart produces a few seconds of it from old-epoch copies still in flight. Recommended for BC-1/BC-2, for the princes to confirm: treat `epoch-regression` that continues past one advertised loop period after the key's epoch advanced as a duplicate-key signal, quarantined like equivocation.
+- Proof gate (with BC-5's two-host proof): two hosts, one copied key; every receiver that hears both records the evidence and holds the key out.
 
 ### OpenClaw
 
@@ -819,7 +829,7 @@ plugins: { entries: { "binary-canticle": {
 5. **Q5. Landing model.** Per-frame durable rows with the per-turn dose enforced by drain caps (recommended), or the §14.14 two-slot digest (C11)?
 6. **Q6. Freeze point.** Which commit do we freeze against?
    - 234464a (main when the brief was written): §10.9 has no `over_quota` or `pluck_mismatch`.
-   - The merge of PR #62 (issue #60): adds both, gives supersession marks their own per-key limit (§7.4), restates mark retention (§7.8), checks a PLUCK against its held target (§7.7), and adds §23.2 question 21.
+   - `c9fe9cdc0a401c9875aa1bf9dea46d5c52bcc041`, the head of PR #62 (issue #60) when this report was written; re-pin to the merge commit if #62 changes before it lands. It adds both, gives supersession marks their own per-key limit (§7.4), restates mark retention (§7.8), checks a PLUCK against its held target (§7.7), and adds §23.2 question 21.
 7. **Q7. Config posture.** Do you accept JSON5 under `.config`, and Gateway boot refusal when a canticle block is schema-invalid? The alternative is a core change that disables just that plugin (oc/src/config/validation-plugin-config.ts:345-395).
 8. **Q8. Trust tier.** Third-party install, or bundled/trusted official? This decides access to `openKeyedStore`, doctor health checks and the trusted diagnostics channel (oc/src/plugins/registry-runtime.ts:202-220; oc/src/flows/bundled-health-checks.ts:105-111).
 9. **Q9. Banner marker.** `[canticle:heard]` (RFC) or `[binary-canticle]` (demand) (C6)?
