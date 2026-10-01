@@ -12,6 +12,7 @@ maxima, dedup digests, sticky PLUCKs, supersession high-water marks; §5.2, §7.
 from __future__ import annotations
 
 import hashlib
+import heapq
 import json
 import os
 import tempfile
@@ -27,7 +28,7 @@ SKEW_MS = 5_000
 OFFSET_SAMPLES = 16
 SCOPE_NAMES = {v: k for k, v in SCOPES.items()}
 LIVE_STATE = CLASS_BY_NAME["live-state"].code
-STATE_VERSION = 1
+STATE_VERSION = 2  # 2: dedup rows carry the item's (expires_at, scope) for the §9.7 PLUCK check (#60)
 
 
 @dataclass
@@ -69,20 +70,48 @@ class _StationState:
     signed_off: bool = False
     offsets: deque = field(default_factory=lambda: deque(maxlen=OFFSET_SAMPLES))
     stream_loops: dict = field(default_factory=dict)  # stream_id -> advertised loop_ms
-    last_stream_item: dict = field(default_factory=dict)  # stream_id -> last time a copy was heard
+    last_stream_item: dict = field(default_factory=dict)  # stream_id -> last admitted copy, oldest first (#60)
     presence: str = ""  # nothing reported yet
     first_beacon_at: Optional[int] = None  # first beacon heard since this listener started (warm-up, §7.8)
     stream_loop_max: dict = field(default_factory=dict)  # stream_id -> advertised loop_max_ms
     stream_entries: dict = field(default_factory=dict)  # stream_id -> latest beacon StreamEntry (heads, live)
+    # page index -> (bseq heard at, that page's stream entries). The three stream maps above are rebuilt
+    # from these, so they hold one advertised catalog (at most 8 pages, §8.4), not every stream id ever
+    # beaconed (#60). A stream on two held pages takes its entry from the more recent beacon.
+    catalog_pages: dict = field(default_factory=dict)
 
     @property
     def offset_ms(self) -> int:
         return min(self.offsets) if self.offsets else 0
 
 
+class _Expiries:
+    """Min-heap of (time, key) over one table whose entries expire (#60 review). Purging pops only what
+    is due, rather than scanning the table, so a key held at its limit cannot make every refusal or
+    tick cost a full scan. Deletion is lazy: the table is the truth, and a popped entry whose table
+    row has gone or moved later is skipped."""
+
+    def __init__(self):
+        self.heap: list = []
+
+    def push(self, t: int, key) -> None:
+        heapq.heappush(self.heap, (t, key))
+
+    def due(self, now_ms: int):
+        while self.heap and self.heap[0][0] <= now_ms:
+            yield heapq.heappop(self.heap)
+
+    def compact(self, live: int, rows) -> None:
+        """Rebuild from the live (time, key) rows (a callable) once stale entries outnumber them."""
+        if len(self.heap) > 2 * live + 1024:
+            self.heap = list(rows())
+            heapq.heapify(self.heap)
+
+
 class Listener:
     def __init__(self, manifest: Manifest, tuned: Optional[set] = None, dedup_capacity: int = 100_000,
-                 binding: str = "lan", state_path=None, warmup: bool = True, ephemeral: bool = False):
+                 binding: str = "lan", state_path=None, warmup: bool = True, ephemeral: bool = False,
+                 per_key_quota: Optional[int] = None, per_key_mark_quota: Optional[int] = None):
         # Restart safety is the default: without state_path a restarted listener could surface a
         # stale or withdrawn item (§7.4-§7.8). Tests and experiments must opt out explicitly.
         if state_path is None and not ephemeral:
@@ -101,10 +130,14 @@ class Listener:
         self.held: dict[tuple, tuple] = {}  # (kid, stream, state_key) -> (ident, item, retain) during warm-up
         self.tuned = tuned                    # stream names to surface; None = every named stream
         self.dedup_capacity = dedup_capacity
-        self.dedup: dict[tuple, tuple] = {}   # identity -> (sha256(frame), retain_until)
+        self.per_key_quota = per_key_quota    # fixed per-key share; None = an equal share of dedup_capacity
+        self.per_key_mark_quota = per_key_mark_quota  # fixed per-key mark limit; None = derived (_mark_quota)
+        self.dedup: dict[tuple, tuple] = {}   # identity -> (sha256(frame), retain_until, (expires_at, scope) | None)
         self.dedup_per_key: dict[bytes, int] = {}
         self.sticky_pluck: dict[tuple, int] = {}
         self.hwm: dict[tuple, tuple] = {}     # (kid, stream, state_key) -> (issued_at, epoch, seq, retain_until)
+        self.hwm_per_key: dict[bytes, int] = {}
+        self._dedup_due, self._sticky_due, self._hwm_due = _Expiries(), _Expiries(), _Expiries()
         self.current: dict[tuple, _Heard] = {}  # identity -> heard item (on air, from this listener's view)
         self.stations: dict[bytes, _StationState] = {}
         self.evidence_counts: dict[str, int] = {}
@@ -143,19 +176,22 @@ class Listener:
         self._save_if_dirty()
         return events
 
-    def _epoch_ok(self, kid: bytes, epoch: int, now_ms: int, events: list) -> bool:
+    def _epoch_ok(self, kid: bytes, epoch: int, now_ms: int, events: list, advance: bool = True) -> bool:
         st = self._st(kid)
         if epoch < st.epoch_hwm:
             events.append(self._evidence("epoch-regression", kid, f"{epoch} < {st.epoch_hwm}"))
             return False
-        if epoch > st.epoch_hwm:
+        if advance and epoch > st.epoch_hwm:
             st.epoch_hwm, st.epoch_seen_at = epoch, now_ms
             self._dirty = True
-            # bseq and the advertised loops belong to the previous epoch (§9.8): a restarted
-            # station counts beacons from 1 again and may loop different streams.
+            # bseq, the advertised catalog and the per-stream hearing times belong to the previous
+            # epoch (§9.8): a restarted station counts beacons from 1 again and may loop different streams.
             st.bseq = 0
+            st.catalog_pages.clear()
             st.stream_loops.clear()
+            st.stream_loop_max.clear()
             st.stream_entries.clear()
+            st.last_stream_item.clear()
         return True
 
     def _beacon(self, f: wire.Frame, now_ms: int) -> list[Event]:
@@ -173,10 +209,23 @@ class Listener:
         st.period_ms = b.next_beacon_ms or st.period_ms
         if st.first_beacon_at is None:
             st.first_beacon_at = now_ms
-        for e in b.streams:
-            st.stream_loops[e.stream_id] = e.loop_ms
-            st.stream_loop_max[e.stream_id] = e.loop_max_ms
-            st.stream_entries[e.stream_id] = e
+        # A beacon carries one page of the station's catalog (§8.4): it replaces that page and drops
+        # pages past the advertised count. Rebuilding the stream maps from the pages bounds them by
+        # what one catalog can advertise, however many beacons (or stream ids) a key sends (#60).
+        index, count = b.page or (0, 1)
+        for p in [p for p in st.catalog_pages if p >= count]:
+            del st.catalog_pages[p]
+        st.catalog_pages[index] = (b.bseq, b.streams)
+        st.stream_loops.clear()
+        st.stream_loop_max.clear()
+        st.stream_entries.clear()
+        # bseq order, so the newest copy wins: §8.4 lets a changed stream ride the next beacon, whatever
+        # its page. bseq only rises within an epoch, and an epoch advance clears the pages.
+        for _, entries in sorted(st.catalog_pages.values(), key=lambda v: v[0]):
+            for e in entries:
+                st.stream_loops[e.stream_id] = e.loop_ms
+                st.stream_loop_max[e.stream_id] = e.loop_max_ms
+                st.stream_entries[e.stream_id] = e
         events.extend(self._presence(f.key_id, now_ms))
         return events
 
@@ -203,13 +252,14 @@ class Listener:
             events.append(self._evidence("hop-limit", kid, f"hop {body.hop} > {CLASSES[body.cls].hop_limit} for "
                                          f"{CLASSES[body.cls].name}", stream=sname, seq=body.seq))
             return events
-        if not self._epoch_ok(kid, body.epoch, now_ms, events):
+        # Regression is checked now; a higher epoch is adopted only once the frame is admitted, so an
+        # over-quota or mismatched frame cannot advance it (§10.9: refusals are state-neutral).
+        if not self._epoch_ok(kid, body.epoch, now_ms, events, advance=False):
             return events
         ident = f.identity
         digest = hashlib.sha256(f.raw).digest()
         seen = self.dedup.get(ident)
         st = self._st(kid)
-        st.last_stream_item[body.stream] = now_ms
         resurface = False
         if seen is not None:
             if seen[0] != digest:
@@ -221,25 +271,49 @@ class Listener:
                 h.copies += 1
                 h.last_heard = now_ms
             if ident not in self._restored:
+                self._heard_on(st, body.stream, now_ms)
                 return events  # a repeat is a benign no-op (§7.4)
             # Accepted before a restart: its dedup, pluck and supersession state was kept, but this
             # process has not surfaced it yet. Surface it once, through the same checks.
+            if self._needs_hwm_slot(f, ident) and not self._hwm_room(kid, now_ms):
+                events.append(self._evidence("over-quota", kid, "per-key supersession mark limit full; live "
+                                             "marks kept", stream=self._stream_name(kid, body.stream), seq=body.seq))
+                return events
+            self._heard_on(st, body.stream, now_ms)
             self._restored.discard(ident)
             resurface = True
             retain = seen[1]
         else:
+            target = None
+            if f.kind == wire.KIND_PLUCK:
+                # §9.7: a PLUCK carries its target's expires_at and scope. Checkable while the target's
+                # dedup entry is held; a PLUCK for a target never heard is still recorded (§7.7).
+                target = self.dedup.get((kid, body.epoch, body.stream, body.target_seq))
+                if target is not None and target[2] is not None and target[2] != (body.expires_at, body.scope):
+                    events.append(self._evidence("pluck-mismatch", kid, "expires_at or scope differs from the "
+                                                 "target's (§9.7)", stream=self._stream_name(kid, body.stream),
+                                                 seq=body.seq))
+                    return events
             if not self._room_for(kid, now_ms):
                 events.append(self._evidence("over-quota", kid, "per-key dedup quota full; live entries kept",
                                              stream=self._stream_name(kid, body.stream), seq=body.seq))
                 return events
+            if self._needs_hwm_slot(f, ident) and not self._hwm_room(kid, now_ms):
+                events.append(self._evidence("over-quota", kid, "per-key supersession mark limit full; live "
+                                             "marks kept", stream=self._stream_name(kid, body.stream), seq=body.seq))
+                return events
+            self._epoch_ok(kid, body.epoch, now_ms, events)
             retain = wire.local_expiry_ms(body, st.offset_ms, first_heard_ms=now_ms) + SKEW_MS
-            self._remember(ident, digest, retain)
+            self._remember(ident, digest, retain,
+                           (body.expires_at, body.scope) if f.kind == wire.KIND_ITEM else None)
+            self._heard_on(st, body.stream, now_ms)
         name = self._stream_name(kid, body.stream)
         if f.kind == wire.KIND_PLUCK:
             if resurface:
                 return events  # its sticky mark was kept across the restart
             target = (kid, body.epoch, body.stream, body.target_seq)
             self.sticky_pluck[target] = retain
+            self._sticky_due.push(retain, target)
             self._dirty = True
             for k, (hid, _, _) in list(self.held.items()):
                 if hid == target:
@@ -250,7 +324,10 @@ class Listener:
                                     {"by_seq": body.seq, "reason": body.reason}))
             return events
         it: wire.Item = body
-        if ident in self.sticky_pluck:
+        # A keyed item that arrives after its own PLUCK still superseded what came before it at the
+        # station (§7.8, whatever the arrival order), so it moves the mark before it is dropped.
+        plucked = ident in self.sticky_pluck
+        if plucked and (it.state_key is None or it.cls not in CLASSES):
             events.append(self._evidence("plucked", kid, "item arrived after its pluck", stream=name, seq=it.seq))
             return events
         if it.cls not in CLASSES:
@@ -260,18 +337,40 @@ class Listener:
             hkey = (kid, it.stream, it.state_key)
             order = (it.issued_at, it.epoch, it.seq)
             prev = self.hwm.get(hkey)
+            # A mark must outlive every older item for its key (§7.8). Its horizon is the latest of
+            # (local expiry + skew + class max TTL) over the items admitted for the key while it is held,
+            # so it never goes down (#60 review: a newer value of a shorter-lived class must not shorten
+            # it). Each term is bounded when it is set (local expiry is at most first hearing + TTL), so
+            # no clock offset can push a horizon past now + TTL + class max + skew. Refused older items
+            # do not move it. A mark whose horizon has passed is dropped first, as tick() would, so the
+            # outcome does not depend on tick cadence.
+            if prev is not None and prev[3] <= now_ms:
+                del self.hwm[hkey]
+                self.hwm_per_key[kid] -= 1
+                self._dirty = True
+                prev = None
             # Equal order is only possible for the same identity, i.e. a re-surface after restart.
             if prev is not None and (order < prev[:3] or (order == prev[:3] and not resurface)):
-                events.append(self._evidence("superseded", kid, "older than the high-water mark", stream=name, seq=it.seq))
+                reason = "plucked" if plucked else "superseded"   # §7.7: a plucked tuple reports plucked
+                events.append(self._evidence(reason, kid, "older than the high-water mark" if reason == "superseded"
+                                             else "item arrived after its pluck", stream=name, seq=it.seq))
                 return events
             if prev is None or order > prev[:3]:
-                class_max_ms = CLASSES[it.cls].max_ttl_s * 1000
-                self.hwm[hkey] = (*order, retain + class_max_ms)
+                until = retain + CLASSES[it.cls].max_ttl_s * 1000
+                if prev is None:
+                    self.hwm_per_key[kid] = self.hwm_per_key.get(kid, 0) + 1
+                else:
+                    until = max(until, prev[3])
+                self.hwm[hkey] = (*order, until)
+                self._hwm_due.push(until, hkey)
                 self._dirty = True
             for other_ident, h in list(self.current.items()):
                 if other_ident[0] == kid and h.item.stream == it.stream and h.item.state_key == it.state_key:
                     del self.current[other_ident]
                     events.append(Event("superseded", self._name(kid), kid.hex(), name, h.item.seq, {"by_seq": it.seq}))
+        if plucked:
+            events.append(self._evidence("plucked", kid, "item arrived after its pluck", stream=name, seq=it.seq))
+            return events
         if name is None or (self.tuned is not None and name not in self.tuned):
             return events  # untuned or unnamed streams are held, not surfaced (§5.4)
         if it.cls == LIVE_STATE and self.warmup and not self._warm(kid, it.stream, now_ms):
@@ -307,6 +406,8 @@ class Listener:
 
     def _quota(self) -> int:
         """Per-key share of the dedup store (§7.4). A key that floods only fills its own share."""
+        if self.per_key_quota is not None:
+            return max(1, self.per_key_quota)
         return max(1, self.dedup_capacity // max(1, sum(1 for _ in self.manifest)))
 
     def _room_for(self, kid: bytes, now_ms: int) -> bool:
@@ -314,6 +415,40 @@ class Listener:
             return True
         self._purge_dedup(now_ms)
         return self.dedup_per_key.get(kid, 0) < self._quota()
+
+    def _needs_hwm_slot(self, f: wire.Frame, ident: tuple) -> bool:
+        """Would admitting this frame add a supersession mark? (the conditions of the hwm step below)"""
+        it = f.body
+        return (f.kind == wire.KIND_ITEM and it.state_key is not None and it.cls in CLASSES
+                and (f.key_id, it.stream, it.state_key) not in self.hwm)
+
+    def _mark_quota(self, kid: bytes) -> int:
+        """Per-key limit on supersession marks, counted apart from dedup entries (§7.4). A dedup entry
+        lasts about one TTL; a mark lasts that TTL + skew + the class max TTL (§7.8). So the limit is the
+        dedup share scaled by the largest ⌈(default TTL + max TTL + skew) / default TTL⌉ among the key's
+        granted classes: a key churning state_keys at its class default TTLs within its share fits."""
+        if self.per_key_mark_quota is not None:
+            return max(1, self.per_key_mark_quota)
+        entry = self.manifest.entry(kid)
+        specs = [CLASSES[c] for c in (entry.classes if entry else ()) if c in CLASSES] or list(CLASSES.values())
+        factor = max(-(-((c.default_ttl_s + c.max_ttl_s) * 1000 + SKEW_MS) // (c.default_ttl_s * 1000)) for c in specs)
+        return self._quota() * factor
+
+    def _hwm_room(self, kid: bytes, now_ms: int) -> bool:
+        """Marks outlive dedup entries, so they have their own per-key limit, checked at admission and
+        never met by evicting a live mark (§7.4, #60)."""
+        if self.hwm_per_key.get(kid, 0) < self._mark_quota(kid):
+            return True
+        self._purge_hwm(now_ms)
+        return self.hwm_per_key.get(kid, 0) < self._mark_quota(kid)
+
+    def _heard_on(self, st: _StationState, stream: int, now_ms: int) -> None:
+        """Note an admitted copy on a stream, for presence (§8.6). Capped at the key's share, oldest
+        dropped first: presence only asks whether some stream was heard within its loops (#60)."""
+        st.last_stream_item.pop(stream, None)
+        st.last_stream_item[stream] = now_ms
+        while len(st.last_stream_item) > self._quota():
+            del st.last_stream_item[next(iter(st.last_stream_item))]
 
     def _warm(self, kid: bytes, stream: int, now_ms: int) -> bool:
         """Warm-up is over for a stream once a beacon has been heard since start and one
@@ -343,19 +478,41 @@ class Listener:
                                 self._item_data(it, now_ms, st)))
         return events
 
-    def _remember(self, ident: tuple, digest: bytes, retain: int) -> None:
+    def _remember(self, ident: tuple, digest: bytes, retain: int, meta: Optional[tuple] = None) -> None:
         # Live entries are never evicted: they hold the equivocation evidence (§10.8) and stop a
         # repeat from counting as new. New tuples are refused per key instead (_room_for).
-        self.dedup[ident] = (digest, retain)
+        # meta is an ITEM's (expires_at, scope), which a later PLUCK must match (§9.7).
+        self.dedup[ident] = (digest, retain, meta)
         self.dedup_per_key[ident[0]] = self.dedup_per_key.get(ident[0], 0) + 1
+        self._dedup_due.push(retain, ident)
         self._dirty = True
 
     def _purge_dedup(self, now_ms: int) -> None:
-        for k in [k for k, v in self.dedup.items() if v[1] <= now_ms]:
-            del self.dedup[k]
-            self.dedup_per_key[k[0]] -= 1
-            self._restored.discard(k)
-            self._dirty = True
+        for _, k in self._dedup_due.due(now_ms):
+            v = self.dedup.get(k)
+            if v is not None and v[1] <= now_ms:
+                del self.dedup[k]
+                self.dedup_per_key[k[0]] -= 1
+                self._restored.discard(k)
+                self._dirty = True
+        # A sticky-pluck mark has its PLUCK's retention (§7.7): purging them together keeps the marks
+        # within the dedup quota between ticks too (#60).
+        for _, k in self._sticky_due.due(now_ms):
+            v = self.sticky_pluck.get(k)
+            if v is not None and v <= now_ms:
+                del self.sticky_pluck[k]
+                self._dirty = True
+        self._dedup_due.compact(len(self.dedup), lambda: ((v[1], k) for k, v in self.dedup.items()))
+        self._sticky_due.compact(len(self.sticky_pluck), lambda: ((v, k) for k, v in self.sticky_pluck.items()))
+
+    def _purge_hwm(self, now_ms: int) -> None:
+        for _, k in self._hwm_due.due(now_ms):
+            v = self.hwm.get(k)
+            if v is not None and v[3] <= now_ms:
+                del self.hwm[k]
+                self.hwm_per_key[k[0]] -= 1
+                self._dirty = True
+        self._hwm_due.compact(len(self.hwm), lambda: ((v[3], k) for k, v in self.hwm.items()))
 
     # ------------------------------------------------------------ time
 
@@ -367,12 +524,7 @@ class Listener:
                 events.append(Event("expired", self._name(ident[0]), ident[0].hex(),
                                     self._stream_name(ident[0], ident[2]), ident[3]))
         self._purge_dedup(now_ms)
-        for k in [k for k, v in self.sticky_pluck.items() if v <= now_ms]:
-            del self.sticky_pluck[k]
-            self._dirty = True
-        for k in [k for k, v in self.hwm.items() if v[3] <= now_ms]:
-            del self.hwm[k]
-            self._dirty = True
+        self._purge_hwm(now_ms)
         events.extend(self._release_held(now_ms))
         self._save_if_dirty()
         for kid in list(self.stations):
@@ -387,7 +539,8 @@ class Listener:
         state = {
             "version": STATE_VERSION,
             "epochs": {k.hex(): [s.epoch_hwm, s.epoch_seen_at] for k, s in self.stations.items() if s.epoch_hwm},
-            "dedup": [[i[0].hex(), i[1], i[2], i[3], d.hex(), r] for i, (d, r) in self.dedup.items()],
+            "dedup": [[i[0].hex(), i[1], i[2], i[3], d.hex(), r, *(m or (None, None))]
+                      for i, (d, r, m) in self.dedup.items()],
             "sticky_pluck": [[i[0].hex(), i[1], i[2], i[3], r] for i, r in self.sticky_pluck.items()],
             "hwm": [[k[0].hex(), k[1], k[2], *v] for k, v in self.hwm.items()],
         }
@@ -414,20 +567,30 @@ class Listener:
     def _load(self, path) -> None:
         with open(path) as f:
             state = json.load(f)
-        if state.get("version") != STATE_VERSION:
-            raise ValueError(f"listener state {path}: unsupported version {state.get('version')!r}")
+        version = state.get("version")
+        if version not in (1, STATE_VERSION):
+            raise ValueError(f"listener state {path}: unsupported version {version!r}")
         for kid_hex, (epoch, seen_at) in state["epochs"].items():
             st = self._st(bytes.fromhex(kid_hex))
             st.epoch_hwm, st.epoch_seen_at = epoch, seen_at
-        for kid_hex, epoch, stream, seq, digest, retain in state["dedup"]:
+        for row in state["dedup"]:
+            # version 1 rows have no (expires_at, scope): those targets skip the §9.7 PLUCK check
+            kid_hex, epoch, stream, seq, digest, retain = row[:6]
+            meta = tuple(row[6:8]) if len(row) >= 8 and row[6] is not None else None
             ident = (bytes.fromhex(kid_hex), epoch, stream, seq)
-            self.dedup[ident] = (bytes.fromhex(digest), retain)
+            self.dedup[ident] = (bytes.fromhex(digest), retain, meta)
             self.dedup_per_key[ident[0]] = self.dedup_per_key.get(ident[0], 0) + 1
+            self._dedup_due.push(retain, ident)
             self._restored.add(ident)
         for kid_hex, epoch, stream, seq, retain in state["sticky_pluck"]:
-            self.sticky_pluck[(bytes.fromhex(kid_hex), epoch, stream, seq)] = retain
+            target = (bytes.fromhex(kid_hex), epoch, stream, seq)
+            self.sticky_pluck[target] = retain
+            self._sticky_due.push(retain, target)
         for kid_hex, stream, state_key, issued_at, epoch, seq, retain in state["hwm"]:
-            self.hwm[(bytes.fromhex(kid_hex), stream, state_key)] = (issued_at, epoch, seq, retain)
+            kid = bytes.fromhex(kid_hex)
+            self.hwm[(kid, stream, state_key)] = (issued_at, epoch, seq, retain)
+            self._hwm_due.push(retain, (kid, stream, state_key))
+            self.hwm_per_key[kid] = self.hwm_per_key.get(kid, 0) + 1
 
     # ------------------------------------------------------------ presence (§8.6)
 
