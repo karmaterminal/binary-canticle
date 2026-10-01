@@ -12,6 +12,7 @@ maxima, dedup digests, sticky PLUCKs, supersession high-water marks; §5.2, §7.
 from __future__ import annotations
 
 import hashlib
+import heapq
 import json
 import os
 import tempfile
@@ -84,6 +85,29 @@ class _StationState:
         return min(self.offsets) if self.offsets else 0
 
 
+class _Expiries:
+    """Min-heap of (time, key) over one table whose entries expire (#60 review). Purging pops only what
+    is due, rather than scanning the table, so a key held at its limit cannot make every refusal or
+    tick cost a full scan. Deletion is lazy: the table is the truth, and a popped entry whose table
+    row has gone or moved later is skipped."""
+
+    def __init__(self):
+        self.heap: list = []
+
+    def push(self, t: int, key) -> None:
+        heapq.heappush(self.heap, (t, key))
+
+    def due(self, now_ms: int):
+        while self.heap and self.heap[0][0] <= now_ms:
+            yield heapq.heappop(self.heap)
+
+    def compact(self, live: int, rows) -> None:
+        """Rebuild from the live (time, key) rows (a callable) once stale entries outnumber them."""
+        if len(self.heap) > 2 * live + 1024:
+            self.heap = list(rows())
+            heapq.heapify(self.heap)
+
+
 class Listener:
     def __init__(self, manifest: Manifest, tuned: Optional[set] = None, dedup_capacity: int = 100_000,
                  binding: str = "lan", state_path=None, warmup: bool = True, ephemeral: bool = False,
@@ -113,6 +137,7 @@ class Listener:
         self.sticky_pluck: dict[tuple, int] = {}
         self.hwm: dict[tuple, tuple] = {}     # (kid, stream, state_key) -> (issued_at, epoch, seq, retain_until)
         self.hwm_per_key: dict[bytes, int] = {}
+        self._dedup_due, self._sticky_due, self._hwm_due = _Expiries(), _Expiries(), _Expiries()
         self.current: dict[tuple, _Heard] = {}  # identity -> heard item (on air, from this listener's view)
         self.stations: dict[bytes, _StationState] = {}
         self.evidence_counts: dict[str, int] = {}
@@ -241,12 +266,12 @@ class Listener:
                 events.append(self._evidence("equivocation", kid, f"two frames for {ident[1:]}",
                                              stream=self._stream_name(kid, body.stream), seq=body.seq))
                 return events
-            self._heard_on(st, body.stream, now_ms)
             if ident in self.current:
                 h = self.current[ident]
                 h.copies += 1
                 h.last_heard = now_ms
             if ident not in self._restored:
+                self._heard_on(st, body.stream, now_ms)
                 return events  # a repeat is a benign no-op (§7.4)
             # Accepted before a restart: its dedup, pluck and supersession state was kept, but this
             # process has not surfaced it yet. Surface it once, through the same checks.
@@ -254,6 +279,7 @@ class Listener:
                 events.append(self._evidence("over-quota", kid, "per-key supersession mark limit full; live "
                                              "marks kept", stream=self._stream_name(kid, body.stream), seq=body.seq))
                 return events
+            self._heard_on(st, body.stream, now_ms)
             self._restored.discard(ident)
             resurface = True
             retain = seen[1]
@@ -287,6 +313,7 @@ class Listener:
                 return events  # its sticky mark was kept across the restart
             target = (kid, body.epoch, body.stream, body.target_seq)
             self.sticky_pluck[target] = retain
+            self._sticky_due.push(retain, target)
             self._dirty = True
             for k, (hid, _, _) in list(self.held.items()):
                 if hid == target:
@@ -310,34 +337,32 @@ class Listener:
             hkey = (kid, it.stream, it.state_key)
             order = (it.issued_at, it.epoch, it.seq)
             prev = self.hwm.get(hkey)
-            # A mark must outlive every older item for its key (§7.8). Its horizon starts at each admitted
-            # item's local expiry + skew + its class max TTL, and never goes down (#60 review): a newer
-            # value moves it forward by the issued_at gap, so classes heard while the mark is held stay
-            # covered up to the new mark; an older item dropped against it raises it for that item's class.
-            # A mark whose horizon has passed is dropped first, as tick() would, so results do not depend
-            # on tick cadence: every older item of a class heard for the key has expired by then.
+            # A mark must outlive every older item for its key (§7.8). Its horizon is the latest of
+            # (local expiry + skew + class max TTL) over the items admitted for the key while it is held,
+            # so it never goes down (#60 review: a newer value of a shorter-lived class must not shorten
+            # it). Each term is bounded when it is set (local expiry is at most first hearing + TTL), so
+            # no clock offset can push a horizon past now + TTL + class max + skew. Refused older items
+            # do not move it. A mark whose horizon has passed is dropped first, as tick() would, so the
+            # outcome does not depend on tick cadence.
             if prev is not None and prev[3] <= now_ms:
                 del self.hwm[hkey]
                 self.hwm_per_key[kid] -= 1
                 self._dirty = True
                 prev = None
-            class_max_ms = CLASSES[it.cls].max_ttl_s * 1000
             # Equal order is only possible for the same identity, i.e. a re-surface after restart.
             if prev is not None and (order < prev[:3] or (order == prev[:3] and not resurface)):
-                lag = min(prev[0] - it.issued_at, class_max_ms + SKEW_MS)
-                until = max(prev[3], retain + class_max_ms + lag)
-                if until > prev[3]:
-                    self.hwm[hkey] = (*prev[:3], until)
-                    self._dirty = True
-                events.append(self._evidence("superseded", kid, "older than the high-water mark", stream=name, seq=it.seq))
+                reason = "plucked" if plucked else "superseded"   # §7.7: a plucked tuple reports plucked
+                events.append(self._evidence(reason, kid, "older than the high-water mark" if reason == "superseded"
+                                             else "item arrived after its pluck", stream=name, seq=it.seq))
                 return events
             if prev is None or order > prev[:3]:
-                until = retain + class_max_ms
+                until = retain + CLASSES[it.cls].max_ttl_s * 1000
                 if prev is None:
                     self.hwm_per_key[kid] = self.hwm_per_key.get(kid, 0) + 1
                 else:
-                    until = max(until, prev[3] + (it.issued_at - prev[0]))
+                    until = max(until, prev[3])
                 self.hwm[hkey] = (*order, until)
+                self._hwm_due.push(until, hkey)
                 self._dirty = True
             for other_ident, h in list(self.current.items()):
                 if other_ident[0] == kid and h.item.stream == it.stream and h.item.state_key == it.state_key:
@@ -459,25 +484,35 @@ class Listener:
         # meta is an ITEM's (expires_at, scope), which a later PLUCK must match (§9.7).
         self.dedup[ident] = (digest, retain, meta)
         self.dedup_per_key[ident[0]] = self.dedup_per_key.get(ident[0], 0) + 1
+        self._dedup_due.push(retain, ident)
         self._dirty = True
 
     def _purge_dedup(self, now_ms: int) -> None:
-        for k in [k for k, v in self.dedup.items() if v[1] <= now_ms]:
-            del self.dedup[k]
-            self.dedup_per_key[k[0]] -= 1
-            self._restored.discard(k)
-            self._dirty = True
+        for _, k in self._dedup_due.due(now_ms):
+            v = self.dedup.get(k)
+            if v is not None and v[1] <= now_ms:
+                del self.dedup[k]
+                self.dedup_per_key[k[0]] -= 1
+                self._restored.discard(k)
+                self._dirty = True
         # A sticky-pluck mark has its PLUCK's retention (§7.7): purging them together keeps the marks
         # within the dedup quota between ticks too (#60).
-        for k in [k for k, v in self.sticky_pluck.items() if v <= now_ms]:
-            del self.sticky_pluck[k]
-            self._dirty = True
+        for _, k in self._sticky_due.due(now_ms):
+            v = self.sticky_pluck.get(k)
+            if v is not None and v <= now_ms:
+                del self.sticky_pluck[k]
+                self._dirty = True
+        self._dedup_due.compact(len(self.dedup), lambda: ((v[1], k) for k, v in self.dedup.items()))
+        self._sticky_due.compact(len(self.sticky_pluck), lambda: ((v, k) for k, v in self.sticky_pluck.items()))
 
     def _purge_hwm(self, now_ms: int) -> None:
-        for k in [k for k, v in self.hwm.items() if v[3] <= now_ms]:
-            del self.hwm[k]
-            self.hwm_per_key[k[0]] -= 1
-            self._dirty = True
+        for _, k in self._hwm_due.due(now_ms):
+            v = self.hwm.get(k)
+            if v is not None and v[3] <= now_ms:
+                del self.hwm[k]
+                self.hwm_per_key[k[0]] -= 1
+                self._dirty = True
+        self._hwm_due.compact(len(self.hwm), lambda: ((v[3], k) for k, v in self.hwm.items()))
 
     # ------------------------------------------------------------ time
 
@@ -545,12 +580,16 @@ class Listener:
             ident = (bytes.fromhex(kid_hex), epoch, stream, seq)
             self.dedup[ident] = (bytes.fromhex(digest), retain, meta)
             self.dedup_per_key[ident[0]] = self.dedup_per_key.get(ident[0], 0) + 1
+            self._dedup_due.push(retain, ident)
             self._restored.add(ident)
         for kid_hex, epoch, stream, seq, retain in state["sticky_pluck"]:
-            self.sticky_pluck[(bytes.fromhex(kid_hex), epoch, stream, seq)] = retain
+            target = (bytes.fromhex(kid_hex), epoch, stream, seq)
+            self.sticky_pluck[target] = retain
+            self._sticky_due.push(retain, target)
         for kid_hex, stream, state_key, issued_at, epoch, seq, retain in state["hwm"]:
             kid = bytes.fromhex(kid_hex)
             self.hwm[(kid, stream, state_key)] = (issued_at, epoch, seq, retain)
+            self._hwm_due.push(retain, (kid, stream, state_key))
             self.hwm_per_key[kid] = self.hwm_per_key.get(kid, 0) + 1
 
     # ------------------------------------------------------------ presence (§8.6)

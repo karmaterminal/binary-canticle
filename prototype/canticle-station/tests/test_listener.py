@@ -388,7 +388,7 @@ class PerKeyBoundsTest(unittest.TestCase):
 
     def test_mark_retention_never_shrinks(self):
         # The #60 review, with mixed classes under one state_key: a shorter-class newer value must not
-        # shorten the mark, and an older item refused against it extends the mark to cover its class.
+        # shorten the mark, so a captured longer-class older value cannot land once it lapses.
         entry = StationEntry("cael", wire.public_key_bytes(SK), frozenset({1, 5}), ("chatter",))
         fr = lambda seq, t, text: self.item(seq, t, cls=5, ttl=3_600_000, extra={10: "a", 8: text})
         v1, v2 = fr(1, T0, b"threat high"), fr(2, T0 + 100, b"threat high")
@@ -400,13 +400,77 @@ class PerKeyBoundsTest(unittest.TestCase):
         evs = lst.hear(v1, T0 + 400_000)                                             # replayed after v3's class max
         self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["superseded"])
         self.assertNotIn("item", [e.kind for e in evs])
-        lst = Listener(Manifest([entry]), ephemeral=True, warmup=False)
-        lst.hear(v3, T0 + 400)
-        lst.hear(v1, T0 + 500)                                                       # refused, extends the mark
-        lst.tick(T0 + 400_000)
-        evs = lst.hear(v2, T0 + 400_000)
-        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["superseded"])
-        self.assertGreaterEqual(lst.hwm[(SK_ID, self.CHAT, "a")][3], T0 + 200 + 86_400_000)
+
+    def test_refused_older_items_do_not_hold_the_mark(self):
+        # Third #60 review: a station whose clock was stepped back sends values older than the mark.
+        # They are dropped, but must not keep the mark alive, or the station's real current value would
+        # stay hidden for as long as the step instead of the mark's own horizon (main's behaviour).
+        lst = self.lst(warmup=False)
+        step = 7_200_000
+        lst.hear(self.beacon(1, [], wallclock=T0 + step), T0)                         # station clock 2 h ahead
+        lst.hear(self.item(1, T0 + step, cls=3, ttl=180_000, extra={10: "now"}), T0)
+        horizon = lst.hwm[(SK_ID, self.CHAT, "now")][3]
+        for b in range(2, 18):                                                       # NTP steps it back; δ̂ follows
+            lst.hear(self.beacon(b, [], wallclock=T0 + 60_000 + b), T0 + 60_000 + b)
+        self.assertEqual(lst.stations[SK_ID].offset_ms, 0)
+        landed = None
+        for i in range(1, 20):                                                       # stepped back: re-issued every 120 s
+            t = T0 + i * 120_000
+            lst.tick(t)
+            evs = lst.hear(self.item(1 + i, t, cls=3, ttl=180_000, extra={10: "now"}), t)
+            if "item" in [e.kind for e in evs]:
+                landed = t
+                break
+        self.assertIsNotNone(landed)
+        self.assertLessEqual(landed, horizon + 120_000)                              # first re-issue after the horizon
+        self.assertLess(landed, T0 + step)
+
+    def test_mark_horizon_is_bounded_whatever_the_offset(self):
+        # Third #60 review: a beacon wallclock 10 years ahead makes δ̂ hugely negative, and a newer value
+        # issued 10 years "ahead" passes. Its horizon must still be at most now + TTL + skew + class max.
+        lst = self.lst(warmup=False)
+        lst.hear(self.item(1, T0, cls=3, ttl=180_000, extra={10: "k"}), T0)
+        ten_years = 10 * 365 * 86_400_000
+        lst.hear(self.beacon(1, [], wallclock=T0 + ten_years), T0 + 1_000)
+        self.assertEqual(lst.stations[SK_ID].offset_ms, -ten_years + 1_000)
+        evs = lst.hear(self.item(2, T0 + ten_years + 1_000, cls=3, ttl=180_000, extra={10: "k"}), T0 + 2_000)
+        self.assertIn("item", [e.kind for e in evs])
+        self.assertLessEqual(lst.hwm[(SK_ID, self.CHAT, "k")][3], T0 + 2_000 + 180_000 + 5_000 + 900_000)
+
+    def test_a_plucked_older_item_reports_plucked(self):
+        # Third #60 review: §7.7 says a tuple heard after its PLUCK is dropped as plucked, even when it is
+        # also older than the mark.
+        lst = self.lst(warmup=False)
+        o = self.item(1, T0, cls=3, ttl=600_000, extra={10: "notice"})
+        n = self.item(3, T0 + 2_000, cls=3, ttl=600_000, extra={10: "notice"})
+        lst.hear(self.pluck(2, 1, T0 + 1_000, T0 + 600_000), T0 + 2_000)
+        lst.hear(n, T0 + 2_000)
+        evs = lst.hear(o, T0 + 2_000)
+        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["plucked"])
+
+    def test_purges_cost_what_expires_not_what_is_held(self):
+        # Third #60 review: at the mark limit every refused frame rescanned every mark. Purges now pop
+        # due entries from an index, so refusals and ticks leave the tables unscanned.
+        lst = self.lst(quota=2_100, per_key_mark_quota=2_000, warmup=False)
+        for i in range(2_000):
+            t = T0 + i
+            lst.hear(self.item(i + 1, t, cls=3, ttl=60_000, extra={10: f"k{i}"}), t)
+            lst.tick(t)
+        self.assertEqual(len(lst.hwm), 2_000)
+
+        class Watched(dict):
+            scans = 0
+
+            def items(self):
+                Watched.scans += 1
+                return super().items()
+        lst.hwm, lst.dedup = Watched(lst.hwm), Watched(lst.dedup)
+        t = T0 + 70_000                                                              # dedup room again; marks live
+        for i in range(50):
+            evs = lst.hear(self.item(5_000 + i, t, cls=3, ttl=60_000, extra={10: f"new{i}"}), t)
+            self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["over-quota"])
+            lst.tick(t)
+        self.assertEqual(Watched.scans, 0)
 
     def test_mark_survives_a_later_rise_in_the_clock_offset(self):
         # Second #60 review: the newer value is heard before any beacon (δ̂ = 0), then a beacon shows the
@@ -420,19 +484,6 @@ class PerKeyBoundsTest(unittest.TestCase):
         self.assertEqual(lst.stations[SK_ID].offset_ms, d)
         lst.tick(T0 + 930_000)
         evs = lst.hear(o, T0 + 930_000)
-        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["superseded"])
-
-    def test_classes_heard_stay_covered_when_the_mark_moves(self):
-        # Second #60 review: a short regulatory value A is heard, a later long one O is lost, and a
-        # live-state N supersedes. O was issued before N, so it must stay dropped while it is valid.
-        entry = StationEntry("cael", wire.public_key_bytes(SK), frozenset({3, 6}), ("chatter",))
-        lst = Listener(Manifest([entry]), ephemeral=True, warmup=False)
-        reg = lambda seq, t, ttl: self.item(seq, t, cls=6, ttl=ttl, extra={10: "notice", 11: 0})
-        lst.hear(reg(1, T0 + 1_000, 60_000), T0 + 1_000)
-        o = reg(2, T0 + 100_000, 3_600_000)                                          # never heard live
-        lst.hear(self.item(3, T0 + 110_000, cls=3, ttl=180_000, extra={10: "notice"}), T0 + 110_000)
-        lst.tick(T0 + 3_680_000)
-        evs = lst.hear(o, T0 + 3_680_000)
         self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["superseded"])
 
     def test_a_plucked_newer_value_still_supersedes(self):
