@@ -662,6 +662,20 @@ class ClassPerStateKeyTest(unittest.TestCase):
             evs = old.hear(self.item(2, T0 + 1_000, 1), T0 + 1_000)                 # no class known: no check
             self.assertIn("item", [e.kind for e in evs])
 
+    def test_a_mark_from_older_state_learns_its_class_on_resurface(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "listener.json"
+            first = self.item(1, T0, 5, ttl=3_600_000)
+            Listener(self.manifest(), state_path=path, warmup=False).hear(first, T0)
+            state = json.loads(path.read_text())
+            state["version"] = 2
+            state["hwm"] = [row[:7] for row in state["hwm"]]
+            path.write_text(json.dumps(state))
+            old = Listener(self.manifest(), state_path=path, warmup=False)
+            old.hear(first, T0 + 500)                                               # its own item re-surfaces
+            self.assertEqual(old.hwm[(SK_ID, self.CHAT, "k")][4], 5)
+            self.assertEqual(self.reasons(old.hear(self.item(2, T0 + 1_000, 1), T0 + 1_000)), ["class-change"])
+
 
 class RobustnessTest(unittest.TestCase):
     def test_garbage_never_escapes(self):

@@ -153,6 +153,7 @@ def sequence_cases() -> list[dict]:
         ("epoch-regression", [epoch2, v1], ["item", "evidence:epoch-regression"]),
         ("pluck-expiry-mismatch", [v1, pl_late], ["item", "evidence:pluck-mismatch"]),
         ("class-change-in-one-epoch", [kc(1, T0, 3), kc(2, T0 + 1_000, 1)], ["item", "evidence:class-change"]),
+        ("class-change-older-in-one-epoch", [kc(2, T0 + 1_000, 3), kc(1, T0, 1)], ["item", "evidence:class-change"]),
         ("class-change-across-epochs", [kc(1, T0, 3), kc(1, T0 + 1_000, 1, epoch=2)], ["item", "superseded", "item"]),
     ]
     out = [{"name": n, "datagrams_hex": [d.hex() for d in ds], "now_ms": NOW, "expect": e} for n, ds, e in seqs]

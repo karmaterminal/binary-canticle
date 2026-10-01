@@ -363,6 +363,9 @@ class Listener:
                 events.append(self._evidence(reason, kid, "older than the high-water mark" if reason == "superseded"
                                              else "item arrived after its pluck", stream=name, seq=it.seq))
                 return events
+            if prev is not None and resurface and order == prev[:3] and prev[4] is None:
+                self.hwm[hkey] = (*prev[:4], it.cls)   # a mark loaded from v1/v2 state learns its class
+                self._dirty = True
             if prev is None or order > prev[:3]:
                 until = retain + CLASSES[it.cls].max_ttl_s * 1000
                 if prev is None:

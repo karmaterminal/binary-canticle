@@ -88,6 +88,25 @@ class CarouselTest(unittest.TestCase):
         later = Station(SK, [StreamConfig("chatter")], epoch=2, rng=random.Random(2), now_ms=T0 + 4)
         later.sing(T0 + 4, "chatter", text="e", cls="chatter", state_key="k")     # a new epoch may change it
 
+    def test_key_classes_are_forgotten_once_no_mark_can_hold_them(self):
+        # The q21 review: the table must not grow with every key of the epoch. A key is forgotten once its
+        # last item's expiry + TTL + class max TTL + margin has passed; then a class change is allowed.
+        st = Station(SK, [StreamConfig("chatter")], epoch=1, rng=random.Random(1), now_ms=T0)
+        st.sing(T0, "chatter", text="a", cls="live-state", state_key="k", ttl_s=60)
+        t = T0 + 60_000 + 60_000 + 900_000 + 10_000 - 1
+        st.poll(t)
+        with self.assertRaises(ValueError):                                       # a mark may still be held
+            st.sing(t, "chatter", text="b", cls="chatter", state_key="k")
+        st.poll(t + 1)
+        self.assertEqual(st.streams["chatter"].key_classes, {})
+        st.sing(t + 1, "chatter", text="c", cls="chatter", state_key="k")         # no mark can hold it now
+        churn = Station(SK, [StreamConfig("chatter")], epoch=2, rng=random.Random(2), now_ms=T0)
+        for i in range(2_000):                                                    # a new key every second
+            t = T0 + i * 1_000
+            churn.sing(t, "chatter", text="x", state_key=f"k{i}", ttl_s=30)
+            churn.poll(t)
+        self.assertLessEqual(len(churn.streams["chatter"].key_classes), 30 + 30 + 300 + 10 + 1)
+
     def test_pluck_stops_target_and_loops_until_target_expiry(self):
         st = station()
         a = st.sing(T0, "chatter", text="oops", ttl_s=60)
