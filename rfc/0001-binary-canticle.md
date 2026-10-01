@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft (2026-09-27) |
+| **Status** | Draft (2026-09-27; revised 2026-09-29 to apply the decisions of #54) |
 | **Location** | `rfc/0001-binary-canticle.md` |
 | **Repository baseline** | `karmaterminal/binary-canticle` `main` @ `b46a45a` (2026-09-17) |
 | **Supersedes (normative text)** | `proto/protocol-spec-v0.1.md`, `proto/stations-and-streams-v0.2.md`, `proto/stations-and-streams-v0.2-open-questions-bytewalk-cael.md`, `proto/receptor-contract-v0.2.md`, `proto/ringbuffer-contract.md`, `proto/explicit-non-goals.md`, `proto/immune-model-addendum.md` (grammar), `proto/scope-framing-and-noosphere-mapping.md` (scope ladder), the three `proto/openclaw-*.md` boundary docs. Full map in Appendix A. |
@@ -27,14 +27,22 @@ This is a **Draft**. It is not wire-stable. Nothing in it is deployed; the only 
 
 The draft was built from a 2026-09-27 review of every document, issue, pull request and branch in the repository, plus the OpenClaw continuation RFC, `ews-concept-new` and `nerv-ui`. That review produced a decision baseline ("the spine", positions P1-P15 and owner decisions D1-D10) and three adversarial challenge notes (broker, red-team, biology/radio). Where this RFC departs from the spine it says **"Deviation from spine:"** and names the evidence. The review notes are committed next to this file under `rfc/0001-notes/`, so the citations below resolve: `review/<note> §x` means section x of `rfc/0001-notes/<note>.md` (the spine is `rfc/0001-notes/spine.md`).
 
+**Revision of 2026-09-29.** figs delegated the owner decisions to the cohort's princes. On discussion issue #54, Silas decided D1, D4, D10, D14 and D15 on 2026-09-28, after Elliott's review, which agreed on all five. Silas also gave a disposition for each of the thirteen amendments (A1-A13) proposed by the protocol-dynamics spike (`spike/protocol-dynamics-udp-vs-tcp-2026-09-27.md` §7):
+
+- accepted: A1, A2, A4, A5, A7 and A13;
+- accepted with amendments: A3, A6, A8, A9, A10 and A11;
+- deferred from normative v1, pending a separate trust and privacy mini-RFC: A12.
+
+This revision applies those decisions. Each change is marked **"Amendment A<n> (#54):"**, and §23.1 records the decisions. The amendment ids are the spike's. They are unrelated to the attenuation-ladder steps A1-A5 of §12.3.
+
 ### Conventions
 
 The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **SHOULD**, **SHOULD NOT**, **RECOMMENDED**, **NOT RECOMMENDED**, **MAY** and **OPTIONAL** are to be interpreted as described in BCP 14 [RFC 2119] [RFC 8174] when, and only when, they appear in all capitals.
 
 - Sections marked *(Non-normative)* explain; they impose no requirement.
-- **DECISION D<n> (recommended: …)** marks a choice only the owner can make. The draft proceeds with the recommended option; all decisions are collected in §23.1.
+- **DECISION D<n> (recommended: …)** marks a choice only the owner can make. The draft proceeds with the recommended option; all decisions are collected in §23.1. **DECIDED D<n> (…)** marks one that has been made; §23.1 records who decided it and where.
 - **[PROPOSED DEFAULT]** numbers are starting values for the `canticle-regulation/1` profile (§12.8). They are to be tuned at cohort scale before fleet use (D5).
-- Citations: repository paths are relative to the repository root at `b46a45a` (for example `proto/stations-and-streams-v0.2.md:79`). `OC-RFC:<n>` is a line of the OpenClaw continuation RFC at `9eb655afa`. OpenClaw source paths are on that same branch unless marked `main`.
+- Citations: repository paths are relative to the repository root at `b46a45a` (for example `proto/stations-and-streams-v0.2.md:79`). Files added by PR #52 (`spike/protocol-dynamics-udp-vs-tcp-2026-09-27.md`, `prototype/protocol-dynamics/`, `prototype/canticle-station/`, `rfc/0001-notes/proto-dynamics-research.md`) are cited at `main` @ `25081b3`. `OC-RFC:<n>` is a line of the OpenClaw continuation RFC at `9eb655afa`. OpenClaw source paths are on that same branch unless marked `main`.
 
 ### Scope of this document
 
@@ -208,7 +216,7 @@ The repository listed planes four ways: four in `proto/TASK-BRIEF.md:25-29`, fiv
                             relay = membrane (Go/Rust)  ── lease: HELLO→COOKIE→LISTEN→RENEW
                             admit, budget, dedup, proxy-loop, fan-out
                                         │                 │
-                                        │                 └──▶ other relays (D10: NATS backbone beyond cohort scale)
+                                        │                 └──▶ other relays (D10: TCP/QUIC; NATS only after S4a)
                                         ▼
                             ringserver (DataLink write) ──▶ SeedLink v3/v4, DataLink, WebSocket ──▶ dashboards
   harness bindings: OpenClaw plugin (enqueueSystemEvent + wrapExternalContent + requestHeartbeatNow)
@@ -487,6 +495,14 @@ Worked numbers (from `review/challenge-bio §3.3`):
 | `ambient`, 40 × 900 B, TTL 300 s | 40 | 72 s | 72 s (`hi` = 100 s) | ~96 s |
 | `chatter`, 100 × 600 B, TTL 60 s | 100 | 120 s | exceeds `hi` = 20 s → DEGRADED: chatter stops looping, new chatter gets backpressure | first copy only |
 
+**Amendment A7 (#54): why the class floors are below SAP's.** SAP scales its interval with bandwidth above a 300 s floor, `interval = max(300; 8 · no_of_ads · ad_size / limit)` (RFC 2974 §3.1). That floor is a congestion-safety rule for a multicast with no feedback. This RFC keeps SAP's bandwidth cap (`B_stream`, `B_station`) and deliberately drops the floor: the class floors of §6.2 are 1-30 s, 10 to 300 times faster, because canticle carries live state rather than session announcements (`rfc/0001-notes/proto-dynamics-research.md` §3.4). The departure rests on three controls:
+
+- **LAN.** The multicast fast path runs only where `canticle doctor` has passed (§11.2). That is the "controlled environment" RFC 8085 §3.6 treats separately from the general Internet, and the budgets still cap the rate.
+- **Internet.** Frames reach internet listeners only through relays. Per-lease and global budgets (§11.3.7, §12.3) and the circuit breaker (§14.8.3) bound what any path carries.
+- **Feedback.** Relays learn each lease's loss from the receiver report on RENEW (§11.3.2, amendment A3). This gives the relay → listener flow loss detection, which RFC 8085 §3.1.3 asks of any sender faster than one datagram every 3 s. Counting RENEW as that return traffic is an interpretation, and it holds only because RENEW carries the report (`rfc/0001-notes/proto-dynamics-research.md` §9).
+
+**Amendment A13 (#54): the budget, not the class floor, sets catch-up.** The class floor bounds how fast an item may loop. How fast a late joiner actually catches up depends on the stream's budget and live-set size, through `fair_ms`. E4 measured this: with `B_stream` = 4 kbit/s shared by 20 items of 327 B, the fair-share loop is 13.08 s, not the 5 s class floor. Passive catch-up was then 14.9 s (p50) with no loss and 37.4 s at 30% loss (`prototype/protocol-dynamics/SUMMARY.md`, E4). The beacon advertises the effective loop (`loop_ms`, `loop_max_ms`, §9.8), so listeners can compute their catch-up contract. A catch-up SLO needs an explicit, bounded fill budget: a larger `B_stream` within `B_station`, or a relay fill (§7.10). A catch-up SLO without such a budget is not a valid stream configuration.
+
 ### 7.6 New-item burst
 
 On a new item, a supersede (§7.8), a pluck (§7.7) or an UNEQUIP (§8.5), the station SHOULD transmit immediately and then at +1 s, +2 s and +4 s, before settling at `loop_ms`. This follows mDNS's announcement rule ("at least two unsolicited responses, one second apart", RFC 6762 §8.3) and Trickle's reset on inconsistency (RFC 6206 §4.2). The burst is charged to `B_stream`. It MUST be skipped when the budget is exhausted, except for control frames.
@@ -524,9 +540,33 @@ A keyed item may need to stay on air longer than one TTL — a root mark, or an 
 ### 7.10 Late joiners
 
 - **Passive catch-up.** A listener that tunes in hears every live item within about `loop_ms · 4/3` without loss. With independent loss probability *p* per copy, it still misses an item after *k* revolutions with probability *p^k*. Measured in the broker control experiment: about 1.0 s for 20 items looping at 1 s, over raw UDP, NATS core and Zenoh alike; at 30% emulated loss, p95 2.43 s and maximum 7.21 s (`review/challenge-broker §5.1`).
-- **Relay snapshot (MAY).** After a cookie-validated LISTEN (§11.3), a relay MAY send the listener the current verified live set matching its filters once, paced within the lease's byte budget. This is SAP's proxy cache (RFC 2974 §9) and happens entirely at the relay: the station is untouched, and I-1/I-2 hold.
+- **Gaps.** Each beacon stream entry carries `trail_seq`, the lowest `seq` still on air, beside `head_seq` (§9.8, amendment A1). The live set is not contiguous, because items expire, are superseded or are plucked out of order. A missing `seq` below `trail_seq` is gone and will not loop again, so a listener stops waiting for it. A missing `seq` in [`trail_seq`, `head_seq`] may still be live: the listener MAY wait up to one `loop_max_ms` for it, or ask its relay for repair (below). Either way, a gap is never a value (I-9).
+- **Join modes and fill (MAY; amendment A5, #54).** A LISTEN names how the listener joins (§11.3.2, key 7):
+  - `live` (the default): looped frames only, with passive catch-up;
+  - `live+fill`: looped frames, plus a **fill**. The relay sends the current verified live set that matches the filters, paced within a fill budget;
+  - `fill-only`: the fill without looped frames, as a one-off view of the live set. The lease lapses unless it is renewed.
 
-**Deviation from spine:** P1 said "late joiners catch up passively within one loop period", and P6 left relays at pure fan-out. This RFC lets an edge relay replace that wait with a validated, budget-capped snapshot. Evidence: a JetStream last-per-subject snapshot delivered 20 live items in 3.7 ms against about 1 s for the loop, and up to 7.2 s at 30% loss (`review/challenge-broker S1, §5.1`).
+  A fill is SAP's proxy cache (RFC 2974 §9), and it happens entirely at the relay. The station is untouched, and I-1 and I-2 hold. A fill:
+  - is paced at `fill_bps`, which the relay grants in LISTEN_OK. [PROPOSED DEFAULT]: at most 128 kbit/s, within the per-prefix caps of §11.3.7;
+  - makes at most `fill_passes` passes over the live set ([PROPOSED DEFAULT] 2). Each pass sends each matching live tuple once. E4 showed that one snapshot paced at 32 kbit/s is slow under loss: 20 frames took 1.57 s with no loss, and a lost frame then waited for the 13 s loop (p50 4.7 s at 5% loss, 28.5 s at 30%; `prototype/protocol-dynamics/SUMMARY.md`, E4);
+  - contains only verified, unexpired frames the relay already holds, in their original bytes. There is no archive demand: anything older than the live set belongs to the replay tier (§18).
+
+  Fill frames are ordinary copies to the receiver. A tuple it has already heard is a no-op (§7.4).
+- **Relay repair (MAY; amendment A2, #54).** A leased listener that sees a gap MAY ask its relay for the missing tuples with REPAIR (§11.3.2). Seismic telemetry settled on this pattern over bad links: UDP push, with repair on request from the sender's buffer (Nanometrics NMX/NAQS; `rfc/0001-notes/proto-dynamics-research.md` §2). Here the edge relay serves the repair instead of the station, so I-1 and I-2 still hold.
+  - A listener requests only a `seq` in [`trail_seq`, `head_seq`] of the station's latest beacon that it has not heard.
+  - It sends at most one REPAIR per lease per beacon interval for that station, lowest `seq` first. It does not ask for the same tuple again within (K + 2) · RTT, where RTT is measured on its lease exchange and K = 4 [PROPOSED DEFAULT]. This is NORM's discipline (RFC 5740 §5.3).
+  - The relay answers only:
+    - on a validated lease (cookie and address, §11.3.3);
+    - from its verified, unexpired live set (§12.4), with the stored station-signed bytes;
+    - within the lease's `granted_bps` and the relay's global egress cap.
+
+    It skips a tuple it already sent to that lease within the tuple's `loop_ms`, and it never sends a frame whose remaining life is below its class's egress minimum (§12.3).
+  - For tuples the relay does not hold, it MAY answer REPAIR_GONE. It sends at most one per lease per 2 · RTT, and never one larger than the REPAIR that triggered it (NORM's rate-limited `SQUELCH`).
+  - A relay MUST NOT forward a REPAIR, or anything derived from one, to a station or an upstream relay. No station ever sees repair traffic.
+  - Receivers verify repaired frames like any other frame. A repaired copy of a tuple already heard is a no-op (§7.4). REPAIR_GONE is availability data: it ends the wait, and it is never evidence about the item.
+  - The carousel remains the baseline, and repair is an optimisation. Non-goal 1's exception (§21) is scoped to exactly this mechanism. There are no NACKs on LAN multicast in v1.
+
+**Deviation from spine:** P1 said "late joiners catch up passively within one loop period", and P6 left relays at pure fan-out. This RFC lets an edge relay replace that wait with a validated, budget-capped fill, and repair gaps on request. Evidence: a JetStream last-per-subject snapshot delivered 20 live items in 3.7 ms against about 1 s for the loop, and up to 7.2 s at 30% loss (`review/challenge-broker S1, §5.1`). The fill and repair rules are amendments A2 and A5, measured in E4 (`spike/protocol-dynamics-udp-vs-tcp-2026-09-27.md` §3.6, §7).
 
 ### 7.11 Addressed items are never looped
 
@@ -549,7 +589,7 @@ The beacon keeps v0.2's framing (`proto/stations-and-streams-v0.2.md:29-40`), wh
 The BEACON frame layout is in §9.8. Semantically it does six jobs:
 
 1. **Presence.** The station exists and is emitting, without anyone tuning to a stream.
-2. **Head-sync per stream.** `head_seq` per stream, not per station. v0.2's single station-level `head_seq` could not head-sync per-stream rings (`review/spec-core §1.4, C18`).
+2. **Head-sync per stream.** `head_seq` per stream, not per station. v0.2's single station-level `head_seq` could not head-sync per-stream rings (`review/spec-core §1.4, C18`). Beside it, `trail_seq` gives the lowest `seq` still on air, so a receiver can tell a gap that will loop again from one that is gone (§7.10). The UDP telemetry designs that lasted advertise both ends of their window: PGM's `TXW_TRAIL`, the Nanometrics NMX oldest sequence number and Güralp SCREAM's `OLDEST` (amendment A1, #54; `rfc/0001-notes/proto-dynamics-research.md` §7 item 2).
 3. **Liveness.** `next_beacon_ms` states when to expect the next beacon.
 4. **Retention contract.** Per stream: default and maximum TTL.
 5. **Loop contract.** Per stream: live count, typical and maximum `loop_ms`, `B_stream`; per station: `B_station`, and the regulation profile identifier (§12.8).
@@ -568,14 +608,26 @@ A beacon never counts toward salience, evidence mass, accord or any strength qua
 
 ### 8.4 Catalog overflow and rotation
 
-A stream entry costs about 23 bytes typically and up to about 36 bytes in the worst case (§9.11), so one beacon holds about 26-27 entries in the worst case within the 1 100-byte frame budget. A station with more streams MUST rotate them across beacons:
+A stream entry costs about 25 bytes typically. At the largest encodings the §9.8 CDDL allows, it costs 54 bytes, or 59 with `lens` (§9.11). Even at those sizes, one beacon without a capsid holds 17 entries (15 with `lens`) within the 1 100-byte frame budget. A station with more streams than fit in one beacon MUST rotate them across beacons:
 
 - Each beacon carries `page = [index, count]` and `catalog_digest`, the first 8 bytes of SHA-256 over the deterministic CBOR of the full stream catalog.
 - Every stream MUST appear at least once every `count` beacons, and `count` MUST NOT exceed 8.
 - A stream whose `head_seq` changed SHOULD appear in the next beacon, whatever its page.
 - A receiver whose held catalog does not match `catalog_digest` MUST treat entries it has not refreshed within `count` beacons as unknown, not absent.
+- A station MUST choose the entries per page from their actual encoded sizes, so that every beacon stays within the 1 100-byte frame limit, and so within the 1 200-byte datagram ceiling of §9.1. A catalog that does not fit in 8 pages cannot meet this section. A station with more streams than that MUST split them across stations (keys).
 
-**Deviation from spine:** P3's "more than about 180 streams" threshold assumed v0.2's 8-byte entries (`{stream_id u32, default_ttl u32}`, from the PR #32 review). v2 entries carry head, live count, loop and budget fields, so rotation starts at about 26-27 streams. Evidence: the measured sizes in §9.11 (`rfc/0001-notes/vec/frame_v2_sizes.py`).
+**Paging bound (amendment A1, #54).** Silas accepted A1 on condition of a proof that the worst-case beacon stays within the ceiling with paging. `rfc/0001-notes/vec/frame_v2_sizes.py` computes the bound, with every field at the largest value the §9.8 CDDL allows (`trail_seq` included) and a 32-byte `profile`:
+
+| Beacon | Largest frame, or entries per page |
+|---|---|
+| All fixed fields, no stream entries | 166 B |
+| Station beacon, no capsid | 17 entries per page (15 with `lens`), so any catalog of up to 136 streams (120) fits in 8 pages |
+| Station beacon with the largest capsid of §8.7's suggested shape (LAN only) | 12 entries per page (11 with `lens`); catalog floor 96 (88) |
+| Relay beacon with 32 relay entries (key 11), no stream entries | 661 B |
+
+A station whose catalog is at or below these floors can always page within the limit, whatever its field values.
+
+**Deviation from spine:** P3's "more than about 180 streams" threshold assumed v0.2's 8-byte entries (`{stream_id u32, default_ttl u32}`, from the PR #32 review). v2 entries carry head, trail, live count, loop and budget fields, so rotation can start at 17 streams. Evidence: the measured sizes in §9.11 (`rfc/0001-notes/vec/frame_v2_sizes.py`).
 
 ### 8.5 Root mark and UNEQUIP
 
@@ -629,7 +681,7 @@ Rendering rules:
 
 ### 8.8 Cost
 
-A signed beacon with five stream entries is 243 bytes (§9.11), about 1.9 kbit/s at 1 Hz. Relays SHOULD decimate toward internet leases (for example to 0.2 Hz, about 0.4 kbit/s). Ed25519 verification of beacons is cheap relative to fan-out: roughly 71 000 verifications per second on a 2011 quad-core, per the Ed25519 paper (`review/transport §7.1`).
+A signed beacon with five stream entries is 253 bytes (§9.11), about 2.0 kbit/s at 1 Hz. Relays SHOULD decimate toward internet leases (for example to 0.2 Hz, about 0.4 kbit/s). Ed25519 verification of beacons is cheap relative to fan-out: roughly 71 000 verifications per second on a 2011 quad-core, per the Ed25519 paper (`review/transport §7.1`).
 
 ---
 
@@ -742,24 +794,27 @@ A key can pluck only its own items; this is structural, because the pluck's `key
 
 | Key | Name | Type | Required | Rules |
 |---|---|---|---|---|
-| 1 | `epoch` | uint | yes | |
-| 2 | `bseq` | uint | yes | Beacon counter within the epoch, starting at 1. A lower `bseq` than already seen in the same epoch is ignored; a receiver that accepts a higher epoch resets its `bseq` mark |
+| 1 | `epoch` | uint ≤ 2³²−1 | yes | |
+| 2 | `bseq` | uint ≤ 2⁶⁴−1 | yes | Beacon counter within the epoch, starting at 1. A lower `bseq` than already seen in the same epoch is ignored; a receiver that accepts a higher epoch resets its `bseq` mark |
 | 3 | `wallclock` | uint, ms since the Unix epoch | yes | Station clock at send time (§8.2 job 6) |
-| 4 | `next_beacon_ms` | uint | yes | Time to the next beacon; `0` = goodbye (§8.3) |
+| 4 | `next_beacon_ms` | uint ≤ 2³²−1 | yes | Time to the next beacon; `0` = goodbye (§8.3) |
 | 5 | `profile` | tstr ≤ 32 B | yes | Regulation profile id, e.g. `"canticle-regulation/1"` (§12.8) |
 | 6 | `streams` | array of `stream-entry` | yes | May be empty |
 | 7 | `page` | `[index: uint, count: uint]` | when rotating | §8.4; `count` ≤ 8 |
-| 8 | `b_station` | uint, bit/s | yes | §7.5 |
+| 8 | `b_station` | uint ≤ 2³²−1, bit/s | yes | §7.5 |
 | 9 | `catalog_digest` | bstr .size 8 | when rotating | §8.4 |
 | 10 | `capsid` | map | no | Off by default (§8.7) |
 | 11 | `relay` | map | relay beacons only | `{1: tier (0 lan, 1 fleet, 2 public), 2: breaker (0 closed, 1 open, 2 half-open), 3: [* [key_id, decimation n]], ? 4: new alarm tuples per minute (fleet rate)}` |
 
 ```cddl
-stream-entry = [ stream_id: uint, head_seq: uint, live: uint, loop_ms: uint, loop_max_ms: uint,
-                 default_ttl_s: uint, max_ttl_s: uint, b_stream: uint, ? lens: uint ]
+stream-entry = [ stream_id: uint .size 4, head_seq: uint .size 8, trail_seq: uint .size 8,
+                 live: uint .size 4, loop_ms: uint .size 4, loop_max_ms: uint .size 4,
+                 default_ttl_s: uint .size 4, max_ttl_s: uint .size 4, b_stream: uint .size 4,
+                 ? lens: uint .size 4 ]
 ```
 
 - `head_seq` is the highest `seq` the station has issued on the stream in this epoch, counting ITEM and PLUCK frames.
+- `trail_seq` (amendment A1, #54) is the lowest `seq` of any ITEM or PLUCK the station still has on air on the stream in this epoch. When nothing is on air, `trail_seq = head_seq + 1`, which is PGM's empty-window convention. A station MUST NOT advertise a `trail_seq` above a `seq` it will transmit again. Receivers use it only as §7.10 says, never as a strength or trust input (§12.1).
 - `live` is the live-set size; `loop_ms` and `loop_max_ms` are the median and maximum effective loop over live items (0 when `live` = 0).
 - Beacons are deduplicated on `(key_id, epoch, bseq)`, separately from items.
 
@@ -801,8 +856,10 @@ Measured with the illustrative encoder in §9.13 (Python `cbor2` canonical mode,
 | ITEM | aspect item (§17.3) with a 512-byte synthesis and 6 evidence references (704-byte body), `lens` and `scope = fleet` set | 869 B |
 | ITEM | "hello, station" (vector 1, §9.13) | 127 B |
 | PLUCK | minimal (vector 2) | 107 B |
-| BEACON | 5 stream entries (the 8-field `stream-entry` of §9.8) | 243 B (about 23 B per entry) |
-| BEACON | worst-case entry sizes (about 35 B each; 36 B with `lens`) | about 27 entries per page, 26 with `lens` (§8.4) |
+| BEACON | 5 stream entries (the 9-field `stream-entry` of §9.8) | 253 B (about 25 B per entry) |
+| BEACON | every field at its CDDL maximum, no stream entries | 166 B |
+| BEACON | stream entries at their CDDL maximum (54 B each; 59 B with `lens`) | 17 entries per page, 15 with `lens`; 12 and 11 with the largest capsid (§8.4) |
+| relay BEACON | 32 relay entries in key 11, no stream entries | 661 B |
 
 The fixed parts cost 76 bytes (12 header + 64 signature). Core keys add about 50. Transport headers (IPv4 28 B, IPv6 48 B; WebTransport about 30-60 B) are extra and within the 1 200-byte datagram ceiling.
 
@@ -872,9 +929,13 @@ DECISION D12 (recommended: keep the bespoke fixed header, deterministic CBOR and
 1. Every frame — ITEM, PLUCK and BEACON, all classes — MUST carry a valid Ed25519 signature (§9.3). Receivers MUST verify it before any use other than bounded debug logging.
 2. Trust derives **only** from the signature plus the fleet manifest (§10.3). Receivers MUST NOT infer trust from a name, a DNS or mDNS record, a network location, a relay, a beacon, payload shape, or any self-asserted field (#48: "never infer trust from a familiar name, network location, or payload shape"). The orphan branch's ingress gate (`packet.provenance.trusted`, `packet.from in cohort_glyphs`, `origin/ronan/20260614/send-receive-threshold-landing:proto/receive-side-draft.md:53`) is exactly the self-asserted trust this forbids.
 3. Relays are trusted for availability only. They forward signed bytes and never re-sign (I-8). This settles `proto/scope-framing-and-noosphere-mapping.md:94-96` ("relay verifies … and re-signs … (or simply forwards)") in favour of forwarding.
-4. #48's guardrail is adopted: verification authorizes **interpretation eligibility**, never task execution, durable task ownership or arbitrary session delivery. Verification alone never causes a turn. A wake happens only by the receiver's own explicit, budgeted local policy (§14.10); D1 (§14.10) records the strict alternative.
+4. #48's guardrail is adopted: verification authorizes **interpretation eligibility**, never task execution, durable task ownership or arbitrary session delivery. Verification alone never causes a turn. A wake happens only by the receiver's own explicit, budgeted local policy (§14.10); D1 (§14.10) records the decision.
 
-DECISION D4 (recommended: Ed25519 mandatory for every frame that can land in a session or affect a receptor, on every binding including host-local; unsigned frames only on a peer-authenticated host socket for debugging, never landed).
+DECIDED D4 (2026-09-28, #54): Ed25519 on every frame or binding that can land in a session or mutate receptor state, host-local paths included.
+
+- **The one unsigned path.** A peer-authenticated unix debug socket (§11.1), whose output is bounded debug logging only. Nothing arriving on it may mutate receptor state, land, carry accord weight, be relayed, or act as a compatibility fallback.
+- **No downgrade.** The old unsigned LAN formats (v0.1, v0.2) are superseded, and there is no downgrade mode (§9.1; §19.3 Never 8).
+- **HMAC.** A group HMAC MAY serve only as a relay flood pre-filter (§10.2). It is never identity and never authorization.
 
 **Deviation from spine:** P5 allowed unsigned frames at scope ≤ 1 (loopback), recorded as `sigState=absent`. UDP loopback is not authenticated on hosts with host-networked containers, multiple users, or a compromised package post-install script: any local process can send to 127.0.0.1. Unsigned frames therefore never land, and the host binding is a unix socket with peer credentials (§11.1). Evidence: `review/challenge-redteam T16, amendment 3`.
 
@@ -899,7 +960,7 @@ Format: a deterministic-CBOR map, signed by at least *k* of the *n* root keys it
 |---|---|
 | `version`, `serial` | Format version; serial strictly increasing |
 | `issued_at`, `not_after` | `not_after − issued_at` ≤ 7 days [PROPOSED DEFAULT] |
-| `roots`, `threshold` | Root public keys and *k*. RECOMMENDED 2-of-*n* at fleet scale |
+| `roots`, `threshold` | Root public keys and *k*: 1-of-1 is acceptable for the cohort pressure test; 2-of-3 is REQUIRED before fleet deployment (D15) |
 | `principals` | `[{id, name, kind: operator \| host \| service \| human}]` |
 | `keys` | `[{pk, key_id, principal, name, role: station \| relay \| keeper \| issuer \| control, caps: [capability], scopes: [host, lan, fleet, public], streams?: [name patterns], not_before, not_after}]`. `key_id` MUST equal `SHA-256(pk)[0:8]`; duplicate key-ids make the manifest invalid |
 | `relays` | `[{key_id, endpoints, tier: lan \| fleet \| public}]` |
@@ -911,17 +972,23 @@ Format: a deterministic-CBOR map, signed by at least *k* of the *n* root keys it
 
 Distribution and lifetime:
 
-- Fetched over HTTPS from a location in configuration or in the DNS-SD TXT key `mfst=` (§13.2); cached on disk; refreshed every 24 h [PROPOSED DEFAULT] and on a root-signed MANIFEST-REFRESH control frame (§10.6).
+- Fetched over HTTPS from a location in configuration or in the DNS-SD TXT key `mfst=` (§13.2); cached on disk; refreshed every 24 h and on a root-signed MANIFEST-REFRESH control frame (§10.6). Refresh means re-fetch and revalidate. While the signed manifest is unchanged and unexpired, it does not require a daily offline signing ceremony.
 - A receiver whose manifest has passed `not_after` MUST fail closed: it keeps processing control frames from the last known root and treats every other frame as `ringbuffer_only`, and it alerts its operator.
-- A single-owner cohort MAY run a 1-of-1 root.
+- A single-owner cohort MAY run a 1-of-1 root for the pressure test. Before fleet deployment, roots MUST be 2-of-3, offline and held by humans, and root-key backup and recovery MUST be documented before the switch.
 
 Bootstrap and rollover (raised in review of PR #52):
 
-- **Genesis pin.** A receiver MUST NOT accept a manifest unless it verifies against a root set, or the SHA-256 digest of a genesis manifest, that its operator provisioned out of band: configuration management, the install package, or `stations.toml`. A manifest found by location alone (configured URL, DNS-SD `mfst=`, HTTPS) is only a candidate. HTTPS and the WebPKI authenticate the server, not the fleet, and are never sufficient on their own.
+- **Genesis pin.** A receiver MUST NOT accept a manifest unless it verifies against a root set, or the SHA-256 digest of a genesis manifest, that its operator provisioned out of band. The install ships the genesis root set or genesis-manifest digest; configuration management and `stations.toml` MAY carry it too. The trust anchor is never fetched from DNS, HTTPS or a configured URL. A manifest found by location alone (configured URL, DNS-SD `mfst=`, HTTPS) is only a candidate. HTTPS and the WebPKI authenticate the server, not the fleet, and are never sufficient on their own.
 - **Root rotation.** A manifest whose `roots` or `threshold` differ from the currently trusted set MUST carry signatures meeting the threshold of the current set as well as of the new one. A receiver that cannot see such a chain from its pinned set MUST keep the old set and alert its operator.
 - **Rollback.** A receiver MUST durably record the highest `serial` it has accepted before acting on that manifest, and MUST reject a manifest with a lower serial, or the same serial and different bytes (the latter is root equivocation: alert).
 
-DECISION D15 (recommended: 2-of-*n* offline roots held by humans, separate from alarm-key holders, manifest lifetime 7 days, refresh daily; 1-of-1 acceptable at cohort scale; the genesis pin shipped with the install, not fetched).
+DECIDED D15 (2026-09-28, #54): staged custody.
+
+- **Cohort pressure test.** A 1-of-1 root is acceptable.
+- **Before fleet deployment.** 2-of-3 offline roots, held by humans, with backup and recovery documented before the switch.
+- **Separation.** Root holders and alarm-key holders MUST be separate.
+- **Genesis pin.** It ships with the install and is never fetched.
+- **Lifetime and rotation.** A manifest lives at most seven days, and receivers re-fetch and revalidate it daily. Root-set changes need both thresholds. Receivers keep durable highest-serial rollback protection, and fail closed after expiry.
 
 `~/.binary-canticle/stations.toml` (the static-configuration fallback that `proto/protocol-spec-v0.1.md:305-307` made a MUST) keeps its role as a **locator**, and is one place the genesis pin (root keys and threshold, or a genesis manifest digest) MAY be provisioned.
 
@@ -935,14 +1002,17 @@ DECISION D15 (recommended: 2-of-*n* offline roots held by humans, separate from 
 | `finding-ref` | class 5 | session stations, ledger services |
 | `regulatory` | class 6, ops `tighten`, `all-clear`, `lower-attention`, `grounding-anchor` | sentinels, operators |
 | `quarantine` | class 6, ops `quarantine-vote`, `rescind-vote` | operators, security services |
-| `alarm` | class 7 | human-operated stations, or an issuer service (D14) |
+| `alarm` | class 7 | human-operated stations; an issuer service only behind D14's flag |
 | `control` | class 8 | manifest roots and root-delegated control keys only |
 
 - A frame whose class or op exceeds its key's capability MUST be treated as `ringbuffer_only` with zero accord weight and evidence `capability-exceeded`.
 - A frame whose `scope` exceeds the key's scopes, or whose stream is outside the key's `streams` patterns, is treated the same way.
-- Keys held by LLM-driven sessions SHOULD NOT hold `quarantine`, `alarm` or `control` (`review/challenge-redteam C3, N.3`).
+- An LLM-driven session MUST NOT hold a key with `quarantine`, `alarm` or `control` (`review/challenge-redteam C3, N.3`; D14).
 
-DECISION D14 (recommended: in v1, `alarm` keys are held by human-operated stations; an automated issuer that turns a 2-of-3 threat-keeper vote into an alarm stays behind a flag until the red-team suite (§22.7) passes).
+DECIDED D14 (2026-09-28, #54): in v1, `alarm` keys are operated by humans.
+
+- **Automated issuance.** An automated issuer that turns a 2-of-3 threat-keeper vote into an alarm stays disabled behind an explicit feature flag. The flag stays off until the S5 worm range (§22.7) shows resistance to correlated evidence, re-sung lineage, colluding keepers and false independence.
+- **Custody.** Alarm-key custody is separate from manifest-root custody (D15).
 
 ### 10.5 Key lifecycle
 
@@ -1040,12 +1110,27 @@ Four bindings carry the same frames, and a fifth and sixth are planned or option
 | (b) | LAN multicast fast path, with `canticle doctor` | 2 | OPTIONAL; used only when the doctor passes |
 | (c) | Relay lease (unicast UDP) | 2, R, R-pub | MUST; the default outside a known wired VLAN |
 | (d) | ringserver replay/dashboard tier (TCP, via a DataLink bridge) | R | SHOULD (§18) |
-| (e) | WebTransport datagrams from relays to browsers | R, R-pub | later |
+| (e) | WebTransport from relays to browsers | R, R-pub | later; experimental (§11.5) |
 | (f) | NATS WebSocket/TCP listener binding | R | MAY (§11.6) |
 
 "No subscription at the sender" stays true on every binding: leases live in relays, never in stations (I-1).
 
 DECISION D6 (recommended: internet listeners are in scope, through relay-held leases; the station still tracks nobody).
+
+DECIDED D10 (2026-09-28, #54): **transport by plane.** The measurements do not show that UDP beats TCP in general. On healthy links TCP is fresher: it repairs one loss within one retransmission timeout. The carousel is for bounded staleness, and for keeping listeners isolated from each other, under loss, outages or stalled consumers (`spike/protocol-dynamics-udp-vs-tcp-2026-09-27.md` §2-§3):
+
+| Plane (§3.1) | Transport | Evidence |
+|---|---|---|
+| Broadcast edge: station or relay → listeners, LAN multicast | **UDP carousel** (§7, §11.2, §11.3) | Every update delivered in every loss condition, worst case 4.5-10 s under the heaviest loss (E1); a dead lease costs the sender nothing (E3); about 3× less sender CPU per listener than TCP (E2) |
+| Soft-state membership: beacons, presence | **UDP** (§8) | Periodic and loss-tolerant |
+| Relay ↔ relay backbone | **TCP or QUIC streams**, under §12.4's backbone rules | Few, usually healthy links; one retransmission timeout repairs a loss; each item is carried once, not looped |
+| Clean-path snapshots, replay, dashboards | **TCP** (ringserver, §18); the carousel and fill (§7.10) as the fallback | A TCP snapshot took 0.5 ms with no loss, but lost SYNs stalled joins at 30% loss (E4) |
+| Ledger (findings, promotion) | **TCP** | Reliability and order matter; freshness does not |
+| Addressed, durable control | **TCP/QUIC**, or the harness's durable queue | Needs a receipt |
+
+- **One relay:** no broker.
+- **Cohort scale:** simple custom relay-to-relay forwarding.
+- **NATS:** only when multi-relay fleet operation actually justifies it, and only after spike S4a (§12.4). Zenoh remains the evaluated alternate.
 
 ### 11.1 Host-local binding
 
@@ -1093,19 +1178,36 @@ All lease messages start with `magic`, `version` and `kind` (§9.2), followed by
 |---|---|---|---|---|
 | `0x10` | HELLO | listener → relay | no | `{1: client_nonce (bstr .size 16), 2: profile (tstr), 3: pad (bstr)}`. The datagram MUST be ≥ 256 bytes; relays ignore shorter HELLOs |
 | `0x11` | COOKIE | relay → listener | no | `{1: client_nonce, 2: cookie (bstr .size 16), 3: relay_epoch (uint), 4: lease_max_s (uint)}`. MUST be ≤ the HELLO's size (in practice ≤ 64 B) |
-| `0x12` | LISTEN | listener → relay | no (capability inside is signed) | `{1: client_nonce, 2: cookie, 3: relay_epoch, 4: [* filter], ? 5: capability (bstr), ? 6: budget_bps (uint), ? 7: snapshot (bool)}` |
-| `0x13` | LISTEN_OK | relay → listener | **yes** (relay key) | `{1: lease_id (bstr .size 8), 2: lease_s, 3: renew_s, 4: granted_bps, 5: [* [key_id, decimation n]], 6: relay_beacon_ms, ? 7: [* denied filter index], 8: profile}` |
-| `0x14` | RENEW | listener → relay | no | `{1: lease_id, 2: cookie, 3: relay_epoch, 4: renew_seq (uint), 5: pad}`. The datagram MUST be ≥ 96 bytes |
+| `0x12` | LISTEN | listener → relay | no (capability inside is signed) | `{1: client_nonce, 2: cookie, 3: relay_epoch, 4: [* filter], ? 5: capability (bstr), ? 6: budget_bps (uint), ? 7: join (uint: 0 live, 1 live+fill, 2 fill-only; absent = 0), ? 8: fill_bps (uint)}` (§7.10) |
+| `0x13` | LISTEN_OK | relay → listener | **yes** (relay key) | `{1: lease_id (bstr .size 8), 2: lease_s, 3: renew_s, 4: granted_bps, 5: [* [key_id, decimation n]], 6: relay_beacon_ms, ? 7: [* denied filter index], 8: profile, ? 9: granted fill_bps, ? 10: fill_passes}`. Keys 9 and 10 are present when the join includes a fill |
+| `0x14` | RENEW | listener → relay | no | `{1: lease_id, 2: cookie, 3: relay_epoch, 4: renew_seq (uint), 5: pad, ? 6: receiver-report}`. The datagram MUST be ≥ 96 bytes |
 | `0x15` | BYE | listener → relay | no | `{1: lease_id, 2: cookie}` |
-| `0x16` | LEASE_UNKNOWN | relay → listener | no | `{1: lease_id}`. Sent only in reply to a RENEW with a valid cookie; ≤ the RENEW's size |
-| — | data | relay → listener | station-signed | Admitted frames (ITEM, PLUCK, BEACON, relay BEACON), byte-identical |
+| `0x16` | LEASE_UNKNOWN | relay → listener | no | `{1: lease_id}`. Sent only in reply to a RENEW or REPAIR with a valid cookie; ≤ the size of that message |
+| `0x17` | REPAIR | listener → relay | no | `{1: lease_id, 2: cookie, 3: relay_epoch, 4: [* repair-range], 5: pad}`. The datagram MUST be ≥ 96 bytes. At most 8 ranges and 64 tuples ([PROPOSED DEFAULT]; §7.10, amendment A2) |
+| `0x18` | REPAIR_GONE | relay → listener | no | `{1: lease_id, 2: [* repair-range]}`: requested tuples the relay does not hold. Sent only in reply to a REPAIR on a validated lease; ≤ that REPAIR's size, truncated to fit; at most one per lease per 2 · RTT |
+| `0x19` | RELAY_GOAWAY | relay → listener | **yes** (relay key) | `{1: relay_epoch, 2: [* next relay key_id (bstr .size 8)], 3: reason (uint: 0 restart, 1 drain, 2 overload), ? 4: spread_ms (uint)}`: the relay is going away (§11.3.9, amendment A8) |
+| — | data | relay → listener | station-signed | Admitted frames (ITEM, PLUCK, BEACON, relay BEACON), byte-identical; repaired and fill frames are the same bytes |
 
 ```cddl
 filter = [ key_id: bstr .size 8 / null,     ; null = any key the capability allows
            stream_id: uint / null,          ; null = any stream
            class_mask: uint / null ]        ; bit c set = class c wanted; null = all
 ; at most 32 filters per LISTEN
+
+repair-range = [ key_id: bstr .size 8, stream_id: uint, epoch: uint, first_seq: uint, last_seq: uint ]
+
+receiver-report = [* [ key_id: bstr .size 8, stream_id: uint,
+                       received: uint,       ; distinct tuples heard since the previous RENEW
+                       expected: uint,       ; tuples the station's head_seq advanced by in that time
+                       max_gap: uint ] ]     ; longest run of consecutive missing seq
+; at most 16 entries
 ```
+
+**Receiver reports (amendment A3, #54).** A RENEW MAY carry a report with aggregate counts per stream: tuples received and expected since the previous RENEW, and the largest gap. A relay MAY use a report to adjust that lease's decimation (§12.3, ladder step A2) or `granted_bps`, and to trip a per-lease circuit breaker on sustained heavy loss (RFC 8084). A relay is free to ignore reports. Reports are availability telemetry and nothing more:
+
+- They carry no content judgment, no stance (§14.16), no session identity and no identifier that is stable across leases. The lease's own identifiers are the only link.
+- They never affect trust, admission, accord or any authority.
+- They fall under the lease-log rules of §11.3.7: kept minimal and short-lived, and never disclosed.
 
 #### 11.3.3 Cookie
 
@@ -1116,6 +1218,12 @@ cookie = first 16 bytes of HMAC-SHA256(K_secret[relay_epoch], src_ip ‖ src_por
 - `K_secret` rotates every 120 s. A relay accepts cookies made with the current and the previous secret, so a cookie is valid for at most 240 s.
 - The relay keeps no state before a valid LISTEN arrives.
 - When the secret rotates, a relay answers the next RENEW with a fresh COOKIE (no larger than that RENEW).
+- **Persisted secret (MAY; amendment A8, #54).** A relay MAY persist its current and previous `K_secret` and its `relay_epoch` across a restart, so that it can validate old cookies and answer a RENEW with LEASE_UNKNOWN instead of silence. The rules:
+  - The store MUST be readable only by the relay.
+  - A persisted secret MUST NOT validate cookies once it is more than 240 s old by the relay's clock.
+  - A relay MUST NOT roll back to an older secret: it keeps a durable, strictly increasing secret counter and discards any persisted secret below it.
+
+  A relay MUST NOT persist its lease table for this purpose. Listener state stays soft and short-lived (§11.3.7). If S4 needs faster recovery than §11.3.9's SLO allows, the options are persisting only minimal, opaque lease state under a short TTL, or shortening the listener's failover detection. A durable listener inventory is not one of them.
 
 #### 11.3.4 Exchange
 
@@ -1126,7 +1234,7 @@ listener                                  relay
    | LISTEN(nonce, cookie, filters, cap?) ─▶ |   validate cookie → address validated;
    |                                         |   check capability; create lease
    | ◀──────────────── LISTEN_OK(lease_id, lease_s, renew_s, granted_bps, decimation) [relay-signed]
-   | ◀══════ (MAY) snapshot of the live set, paced ≤ granted_bps (§7.10)
+   | ◀══════ (join ≠ live) fill of the live set, paced ≤ fill_bps (§7.10)
    | ◀══════ looped frames, beacons, relay beacons
    | RENEW(lease_id, cookie) every renew_s·U(0.8,1.2) ─▶ |  lease extended; NAT refreshed
    | ...                                     |
@@ -1144,7 +1252,11 @@ listener                                  relay
 | Lease lapse | no valid RENEW for `lease_s` | The relay deletes the lease silently |
 | `relay_beacon_ms` | 5 000 ms | The listener declares the relay unobservable after 3 × and fails over |
 | Station beacon decimation toward leases | ≥ 1 per 5 s per station | Announced per station in LISTEN_OK and relay beacons (§8.3) |
-| Snapshot | at most once per lease, within `granted_bps` over the first loop period | §7.10 |
+| Fill | `fill_bps` ≤ 128 kbit/s; `fill_passes` = 2; only for `live+fill` and `fill-only` joins | §7.10, amendment A5 |
+| REPAIR | at most one per lease per station beacon interval; the same tuple again only after (K + 2) · RTT, K = 4 | §7.10, amendment A2 |
+| REPAIR_GONE | at most one per lease per 2 · RTT | §7.10 |
+| Failover backoff | after every manifest relay has failed: exponential from 1 s to 60 s, jittered by U(0.5, 1.5) | §11.3.9, amendment A8 |
+| Restart SLO | every listener of a crashed relay leased again within 3 × `relay_beacon_ms` + 5 s (20 s), p99 | §11.3.9; to be confirmed in S4 |
 
 #### 11.3.6 Listen capability
 
@@ -1173,7 +1285,8 @@ Private streams (audience `private`) MUST also be confidential on the relay link
 - A global egress cap, enforced by `tc` (§12.6).
 - nftables per-source meters on the lease port (§12.6).
 - Listeners SHOULD accept data only from the relay endpoint they leased from (`review/challenge-redteam N.11`).
-- Relays SHOULD keep lease logs minimal and short-lived, and MUST NOT disclose listener sets. Issue #30's `WHO <station>` ("see who's tuned in") is dropped: it contradicts I-1 at the protocol level and is a `monlist`-style reflector. `WHO` may only mean "stations heard", computed from beacons.
+- Fill, repair and REPAIR_GONE traffic counts against the same per-lease, per-prefix and global caps as looped traffic (§7.10).
+- Relays SHOULD keep lease logs, receiver reports included, minimal and short-lived, and MUST NOT disclose listener sets. Issue #30's `WHO <station>` ("see who's tuned in") is dropped: it contradicts I-1 at the protocol level and is a `monlist`-style reflector. `WHO` may only mean "stations heard", computed from beacons.
 
 #### 11.3.8 Station ingress
 
@@ -1183,7 +1296,14 @@ Private streams (audience `private`) MUST also be confidential on the relay link
 
 #### 11.3.9 Failover
 
-Listeners choose relays only from those listed in the manifest (§10.3), ordered by SRV priority and weight (§13). On relay unobservability (§11.3.5) or LEASE_UNKNOWN, a listener re-runs HELLO against the next relay.
+Listeners choose relays only from those listed in the manifest (§10.3), ordered by SRV priority and weight (§13). On relay unobservability (§11.3.5), LEASE_UNKNOWN or RELAY_GOAWAY, a listener re-runs HELLO against the next relay.
+
+Amendment A8 (#54) adds graceful movement, retry and failover bounds, and a restart SLO:
+
+- **RELAY_GOAWAY.** A relay that is about to restart, drain or shed load SHOULD send a signed RELAY_GOAWAY to every lease before it stops. A listener acts on one only if it verifies against that relay's manifest key and carries the current `relay_epoch`. It tries the `next` relays first, but only those listed in the manifest; unknown key-ids are ignored. Before its first HELLO it waits a random delay in [0, `spread_ms`] (default 1 000 ms), so the relay's listeners do not arrive at the next relay in one burst.
+- **Retry bounds.** A listener follows the HELLO retransmit schedule of §11.3.5 against one relay at a time. After every manifest relay has failed, it backs off exponentially from 1 s to 60 s, jittered (§11.3.5).
+- **Restart SLO** [PROPOSED DEFAULT, to be confirmed in S4]: after an unplanned relay restart, every listener holds a lease again, on that relay or another, within 3 × `relay_beacon_ms` + 5 s (20 s) at p99. E5 measured 13.2 s at 1 000 listeners, because a restarted relay could not validate old cookies and listeners waited out three missed relay beacons (`prototype/protocol-dynamics/SUMMARY.md`, E5). A planned restart sends RELAY_GOAWAY, so no listener waits for unobservability.
+- A relay does not persist its lease table to meet the SLO (§11.3.3).
 
 ### 11.4 ringserver replay tier
 
@@ -1192,6 +1312,12 @@ A relay-side bridge writes into EarthScope ringserver over DataLink. Dashboards 
 ### 11.5 WebTransport datagrams (later)
 
 A relay MAY terminate WebTransport sessions and send each admitted frame as one datagram, unchanged. The listen capability travels in the session setup. QUIC datagrams are congestion-controlled and never retransmitted, and a sender that the congestion controller blocks may drop them rather than delay them, which suits a lossy radio (RFC 9221 §2, §5, §5.4). Browser support was reported as broad by 2026; that report comes from secondary sources and was not verified in the review (`review/transport §3.4`).
+
+**Amendment A10 (#54): an experimental binding only.**
+
+- **Mapping.** Datagrams carry repeats and beacons, with a maximum age equal to the frame's remaining life and a small datagram buffer. The first copy of each alarm, control and PLUCK frame goes on its own short unidirectional stream, reset at the frame's expiry. This is MoQ's pattern (`rfc/0001-notes/proto-dynamics-research.md` §7 item 8).
+- **HTTP/2 fallback.** A relay MUST refuse WebTransport's HTTP/2 capsule fallback for this binding, or label that session explicitly as retransmitting and treat it like the TCP tier. Over capsules, datagrams are "retransmitted by QUIC, and therefore do not provide unreliable delivery" (draft-ietf-webtrans-http3; research notes §5.2).
+- **Before any requirement.** The binding stays experimental, and no deployment may require it, until the real browser, CDN and proxy paths the project will use have been validated.
 
 ### 11.6 NATS WebSocket/TCP listener binding (MAY)
 
@@ -1268,6 +1394,17 @@ Budgets exist at three points: the station's own `B_stream`/`B_station` (§7.5);
 
 Implementations MUST NOT shed or decimate the **first copy** of any tuple, nor any control, pluck, supersede, UNEQUIP or alarm first copy. Step A2 is the literal concentration gradient: far listeners hear new items as fast as near ones, but get catch-up repeats less often; meaning is untouched.
 
+**Egress scheduling at relays (amendment A4, #54).** A relay MUST schedule egress per lease, in the manner of Media over QUIC's relays (`rfc/0001-notes/proto-dynamics-research.md` §5.4, §7 item 5):
+
+1. **Priority.** Frames go out in class priority order (the order of §7.5: control ≥ alarm > live-state > …). Within a class, first copies, supersedes and PLUCKs go before repeats; fill and repair frames count as repeats. Within one `state_key`, the newest `issued_at` goes first.
+2. **Latest value.** A queued frame that has been superseded or plucked leaves the queue.
+3. **Bounded queues.** Each lease's queue is capped ([PROPOSED DEFAULT] 64 frames, or 2 s of `granted_bps`, whichever is smaller). When the queue is full, the oldest repeat is dropped first. A lease whose queue stays full of first copies is too far behind: the relay ends it, and the listener sees LEASE_UNKNOWN at its next RENEW. Its first copies are never shed silently.
+4. **Remaining life.** A queued frame whose remaining life is below its class egress minimum ([PROPOSED DEFAULT] 100 ms, the station's own stop rule, §7.3) leaves the queue. So does one that has waited longer than `max_queue_ms` ([PROPOSED DEFAULT] 2 000 ms).
+5. **Minimum fairness.** Backlogged leases share egress round-robin by bytes (deficit round robin), so one slow or greedy lease cannot starve the others.
+6. **Small kernel buffers.** Kernel send buffers stay small, because data already handed to the kernel "can no longer be timed out" (draft-ietf-moq-transport; research notes §4.4).
+
+Priority among a listener's own filters is left to S4.
+
 **Deviation from spine:** P7 said "lower loop rate first, then drop classes". The ladder above makes that explicit, adds relay depth decimation, and lists what may never be shed. Evidence: `review/challenge-bio §3.4, §9 item 3`.
 
 ### 12.4 Relays as proxy-stations, and relay to relay
@@ -1277,14 +1414,27 @@ Implementations MUST NOT shed or decimate the **first copy** of any tuple, nor a
 - Redundant relays on one LAN segment MAY use Trickle suppression: skip a scheduled repeat of τ if at least *k* = 1 copy of τ was heard on the segment in the current interval (RFC 6206 §4.2).
 - For availability against a malicious relay (which cannot forge but can drop), fleets SHOULD provide *k* independent relay paths. The relevant theorem is Edmonds' branching theorem — *k* arc-disjoint arborescences rooted at *r* exist iff every *r*-cut has at least *k* entering arcs. The repository's wording "every cut ≥ k edges" (`references/papers/nsdi26-octopus-forestcoll-ocp-mrc-2026-05-07.md`) states it as if for undirected spanning trees, where it is not sufficient (`review/spikes §5.4`).
 
-**Relay-to-relay transport.** DECISION D10 (recommended: keep the edge — station ↔ host, LAN multicast, relay ↔ listener lease — as raw UDP and never make a station depend on a broker; with a single relay use no backbone; at cohort scale custom relay-to-relay forwarding is acceptable; beyond it, interconnect relays over NATS core using leaf nodes and gateways, with Zenoh as the alternate; decide by spike S4a below). Rules for a NATS backbone:
+**Relay-to-relay transport.** DECIDED D10 (2026-09-28, #54): transport by plane (§11).
+
+- The edge (station ↔ host, LAN multicast, relay ↔ listener lease) stays raw UDP, and no station ever depends on a broker.
+- A single relay uses no backbone. At cohort scale, relays forward to each other over simple custom TCP or QUIC links.
+- NATS core, using leaf nodes and gateways, is adopted only when multi-relay fleet operation actually justifies it, and only after spike S4a below. Zenoh remains the evaluated alternate.
+
+**Backbone rules (amendment A6, #54).** Every relay-to-relay link MUST provide these outcomes, whether it is custom or brokered, TCP or QUIC:
+
+- **Latest value per key.** At most one queued frame per `(key_id, stream_id, state_key)` for keyed items; a newer item replaces the queued one. On Linux TCP, `TCP_NOTSENT_LOWAT` keeps the unsent kernel queue small enough for this to work.
+- **Bounded, drop-oldest queues.** A first copy of a PLUCK, control or alarm frame is never dropped while a repeat or a superseded item is queued.
+- **Bounded unacknowledged lifetime.** A link on which data stays unacknowledged for longer than `D_fail` ([PROPOSED DEFAULT] 30 s) MUST be torn down, and the relay fails over or reconnects. On Linux TCP that is `TCP_USER_TIMEOUT` ≤ 30 s. QUIC implementations need an equivalent deadline of their own. E3 measured the need: detecting a silently vanished TCP peer took 939 s, or 30.3 s with `TCP_USER_TIMEOUT` (`prototype/protocol-dynamics/SUMMARY.md`, E3).
+- **Expiry at the receiving end.** The receiving relay checks every frame's `expires_at` (after δ̂) and drops expired frames, whatever the link delivered. In E1, TCP delivered 1 292 frames after their signed expiry (§20.2 (b)).
+
+Rules for a NATS backbone, once adopted:
 
 - Subjects `cnt.<key_id hex>.<stream_id>`, `cnt.<key_id hex>.pluck`, `cnt.<key_id hex>.beacon`; payload = the canonical frame, unchanged.
 - Loop at the edge relay, not across the backbone, so the backbone carries each item once plus plucks and (aggregated) beacons.
 - If a JetStream store is used as a relay-side live-set cache: `Nats-Msg-Id = <key_id>:<epoch>:<stream_id>:<seq>` (deduplicates loops), and `Nats-TTL = max(1 s, ⌈expires_at − now⌉)` recomputed at **every** hop. NATS TTL restarts when a message is sourced into another stream (measured: a 6 s TTL message copied at t ≈ 3.3 s disappeared from the copy at 9.3 s, `review/challenge-broker §3.2`), so broker TTL is garbage collection only; frames' own `expires_at` governs.
 - NATS NKeys/JWT and subject permissions (`cnt.<K>.>` publishable only by K's relay) MAY be used as defence in depth. They authenticate connections, not frames, and never replace §10.
 
-**Deviation from spine:** P7 and P15 had canticle building "relay-to-relay chaining" itself. Beyond cohort scale this RFC borrows a backbone instead, under the OpenClaw RFC's substrate-adoption rule ("prefer [an existing substrate] over bespoke transport … Bespoke pathing is acceptable only where a concrete direct or transitive functional reason is named", `OC-RFC:879`). Evidence: `review/challenge-broker S4, §7, §8`.
+**Deviation from spine:** P7 and P15 had canticle building "relay-to-relay chaining" itself. Once multi-relay fleet operation justifies one, this RFC borrows a backbone instead, under the OpenClaw RFC's substrate-adoption rule ("prefer [an existing substrate] over bespoke transport … Bespoke pathing is acceptable only where a concrete direct or transitive functional reason is named", `OC-RFC:879`). Evidence: `review/challenge-broker S4, §7, §8`.
 
 **Spike S4a (decision rule for D10).** Topology: network namespaces with 1 station, 2 relays, 200 listeners; netem at 0/2/10/30% loss plus burst loss and 20-150 ms RTT; one listener behind MASQUERADE with `nf_conntrack_udp_timeout=30`. Arms: A custom relay-to-relay; B NATS core leaf/gateway with edge re-loop; B+ with a JetStream live-set cache; C Zenoh routers (UDP batch ≤ 1 200 B). Measure time-to-hear percentiles, staleness, never-heard fraction, backbone bytes per item, relay CPU/RSS/pps, NAT survival after 10 min idle, remaining-life correctness after 2 hops, pluck propagation, tamper rejection, code size, and hardening code needed to pass an amplification test. Adopt B or B+ if p95 time-to-hear is within 1.2 × of A at ≤ 10% loss, the remaining-life and signature invariants hold with frame-level enforcement, and relay RSS is ≤ 64 MB at 10 000 leases; otherwise keep A (`review/challenge-broker §5.2`).
 
@@ -1584,6 +1734,30 @@ No single station SHOULD occupy more than 25% of a session's digest over a 10-mi
 
 A receptor SHOULD adjust each session's θ every 10 minutes by `θ ← clamp(θ · (R_obs/R*)^0.5, θ0, 4θ0)`, with set point R* = 12 surfaced items per hour per session. Alarm and control classes are exempt; they have their own budgets.
 
+#### 14.6.8 Proofreading and consumption modes (amendment A9, #54)
+
+Two receptor mechanisms come from biology (`rfc/0001-notes/proto-dynamics-research.md` §6.6):
+
+- **Kinetic proofreading.** A signal must persist before it commits a cell to act. T cells discriminate by how long a ligand stays bound, not by how strongly it binds (McKeithan, PNAS 1995; from a search excerpt).
+- **Mora–Nemenman windows.** Integration windows are sized from how often the signal arrives and how fast it changes.
+
+They apply as follows:
+
+- **Proofreading gates wake, not reception.** Verified silent landing (§14.9) MAY be immediate. Before a verified alarm can wake a session (§14.10 item 11), the receptor MUST have one of two kinds of evidence:
+  - **Station-attested persistence.** The receptor has admitted *k* signed beacons from the alarm's station, with strictly increasing `bseq` in the alarm's epoch, after first hearing the alarm. Each beacon counts only if all of these hold:
+    - its `wallclock` is not earlier than the alarm's `issued_at`;
+    - its entry for the alarm's stream covers the alarm: `trail_seq` ≤ `seq` ≤ `head_seq` (§9.8);
+    - no PLUCK or superseding item for the alarm has been heard.
+
+    The receptor MUST also have heard every `seq` in (alarm `seq`, `head_seq`] of the last beacon it counts. An unheard `seq` there could be the PLUCK or supersede, so the alarm waits until the gap fills, by loop or by repair (§7.10), or until the alarm expires.
+  - **Independent corroboration.** Independent principals with distinct lineage roots corroborated the alarm. Independence is counted by manifest principal and lineage root, never by key count (§10.7).
+- **Repeats of one frame are not persistence.** Carousel copies of a tuple are byte-identical and carry no observation time, so anyone who captured one live alarm can replay it once per loop interval. Hearing the same tuple again is availability evidence only. It MUST NOT satisfy proofreading, and it MUST NOT count toward any security or independence claim (Ronan's review of #56). Beacons can't be manufactured from a captured item, because each needs a new signature over a higher `bseq`. A party that delays the station's whole signed sequence can shift that evidence in time but cannot extend it: the evidence still shows the station asserting the alarm across *k* beacons, and §14.6.3 still caps local life at the full TTL from first hearing.
+- **The parameters are open.** *k* and the window are derived per stream from its advertised beacon period, loop and budget (`next_beacon_ms`, `loop_ms`, `loop_max_ms`, §9.8) and its supersession cadence. They are not fixed by analogy (§23.2). The maximum latency that proofreading adds to an alarm wake MUST be defined, and tested against the alarm freshness bound of 120 s (§14.10 item 9). As an illustration only: with *k* = 2, the added latency is about 2 s at a 1 s beacon period, and about 10 s through a relay that decimates beacons to one per 5 s (§8.3).
+- **Persistence is not strength.** Proofreading uses persistence as availability evidence. A repeat still adds nothing to salience, evidence mass or accord (R-INT-1, R-INT-6).
+- **Consumption modes.** A session's tune entry MAY choose how heard items reach it:
+  - `raw` (the default): an item lands as soon as it is verified;
+  - `completed`: the receptor holds items so that gaps in [`trail_seq`, `head_seq`] (§7.10) can fill, then lands them in `issued_at` order. The hold lasts at most one advertised `loop_max_ms`, and never past an item's local expiry. This is the short-term completion of Nanometrics NAQS (research notes §2).
+
 ### 14.7 The immune grammar
 
 The minimal grammar of `proto/immune-model-addendum.md:203-226` — tighten, quarantine, all-clear/stand-down, remember only by explicit promotion — becomes four mechanisms, each with numbers. All regulatory effects are **receiver-local modulation**: evidence-logged changes to the receiver's own filters. They are never session actuation, never commands, and never forced self-posture (`proto/protocol-spec-v0.1.md:479-484`; `review/spec-core C15`). "Volitional" (`proto/immune-model-addendum.md:249-250`) here means "local policy configured by the hearer".
@@ -1732,7 +1906,21 @@ The return-stage addendum's MUST-NOTs (PR #34, branch `scribe/return-stage-anti-
 
 ### 14.10 Wake policy
 
-DECISION D1 (recommended: wake is never sender-forced; a receiver-local, opt-in policy MAY escalate verified **alarm** frames to `silent-wake` for designated responder sessions under the conjunction below. The alternative is v0.1 §9.2's strict no-wake, `proto/protocol-spec-v0.1.md:469`, `:473-474`, with humans as the only wake path).
+DECIDED D1 (2026-09-28, #54): silent landing by default. A receiver-local, opt-in policy MAY escalate verified **alarm** frames to `silent-wake` for designated responder sessions, under the conjunction below.
+
+- **The initial deployment is silent-only.** A receptor MUST NOT enable `silent-wake` until S3 has implemented and tested the whole receiver-side conjunction:
+  - manifest capability;
+  - explicit local stream and session opt-in;
+  - hop 0, and lineage that is not wake-derived;
+  - the freshness bound;
+  - independent session, host and token budgets;
+  - coalescing and the circuit breaker;
+  - sandboxing, taint handling (§14.12) and sealed bootstrap state;
+  - proofreading (§14.6.8).
+- **No sender wake.** A sender can neither request nor force a wake.
+- **Post-compaction.** Landing heard content after compaction stays reserved in v1 (D13, §14.9).
+
+v0.1 §9.2's strict no-wake (`proto/protocol-spec-v0.1.md:469`, `:473-474`), with humans as the only wake path, was the alternative. Until S3 passes, deployments behave as if it were in force.
 
 A receptor MAY wake a session only if **all** of these hold:
 
@@ -1746,6 +1934,7 @@ A receptor MAY wake a session only if **all** of these hold:
 8. `hop = 0`, and flag `wake_derived` is 0.
 9. The frame's age at first hearing is at most `stale_after[alarm]` (120 s), and it is neither superseded nor plucked.
 10. Host prerequisites hold. For OpenClaw: sandboxing is on for the agent and its bootstrap files are sealed (D16; §16.3).
+11. Proofreading has passed (§14.6.8).
 
 Wakes MUST be coalesced (OpenClaw `coalesceMs` ≥ 5 000 ms). Each wake MUST be logged with its evidence.
 
@@ -1820,6 +2009,35 @@ From: magi-threat 21fe31dfa154a261
 
 The receptor contract's session surface stays, as a local API over the host socket: `listen`, `atmosphere` (the interpreted digest), `ringbuffer` (raw), `receipts`, `receptorState`, `quarantineView` (`proto/receptor-contract-v0.2.md:447-457`). "No adapter or session surface may bypass the receptor core to write directly into atmosphere" (`:461-462`).
 
+### 14.16 Contagion controls (amendment A11, #54)
+
+The cohort has already seen contagion, with no canticle involved (`spike/protocol-dynamics-udp-vs-tcp-2026-09-27.md` §5). Over Discord, one prince's "nah, tomorrow" spread to the others almost at once, even mid-activity, and "goodnight princes" halted every prince. Susceptibility does not depend on the channel. Canticle can carry a cue faster and further, and TCP would deliver a bad cue as reliably as a good one. The controls therefore sit at the receiver:
+
+1. **Election to listen.** Nothing lands on a session that has not tuned the stream (§14.6.1). Tuning is explicit, sessions start untuned, and untuning takes effect at once.
+2. **Turn-boundary landing.** A silent landing takes effect only at a turn boundary, when the session's next turn starts (§14.9). It never interrupts a step in progress. The one exception is a gated alarm wake (§14.10).
+3. **Desynchronised landing.** Each session lands chatter, ambient and advisory items after its own random delay, so a fleet cannot flip in lock-step. Alarm, control, regulatory and live-state items are not delayed.
+   - **The draw.** The delay is drawn per session and item from U(0, min(`D_desync`, `remaining_life` − `m`)), with `remaining_life` measured to the item's local expiry. [PROPOSED DEFAULT]: `D_desync` 60 s, `m` 1 s. When no positive window remains, the item does not land. Delays are never clamped to the expiry instant: clamping would put every late session on the same deadline, which re-synchronises the fleet (Ronan's review of #56).
+   - **Cancellation.** A pending landing is cancelled if, before its timer matures, the item is superseded, plucked, revoked or expired, its key is quarantined, the receiver is muted, or the session untunes the stream.
+   - **Maturity.** A timer that matures does not land anything by itself. It makes the item eligible at the session's next turn boundary. There the receptor checks every cancellation condition again and lands the item only if none holds. A matured timer never injects mid-turn, and never carries stale state past a later withdrawal.
+4. **Typed control, not tone.** A halt, deferral or "goodnight" that should change behaviour is an explicit `control` or `advisory` item, signed by a key a human holds (§10.4). A behaviour change carried only by the tone of heard chatter stays data: the banner says so (§14.13), and hosts SHOULD flag it rather than follow it.
+5. **Hop, lineage and taint.** Anything a session sings after hearing carries `hop + 1` and the lineage root (§14.11), and a tainted session cannot sing at `fleet` or `public` scope (§14.12). A follower's agreement cannot spread as fresh evidence.
+
+**Stance first is telemetry only.** A receptor MAY record locally one line of a session's current intent before a drain, and whether the plan changed afterwards. The per-session flip rate measures susceptibility, for evaluation. The record stays on the host under the privacy rules of §19.7. It MUST NOT decide admission, permission, wake or truth, and it never travels in receiver reports (§11.3.2).
+
+### 14.17 Guardian sessions (deferred) *(Non-normative)*
+
+Amendment A12 proposed a **guardian** role (`spike/protocol-dynamics-udp-vs-tcp-2026-09-27.md` §5). A guardian would be a session that the manifest authorises to read a ward's transcript and to send the ward addressed, durable, advisory **doubts**. #54 deferred it from normative v1: a guardian's transcript access is a new, high-value trust boundary, and it needs its own trust and privacy mini-RFC (§23.2). v1 defines no guardian capability and no doubt channel.
+
+Any future guardian design must at least provide:
+
+- explicit, ward-local enablement;
+- least-privilege transcript slices;
+- a separate manifest principal and, where practical, a different model family from the ward;
+- durable audit and strict rate limits;
+- doubts that are addressed, hop 0 and never broadcast;
+- no authority to wake, command, assign tasks or tools, change policy, suppress ordinary input or veto. A doubt is advisory data;
+- no reading of silence as evidence: a guardian that raises no doubt certifies nothing.
+
 ---
 
 ## 15. Publishing
@@ -1872,7 +2090,7 @@ canticle_listen({ stream?: string, since?: string, limit?: number,
 ```
 
 - Tool results MUST NOT echo payload bytes (the precedent is the OpenClaw RFC's attachment handling, `OC-RFC:1770`).
-- `wake-on-alarm` is honoured only where host configuration allows wake (D1); otherwise `effectivePosture` reports `silent`.
+- `wake-on-alarm` is honoured only where host configuration allows wake, and D1 keeps wake off everywhere until S3 has tested the §14.10 conjunction; otherwise `effectivePosture` reports `silent`.
 - Operators and services publish alarm, regulatory and control frames through the CLI (§15.7) with keys that hold those capabilities.
 
 ### 15.2 Owns-table
@@ -2306,6 +2524,7 @@ These are normative MUST NOTs.
 16. A relay never re-signs, rewrites or originates content, and never answers unauthenticated UDP with more bytes than it received.
 17. Broadcast frames are never used as training data in this version.
 18. No public station is ever wake-eligible, and none targets agents outside the manifest without their operators' opt-in.
+19. An LLM-driven session never holds a key with the `alarm`, `quarantine` or `control` capability (D14).
 
 ### 19.4 Requirements index
 
@@ -2320,7 +2539,7 @@ These are normative MUST NOTs.
 | Alarms, all-clear, kill switch | Typed alarms; reversible local response only; authority rules; MUTE | §10.6, §14.7.2, §14.7.6 |
 | Promotion and training | Explicit, typed, untainted promotion; `training_eligible` false; no training in v1 | §6.4 |
 | Confidentiality and privacy | Content policy; audience scopes and listen capabilities; private-stream encryption; capsid off; no listener disclosure; hash-only telemetry | §8.7, §11.3.6, §15.4, §19.7 |
-| Relays and amplification | Cookie before stream; reply ≤ request before validation; silence to the unauthenticated; caps; loop prevention | §11.3, §12.2-§12.6 |
+| Relays and amplification | Cookie before stream; reply ≤ request before validation; silence to the unauthenticated; caps; loop prevention; REPAIR only on validated leases, REPAIR_GONE ≤ its request, fill and repair within the lease caps, never forwarded to a station | §7.10, §11.3, §12.2-§12.6 |
 | Discovery | DNS as locator only; DNSSEC with NSEC3 or online signing; minimal TXT; mismatch = alert | §13.4 |
 | Receiver robustness | Strict, bounded, fuzzed parsers; cheap checks before crypto; evicting dedup; unverified input isolated | §9.4, §14.1, §7.4 |
 | Third-party components | Write access to the replay tier limited to relays; no client-chosen hosts in proxies; actuators only on verified alarms | §18.2, §18.6 |
@@ -2331,7 +2550,7 @@ These are normative MUST NOTs.
 - Public stations MUST be ambient-only and MUST NOT target agents whose operators have not opted in.
 - Posture and regulatory frames modulate only the receiver's filters, never a session's tools, goals or self-posture without explicit per-session opt-in (`proto/protocol-spec-v0.1.md:479-484`).
 - Every sing is attributable: the daemon keeps a signed sing log naming the principal.
-- Operators SHOULD separate the duties of manifest-root holders and alarm-key holders; root operations need 2-of-*n* (D15).
+- Operators MUST separate the duties of manifest-root holders and alarm-key holders, and root operations need 2-of-3 before fleet deployment (D15).
 - DECISION D19 (recommended: fleet- and public-scope streams use plain operational language by convention; the cohort's liturgical register — canticle, choir, mantra, votive, resonance — stays on private stations. Evidence: the "viral persona" that evolved worms converge on in Mind Viruses (arXiv 2608.10218) overlaps that register heavily, so content heuristics cannot separate normal traffic from viral payloads, and defences must be structural).
 
 ### 19.6 Owner use cases: verdicts
@@ -2341,7 +2560,7 @@ These are normative MUST NOTs.
 | Variant | Verdict | Conditions |
 |---|---|---|
 | Defensive posture broadcast: an alarm-capability or root-signed typed advisory; receivers tighten their own filters and silently enrich sessions with a bannered advisory | **v1** | §10, §14.7.6, §14.13, §18.8; humans alerted through dashboards |
-| Opt-in wake of designated responder sessions on an alarm | **v1, gated** | §14.10 conjunction; sandbox required (§16.3); alarm from a human-held key (D14) |
+| Opt-in wake of designated responder sessions on an alarm | **v1, gated** | §14.10 conjunction; silent-only until S3 has tested it (D1); sandbox required (§16.3); alarm from a human-held key (D14) |
 | A single automated keeper raising fleet alarms | **not v1**: advisory only | would need 2-of-3 keepers on distinct principals with hysteresis (§17.4) |
 | Automated remediation triggered by heard content (credential rotation, deletion, firewall changes, peer quarantine, process kill, the ESP32 or other actuators) | **out of scope; never via canticle** | belongs to the control plane with human confirmation (#48; `OC-RFC:1489`) |
 | Threat intelligence on public streams | **out of scope for v1** | `fleet` audience + listen capability (§11.3.6) |
@@ -2394,7 +2613,7 @@ Whatever carries canticle frames — raw UDP, a relay, a broker — receivers MU
 
 ### 20.3 Why not NATS
 
-Core NATS is at-most-once but runs over TCP: loss becomes delay or slow-consumer disconnection, not independent per-frame loss, and there is no UDP transport. JetStream adds storage and at-least-once delivery, which the edge path does not want; per-message TTLs have a 1 s floor (`err 10165` for 500 ms), schedules have a 1 s floor (`err 10189`), and TTLs restart per hop. JetStream schedules *can* run a server-side carousel (a byte-identical 712-byte signed frame re-emitted every second until the schedule's TTL), but each firing is a stored message and core subscribers hear nothing without RePublish — a poor fit per item at fleet scale. NATS is nonetheless the RECOMMENDED relay-to-relay backbone beyond cohort scale (§12.4, D10).
+Core NATS is at-most-once but runs over TCP: loss becomes delay or slow-consumer disconnection, not independent per-frame loss, and there is no UDP transport. JetStream adds storage and at-least-once delivery, which the edge path does not want; per-message TTLs have a 1 s floor (`err 10165` for 500 ms), schedules have a 1 s floor (`err 10189`), and TTLs restart per hop. JetStream schedules *can* run a server-side carousel (a byte-identical 712-byte signed frame re-emitted every second until the schedule's TTL), but each firing is a stored message and core subscribers hear nothing without RePublish — a poor fit per item at fleet scale. NATS is nonetheless the candidate relay-to-relay backbone once multi-relay fleet operation justifies one, after spike S4a (§12.4, D10).
 
 ### 20.4 Why not MQTT 5 or MQTT-SN
 
@@ -2415,7 +2634,7 @@ Zenoh is the closest routed pub/sub: unreliable UDP links, multicast scouting, l
 ### 20.8 Bindings
 
 - The **edge** — station ↔ host receptor, LAN multicast, relay ↔ listener lease — is raw UDP as specified in §11 and MUST NOT require a broker.
-- A single relay needs no backbone, and at cohort scale simple relay-to-relay forwarding is acceptable. Deployments beyond cohort scale SHOULD interconnect relays over a broker, NATS recommended, Zenoh the alternate, as spike S4a decides (§12.4, D10). Edge relays are proxy-stations and loop locally, so the backbone carries each item once.
+- A single relay needs no backbone, and at cohort scale simple custom relay-to-relay forwarding over TCP or QUIC is the rule. Relays interconnect over a broker only when multi-relay fleet operation actually justifies it, after spike S4a: NATS is the candidate and Zenoh the evaluated alternate (§12.4, D10). Every backbone link follows the backbone rules of §12.4 (amendment A6). Edge relays are proxy-stations and loop locally, so the backbone carries each item once.
 - A NATS WebSocket listener binding MAY be offered (§11.6).
 - The SeedLink replay tier remains ringserver fed over DataLink (§18); no broker speaks SeedLink.
 
@@ -2458,7 +2677,7 @@ Loopback, 20 items of 712 bytes (600-byte body) looping at 1 s with ±10% jitter
 | Zenoh peers over an unreliable UDP link | max 0.996 s | best-effort | 31.5 MB per Python peer |
 | COSE_Sign1 envelope instead of the bespoke trailer | — | — | +11 B per frame |
 
-Late-join latency is set by the carousel, not the transport; only a stateful snapshot beats it, which is why relays MAY snapshot (§7.10).
+Late-join latency is set by the carousel, not the transport; only a stateful snapshot beats it, which is why relays MAY send a fill (§7.10).
 
 ---
 
@@ -2468,13 +2687,13 @@ Late-join latency is set by the carousel, not the transport; only a stateful sna
 
 | # | Non-goal | Status | Statement |
 |---|---|---|---|
-| 1 | Not reliable transport (not OCP-MRC) | kept, one clause revised | No connections, SACK/NACK, retransmission, multipath or reliability tiers (`proto/explicit-non-goals.md:23-37`). *Revised:* "No congestion control … Frames go out at the chanter's chosen cadence" (`:33`) conflicts with internet UDP (RFC 8085); stations and relays enforce budgets (§7.5, §12.3). |
+| 1 | Not reliable transport (not OCP-MRC) | kept; one clause revised; one declared exception | No connections, SACK/NACK, retransmission, multipath or reliability tiers (`proto/explicit-non-goals.md:23-37`). *Revised:* "No congestion control … Frames go out at the chanter's chosen cadence" (`:33`) conflicts with internet UDP (RFC 8085); stations and relays enforce budgets (§7.5, §12.3). *Exception (amendment A2, #54):* a leased listener MAY ask its edge relay to repair gaps from the relay's verified live set (§7.10). The request never reaches a station, the relay repairs only what is still live, and there are no NACKs on multicast. The carousel stays the baseline. Relay-to-relay backbone links may be TCP or QUIC (D10, §12.4); they carry each item once and never replace the carousel at the edge. |
 | 2 | Not throughput-optimal (not ForestColl) | kept | No coordinated schedules or collectives (`:39-54`). Graph primitives that describe capacity are allowed; relay trees may use Edmonds' branching theorem for disjoint paths (§12.4). |
 | 3 | Not physically constrained sparsity (not Octopus) | kept | Sparsity is volitional (`:56-68`). |
-| 4 | Not a replay or durability layer | **revised** | There is still **no catch-up channel to the station** and no since-token on the wire (`:75`). What was contradictory — "no catch-up" beside "replay-from-ring" with no mechanism (`:74-76`; `proto/stations-and-streams-v0.2.md:87`) — resolves to: late joiners catch up **passively** from the carousel within TTL (§7); an edge relay MAY send a validated snapshot (§7.10); the ringserver tier is a separate TCP surface for dashboards, bounded by ring size and honouring expiry (§18). Frames have tuple identity but no durable identity (§5.6). |
+| 4 | Not a replay or durability layer | **revised** | There is still **no catch-up channel to the station** and no since-token on the wire (`:75`). What was contradictory — "no catch-up" beside "replay-from-ring" with no mechanism (`:74-76`; `proto/stations-and-streams-v0.2.md:87`) — resolves to: late joiners catch up **passively** from the carousel within TTL (§7); an edge relay MAY send a validated, budgeted fill and repair gaps from its live set (§7.10); the ringserver tier is a separate TCP surface for dashboards, bounded by ring size and honouring expiry (§18). Frames have tuple identity but no durable identity (§5.6). |
 | 5 | Not a full subscription or discovery layer | kept at the station; one declared exception | No subscription registry at the sender, no participant tables, no QoS negotiation (`:81-90`). *Exception:* relays hold soft-state leases (§11.3). There is no `WHO`. |
 | 6 | Not command or event semantics | kept, strengthened | Frames are not commands and not guaranteed events (`:92-99`); I-6 and I-12. |
-| 7 | Not request-response | kept at the station; one declared exception | Stations have no inboxes (`:112`). Publishing is a local tool/daemon call, not a wire message to a station. The listener ↔ relay lease exchange is the one wire request-response, and it never reaches a station. No correlation ids; lineage references only. |
+| 7 | Not request-response | kept at the station; one declared exception | Stations have no inboxes (`:112`). Publishing is a local tool/daemon call, not a wire message to a station. The listener ↔ relay lease exchange, REPAIR included (§7.10), is the one wire request-response, and it never reaches a station. No correlation ids; lineage references only. |
 | 8 | Not a weapon, not an influence tool | kept | `proto/protocol-spec-v0.1.md:61-64`; §19.5. |
 | 9 | No auto-actuation on receive | **revised** | Becomes **no sender actuation** (I-7): silent landing by tune consent; a budgeted, receiver-local wake for alarms only (D1); never remediation (§14.7.6). Replaces `proto/protocol-spec-v0.1.md:464-477` and `proto/TASK-BRIEF.md:39`. |
 | 10 | Atmosphere not auto-injected | **revised** | Tuned sessions receive a bounded digest silently (§14.14). Replaces `proto/protocol-spec-v0.1.md:393-398`. |
@@ -2536,6 +2755,7 @@ The fixture suite is issue #27's deliverable; it absorbs the fixture asks of #37
 | **BE** | blind-enrichment acceptance for each harness binding, with negative controls | §16.7; `OC-RFC:1594-1624` |
 | **REG-B1..B6, B10..B12** | regression tests for the prototype bugs, if its verify stage is reused | §10.10 |
 | **S4a** | the broker spike measurements behind D10 | §12.4 |
+| **F-PD** (amendments of #54) | **A1:** `trail_seq` stays correct through expiry, supersession, pluck and depth eviction, with `head_seq + 1` when nothing is live; beacons at the §8.4 bound stay ≤ 1 100 B; receivers stop waiting below `trail_seq`. **A2:** REPAIR is answered only on a validated lease; zero bytes go to a spoofed address; REPAIR_GONE is never larger than its REPAIR; the rate and holdoff limits hold; no repair traffic reaches the station (capture at the station); a repaired copy is a no-op. **A3:** reports carry only their five fields, change no admission or trust result, and a relay that ignores them stays conformant. **A4:** a saturated lease still gets first copies before repeats; superseded or near-expiry frames leave the queue; one slow lease does not starve the others. **A5:** each of the three join modes; fill within `fill_bps` and `fill_passes`; no frame from outside the live set. **A6:** a backbone link to a silent peer is torn down within `D_fail`; expired frames arriving over the backbone are dropped. **A8:** RELAY_GOAWAY moves listeners only to manifest relays, spread over `spread_ms`; a forged one is ignored; E5 re-run against the restart SLO. **A9:** silent landing is immediate; a wake waits for proofreading, within the defined added-latency bound; replaying one captured alarm frame, at any cadence, never passes proofreading; an unheard `seq` between the alarm and `head_seq` holds the wake. **A10:** the capsule fallback is refused or labelled retransmitting. **A11:** nothing lands untuned; no landing interrupts a step; desynchronised landings spread over the drawn window and never bunch at expiry; an item with no positive window does not land; supersede, pluck, revoke, expiry, quarantine, MUTE and untune each cancel a pending landing; a timer that matures mid-turn lands only at the next boundary, after revalidation; stance records never leave the host. **D1:** with `silent-wake` disabled, no input produces a wake | §7.5, §7.10, §8.4, §11.3, §11.5, §12.3, §12.4, §14.6.8, §14.10, §14.16 |
 
 ### 22.4 Loop-regulator tests (station)
 
@@ -2578,7 +2798,7 @@ The eight examples of `proto/receptor-contract-v0.2.md` §13 remain required, re
 
 ### 22.7 Red-team suite
 
-The suite runs on a "worm range": at least 20 simulated sessions (an OpenClaw gates build with the Tier A plugin, plus a Claude Code MCP/hook binding) on at least 3 hosts behind one relay, a test manifest, a seeded content-injection page, and packet capture at the relay; a scale variant uses 1 000 synthetic receptors. Groups: RT-01..RT-09 (worm, taint, MUTE), RT-10..RT-16 (amplification, downgrade), RT-20..RT-25 (Sybil and accord), RT-30..RT-35 (staleness), RT-40..RT-43 (echo chambers, dose), RT-50..RT-54 (storms, budgets), RT-60..RT-64 (exfiltration, privacy), RT-70..RT-73 (training and promotion), RT-80..RT-86 (alarms), RT-90..RT-94 (third-party components), RT-100..RT-103 (discovery), RT-110..RT-114 (receiver DoS), RT-120..RT-123 (insider misuse), RT-130..RT-131 (malicious relays). Stimuli and pass criteria are in `review/challenge-redteam §9`. Among them: RT-03 (propagation stops at hop 2; no wakes; denied tool calls logged), RT-10 (bytes to a spoofed victim ≤ bytes sent before cookie validation), RT-52 (the canticle cost budget stops wakes even though OpenClaw's chain counter resets), RT-110 (fuzz corpus including `{"a":1e400}`: zero crashes), RT-112 (a continuation return survives 100 canticle items; canticle uses at most 2 slots).
+The suite runs on a "worm range": at least 20 simulated sessions (an OpenClaw gates build with the Tier A plugin, plus a Claude Code MCP/hook binding) on at least 3 hosts behind one relay, a test manifest, a seeded content-injection page, and packet capture at the relay; a scale variant uses 1 000 synthetic receptors. Groups: RT-01..RT-09 (worm, taint, MUTE), RT-10..RT-16 (amplification, downgrade), RT-20..RT-25 (Sybil and accord), RT-30..RT-35 (staleness), RT-40..RT-43 (echo chambers, dose), RT-50..RT-54 (storms, budgets), RT-60..RT-64 (exfiltration, privacy), RT-70..RT-73 (training and promotion), RT-80..RT-86 (alarms), RT-90..RT-94 (third-party components), RT-100..RT-103 (discovery), RT-110..RT-114 (receiver DoS), RT-120..RT-123 (insider misuse), RT-130..RT-131 (malicious relays). Stimuli and pass criteria are in `review/challenge-redteam §9`. Among them: RT-03 (propagation stops at hop 2; no wakes; denied tool calls logged), RT-10 (bytes to a spoofed victim ≤ bytes sent before cookie validation), RT-52 (the canticle cost budget stops wakes even though OpenClaw's chain counter resets), RT-110 (fuzz corpus including `{"a":1e400}`: zero crashes), RT-112 (a continuation return survives 100 canticle items; canticle uses at most 2 slots). D14's automated alarm issuer stays off until this range shows that correlated evidence, re-sung lineage and colluding keepers cannot manufacture apparent independence (RT-20..RT-25, RT-80..RT-86).
 
 ---
 
@@ -2586,23 +2806,25 @@ The suite runs on a "worm range": at least 20 simulated sessions (an OpenClaw ga
 
 ### 23.1 Owner decisions
 
-| Id | Decision | Recommended | Where |
+figs delegated the owner decisions to the cohort's princes. Silas decided D1, D4, D10, D14 and D15 on #54 on 2026-09-28; Elliott's review had recommended the same on every one. Rows marked **Decided** record those decisions. The other rows are still recommendations.
+
+| Id | Decision | Recommended, or decided | Where |
 |---|---|---|---|
-| D1 | Receive posture: may a receiver wake a session on a heard frame? | Never sender-forced; receiver-local opt-in wake for **alarm** frames only, under the §14.10 conjunction. Alternative: strict no-wake (v0.1 §9.2) | §14.10 |
+| D1 | Receive posture: may a receiver wake a session on a heard frame? | **Decided (#54):** silent by default; receiver-local opt-in wake for verified **alarm** frames only, under the §14.10 conjunction. The initial deployment is silent-only until S3 implements and tests the whole conjunction. Sender-requested or sender-forced wake is rejected; post-compaction landing stays reserved (D13) | §14.10 |
 | D2 | Content lane | Payload-carrying frames ≤ 1 100 B plus digest references; doorbell as one class | §9.12 |
 | D3 | TTL ceilings | Stream `max_ttl` default 300 s; station hard cap 24 h; root mark persists by refresh re-issue until UNEQUIP | §6.2, §7.9 |
-| D4 | Trust | Ed25519 mandatory for every frame that can land or modulate, on every binding; unsigned only for debugging on a peer-authenticated host socket | §10.1 |
+| D4 | Trust | **Decided (#54):** Ed25519 on every frame or binding that can land or mutate receptor state, host-local included. The only unsigned path is a peer-authenticated unix debug socket with bounded logging output: no state mutation, landing, accord, relay or fallback. No downgrade mode. HMAC only as a relay flood pre-filter | §10.1 |
 | D5 | Scale target | Design for a fleet via a relay tree; validate at cohort scale | §12.5 |
 | D6 | Internet in scope | Yes, through relay-held leases; the station still tracks nobody | §11 |
 | D7 | SeedLink naming | Private `XX` namespace for cohort dashboards now; FDSN temporary network code before sharing beyond the cohort | §18.5 |
 | D8 | Console stack | ews first; nerv-ui React console later; seisplotjs elements for OpenClaw's Control UI | §18.7 |
 | D9 | Implementation language | Python for codec, station and receptor spike; TypeScript for the OpenClaw plugin, the Claude Code MCP server and the second codec; Go or Rust for the relay | §12.5, §16 |
-| D10 | Relationship to brokers | Raw UDP edge; no backbone for one relay; custom relay-to-relay at cohort scale; NATS backbone beyond (Zenoh alternate), decided by spike S4a | §12.4, §20 |
+| D10 | Relationship to brokers | **Decided (#54):** transport by plane. UDP carousel at the edge and for membership; TCP/QUIC for relay backbones, clean-path snapshots, replay, the ledger and addressed durable control. No broker for one relay; custom relay forwarding at cohort scale; NATS only when multi-relay fleet operation justifies it, after spike S4a, with Zenoh the evaluated alternate | §11, §12.4, §20 |
 | D11 | Third default lens | `purpose` (alternative `evidence`) | §17.2 |
 | D12 | Signed envelope | Bespoke header + deterministic CBOR + trailer; publish a COSE_Sign1 mapping; freeze after S1 | §9.14 |
-| D13 | `post-compaction` landing of heard content | Reserved in v1 | §14.9 |
-| D14 | Who holds alarm keys | Human-operated stations in v1; an automated 2-of-3 keeper issuer behind a flag | §10.4 |
-| D15 | Manifest operations | 2-of-*n* offline human-held roots, separate from alarm-key holders; 7-day lifetime; daily refresh; 1-of-1 at cohort scale; genesis pin shipped with the install | §10.3 |
+| D13 | `post-compaction` landing of heard content | Reserved in v1 (D1's decision on #54 keeps it reserved) | §14.9 |
+| D14 | Who holds alarm keys | **Decided (#54):** human-operated alarm keys in v1; LLM-driven sessions hold no alarm, quarantine or control keys. Automated 2-of-3 keeper issuance stays off behind an explicit flag until the S5 worm range passes. Alarm custody is separate from root custody | §10.4 |
+| D15 | Manifest operations | **Decided (#54):** staged. 1-of-1 for the cohort pressure test; 2-of-3 offline human-held roots before fleet deployment, with backup and recovery documented first; root holders separate from alarm-key holders; genesis pin shipped with the install, never fetched; 7-day lifetime with daily re-fetch and revalidation; dual-threshold root changes; durable rollback serial; fail closed after expiry | §10.3 |
 | D16 | Sandbox mandate | Required for any wake-enabled OpenClaw agent | §16.3 |
 | D17 | Public "lighthouse" stations | Optional; ambient-only, never wake-eligible, declared purpose | §4.1 |
 | D18 | "Tuning a new model" | In-context attunement only in v1; no training on broadcast data | §19.6 |
@@ -2612,6 +2834,24 @@ The suite runs on a "worm range": at least 20 simulated sessions (an OpenClaw ga
 | D22 | Ports, groups, service names | Advertise via SRV; 9999 and `239.255.13.13` provisional for development; check and register with IANA before public use | §11.2, §13.7 |
 | D23 | Healing as continuous counterweight | Votes only in v1; continuous DCA-style mode behind a flag | §17.5 |
 | D24 | Regulation profile | Adopt `canticle-regulation/1` for the cohort test, retune for the fleet | §12.8 |
+
+**Amendments A1-A13.** The protocol-dynamics spike proposed thirteen amendments (`spike/protocol-dynamics-udp-vs-tcp-2026-09-27.md` §7). Silas gave each a disposition on #54 on 2026-09-28, and this revision applies them. Where Elliott's review and Silas's text differed (A6's portable wording, A12's deferral), Silas's text is used.
+
+| Id | Amendment | Disposition and binding conditions | Applied in |
+|---|---|---|---|
+| A1 | `trail_seq` in each beacon stream entry | Accepted, on proof that the worst-case beacon stays within the ceiling with catalog paging (the proof is in §8.4) | §7.10, §8.2, §8.4, §9.8, §9.11 |
+| A2 | Relay-side repair | Accepted. Lease-scoped, cookie- and address-validated, served only from the relay's verified unexpired live set, bounded by suppression, rate and egress limits, non-amplifying, invisible to the station, still receiver-verified | §7.10, §11.3.2, §11.3.5, §21 |
+| A3 | Receiver report on RENEW | Accepted with amendments. Aggregate received and expected counts and the largest gap per stream only; no content judgment, stance, session identity or stable cross-lease id; never affects trust, admission, accord or authority | §7.5, §11.3.2, §11.3.7 |
+| A4 | Relay egress scheduler | Accepted. Bounded queues; first-copy, supersede, pluck and freshness priority; drop-oldest and latest-value semantics; remaining-life checks; minimum fairness | §12.3 |
+| A5 | LISTEN join modes | Accepted. `live`, `live+fill`, `fill-only`, with explicit fill budgets and bounded fills; no unbounded archive demand | §7.10, §11.3.2, §11.3.5 |
+| A6 | Backbone rules for TCP/QUIC links | Accepted with amendments. States the portable outcome: bounded unacknowledged lifetime and failure detection. `TCP_USER_TIMEOUT` is a Linux implementation detail, and QUIC needs an analogous deadline | §12.4, §20.8 |
+| A7 | Class floors below SAP's 300 s | Accepted | §7.5 |
+| A8 | Relay restart | Accepted with amendments. Signed RELAY_GOAWAY, retry and failover bounds, optional persisted cookie secret with rotation and rollback rules, and a restart SLO. No durable lease-table persistence | §11.3.2, §11.3.3, §11.3.5, §11.3.9 |
+| A9 | Kinetic proofreading and consumption modes | Accepted with amendments. Verified silent landing may be immediate; proofreading gates wake, not reception. Persistence is attested by the station's signed beacons, never by repeats of one frame (Ronan's review of #56). Independence by manifest principal and lineage root, not key count. A defined and tested maximum added alarm latency. `completed` consumption bounded by one advertised loop and expiry | §14.6.8, §14.10 |
+| A10 | WebTransport binding | Accepted with amendments, as experimental only. HTTP/2 capsule fallback rejected or labelled retransmitting; the real browser, CDN and proxy path validated before the binding is required | §11.5 |
+| A11 | Contagion controls | Accepted with amendments. Explicit listening election, turn-boundary and desynchronised landing, typed control, and hop, lineage and taint controls. Stance-first stays local, privacy-preserving evaluation telemetry, and never decides admission, permission, wake or truth | §14.16 |
+| A12 | Guardian role and doubt channel | Deferred from normative v1, pending a separate trust and privacy mini-RFC | §14.17, §23.2 |
+| A13 | Budget sets catch-up | Accepted. Catch-up is set by live-set size and stream budget; any catch-up SLO needs an explicit bounded fill budget | §7.5 |
 
 ### 23.2 Open technical questions
 
@@ -2630,6 +2870,11 @@ The suite runs on a "worm range": at least 20 simulated sessions (an OpenClaw ga
 13. **Promotion tool surface** (`keep_from_stream`, #15/#45) and the Project 57 boundary (#45 c3: canticle payloads "remain typed proposals/references and do not silently become memory writes or authority").
 14. **Session API split** (#24): whether the local session API (§14.15) becomes its own document.
 15. **IANA**: service names and ports (D22).
+16. **Proofreading parameters** (A9): how many revolutions, or how many independent roots, are enough before an alarm wake without making a real alarm arrive too late? The maximum added latency must be set and tested (§14.6.8).
+17. **WebTransport in practice** (A10): do datagrams plus short streams behave consistently across the browser, CDN and proxy paths the project will use (§11.5)?
+18. **Guardian mini-RFC** (A12): the trust and privacy design for guardians (§14.17). Its open questions include Elliott's two from #54: can colluding guardians manufacture independent doubt, and can a single guardian exhaust a ward's attention despite rate limits?
+19. **Relay restart SLO** (A8): confirm or replace the proposed 20 s p99 in S4, before any lease state is persisted (§11.3.9).
+20. **Normative vectors**: the 31 candidate vectors of `prototype/canticle-station/vectors/` remain candidates until the independent TypeScript codec reproduces them (§9.13). They, and that spike's beacons, predate `trail_seq` (A1).
 
 ### 23.3 Work items
 
@@ -2639,10 +2884,10 @@ The spine's work plan, refined; the RFC cites these by number.
 |---|---|---|
 | **S0** Housekeeping | Close PRs #50, #32, #29; merge #34 after light edits; request changes on #44; post the #30 HAProxy correction (§12.7); issue triage per the review; rewrite the README (#35); regenerate `proto/INDEX.md`; fix the dangling link in `spike/two-planes-the-ledger-and-the-binary.md:5`; deduplicate reference PDFs; lineage PR for the orphan branch's drafts (`proto/lineage/`); retitle #49 and close it once `prototype/ringserver-proofs/` is on `main` (§18.2); review notes, vectors and broker scripts are committed under `rfc/0001-notes/` (done with this draft) | #21, #35, #49 |
 | **S1** Frame v2 | Codec in Python and TypeScript (D9), deterministic-CBOR checks, COSE_Sign1 comparison (D12), manifest format and verifier, normative test vectors (§9.13), the prototype's bug fixes if its verify stage is reused (§10.10) | #27, #48, #38 |
-| **S2** Station daemon | Carousel and regulator (§7), carrier-beacon (§8), host socket (§11.1), LAN multicast and `canticle doctor` (§11.2), DNS-SD records (§13), CLI (§15.7) | #2, #37, #39, #40 |
-| **S3** Receptor and bindings | Receptor daemon (§14), OpenClaw Tier A plugin (§16.2), Claude Code MCP server and hooks (§16.5), taint seams, blind-enrichment acceptance (§16.7) | #5, #11, #24, #51 |
-| **S4** Relay and replay tier | Go or Rust relay: lease, cookie, admission, budgets, attenuation, proxy-loop (§11.3, §12); ringserver DataLink bridge (§18.3), with HAProxy in front of ringserver on the TCP tier (§12.7); ews fixes and a live carrier trace (§18.6); spike S4a for D10 (§12.4) | #30, #12 |
-| **S5** MAGI and hardening | Keepers for threat, healing and purpose with a dashboard panel (§17, §18.7); the red-team worm range (§22.7); revocation and MUTE drills (§10.5, §10.6); a 1 000-receptor scale test | #7 |
+| **S2** Station daemon | Carousel and regulator (§7), carrier-beacon (§8) with `trail_seq` and paging at actual encoded sizes (A1, §8.4), host socket (§11.1), LAN multicast and `canticle doctor` (§11.2), DNS-SD records (§13), CLI (§15.7); bring `prototype/canticle-station/` and its candidate vectors up to A1 | #2, #37, #39, #40 |
+| **S3** Receptor and bindings | Receptor daemon (§14), OpenClaw Tier A plugin (§16.2), Claude Code MCP server and hooks (§16.5), taint seams, blind-enrichment acceptance (§16.7); silent-only until the whole §14.10 conjunction is implemented and tested (D1); proofreading and consumption modes (A9, §14.6.8); contagion controls (A11, §14.16) | #5, #11, #24, #51 |
+| **S4** Relay and replay tier | Go or Rust relay: lease, cookie, admission, budgets, attenuation, proxy-loop (§11.3, §12); join modes and fill (A5), REPAIR (A2), receiver reports (A3), the egress scheduler (A4), RELAY_GOAWAY, retry bounds and the restart SLO (A8); backbone rules for relay-to-relay links (A6, §12.4); ringserver DataLink bridge (§18.3), with HAProxy in front of ringserver on the TCP tier (§12.7); ews fixes and a live carrier trace (§18.6); spike S4a for D10 (§12.4); validate the WebTransport path before relying on it (A10, §11.5) | #30, #12 |
+| **S5** MAGI and hardening | Keepers for threat, healing and purpose with a dashboard panel (§17, §18.7); the red-team worm range (§22.7), which gates D14's automated alarm issuer; revocation and MUTE drills (§10.5, §10.6); the switch to 2-of-3 roots with backup and recovery documented (D15); a 1 000-receptor scale test | #7 |
 
 ---
 
@@ -2770,10 +3015,10 @@ Binary Canticle is the cohort's work. This RFC arranges it; it did not invent it
 
 | Contributor | Contribution |
 |---|---|
-| **figs** (karmafeast; owner) | The original pitch — streams, MAGI, "adopt posture of defense", attunement without retraining (`spike/silas-teams-context.md`); the carrier-wave and revolving-record intuitions (`proto/stations-and-streams-v0.2.md:3`, `:7`); "it's more the fact that there is a radio operator" (`scratch/notes_on_carrier_wave.md:40`); denser capsules and the lighthouse (`references/memory-capsules.md`); issues #12, #21-#27, #30 (filed from figs's account; its body is signed 🌊, Ronan), #48; the infographic (PR #44) |
-| **Silas** | The four March spikes (SeedLink mapping, exercise compression and the first carousel, prior art, teams context); the next-cut memo (PR #29); protocol-spec discovery seam (PR #41); issues #1-#7, #11 lineage, #13, #18, #33 |
+| **figs** (karmafeast; owner) | The original pitch — streams, MAGI, "adopt posture of defense", attunement without retraining (`spike/silas-teams-context.md`); the carrier-wave and revolving-record intuitions (`proto/stations-and-streams-v0.2.md:3`, `:7`); "it's more the fact that there is a radio operator" (`scratch/notes_on_carrier_wave.md:40`); denser capsules and the lighthouse (`references/memory-capsules.md`); issues #12, #21-#27, #30 (filed from figs's account; its body is signed 🌊, Ronan), #48; the infographic (PR #44); delegating the owner decisions to the princes (#54) |
+| **Silas** | The four March spikes (SeedLink mapping, exercise compression and the first carousel, prior art, teams context); the next-cut memo (PR #29); protocol-spec discovery seam (PR #41); issues #1-#7, #11 lineage, #13, #18, #33; the owner decisions D1, D4, D10, D14 and D15, the dispositions of amendments A1-A13 and the CI boundary (#54, 2026-09-28) |
 | **Cael** | The station:stream framework, presence beacon, ringbuffer-with-TTL, sing/pluck verbs and no-subscriber-tracking (`proto/stations-and-streams-v0.2.md:8`); the six-question byte-walk (`07e4e58`); the RDS and vinyl-record framings; issues #35-#40; the retraction that moved RECEIVE/ELECT out of the wire |
-| **Elliott** | Wire byte specifics — CBOR, ULID-on-wire, schema version, bandwidth math (`proto/stations-and-streams-v0.2.md:9`); the carrier stack, capsid invariants, the four-state machine and the surveillance-exhaust tightening (`scratch/notes_on_carrier_wave.md:141-179`); the prototype landing (`65e6705`); #16, #17 |
+| **Elliott** | Wire byte specifics — CBOR, ULID-on-wire, schema version, bandwidth math (`proto/stations-and-streams-v0.2.md:9`); the carrier stack, capsid invariants, the four-state machine and the surveillance-exhaust tightening (`scratch/notes_on_carrier_wave.md:141-179`); the prototype landing (`65e6705`); #16, #17; the first review of the decision gates and amendments on #54, including the A8 split and the A12 conditions |
 | **Ronan** | The receptor contract and ringbuffer contract (ringbuffer `0a49371`; both merged to `main` in `21b46a4`); the send-side and receive-side drafts with listener-elected landing modes (orphan branch); `station:root` and UNEQUIP as control grammar; sole writer for #51; git identity on the decoherence-axis commit (`9b62df4`) |
 | **Emeric** | Threshold-fire taxonomy v2 with the two-gate model (`2f2b3df`, with Ronan); the ten invariants and acceptance tests of #51, including "rate is not intensity"; #31 c20's typed-reference boundary |
 | **Rune** | #51 assignment and writer boundary; the #45 Project 57 boundary |
