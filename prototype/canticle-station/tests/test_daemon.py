@@ -17,6 +17,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -174,6 +175,45 @@ class SocketTest(DaemonCase):
         _, code = self.run_with(lambda d, p: None, name="f", socket_path=os.path.join(loose, "daemon.sock"))
         self.assertEqual(code, 1)
         self.assertIn("mode 0700", self.fatal())
+
+
+class DurablePublishTest(DaemonCase):
+    """#79 review (Silas): a failed state save never exposes a record; the run ends with `fatal`."""
+
+    def test_failed_save_with_a_connected_peer_then_restart_without_replay(self):
+        st = self.station()
+        res = st.sing(runner.now_ms(), "chatter", text="must not surface", ttl_s=30)
+        frames = [f for f in st.poll(runner.now_ms()) if f[3] == wire.KIND_ITEM]
+
+        async def failing(d, port):
+            c = await self.connect(d)
+            await until(lambda: len(c.lines) == 2)
+            with mock.patch("canticle.listener.atomic_write_json", side_effect=OSError(28, "No space left on device")):
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                    s.sendto(frames[0], ("127.0.0.1", port))
+                await until(lambda: c.eof, what="peer closed after fatal")
+            return c
+        c, code = self.run_with(failing)
+        self.assertEqual(code, 1)
+        self.assertEqual([r["type"] for r in c.recs], ["hello", "landing_state", "fatal"])
+        self.assertEqual((c.recs[2]["reason"], c.recs[2]["rec_seq"]), ("state_not_durable", 3))
+        self.assertIn("No space left", c.recs[2]["detail"])
+        self.assertTrue(any('"type":"fatal"' in x for x in self.logs))
+
+        async def restarted(d, port):   # supervision restarts it; the sender does not replay
+            c = await self.connect(d)
+            await until(lambda: len(c.lines) == 2)
+            await asyncio.sleep(0.2)
+            before = list(c.lines)
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.sendto(frames[0], ("127.0.0.1", port))   # ... and later does: it is new, not resurfaced
+            await until(lambda: len(c.lines) == 3)
+            return before, c.recs[2]
+        (before, frame), code = self.run_with(restarted)
+        self.assertEqual(code, 0)
+        self.assertEqual([json.loads(x)["type"] for x in before], ["hello", "landing_state"])
+        self.assertEqual((frame["type"], frame["disposition"], frame["dedup"], frame["frame"]["seq"]),
+                         ("frame", "surface", "first", res.seq))
 
 
 class ProofCase1Test(DaemonCase):

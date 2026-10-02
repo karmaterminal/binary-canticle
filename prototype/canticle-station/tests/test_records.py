@@ -7,6 +7,7 @@ import random
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -170,6 +171,8 @@ class FrameRecordTest(unittest.TestCase):
         self.assertEqual((f["admission"], f["disposition"]), (admission, disposition))
         self.assertNotIn("body", f)
         self.assertNotIn("body_ref", f)
+        # refused before the hearer ring (§14.1 step 5): no receipt pointer (#79 review)
+        self.assertEqual((f["frame"]["sha256"], f["frame"]["bytes"]), (None, None))
         return f
 
     def test_capability_exceeded_class_and_scope(self):
@@ -224,6 +227,7 @@ class FrameRecordTest(unittest.TestCase):
         f = only(out)
         self.assertEqual((f["admission"], f["disposition"]), ("equivocation", "quarantine_set"))
         self.assertNotIn("body", f)
+        self.assertEqual((f["frame"]["sha256"], f["frame"]["bytes"]), (None, None))
         self.assertEqual(sorted((r["reason"], r["target"]["seq"]) for r in out if r["type"] == "retract"),
                          [("quarantined", 1), ("quarantined", 2)])
         later = only(h.hear(item(3)))
@@ -251,6 +255,75 @@ class FrameRecordTest(unittest.TestCase):
         r = only(h.tick(T0 + 10_000), "retract")
         self.assertEqual((r["reason"], r["by"]), ("expired", None))
         self.assertEqual(h.tick(T0 + 20_000), [])
+
+
+class RingPointerTest(unittest.TestCase):
+    def test_verified_frames_keep_their_pointer(self):
+        h = Harness(manifest(classes=(1, 3, 42)))
+        for raw in (item(1, stream=UNNAMED), item(2, cls=42), item(3)):
+            f = only(h.hear(raw))
+            self.assertEqual(f["admission"], "verified")
+            self.assertEqual((f["frame"]["sha256"], f["frame"]["bytes"]), (hashlib.sha256(raw).hexdigest(), len(raw)))
+        h.hear(item(1, epoch=9))
+        f = only(h.hear(item(1, epoch=4)))
+        self.assertEqual((f["reasons"], f["frame"]["bytes"] is not None), (["epoch_regression"], True))
+
+
+class DurablePublishTest(unittest.TestCase):
+    """#79 review (Silas): records are published only after the state they imply is saved."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir)
+
+    def failing(self):
+        return mock.patch("canticle.listener.atomic_write_json", side_effect=OSError(28, "No space left on device"))
+
+    def test_failed_save_publishes_nothing_and_ends_the_receptor(self):
+        h = Harness(state_dir=self.dir)
+        with self.failing():
+            with self.assertRaises(records.StateNotDurable):
+                h.r.hear(item(1), T0)
+        self.assertEqual([r["type"] for r in h.recs], ["hello", "landing_state"])   # no surfacing frame went out
+        self.assertEqual(h.em.rec_seq, 2)                                           # and no rec_seq was used
+        self.assertIn("No space left", h.r.failed)
+        for call in (lambda: h.r.hear(item(2), T0), lambda: h.r.tick(T0), lambda: h.r.health(T0), h.r.bye):
+            with self.assertRaises(records.StateNotDurable):
+                call()
+        self.assertEqual(len(h.recs), 2)
+        h.r.fatal("state_not_durable", h.r.failed)
+        self.assertEqual(h.recs[-1]["rec_seq"], 3)
+        # The supervised restart: nothing was committed, so nothing is owed and the item is new again.
+        b = Harness(state_dir=self.dir)
+        self.assertEqual([r["type"] for r in b.recs], ["hello", "landing_state"])
+        f = only(b.hear(item(1), T0 + 5), "frame")
+        self.assertEqual((f["disposition"], f["dedup"]), ("surface", "first"))
+
+    def test_failed_save_on_tick_withholds_the_retract(self):
+        h = Harness(state_dir=self.dir)
+        h.hear(item(1, ttl=10_000))
+        with self.failing():
+            with self.assertRaises(records.StateNotDurable):
+                h.r.tick(T0 + 10_000)
+        self.assertEqual(h.recs[-1]["type"], "frame")
+        b = Harness(state_dir=self.dir)                 # the retract is still owed: the restored tuple expires
+        self.assertEqual([r["type"] for r in b.recs], ["hello", "landing_state"])
+        self.assertEqual([r["reason"] for r in only_type(b.tick(T0 + 10_000), "retract")], ["expired"])
+
+    def test_failed_save_at_start_sends_no_hello(self):
+        a = Harness(state_dir=self.dir)
+        a.hear(item(1, ttl=10_000, t=T0 - 20_000), T0 - 20_000)
+        lines = []
+        lst = Listener(manifest(), state_path=os.path.join(self.dir, "listener.json"), receptor_mode=True)
+        r = Receptor(lst, Emitter(lambda t, line: lines.append(line)), bind="127.0.0.1:9", now_ms=T0)
+        with self.failing():
+            with self.assertRaises(records.StateNotDurable):
+                r.start(T0)                             # the reconcile's expired retract cannot be saved
+        self.assertEqual(lines, [])                     # so not even hello goes out
+
+
+def only_type(recs, type_):
+    return [r for r in recs if r["type"] == type_]
 
 
 class WarmupTest(unittest.TestCase):

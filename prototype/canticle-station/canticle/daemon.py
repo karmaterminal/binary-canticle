@@ -17,7 +17,10 @@ socket:
   within 2 s, closes that connection only. At most 16 connections; more are refused at
   accept. The receive path never waits on a connection;
 - a clean stop emits ``bye``; a failure to start emits ``fatal`` (on stderr: no
-  connection exists yet) and exits non-zero.
+  connection exists yet) and exits non-zero;
+- write-ahead: a datagram's or tick's records go out only after the safety state they
+  imply is saved. A failed save sends none of them and ends the run with ``fatal``
+  (``state_not_durable``) and exit 1; the binding's supervision restarts it (§14.18.2).
 
 The daemon binds its UDP port without ``SO_REUSEADDR``, so no other socket can share it
 (proof case 1, §14.18.2), and holds a lease on its state directory, so a second daemon
@@ -43,7 +46,7 @@ from typing import Callable, Optional
 from . import runner
 from .listener import Listener
 from .manifest import Manifest
-from .records import DROPPABLE, HEALTH_INTERVAL_MS, Emitter, Receptor
+from .records import DROPPABLE, HEALTH_INTERVAL_MS, Emitter, Receptor, StateNotDurable
 
 QUEUE_MAX = 1024          # records per connection (§14.18.2 [PROPOSED DEFAULT])
 MAX_PEERS = 16            # connections (§14.18.2 [PROPOSED DEFAULT])
@@ -157,6 +160,8 @@ class Daemon:
         self.udp: Optional[socket.socket] = None
         self.server: Optional[asyncio.base_events.Server] = None
         self._lease = None
+        self._stop: Optional[asyncio.Event] = None
+        self.failed: Optional[tuple] = None   # (reason, detail) once the run must end with `fatal`
 
     # ------------------------------------------------------------ fan-out (never blocks)
 
@@ -317,7 +322,10 @@ class Daemon:
             self.receptor = self._load()
             self.udp = self._bind_udp()
             self.receptor.bind = "%s:%d" % self.udp.getsockname()[:2]   # the port actually bound (port 0 in tests)
-            self.receptor.start(runner.now_ms())   # hello, then the first landing_state
+            try:
+                self.receptor.start(runner.now_ms())   # hello, then the first landing_state, after the save
+            except StateNotDurable as e:
+                raise StartError("state_not_durable", str(e)) from None
             await self._serve_socket()
         except StartError as e:
             self.emitter.emit("fatal", reason=e.reason, detail=e.detail[:200])
@@ -328,10 +336,7 @@ class Daemon:
 
         class Proto(asyncio.DatagramProtocol):
             def datagram_received(self, data, addr):
-                try:
-                    daemon.receptor.hear(data, runner.now_ms())
-                except Exception:   # a bug in the record path must not stop the receive path
-                    daemon.counts["receive_errors"] += 1
+                daemon._call(daemon.receptor.hear, data, runner.now_ms())
 
         transport, _ = await loop.create_datagram_endpoint(Proto, sock=self.udp)
         tasks.append(asyncio.create_task(self._watch()))
@@ -339,6 +344,7 @@ class Daemon:
             tasks.append(asyncio.create_task(self._every(self.cfg.tick_ms, self.receptor.tick)))
         if self.cfg.health_interval_ms:
             tasks.append(asyncio.create_task(self._every(self.cfg.health_interval_ms, self.receptor.health)))
+        self._stop = stop
         if started is not None:
             started(self)
         try:
@@ -348,18 +354,42 @@ class Daemon:
                 t.cancel()
             transport.close()
             self.server.close()
-            self.receptor.bye()
+            if self.failed is None:
+                try:
+                    self.receptor.bye()
+                except StateNotDurable as e:
+                    self._fail("state_not_durable", str(e))
             await self._flush_peers()
             self._cleanup_files()
-        return 0
+        return 1 if self.failed else 0
+
+    def _call(self, fn, *args) -> None:
+        """Run a receptor step. A failed save (or any error in the record path) ends the run with `fatal`:
+        the state that guards against stale or withdrawn items is not durable, and records implied by it
+        were not sent (write-ahead, #79 review). The binding's supervision restarts the daemon (§14.18.2)."""
+        if self.failed is not None:
+            return
+        try:
+            fn(*args)
+        except StateNotDurable as e:
+            self._fail("state_not_durable", str(e))
+        except Exception as e:
+            self._fail("internal", type(e).__name__)
+
+    def _fail(self, reason: str, detail: str) -> None:
+        if self.failed is not None:
+            return
+        self.failed = (reason, detail)
+        self.counts["receive_errors"] += 1
+        self.emitter.discard()
+        self.emitter.emit("fatal", reason=reason, detail=detail[:200])
+        if self._stop is not None:
+            self._stop.set()
 
     async def _every(self, period_ms: int, fn) -> None:
         while True:
             await asyncio.sleep(period_ms / 1000)
-            try:
-                fn(runner.now_ms())
-            except Exception:
-                self.counts["receive_errors"] += 1
+            self._call(fn, runner.now_ms())
 
     async def _flush_peers(self) -> None:
         deadline = time.monotonic() + SHUTDOWN_FLUSH_S

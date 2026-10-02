@@ -229,8 +229,19 @@ record per line.
   receive path only ever appends to queues.
 - **Lifecycle.** Start: lease, manifest, state, UDP bind (and the multicast join if configured), then `hello`
   and the first `landing_state`, then the socket. A failure emits `fatal` (`state_locked`, `manifest_invalid`,
-  `state_corrupt`, `bind_failed`, `socket_failed`) and exits 1. SIGTERM or SIGINT emits `bye`, waits up to 2 s
-  for it to reach each connection, closes them and removes the socket.
+  `state_corrupt`, `state_not_durable`, `bind_failed`, `socket_failed`) and exits 1. SIGTERM or SIGINT emits
+  `bye`, waits up to 2 s for it to reach each connection, closes them and removes the socket.
+- **Durable publish (write-ahead, #79 review).** Each datagram and each tick is one batch. The records it
+  implies are held, the safety state is saved (one atomic replace), and only then are the records numbered and
+  sent. If the save fails, none of that batch is sent, retracts included, and no `rec_seq` is spent. The run
+  then ends: `fatal` with reason `state_not_durable` (an error elsewhere in the record path ends it the same
+  way, reason `internal`), up to 2 s for it to reach each connection, then exit 1, with no `bye`. This
+  follows the RFC rather than limping on: a receptor's `health.state` is only `ok` or `degraded`
+  (§14.18.3), supersession marks MUST persist across restart (§7.8), `fatal` precedes any non-zero exit, and
+  the binding's supervision restarts the receptor with backoff after `fatal` (§14.18.2). A binding treats
+  `fatal` as receive health `failed` and delivers nothing more from the run, so withholding a retract
+  withdraws nothing it would still deliver. The restarted daemon starts from the last saved state and
+  reconciles it (below).
 - **Output.** Records go only to the socket: `frame` records carry item text (RFC §19.7). `hello`, `fatal` and
   `bye` are copied to stderr.
 - **Inbound.** Publishing over the socket (sing/hush, §15) is not in this slice: bytes a peer sends are read,
@@ -293,10 +304,16 @@ lower-epoch tuples as above. `canticle listen` and `canticle tuner` behave as be
 - Revocation retracts only at start: the daemon does not reload its manifest while running.
 - `gap` is always `"unavailable"` (§7.10's receiver side is not implemented); `station.principal` is always
   null (the spike manifest names none).
-- There is no hearer ring (§14.4): `frame.sha256` and `frame.bytes` are those of the received datagram.
+- `frame.sha256` and `frame.bytes` point at a hearer-ring copy only for a frame that reaches the ring at §14.1
+  step 5, that is, admission `verified` (`surface` or `ringbuffer_only`, including `unnamed_stream`,
+  `unknown_class`, `warmup_hold` and `epoch_regression`). A frame refused at steps 3-4 has none, and both
+  fields are `null`: `capability_exceeded`, `scope_violation`, `hop_limit`, `over_quota`, `pluck_mismatch`,
+  `plucked`, `superseded`, `class_change` and `equivocation` (#79 review). This spike keeps no hearer ring
+  (§14.4): for a verified frame the two are the hash and size its ring copy would have.
 - Fields a frame does not carry are null: a PLUCK's `class`, `hop`, `state_key`, `purpose`, `intensity` and
-  `lens`; the `stream` of an unnamed stream; the `class` of an unknown class code. frond-ear#34's consumer
-  requires `stream` and `class` strings and an integer `hop` on every `frame`, so it counts those records as
+  `lens`; the `stream` of an unnamed stream; the `class` of an unknown class code; and `frame.sha256` and
+  `frame.bytes` of a refused frame (above). frond-ear#34's consumer requires `stream` and `class` strings, an
+  integer `hop`, a string `sha256` and an integer `bytes` on every `frame`, so it counts those records as
   `malformed_record` rather than not deliverable. None of them is deliverable either way.
 - The stdout child-process transport of §14.18.2 is not a separate command: only the daemon carries records.
 - Mixed-host proof cases (4) and (6) need a harness binding and OC-0, and are not run here. Case (1) is shown
@@ -305,7 +322,7 @@ lower-epoch tuples as above. `canticle listen` and `canticle tuner` behave as be
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 228 tests, about 25 s
+python -m unittest discover -s tests      # 233 tests, about 25 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -343,7 +360,9 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
   items, a re-heard PLUCK, supersession and expiry of tuples surfaced before the restart, revocation at start,
   quarantine kept), the start-time reconcile (the #79 crash window: a PLUCK or a supersession mark persisted
   without its retract, with no replay, is retracted at start before the first `landing_state`; also a
-  quarantined key, expiry while down, and one state file written once), presence and beacon counters, unverified counters that never name a station, a 2 000-datagram
+  quarantined key, expiry while down, and one state file written once), write-ahead publishing (a failed save
+  sends nothing, spends no `rec_seq` and ends the receptor, at start, on a datagram and on a tick; a restart
+  without replay owes nothing), null receipt pointers on every pre-ring refusal, presence and beacon counters, unverified counters that never name a station, a 2 000-datagram
   flood of key ids that keeps the table at 16 and the `health` record the same size, and the `health` states.
 - `test_daemon.py` runs the daemon in one event loop over loopback UDP and a unix socket in a temporary
   directory, for the local mixed-host proof cases of §14.18.2:
@@ -358,6 +377,9 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
     within a second and with no gap: closed at once when its full queue cannot take the `retract`, or after the
     2 s bound when the queue has room but the kernel does not; its queue and write buffer stay within bounds and
     the daemon keeps receiving datagrams;
+  - a failed save with a connected peer: the peer receives `fatal` (`state_not_durable`) and end of stream,
+    never the frame; the daemon exits 1, and the restarted daemon, with no replay, owes nothing, and hears the
+    item as new when it comes again;
   - socket and directory modes, a refused peer uid, the peer limit, bytes from a peer ignored, `bye` and end of
     stream on a clean stop, a live socket not taken over and a loose socket directory refused.
 - `test_tuner.py` covers the tuner's view and gateway:

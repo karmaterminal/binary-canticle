@@ -91,11 +91,30 @@ class Emitter:
         self.rec_seq = 0
         self.sink = sink
 
-    def emit(self, type_: str, **fields) -> bytes:
+        self._staged: Optional[list] = None
+
+    def emit(self, type_: str, **fields) -> Optional[bytes]:
+        """Send a record now, or, inside begin()/commit(), hold it until commit (returns None then)."""
+        if self._staged is not None:
+            self._staged.append((type_, fields))
+            return None
         self.rec_seq += 1
         line = encode_line({"v": RECORD_V, "type": type_, "rec_seq": self.rec_seq, "run": self.run, **fields})
         self.sink(type_, line)
         return line
+
+    # Write-ahead publishing (#79 review): records that a state change implies are held, the state is saved,
+    # and only then are they numbered and sent. A discarded batch uses no rec_seq.
+    def begin(self) -> None:
+        self._staged = []
+
+    def commit(self) -> None:
+        staged, self._staged = self._staged or [], None
+        for type_, fields in staged:
+            self.emit(type_, **fields)
+
+    def discard(self) -> None:
+        self._staged = None
 
 
 class KeyTable:
@@ -141,6 +160,11 @@ def idem(t: tuple) -> str:
     return f"canticle:{kid.hex()}:{epoch}:{stream:08x}:{seq}"
 
 
+class StateNotDurable(Exception):
+    """The safety state could not be saved. The records it implied were not sent; the receptor is unusable
+    and its run must end with `fatal` (reason ``state_not_durable``) and a non-zero exit (§14.18.2)."""
+
+
 class Receptor:
     """The listener's outcomes as record v1 (§14.18.3). Not thread-safe; one event loop drives it."""
 
@@ -172,6 +196,7 @@ class Receptor:
         # One state file, one atomic write per datagram: the listener's guards and this receptor's surfaced
         # set and quarantines are saved together (self._save_if_dirty), so a crash cannot persist a PLUCK
         # or a mark without the retract it implies (#79 review). start() reconciles anyway.
+        self.failed: Optional[str] = None   # set when a save failed: nothing more is heard or sent
         listener.autosave = False
         listener.extra_state = self._state_json
         if listener.loaded_extra is not None:
@@ -179,17 +204,46 @@ class Receptor:
 
     # ------------------------------------------------------------ lifecycle
 
+    def _batch(self, fn) -> None:
+        """Run ``fn``, save the state it changed, then publish the records it emitted (write-ahead). If the
+        save fails, nothing from ``fn`` is published and StateNotDurable is raised. Any other exception also
+        publishes nothing and propagates: the caller ends the run (fail closed)."""
+        if self.failed is not None:
+            raise StateNotDurable(self.failed)
+        self.em.begin()
+        try:
+            fn()
+            self._save_if_dirty()
+        except OSError as e:
+            self.em.discard()
+            self.failed = f"{type(e).__name__}: {e}"
+            raise StateNotDurable(self.failed) from e
+        except BaseException:
+            self.em.discard()
+            self.failed = "internal"
+            raise
+        self.em.commit()
+
     def start(self, now_ms: int) -> None:
         """`hello`, then the retracts the persisted state owes (reconcile), then the first `landing_state`
-        (§14.18.3). The host daemon serves no connection before this returns."""
+        (§14.18.3), published only once that state is saved. The host daemon serves no connection before
+        this returns."""
+        self._batch(lambda: self._start(now_ms))
+
+    def _start(self, now_ms: int) -> None:
         self.em.emit("hello", wire_version=wire.VERSION, record_version=RECORD_V, pid=os.getpid(), bind=self.bind,
                      multicast=self.multicast, transport=self.transport, manifest_sha256=self.manifest_sha256,
                      manifest_label=self.manifest_label, state_version=STATE_VERSION,
                      receptor_state_version=RECEPTOR_STATE_VERSION, rule_version=RULE_VERSION)
-        self.reconcile(now_ms)
+        self._reconcile(now_ms)
         self.em.emit("landing_state", **self.landing)
 
     def reconcile(self, now_ms: int) -> int:
+        n = [0]
+        self._batch(lambda: n.__setitem__(0, self._reconcile(now_ms)))
+        return n[0]
+
+    def _reconcile(self, now_ms: int) -> int:
         """Retract every surfaced tuple that the persisted guards say is withdrawn: its key revoked or gone
         from the manifest, its key quarantined, a sticky PLUCK on it, a supersession mark newer than it, or
         its local expiry passed. Idempotent: a retracted tuple leaves the surfaced set, so a second call
@@ -214,7 +268,6 @@ class Receptor:
                 continue
             self._retract(ident, reason, by=by)
             n += 1
-        self._save_if_dirty()
         return n
 
     def set_landing(self, **changes) -> bool:
@@ -231,12 +284,22 @@ class Receptor:
         return self.em.emit("fatal", reason=reason, detail=detail[:200])
 
     def bye(self) -> bytes:
-        self._save_if_dirty()
+        """Save, then `bye`. A failed save raises StateNotDurable: the run then ends with `fatal`."""
+        if self.failed is not None:
+            raise StateNotDurable(self.failed)
+        try:
+            self._save_if_dirty()
+        except OSError as e:
+            self.failed = f"{type(e).__name__}: {e}"
+            raise StateNotDurable(self.failed) from e
         return self.em.emit("bye")
 
     # ------------------------------------------------------------ hearing
 
     def hear(self, datagram: bytes, now_ms: int) -> None:
+        self._batch(lambda: self._hear(datagram, now_ms))
+
+    def _hear(self, datagram: bytes, now_ms: int) -> None:
         self.last_datagram_at = now_ms
         try:
             events = self.lst.hear(datagram, now_ms)
@@ -252,7 +315,6 @@ class Receptor:
             self._presence_events(events)
         else:
             self._item_or_pluck(f, dedup, events, now_ms)
-        self._save_if_dirty()
 
     def _unverified(self, datagram: bytes, reason: str) -> None:
         """Steps 1-2 of §14.1 failed: counters only, never a record, never attributed (D34)."""
@@ -377,8 +439,12 @@ class Receptor:
         local_expiry = wire.local_expiry_ms(b, offset, first_heard_ms=heard)
         item = f.kind == wire.KIND_ITEM
         rec = {
+            # Only a verified frame reaches the hearer ring (§14.1 step 5); one refused at steps 3-4 has no
+            # ring copy, so no receipt pointer: null (#79 review). This spike keeps no ring; for a verified
+            # frame these are the hash and size its ring copy would have (the dedup digest).
             "frame": {**_tuple_json(ident), "kind": "item" if item else "pluck",
-                      "sha256": hashlib.sha256(f.raw).hexdigest(), "bytes": len(f.raw)},
+                      "sha256": hashlib.sha256(f.raw).hexdigest() if admission == "verified" else None,
+                      "bytes": len(f.raw) if admission == "verified" else None},
             "idem": idem(ident),
             "station": {"name": entry.name, "principal": None},
             "stream": self.lst._stream_name(kid, b.stream),
@@ -428,6 +494,9 @@ class Receptor:
     # ------------------------------------------------------------ time
 
     def tick(self, now_ms: int) -> None:
+        self._batch(lambda: self._tick(now_ms))
+
+    def _tick(self, now_ms: int) -> None:
         for ev in self.lst.tick(now_ms):
             if ev.kind == "expired" and ev.ident in self.surfaced:
                 self._retract(ev.ident, "expired")
@@ -440,13 +509,14 @@ class Receptor:
             elif ev.kind == "presence":
                 self._presence_events([ev])
         self._expire_restored(now_ms)
-        self._save_if_dirty()
 
     def _expire_restored(self, now_ms: int) -> None:
         for ident in [i for i in self.restored if self.surfaced[i][0] <= now_ms]:
             self._retract(ident, "expired")
 
     def health(self, now_ms: int) -> bytes:
+        if self.failed is not None:
+            raise StateNotDurable(self.failed)
         reasons = []
         since = self.last_datagram_at if self.last_datagram_at is not None else self.started_at
         if now_ms - since >= NO_DATAGRAMS_MS:
