@@ -110,6 +110,12 @@ class WireTest(unittest.TestCase):
         self.assertEqual(wire.parse(mk(entry + [7]), lambda k: PK).body.streams[0].lens, 7)
         u64 = wire.parse(mk(entry[:1] + [2**64 - 1, 2**64 - 1] + entry[3:]), lambda k: PK).body.streams[0]
         self.assertEqual((u64.head_seq, u64.trail_seq), (2**64 - 1, 2**64 - 1))
+        # #72 (§9.8): trail_seq = head_seq + 1 is the empty window and valid, at 0 and at the u64 edge too;
+        # above head_seq + 1 is bad-field (below in `bad`).
+        for head, trail in ((5, 6), (0, 1), (2**64 - 2, 2**64 - 1), (2**64 - 1, 0)):
+            with self.subTest(head=head, trail=trail):
+                got = wire.parse(mk(entry[:1] + [head, trail] + entry[3:]), lambda k: PK).body.streams[0]
+                self.assertEqual((got.head_seq, got.trail_seq), (head, trail))
         bad = {
             "pre-A1 8 elements": entry[:2] + entry[3:],
             "7 elements": entry[:7],
@@ -120,6 +126,8 @@ class WireTest(unittest.TestCase):
             "lens > u32": entry + [2**32],
             "live > u32": entry[:3] + [2**32] + entry[4:],
             "bool element": entry[:3] + [True] + entry[4:],
+            "trail_seq = head_seq + 2 (#72)": entry[:1] + [5, 7] + entry[3:],
+            "trail_seq = u64 max, head_seq 0 (#72)": entry[:1] + [0, 2**64 - 1] + entry[3:],
             "not a list": 7,
         }
         for label, bad_entry in bad.items():
