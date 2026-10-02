@@ -24,7 +24,10 @@ loopback probe only: it joins the group on the default interface (so an IGMP
 report goes out there) and sends an unsigned nonce with IP TTL 0, which never
 leaves this host, on an ephemeral port: not §11.2's signed probe on
 ``x-test.doctor``. So it neither decides nor enables multicast, and it writes
-no configuration.
+no configuration. Because the join is visible on the LAN, the probe runs only
+when multicast is configured (``stations.toml`` or ``--multicast``) or
+``--probe`` asks for it; otherwise multicast is reported as not configured and
+nothing joins the group. ``--no-probe`` always skips it.
 
 Exit status: 0 when no check fails, 1 when one does. These are not §11.2's
 multicast codes (0 multicast OK, 10, 20, 30): a 0 here says nothing about
@@ -222,14 +225,25 @@ def loopback_probe(group: str = runner.MCAST_GROUP, timeout_s: float = 1.0) -> t
         tx.close()
 
 
+PROBE_SKIPPED_FLAG = "loopback probe skipped (--no-probe)"
+PROBE_SKIPPED_UNCONFIGURED = "multicast not configured — probe skipped (--probe runs it anyway)"
+
+
+def should_probe(configured: Optional[bool], force: bool = False, never: bool = False) -> bool:
+    """Run the loopback probe (which joins the group, so the LAN sees an IGMP report) only when multicast is
+    configured, or ``--probe`` forces it. ``--no-probe`` wins over both."""
+    return not never and (force or bool(configured))
+
+
 def multicast_report(configured: Optional[bool], bind: Optional[str],
-                     probe: Optional[Callable[[], tuple]] = None) -> Check:
-    """Status ``report``: never ``fail``, whatever the probe finds, and nothing here turns multicast on."""
+                     probe: Optional[Callable[[], tuple]] = None, skipped: str = PROBE_SKIPPED_FLAG) -> Check:
+    """Status ``report``: never ``fail``, whatever the probe finds, and nothing here turns multicast on.
+    ``skipped`` says why, when ``probe`` is None."""
     group = runner.MCAST_GROUP
     data: dict = {"decided": False, "group": group, "configured": configured}
     if probe is None:
         data["loopback"] = None
-        parts = ["loopback probe skipped"]
+        parts = [skipped]
     else:
         heard, why = probe()
         data["loopback"] = heard

@@ -6,7 +6,7 @@
     python -m canticle hush    --control ... --stream chatter --seq 1
     python -m canticle listen  --manifest fleet.json --bind 0.0.0.0:9999      # one JSON event per line
     python -m canticle listen                                                # the same, from ~/.binary-canticle/stations.toml
-    python -m canticle doctor  [--json]                                      # check this host; exit 1 if a check fails
+    python -m canticle doctor  [--json] [--probe|--no-probe]                 # check this host; exit 1 if a check fails
     python -m canticle manifest verify|show [fleet.json]
     python -m canticle ambient --control ... --stream hymn --fixture hymn.txt --duration 600   # background emitter
     python -m canticle tuner   --manifest fleet.json --multicast --http 127.0.0.1:8765         # read-only web view
@@ -377,7 +377,10 @@ def cmd_doctor(a) -> int:
                       if source else doctor.Check("stations", "skip", "not read: --manifest given"))
         checks.append(doctor.check_manifest(manifest))
         checks.append(doctor.check_bind(bind, _leases(a.state, manifest, bind)))
-    checks.append(doctor.multicast_report(multicast, bind, probe=None if a.no_probe else doctor.loopback_probe))
+    run_probe = doctor.should_probe(multicast, force=a.probe, never=a.no_probe)
+    checks.append(doctor.multicast_report(
+        multicast, bind, probe=doctor.loopback_probe if run_probe else None,
+        skipped=doctor.PROBE_SKIPPED_FLAG if a.no_probe else doctor.PROBE_SKIPPED_UNCONFIGURED))
     failed = any(c.status == "fail" for c in checks)
     if a.json:
         print(json.dumps({"ok": not failed, "checks": [c.to_json() for c in checks]}, indent=2))
@@ -566,12 +569,18 @@ def main(argv=None) -> int:
 
     d = sub.add_parser("doctor", help="check that this host can run a listener; exit 1 if a check fails",
                        description="Checks Python, cryptography (with an Ed25519 known answer), stations.toml, the "
-                       "manifest and the listener's UDP address, then reports multicast. Exit 0 when no check fails, "
+                       "manifest and the listener's UDP address, then reports multicast; its loopback probe runs only when "
+                       "multicast is configured or --probe is given. Exit 0 when no check fails, "
                        "1 when one does. Multicast is reported, never decided or enabled: these are not RFC §11.2's "
                        "exit codes, and a 0 says nothing about multicast.")
     _locator_args(d)
     d.add_argument("--state", help="the listener's --state, if it runs with one, to recognise it holding the address")
-    d.add_argument("--no-probe", action="store_true", help=f"skip the loopback probe to {runner.MCAST_GROUP}")
+    probe = d.add_mutually_exclusive_group()
+    probe.add_argument("--probe", action="store_true",
+                       help=f"run the loopback probe to {runner.MCAST_GROUP} even when multicast is not configured "
+                       "(it joins the group, so an IGMP report goes out on the default interface)")
+    probe.add_argument("--no-probe", action="store_true",
+                       help=f"never run the loopback probe to {runner.MCAST_GROUP}, even when multicast is configured")
     d.add_argument("--json", action="store_true", help="print the checks as JSON")
     d.set_defaults(fn=cmd_doctor)
 
