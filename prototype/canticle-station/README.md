@@ -322,7 +322,7 @@ lower-epoch tuples as above. `canticle listen` and `canticle tuner` behave as be
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 233 tests, about 25 s
+python -m unittest discover -s tests      # 234 tests, about 25 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 

@@ -360,6 +360,15 @@ class DoctorCliTest(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             main(["doctor", "--probe", "--no-probe"])
 
+    def test_the_multicast_flag_counts_when_stations_toml_does_not_load(self):
+        # --multicast configures multicast (README step 3), whether or not a stations.toml loads.
+        code, m, joined = self.spied("--multicast")                        # no stations.toml
+        self.assertEqual((code, joined, m["configured"]), (1, 1, True))
+        (self.conf / "stations.toml").write_text("not toml [")
+        code, m, joined = self.spied("--no-multicast")                     # malformed stations.toml
+        self.assertEqual((code, joined, m["configured"]), (1, 0, False))
+        self.assertIn("listener multicast off", m["detail"])
+
 
 if __name__ == "__main__":
     unittest.main()
