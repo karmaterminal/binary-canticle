@@ -31,8 +31,9 @@ exists at all.
 ## Quick start
 
 One Linux host, Python 3.11 or later. CI runs Ubuntu 24.04 and Python 3.11 with `cryptography` 50.0.1;
-the package asks for `cryptography>=45`. These steps are the onboarding that
-`prototype/canticle-station/tests/test_onboarding.py` runs end to end.
+the package asks for `cryptography>=45`. CI runs the keygen, `stations.toml`, doctor and listen steps as
+`prototype/canticle-station/tests/test_onboarding.py`, and a station's sing, hush and status as
+`tests/test_udp_e2e.py`.
 
 ```sh
 git clone https://github.com/karmaterminal/binary-canticle && cd binary-canticle
@@ -95,9 +96,9 @@ host checks, so turning it on is your decision.
 | Part | Command | What it does |
 |---|---|---|
 | Station | `canticle station` | Signs each item once and loops the same bytes until expiry; regulates the loop rate; sends carrier-beacons; holds one exclusive lease per key. `sing`, `hush` and `status` talk to it over its control socket. |
-| Host daemon | `canticle daemon` | The host's one UDP listener (decision D35). It verifies, deduplicates and judges what it hears, and carries receptor record v1 (RFC §14.18.3) to every binding on the host over a unix socket, with an opt-in join snapshot for late joiners (D36). |
+| Host daemon | `canticle daemon` | The host's one UDP listener (decision D35). It verifies, deduplicates and judges what it hears, and carries receptor record v1 (RFC §14.18.3) to every binding on the host over a unix socket, with an opt-in join snapshot for late joiners (proposed decision D36). |
 | Listener | `canticle listen` | The same verification as the daemon, printed as one JSON event per line. For onboarding, tests and quick checks. It cannot share the UDP port with a daemon. |
-| Agent bindings | not in this repo | Read record v1 from the daemon and decide what reaches which session. frond-ear's `host-daemon` source does this today, listen-only and silent: its sessions read heard items with a `hear` tool, under a `[canticle:heard]` banner (karmaterminal/frond-ear, a private repository). The OpenClaw plugin (RFC §16.2) and the Claude Code MCP server and hooks (§16.5) are planned, not built. |
+| Agent bindings | not in this repo | Read record v1 from the daemon and decide what reaches which session. frond-ear's `host-daemon` source implements this, listen-only and silent: its sessions read heard items when they call a `hear` tool, under a `[canticle:heard]` banner (karmaterminal/frond-ear, a private repository). It stays off on silas and ronan until the mixed-host proofs of §14.18.2 pass there (RFC §23.2, question 23). The OpenClaw plugin (RFC §16.2) and the Claude Code MCP server and hooks (§16.5) are planned, not built. |
 | Doctor | `canticle doctor` | Checks Python, `cryptography`, `stations.toml`, the manifest and the listener's address. Writes nothing. |
 | Tuner | `canticle tuner` | A read-only web page on loopback that shows one listener's view of the stations and their live rings. |
 | Background emitter | `canticle ambient` | Puts paced, short-TTL lines from a fixture file on air through a station. No model calls. |
@@ -108,8 +109,8 @@ refuses every connection, and the control socket is guarded by its file mode alo
 
 ## What works today, and what does not
 
-**Implemented in [`prototype/canticle-station`](prototype/canticle-station/)** (the RFC-0001 work items S1,
-S2 and BC-2, and decisions D35 and D36):
+**Implemented in [`prototype/canticle-station`](prototype/canticle-station/)** (parts of work items S1 and
+S2, the BC-2 slice of S3, the host daemon of decision D35 and the join snapshot of proposed decision D36):
 
 - the frame v2 codec: strict deterministic CBOR, an Ed25519 signature on every frame, and candidate
   conformance vectors;
@@ -124,11 +125,13 @@ S2 and BC-2, and decisions D35 and D36):
 
 **Not implemented yet** (RFC §23.3; the prototype README keeps the exact list):
 
-- landing heard items into agent sessions: banners, taint, digests and wake (work item S3). Until that
-  exists, heard text reaches no session by design. Receivers are silent-only (D1, D25);
+- landing heard items into agent sessions: banners, taint, digests and wake (work item S3). Until it
+  exists, nothing heard is put into a session or wakes one; a session reads heard items only when it asks,
+  as frond-ear's `hear` does. Receivers are silent-only (D1, D25);
 - relays and internet listeners (§11.3), DNS-SD discovery (§13) and the ringserver replay bridge (§18);
 - signed fleet manifests, the genesis pin and the daemon's key store (§10.3, §15.7). Keys are plain files;
 - typed bodies and content policy (§15), accord and control frames (§10.6, §10.7), and the capsid (§8.7);
+- work-conserving budget redistribution and burst budget accounting in the regulator (§7.5, §7.6);
 - the receiver side of `trail_seq` (§7.10), IPv6, and the multicast checks of §11.2's doctor;
 - a mixed-host proof with a real harness binding (§14.18.2 cases 4 and 6).
 
@@ -168,10 +171,11 @@ S2 and BC-2, and decisions D35 and D36):
 ## Lineage
 
 - **March 2026.** figs's pitch: streams of "what is now and…" that color a system, sung as network
-  broadcast that agents tune into (`spike/silas-teams-context.md`). It drew on MAGI-1's broadcast
-  streams, with Dante's nine circles as aspected lenses; aspected streams are RFC §17 now.
-- **SeedLink** ([v4](https://docs.fdsn.org/projects/seedlink/en/latest/protocol.html)) inspired the wire,
-  and SeedLink dashboards are meant to show stations (RFC §18).
+  broadcast that agents tune into, after MAGI-1's broadcast streams (`spike/silas-teams-context.md`). The
+  first README added Dante's nine circles as aspected lenses; aspected streams are RFC §17 now.
+- **SeedLink** ([v4](https://docs.fdsn.org/projects/seedlink/en/latest/protocol.html)) is the conceptual
+  ancestor, not the wire: canticle borrows its naming hierarchy, sequence numbers, rings and format-tagged
+  payloads, but not its TCP session (RFC §18.1). SeedLink dashboards are meant to show stations (§18).
 - **OpenClaw.** The continuation RFC (`docs/design/continue-work-signal-v2.md` on the karmaterminal/openclaw
   branch `codeagent/85651-upstream-1ba243c8-gates`, not on OpenClaw `main`) ships same-host enrichment and
   names a Binary Canticle layer as its future (RFC §1.3). The harness interface (RFC §14.18, §16) is

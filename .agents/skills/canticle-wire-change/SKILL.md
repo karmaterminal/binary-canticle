@@ -63,8 +63,9 @@ and a join-snapshot capture, byte for byte, in `test/fixtures/canticle/`. Its `S
 SHA-256, the binary-canticle commit it was taken from and the change that last touched it.
 
 - In your pull request, say which of the three your change affects, and which vectors changed and why.
-- After it merges, frond-ear needs a follow-up: copy the regenerated file (or recapture the record sample from
-  binary-canticle's own code), update `SOURCE.md` (`sha256sum` of the file and the merge commit), and run
-  `pnpm check` there. Open that follow-up yourself if you can reach frond-ear; otherwise name it in the pull
+- After it merges, frond-ear needs a follow-up: copy the regenerated vectors, or recapture the record or
+  join-snapshot sample from binary-canticle's code the way its `SOURCE.md` describes (no capture script is
+  committed in either repository); update `SOURCE.md` (`sha256sum` of the file and the source commit); and
+  run `pnpm check` there. Open that follow-up yourself if you can reach frond-ear; otherwise name it in the pull
   request so a prince who can picks it up.
 - The vectors stay candidates until that port reproduces them (§9.13).
