@@ -275,6 +275,64 @@ class CarouselTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             station(*cfg(129, lens=1), b_station=100_000)
 
+    def assert_every_window_has_every_stream(self, st, beacons):
+        """§8.4: every stream appears at least once in every `count` consecutive beacons (an unpaged
+        beacon carries the whole catalog, count 1); each beacon fits the frame; count never exceeds 8."""
+        sids = {s.sid for s in st.streams.values()}
+        bodies = [wire.parse(b, lambda k: PK).body for b in beacons]
+        for b in beacons:
+            self.assertLessEqual(len(b), wire.MAX_FRAME)
+        for i, b in enumerate(bodies):
+            count = b.page[1] if b.page else 1
+            self.assertLessEqual(count, 8)
+            if i + count > len(bodies):
+                break
+            seen = {e.stream_id for w in bodies[i:i + count] for e in w.streams}
+            self.assertEqual(sids - seen, set(), f"beacons {i}..{i + count - 1} (pages "
+                             f"{[w.page for w in bodies[i:i + count]]}) miss streams")
+
+    def test_shrinking_entry_never_skips_a_stream_past_count(self):
+        # #71 review (Cael): at 6048276 the split was recomputed from actual sizes every beacon. Stream 0's
+        # one long-loop item expires, its entry shrinks 8 bytes, and stream 30 moves from page 1 to page 0
+        # between the two page sends: (1, present), (0, absent), shrink, (1, absent), (0, present), a gap
+        # of three beacons at count 2. The rotation is now fixed at worst-case sizes, so no stream moves.
+        st = station(*[StreamConfig(f"s{i}", b_stream=500 if i == 0 else 70_000, default_ttl_s=300, max_ttl_s=3_600,
+                                    lens=None if i < 2 else 100_000) for i in range(40)], b_station=3_000_000)
+        names = list(st.streams)
+        st.sing(T0, names[0], text="x", ttl_s=120, loop=70_000)                     # loop fields 5 B each until T0+120 s
+        for n in names[1:]:
+            st.sing(T0, n, text="y", ttl_s=300)
+        beacons = [st._beacon(T0 + dt) for dt in (1_000, 2_000, 100_000, 130_000, 131_000, 132_000, 133_000)]
+        self.assertEqual(st.streams[names[0]].ring, {})                              # the shrink happened mid-run
+        self.assertEqual(st._pages(st._entries())[0][-1].stream_id, st.streams[names[30]].sid)  # and moves the actual split
+        self.assert_every_window_has_every_stream(st, beacons)
+
+    def test_every_window_of_count_beacons_has_every_stream_property(self):
+        # Property form of the #71 finding: random sings, loops and TTLs make entries grow and shrink, so the
+        # actual-size split moves, and a 31-stream catalog crosses in and out of fitting one beacon. Every
+        # window of `count` beacons must still carry every stream. 12 of these 24 seeds fail at 6048276.
+        moved = mixed = 0
+        for seed in range(24):
+            rng = random.Random(seed)
+            n = rng.choice((31, 34, 40))
+            st = station(*[StreamConfig(f"s{i}", b_stream=rng.choice((500, 70_000, 70_000, 70_000)), default_ttl_s=300,
+                                        max_ttl_s=3_600, lens=rng.choice((None, 100_000, 100_000, 100_000)))
+                           for i in range(n)], b_station=n * 70_000)
+            names, now, beacons, splits = list(st.streams), T0, [], set()
+            for _ in range(150):
+                for _ in range(rng.randrange(8)):
+                    st.sing(now, rng.choice(names), text="z", ttl_s=rng.choice((10, 60, 300)),
+                            loop=rng.choice(("normal", 5_000, 70_000)))
+                now += rng.choice((500, 1_000, 5_000, 40_000))
+                beacons.append(st._beacon(now))
+                splits.add(tuple(len(p) for p in st._pages(st._entries())))
+            paged = {wire.parse(b, lambda k: PK).body.page is not None for b in beacons}
+            moved += len(splits) > 1
+            mixed += paged == {True, False}
+            with self.subTest(seed=seed, streams=n):
+                self.assert_every_window_has_every_stream(st, beacons)
+        self.assertGreater(moved, 0)    # positive controls: the actual-size split did move,
+        self.assertGreater(mixed, 0)    # and some catalog went in and out of paging
 
 class LateJoinerTest(unittest.TestCase):
     def test_late_listener_hears_every_live_item_within_one_loop(self):
