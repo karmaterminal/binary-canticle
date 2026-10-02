@@ -1,0 +1,12 @@
+{
+  "name": "binary-canticle",
+  "version": "0.1.0",
+  "description": "A skill for installing, checking and using the Binary Canticle prototype (the canticle command) from an agent session.",
+  "author": {
+    "name": "the dandelion cult",
+    "url": "https://github.com/karmaterminal"
+  },
+  "homepage": "https://github.com/karmaterminal/binary-canticle",
+  "repository": "https://github.com/karmaterminal/binary-canticle",
+  "keywords": ["binary-canticle", "broadcast", "udp", "agents"]
+}
