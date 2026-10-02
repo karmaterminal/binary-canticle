@@ -38,6 +38,9 @@ Status vocabulary:
 | `spike/silas-seedlink-mapping.md` | 🌫️ Silas | transport inspiration / seedlink mapping | pressure-test | transport evaluation | which seedlink ideas are useful vs overfitting? | keep as reference during adapter work | transport religion |
 | `spike/silas-teams-context.md` | 🌫️ Silas | historical/contextual spike | seed | unclear | still relevant? | review or demote/archive | accidental live spec |
 | `references/figs-msft-blog-continuation-notes.txt` | figs | horizon / framing reference | stable | none | which phrases should become spec language? | cite sparingly where load-bearing | rhetorical overreach |
+| `proto/lineage/send-side-draft.md` | 🌊 Ronan + 🕯 Emeric | send side: when a session sings | superseded | none (lineage, `fa3551f`) | its open item 3 (stimulus composition) is not tracked in RFC-0001 | none; current text: RFC-0001 §15.3 (two-gate emission) | a normative source |
+| `proto/lineage/receive-side-draft.md` | 🌊 Ronan + 🕯 Emeric | receive side: how a heard item lands | superseded | none (lineage, `fa3551f`) | its open item 2 is RFC-0001 §23.2 question 3, blocked on D13 | none; current text: RFC-0001 §14.9 (landing modes). Its ingress gate is replaced by signature admission (§10.1); `post-compaction` landing of heard content is reserved in v1 (D13) | a normative source |
+| `proto/lineage/threshold-fire-taxonomy-v2.md` | 🕯 Emeric + 🌊 Ronan | seam ranking (send) and wake register (receive) | superseded | none (lineage, `2f2b3df`) | the death seam (§G) is RFC-0001 §23.2 question 2, deferred | none; current text: RFC-0001 §15.3 (two-gate emission, seam table) and §14.9-§14.10 (listener election, wake policy) | a normative source |
 
 ## Gap matrix template
 
