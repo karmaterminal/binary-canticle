@@ -1,0 +1,27 @@
+# Example user unit: the canticle listener (binary-canticle spike). Documented only; nothing installs it.
+#
+#   cp docs/systemd/canticle-listener.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now canticle-listener
+#   loginctl enable-linger "$USER"   # optional: keep listening while you are logged out
+#
+# It reads ~/.binary-canticle/stations.toml (docs/stations-toml.md): run `canticle doctor` first.
+# Paths follow docs/state-layout.md, with the package installed in a venv at ~/.venvs/canticle.
+
+[Unit]
+Description=canticle listener (binary-canticle spike)
+
+[Service]
+Type=exec
+# The listener keeps its safety state under $XDG_STATE_HOME/canticle. Pinning it here lets
+# `canticle doctor`, run from a shell where XDG_STATE_HOME is unset, find this listener's lease.
+Environment=XDG_STATE_HOME=%h/.local/state
+UMask=0077
+# Heard events carry item text, so they go to a file, not the journal (RFC §19.7). The shell creates
+# the directory first: StandardOutput=append: would need it to exist already. Nothing rotates the file.
+ExecStart=/bin/sh -c 'mkdir -p "%h/.local/state/canticle" && exec "%h/.venvs/canticle/bin/canticle" listen >>"%h/.local/state/canticle/heard.jsonl"'
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

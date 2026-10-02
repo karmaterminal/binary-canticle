@@ -5,6 +5,9 @@
     python -m canticle sing    --control /tmp/canticle-<key_id>.sock --stream chatter --text "port-scan burst from 10.0.0.7" --ttl 60
     python -m canticle hush    --control ... --stream chatter --seq 1
     python -m canticle listen  --manifest fleet.json --bind 0.0.0.0:9999      # one JSON event per line
+    python -m canticle listen                                                # the same, from ~/.binary-canticle/stations.toml
+    python -m canticle doctor  [--json]                                      # check this host; exit 1 if a check fails
+    python -m canticle manifest verify|show [fleet.json]
     python -m canticle ambient --control ... --stream hymn --fixture hymn.txt --duration 600   # background emitter
     python -m canticle tuner   --manifest fleet.json --multicast --http 127.0.0.1:8765         # read-only web view
 """
@@ -24,10 +27,10 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from . import runner, wire
-from .ids import CLASS_BY_NAME, SCOPES
+from . import runner, stations, wire
+from .ids import CLASS_BY_NAME, SCOPES, STATION_NAME_RE
 from .listener import Listener
-from .manifest import Manifest, StationEntry
+from .manifest import FORMAT, Manifest, StationEntry, verify_json
 from .station import Station, StreamConfig, next_epoch
 
 
@@ -46,23 +49,41 @@ def cmd_keygen(a) -> int:
     if out.exists():
         print(f"{out} exists; refusing to overwrite", file=sys.stderr)
         return 1
+    for d in [out.parent] + ([Path(a.manifest).parent] if a.manifest else []):
+        if not d.is_dir():
+            print(f"{d}: no such directory; no key written", file=sys.stderr)
+            return 1
     sk = Ed25519PrivateKey.generate()
-    seed = sk.private_bytes_raw()
-    fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(fd, "w") as f:
-        f.write(seed.hex() + "\n")
     pub = wire.public_key_bytes(sk)
-    info = {"key": str(out), "public_key": pub.hex(), "key_id": wire.key_id(pub).hex()}
+    m = None
     if a.manifest:
-        if not a.name:
-            print("--manifest needs --name", file=sys.stderr)
+        # Everything that can refuse runs before the key file is written, so a mistake leaves no orphan key
+        # behind to block the corrected command with "exists; refusing to overwrite".
+        if not a.name or not STATION_NAME_RE.match(a.name):
+            print("--manifest needs --name, matching [a-z][a-z0-9-]{0,30} (RFC §5.3); no key written", file=sys.stderr)
+            return 1
+        classes = [c for c in a.classes.split(",") if c]
+        scopes = [s for s in a.scopes.split(",") if s]
+        unknown = [f"class {c!r}" for c in classes if c not in CLASS_BY_NAME] + [f"scope {s!r}" for s in scopes if s not in SCOPES]
+        if unknown:
+            print(f"unknown {', '.join(unknown)} (classes: {', '.join(CLASS_BY_NAME)}; scopes: {', '.join(SCOPES)}); "
+                  "no key written", file=sys.stderr)
             return 1
         path = Path(a.manifest)
-        m = Manifest.load(path) if path.exists() else Manifest()
-        m.add(StationEntry(name=a.name, public_key=pub,
-                           classes=frozenset(CLASS_BY_NAME[c].code for c in a.classes.split(",") if c),
-                           streams=tuple(s for s in a.streams.split(",") if s),
-                           scopes=frozenset(SCOPES[s] for s in a.scopes.split(",") if s)))
+        try:
+            m = Manifest.load(path) if path.exists() else Manifest()
+            m.add(StationEntry(name=a.name, public_key=pub, classes=frozenset(CLASS_BY_NAME[c].code for c in classes),
+                               streams=tuple(s for s in a.streams.split(",") if s),
+                               scopes=frozenset(SCOPES[s] for s in scopes)))
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            why = e if isinstance(e, (OSError, ValueError)) else f"does not load ({type(e).__name__}: {e})"
+            print(f"{path}: {why}; no key written (canticle manifest verify lists every problem)", file=sys.stderr)
+            return 1
+    fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(sk.private_bytes_raw().hex() + "\n")
+    info = {"key": str(out), "public_key": pub.hex(), "key_id": wire.key_id(pub).hex()}
+    if m is not None:
         m.save(path)
         info["manifest"] = str(path)
     print(json.dumps(info))
@@ -78,7 +99,10 @@ def _stream_config(spec: str) -> StreamConfig:
 def cmd_station(a) -> int:
     sk = _load_key(a.key)
     kid = wire.key_id(wire.public_key_bytes(sk))
-    grant = Manifest.load(a.manifest).entry(kid)
+    m = _load_manifest(a.manifest)
+    if m is None:
+        return 1
+    grant = m.entry(kid)
     if grant is None or grant.revoked:
         print(f"key {kid.hex()} is not in {a.manifest} (or is revoked); refusing to sign", file=sys.stderr)
         return 1
@@ -161,10 +185,45 @@ def _default_state(manifest: str, bind: str) -> str:
     return os.path.join(base, "canticle", f"listener-{tag}.json")
 
 
+def _locators(a) -> tuple:
+    """(manifest, bind, multicast, stations.toml path or None) for listen and doctor. With --manifest, today's
+    flags and defaults apply and stations.toml is not read. Without it, the locators come from stations.toml
+    (RFC §13.6), and --bind or --(no-)multicast, when given, win over the file."""
+    if a.manifest is not None:
+        return a.manifest, a.bind or stations.DEFAULT_BIND, bool(a.multicast), None
+    cfg = stations.load(a.stations)
+    return str(cfg.manifest), a.bind or cfg.bind, cfg.multicast if a.multicast is None else a.multicast, cfg.path
+
+
+def _stations_hint(e: Exception, otherwise: str = "pass --manifest") -> str:
+    if isinstance(e, stations.StationsMissing):
+        return f"{e}: write it (prototype/canticle-station/docs/stations-toml.md), or {otherwise}"
+    return str(e)
+
+
+def _load_manifest(path: str):
+    try:
+        return Manifest.load(path)
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        why = e if isinstance(e, (OSError, ValueError)) else f"does not load ({type(e).__name__}: {e})"
+        print(f"{path}: {why} (canticle manifest verify lists every problem)", file=sys.stderr)
+        return None
+
+
 def cmd_listen(a) -> int:
+    try:
+        a.manifest, a.bind, a.multicast, source = _locators(a)
+    except stations.StationsError as e:
+        print(_stations_hint(e), file=sys.stderr)
+        return 1
+    if source is not None:
+        print(json.dumps({"stations": str(source), "manifest": a.manifest, "bind": a.bind, "multicast": a.multicast}),
+              file=sys.stderr, flush=True)
+    m = _load_manifest(a.manifest)
+    if m is None:
+        return 1
     state, _lease = _listener_state(a)
-    lst = Listener(Manifest.load(a.manifest), tuned=set(a.stream) if a.stream else None,
-                   state_path=state, ephemeral=a.ephemeral)
+    lst = Listener(m, tuned=set(a.stream) if a.stream else None, state_path=state, ephemeral=a.ephemeral)
     bind = runner.parse_addr(a.bind)
 
     def on_event(ev):
@@ -232,8 +291,11 @@ def cmd_tuner(a) -> int:
     if not is_loopback(http_host):
         print(f"--http must be a loopback address in this spike, not {http_host} (RFC-0001 §18.9)", file=sys.stderr)
         return 1
+    m = _load_manifest(a.manifest)
+    if m is None:
+        return 1
     state, _lease = _listener_state(a, role="tuner")
-    lst = Listener(Manifest.load(a.manifest), state_path=state, ephemeral=a.ephemeral)
+    lst = Listener(m, state_path=state, ephemeral=a.ephemeral)
     log = open(a.log, "a") if a.log else None
 
     def on_event(ev) -> None:
@@ -257,11 +319,120 @@ def cmd_tuner(a) -> int:
     return 0
 
 
+def _leases(state, manifest: str, bind: str) -> dict:
+    """The state leases a running `canticle listen` or `canticle tuner` holds for this manifest and bind."""
+    return {"listener": (state or _default_state(manifest, bind)) + ".lease",
+            "tuner": _default_state(manifest, f"{bind}|tuner") + ".lease"}
+
+
+def cmd_doctor(a) -> int:
+    from . import doctor
+    checks = [doctor.check_python(), doctor.check_cryptography()]
+    try:
+        manifest, bind, multicast, source = _locators(a)
+    except stations.StationsError as e:
+        manifest = bind = multicast = None
+        checks.append(doctor.Check("stations", "fail", _stations_hint(e)))
+        checks += [doctor.Check(name, "skip", "needs stations.toml or --manifest") for name in ("manifest", "bind")]
+    else:
+        checks.append(doctor.Check("stations", "ok", f"{source}: manifest {manifest}, bind {bind}, "
+                                   f"multicast {'on' if multicast else 'off'}", {"path": str(source)})
+                      if source else doctor.Check("stations", "skip", "not read: --manifest given"))
+        checks.append(doctor.check_manifest(manifest))
+        checks.append(doctor.check_bind(bind, _leases(a.state, manifest, bind)))
+    checks.append(doctor.multicast_report(multicast, bind, probe=None if a.no_probe else doctor.loopback_probe))
+    failed = any(c.status == "fail" for c in checks)
+    if a.json:
+        print(json.dumps({"ok": not failed, "checks": [c.to_json() for c in checks]}, indent=2))
+    else:
+        print(doctor.render(checks))
+    return 1 if failed else 0
+
+
+UNSIGNED = ("UNSIGNED: spike-0 manifests carry no signature, so nothing authenticates this file, and whoever can "
+            "write it chooses the keys a listener trusts. RFC-0001 §10.3's root signatures and genesis pin are not "
+            "implemented in this spike; no signature was checked.")
+
+
+def cmd_manifest(a) -> int:
+    try:
+        path = a.path or str(stations.load(a.stations).manifest)
+    except stations.StationsError as e:
+        print(_stations_hint(e, f"name the manifest: canticle manifest {a.action} PATH"), file=sys.stderr)
+        return 1
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        print(f"{path}: {e}", file=sys.stderr)
+        return 1
+    problems = verify_json(data)
+    return (_manifest_verify if a.action == "verify" else _manifest_show)(a, path, data, problems)
+
+
+def _manifest_verify(a, path: str, data, problems: list) -> int:
+    rows = [] if problems else [
+        {"name": s["name"], "key_id": wire.key_id(bytes.fromhex(s["public_key"])).hex(), "key_id_listed": "key_id" in s,
+         "revoked": s.get("revoked", False)} for s in data["stations"]]
+    if a.json:
+        print(json.dumps({"path": path, "ok": not problems, "signed": False, "problems": problems, "stations": rows},
+                         indent=2))
+        return 1 if problems else 0
+    if problems:
+        print(f"{path}: {len(problems)} problem(s)")
+        print("\n".join(f"  - {p}" for p in problems))
+    else:
+        print(f"{path}: {FORMAT}, {len(rows)} station(s)")
+        for r in rows:
+            how = "matches its public key" if r["key_id_listed"] else "derived from its public key (the entry lists none)"
+            print(f"  {r['name']:<16} {r['key_id']}  {how}{'  REVOKED' if r['revoked'] else ''}")
+    print(UNSIGNED)
+    print(f"verify: {'FAILED' if problems else 'ok'} (structure, keys and key ids; no signature checked)")
+    return 1 if problems else 0
+
+
+def _manifest_show(a, path: str, data, problems: list) -> int:
+    try:
+        m = Manifest.from_json(data)
+    except Exception as e:  # anything the listener would refuse to load
+        print(f"{path}: does not load: {type(e).__name__}: {e} (canticle manifest verify lists every problem)",
+              file=sys.stderr)
+        return 1
+    rows = []
+    for e in m:
+        row = e.to_json()
+        row["streams"] = [{"name": name, "stream_id": f"{sid:08x}"} for sid, name in e.stream_names.items()]
+        rows.append(row)
+    if a.json:
+        print(json.dumps({"path": path, "manifest": FORMAT, "signed": False, "problems": problems, "stations": rows},
+                         indent=2))
+        return 0
+    print(f"{path}: {FORMAT}, {len(rows)} station(s), UNSIGNED (nothing authenticates it; RFC §10.3)")
+    for r in rows:
+        streams = ", ".join("{} ({})".format(x["name"], x["stream_id"]) for x in r["streams"])
+        print(f"{r['name']}  key_id {r['key_id']}{'  REVOKED' if r.get('revoked') else ''}")
+        print(f"  public_key  {r['public_key']}")
+        print(f"  classes     {', '.join(r['classes']) or '-'}")
+        print(f"  scopes      {', '.join(r['scopes']) or '-'}")
+        print(f"  streams     {streams or '-'}")
+    if problems:
+        print(f"verify: {len(problems)} problem(s); see canticle manifest verify {path}")
+    return 0
+
+
 def cmd_vectors(a) -> int:
     from .vectors import build
     Path(a.out).write_text(json.dumps(build(), indent=1) + "\n")
     print(a.out)
     return 0
+
+
+def _locator_args(p) -> None:
+    where = p.add_mutually_exclusive_group()
+    where.add_argument("--manifest", help="fleet manifest; without it, the locators come from stations.toml (RFC §13.6)")
+    where.add_argument("--stations", help=f"stations.toml to read when --manifest is not given (default {stations.DEFAULT_PATH})")
+    p.add_argument("--bind", help=f"UDP address to hear on (default: stations.toml's, else {stations.DEFAULT_BIND})")
+    p.add_argument("--multicast", action=argparse.BooleanOptionalAction,
+                   help=f"join {runner.MCAST_GROUP} (default: stations.toml's, else off)")
 
 
 def main(argv=None) -> int:
@@ -320,9 +491,7 @@ def main(argv=None) -> int:
     t.set_defaults(fn=cmd_status)
 
     l = sub.add_parser("listen", help="listen and print one JSON event per line")
-    l.add_argument("--manifest", required=True)
-    l.add_argument("--bind", default=f"0.0.0.0:{runner.DEFAULT_PORT}")
-    l.add_argument("--multicast", action="store_true")
+    _locator_args(l)
     l.add_argument("--stream", action="append", help="only surface these stream names")
     l.add_argument("--evidence", action="store_true", help="also print rejected datagrams and other evidence")
     l.add_argument("--timestamps", action="store_true", help="add the local receive time (t_ms) to each event")
@@ -357,6 +526,27 @@ def main(argv=None) -> int:
     u.add_argument("--ephemeral", action="store_true", help="UNSAFE: keep no listener state across restarts")
     u.add_argument("--log", help="append every listener event, as JSON lines, here")
     u.set_defaults(fn=cmd_tuner)
+
+    d = sub.add_parser("doctor", help="check that this host can run a listener; exit 1 if a check fails",
+                       description="Checks Python, cryptography (with an Ed25519 known answer), stations.toml, the "
+                       "manifest and the listener's UDP address, then reports multicast. Exit 0 when no check fails, "
+                       "1 when one does. Multicast is reported, never decided or enabled: these are not RFC §11.2's "
+                       "exit codes, and a 0 says nothing about multicast.")
+    _locator_args(d)
+    d.add_argument("--state", help="the listener's --state, if it runs with one, to recognise it holding the address")
+    d.add_argument("--no-probe", action="store_true", help=f"skip the loopback probe to {runner.MCAST_GROUP}")
+    d.add_argument("--json", action="store_true", help="print the checks as JSON")
+    d.set_defaults(fn=cmd_doctor)
+
+    mf = sub.add_parser("manifest", help="verify or show a fleet manifest (unsigned in this spike)")
+    msub = mf.add_subparsers(dest="action", required=True)
+    for action, text in (("verify", "check structure, keys and key ids; exit 1 on any problem (no signature: spike-0 has none)"),
+                         ("show", "print each station's key id, grants and streams")):
+        x = msub.add_parser(action, help=text)
+        x.add_argument("path", nargs="?", help="the manifest (default: the one stations.toml names)")
+        x.add_argument("--stations", help=f"stations.toml to read when no path is given (default {stations.DEFAULT_PATH})")
+        x.add_argument("--json", action="store_true")
+        x.set_defaults(fn=cmd_manifest)
 
     v = sub.add_parser("vectors", help="regenerate the candidate conformance vectors")
     v.add_argument("--out", default="vectors/frame-v2-candidates.json")
