@@ -46,7 +46,7 @@ canticle keygen --out ~/.binary-canticle/keys/cael.key --manifest ~/.binary-cant
   --classes chatter,live-state,root --streams chatter,lens.threat,root
 canticle manifest verify ~/.binary-canticle/fleet.json
 
-# stations.toml: where the manifest is, and where the listener hears. Multicast stays off.
+# stations.toml: where the manifest is, and where the listener hears (this host only). Multicast stays off.
 cat > ~/.binary-canticle/stations.toml <<'EOF'
 version = 1
 
@@ -54,7 +54,7 @@ version = 1
 path = "fleet.json"
 
 [listen]
-bind = "0.0.0.0:9999"
+bind = "127.0.0.1:9999"
 multicast = false
 EOF
 
@@ -77,6 +77,9 @@ The listener prints the item once, although the station sends it many times. The
 daemon, the web tuner, the background emitter, example systemd user units and every test.
 [`docs/state-layout.md`](prototype/canticle-station/docs/state-layout.md) says where each file lives.
 
+The quick start's listener hears only this host. To hear stations on other hosts, by unicast or multicast,
+bind `0.0.0.0:9999` instead ([`docs/stations-toml.md`](prototype/canticle-station/docs/stations-toml.md)).
+
 Multicast (`239.255.13.13:9999`, IP TTL 1, provisional per D22) is off until you turn it on. RFC §11.2
 allows it only after a doctor that runs all seven of its checks has passed, and this doctor runs only the
 host checks, so turning it on is your decision.
@@ -96,9 +99,9 @@ host checks, so turning it on is your decision.
 | Part | Command | What it does |
 |---|---|---|
 | Station | `canticle station` | Signs each item once and loops the same bytes until expiry; regulates the loop rate; sends carrier-beacons; holds one exclusive lease per key. `sing`, `hush` and `status` talk to it over its control socket. |
-| Host daemon | `canticle daemon` | The host's one UDP listener (decision D35). It verifies, deduplicates and judges what it hears, and carries receptor record v1 (RFC §14.18.3) to every binding on the host over a unix socket, with an opt-in join snapshot for late joiners (proposed decision D36). |
+| Host daemon | `canticle daemon` | The host's one UDP listener (decision D35). It verifies, deduplicates and judges what it hears, and carries receptor record v1 (RFC §14.18.3) to every binding on the host over a unix socket, with an opt-in join snapshot for late joiners (decision D36, #82). |
 | Listener | `canticle listen` | The same verification as the daemon, printed as one JSON event per line. For onboarding, tests and quick checks. It cannot share the UDP port with a daemon. |
-| Agent bindings | not in this repo | Read record v1 from the daemon and decide what reaches which session. frond-ear's `host-daemon` source implements this, listen-only and silent: its sessions read heard items when they call a `hear` tool, under a `[canticle:heard]` banner (karmaterminal/frond-ear, a private repository). It stays off on silas and ronan until the mixed-host proofs of §14.18.2 pass there (RFC §23.2, question 23). The OpenClaw plugin (RFC §16.2) and the Claude Code MCP server and hooks (§16.5) are planned, not built. |
+| Agent bindings | not in this repo | Read record v1 from the daemon and decide what reaches which session. frond-ear's `host-daemon` source implements this, listen-only and silent: its sessions read heard items when they call a `hear` tool, under a `[canticle:heard]` banner (karmaterminal/frond-ear, a private repository). It is off unless configured, and no seat runs it yet; it stays off on the mixed hosts (silas, ronan) until the mixed-host proofs of §14.18.2 pass there (RFC §23.2, question 23). The OpenClaw plugin (RFC §16.2) and the Claude Code MCP server and hooks (§16.5) are planned, not built. |
 | Doctor | `canticle doctor` | Checks Python, `cryptography`, `stations.toml`, the manifest and the listener's address. Writes nothing. |
 | Tuner | `canticle tuner` | A read-only web page on loopback that shows one listener's view of the stations and their live rings. |
 | Background emitter | `canticle ambient` | Puts paced, short-TTL lines from a fixture file on air through a station. No model calls. |
@@ -110,7 +113,7 @@ refuses every connection, and the control socket is guarded by its file mode alo
 ## What works today, and what does not
 
 **Implemented in [`prototype/canticle-station`](prototype/canticle-station/)** (parts of work items S1 and
-S2, the BC-2 slice of S3, the host daemon of decision D35 and the join snapshot of proposed decision D36):
+S2, the BC-2 slice of S3, the host daemon of decision D35 and the join snapshot of decision D36):
 
 - the frame v2 codec: strict deterministic CBOR, an Ed25519 signature on every frame, and candidate
   conformance vectors;

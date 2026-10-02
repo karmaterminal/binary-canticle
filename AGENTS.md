@@ -60,8 +60,8 @@ PYTHONPATH=prototype/canticle-station python -m unittest discover -s prototype/c
 git status --porcelain
 ```
 
-- `test_station.py`, `test_daemon.py` and `test_join_snapshot.py` take 10 to 30 s each. The other modules take
-  a few seconds or less. Run the module you changed first, then the whole suite.
+- `test_station.py`, `test_daemon.py` and `test_join_snapshot.py` take up to about 30 s each. The other
+  modules take a few seconds or less. Run the module you changed first, then the whole suite.
 - The tests use loopback UDP, unix sockets and temporary directories. They need no network, no root and no
   keys of yours.
 - CI's other job runs the measurement harness's own tests: install `.github/ci/requirements-harness.txt`,
