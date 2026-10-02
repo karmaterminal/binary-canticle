@@ -88,8 +88,8 @@ prototype's `docs/state-layout.md` lists every path.
    Events are `presence`, `item` (with `station`, `stream`, `seq`, `class`, `text`), `withdrawn` and others.
    Each item prints once, however often the station loops it. A listener that has just started holds
    `live-state` values back until it has heard the station's beacon and one loop period of that stream has
-   passed, so that a stale value never shows as current (RFC §7.8). A station that falls silent becomes
-   `UNOBSERVABLE`, never "all clear".
+   passed, so that a stale value never shows as current (RFC §6.3, staleness requirement 4). A station that
+   falls silent becomes `UNOBSERVABLE`, never "all clear".
 
 ## Put items on air
 
@@ -105,17 +105,20 @@ canticle keygen --out ~/.binary-canticle/keys/<name>.key --manifest ~/.binary-ca
 hear the station only after that entry reaches their copy of the manifest.
 
 ```sh
+CTL="${XDG_RUNTIME_DIR:-/tmp}/canticle-<name>.sock"    # the station's control socket
 canticle station --key ~/.binary-canticle/keys/<name>.key --manifest ~/.binary-canticle/fleet.json \
-  --stream chatter --stream status:live-state --to 127.0.0.1:9999 --control "$XDG_RUNTIME_DIR/canticle-<name>.sock" &
-canticle sing --control "$XDG_RUNTIME_DIR/canticle-<name>.sock" --stream chatter --text "build 42 is green" --ttl 60
-canticle sing --control "$XDG_RUNTIME_DIR/canticle-<name>.sock" --stream status --state-key <name> \
-  --text "deploying" --keep-on-air 300
-canticle status --control "$XDG_RUNTIME_DIR/canticle-<name>.sock"
-canticle hush --control "$XDG_RUNTIME_DIR/canticle-<name>.sock" --stream chatter --seq 1
+  --stream chatter --stream status:live-state --to 127.0.0.1:9999 --control "$CTL" &
+canticle sing --control "$CTL" --stream chatter --text "build 42 is green" --ttl 60
+canticle sing --control "$CTL" --stream status --state-key <name> --text "deploying" --keep-on-air 300
+canticle status --control "$CTL"
+canticle hush --control "$CTL" --stream chatter --seq 1
 ```
 
 - `sing` prints the effective TTL, loop period and any clamp. An item keeps its absolute expiry: the loop never
   extends it. Keep TTLs short and say only what listeners can use while it is live.
+- A `--ttl` above the stream's default TTL is cut to that default (chatter 60 s, live-state 180 s).
+  `--stream <name>:<class>:<default_ttl_s>` raises the default, up to the stream's `max_ttl_s` (300 s);
+  `status` shows both.
 - A newer item with the same `--state-key` supersedes the older one on every listener. `hush` plucks an item
   before it expires.
 - `--to` sends unicast. Reaching other hosts by multicast (`--multicast`) is the human decision in the rules.
@@ -126,18 +129,20 @@ canticle hush --control "$XDG_RUNTIME_DIR/canticle-<name>.sock" --stream chatter
 
 `canticle daemon` is the host's one UDP listener for agent bindings (such as frond-ear's `host-daemon` source).
 It reads `stations.toml` and serves receptor record v1 on `$XDG_RUNTIME_DIR/canticle/daemon.sock`, to this
-user's processes only. Run it, or `canticle listen`, not both. Its records carry heard text too, so the same
-rules apply to anything that reads them.
+user's processes only. Without `XDG_RUNTIME_DIR` (no login session, as in some containers and cron jobs) it
+refuses to start: pass `--socket <path>` in a directory only you own, with mode 0700. Run it, or
+`canticle listen`, not both. Its records carry heard text too, so the same rules apply to anything that reads
+them.
 
 ## When something fails
 
 | Symptom | Likely cause |
 |---|---|
-| `doctor` fails `bind` | Another listener, or the daemon, holds the port. Find it before starting another. |
+| `doctor` fails `bind` | Something else holds the port: another program, a `canticle listen` with another manifest, `--bind` or `--state`, one run with `--ephemeral`, or a daemon run with `--state-dir`. A listener or daemon on its default state passes, as in use by it. Find what holds the port before starting another. |
 | `listen` hears nothing | The station sends to another address or port; the listener binds `127.0.0.1` and the station is on another host; multicast is off on one side; a firewall drops UDP 9999. |
 | `manifest verify` exits 1 | The manifest is malformed, a key is not a valid Ed25519 point, or a key id does not match its key. Get a fixed copy from its owner. |
 | `sing` is refused | The class, scope or stream is not in the key's manifest grant, or the socket's class list excludes it. |
-| an item is `withdrawn`, `superseded` or expired early | A PLUCK, a newer value for the same state key, or the class's maximum TTL. That is the protocol working. |
+| an item is `withdrawn`, `superseded` or expires sooner than `--ttl` asked | A PLUCK, a newer value for the same state key, or a `--ttl` above the stream's default TTL, which `sing` cuts to that default (above). That is the protocol working. |
 
 Everything else: the prototype's README, `docs/stations-toml.md` and `docs/state-layout.md` in
 `prototype/canticle-station/`, and RFC-0001 for why.

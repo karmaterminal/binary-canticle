@@ -25,9 +25,9 @@ claude plugin marketplace add karmaterminal/binary-canticle
 claude plugin install binary-canticle@binary-canticle
 ```
 
-Inside a session, `/plugin marketplace add karmaterminal/binary-canticle` and then
-`/plugin install binary-canticle@binary-canticle` do the same. The skill loads when a request matches its
-description, or by name as `/binary-canticle:binary-canticle`.
+Inside a session, `/plugin marketplace add karmaterminal/binary-canticle` adds the marketplace, and
+`/plugin install binary-canticle@binary-canticle` opens the plugin in the `/plugin` panel, where you install it.
+The skill loads when a request matches its description, or by name as `/binary-canticle:binary-canticle`.
 
 - **Pin** a branch or tag: `karmaterminal/binary-canticle#<ref>`.
 - **From a checkout:** `claude plugin marketplace add ./` in the repository root. A relative path must
@@ -76,9 +76,11 @@ openclaw skills info binary-canticle      # expect "Ready" and "Visible to model
 - The skill declares Linux and the `python3` and `git` binaries in `metadata.openclaw`. Where one is
   missing, OpenClaw lists the skill as needing setup and does not show it to the model.
 
-Once the skill is published to ClawHub (below), it installs with `openclaw skills install @<owner>/binary-canticle`,
-updates with `openclaw skills update @<owner>/binary-canticle` and is removed with
-`clawhub uninstall @<owner>/binary-canticle`.
+Once the skill is published to ClawHub (below), it installs with `openclaw skills install @<owner>/binary-canticle`
+and updates with `openclaw skills update @<owner>/binary-canticle`. To remove it, run
+`clawhub --workdir <dir> uninstall @<owner>/binary-canticle`, where `<dir>` is the root it was installed
+into: the agent workspace, or for a `--global` install `~/.openclaw` (`$OPENCLAW_STATE_DIR` when that is set).
+`clawhub` finds the skill through the lock file under `--workdir`, which defaults to the current directory.
 
 ## Publishing to ClawHub
 
@@ -109,7 +111,7 @@ Then the same command without `--dry-run`. Use the `version` from
 ## Changing the skill
 
 - Keep the frontmatter to `name`, `description` and `metadata`, with `metadata` on one line as JSON.
-  OpenClaw's skill validator rejects other keys, such as `compatibility` and `version`.
+  OpenClaw's skill validator rejects keys outside its own list, such as `compatibility` and `version`.
 - Bump `version` in `.claude-plugin/plugin.json` with every change. Claude Code pins an installed plugin
   to that version, so without a bump `update` changes nothing.
 - Before pushing, from the repository root:
@@ -120,5 +122,5 @@ Then the same command without `--dry-run`. Use the `version` from
   ```
 
   `validate` checks the manifests, not the skill's frontmatter. OpenClaw's own check is
-  `python3 <openclaw>/skills/skill-creator/scripts/quick_validate.py plugins/binary-canticle/skills/binary-canticle`,
-  which needs PyYAML.
+  `python3 <openclaw>/skills/skill-creator/scripts/quick_validate.py plugins/binary-canticle/skills/binary-canticle`.
+  It runs without PyYAML, reading one key per line, which this frontmatter keeps to.

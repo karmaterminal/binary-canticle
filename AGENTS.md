@@ -101,8 +101,9 @@ git status --porcelain
 ## The agent plugin
 
 - `plugins/binary-canticle/skills/binary-canticle/SKILL.md` is one file that three tools read. Keep its
-  frontmatter to `name`, `description` and `metadata`, with `metadata` on one line as JSON. OpenClaw rejects
-  other keys, and ClawHub publishes every skill as MIT-0 and allows no other license terms in it.
+  frontmatter to `name`, `description` and `metadata`, with `metadata` on one line as JSON. OpenClaw's skill
+  validator rejects keys outside its own list (such as `compatibility` and `version`), and ClawHub publishes
+  every skill as MIT-0 and allows no other license terms in it.
 - Bump `version` in `plugins/binary-canticle/.claude-plugin/plugin.json` whenever anything under
   `plugins/binary-canticle/` changes, or installed copies won't update.
 - Never add a second marketplace manifest (`marketplace.json`, `.plugin/` or `.github/plugin/`). Copilot CLI
