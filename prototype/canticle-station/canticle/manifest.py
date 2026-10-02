@@ -46,6 +46,10 @@ class StationEntry:
     stream_names: dict = field(init=False)
 
     def __post_init__(self):
+        if not isinstance(self.name, str) or not STATION_NAME_RE.match(self.name):
+            raise ValueError(
+                f"invalid station name {self.name!r}: [a-z][a-z0-9-]{{0,30}} (§5.3)"
+            )
         object.__setattr__(self, "key_id", key_id(self.public_key))
         object.__setattr__(self, "stream_names", stream_ids(self.streams))
 

@@ -134,7 +134,12 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual(verify_json(["not", "an", "object"]), ["the manifest is not a JSON object"])
 
     def test_a_name_with_a_trailing_newline_is_refused(self):
-        # With re.match, `$` also matches before a final newline: "chatter\n" would hash to its own stream_id.
+        # With re.match, `$` also matches before a final newline. Both the verifier and the actual
+        # listener loader must apply the anchored grammar.
+        data = good()
+        data["stations"][0]["name"] = "cael\n"
+        with self.assertRaisesRegex(ValueError, "invalid station name"):
+            Manifest.from_json(data)
         with self.assertRaisesRegex(ValueError, "invalid stream name"):
             check_stream_name("chatter\n")
         with self.assertRaisesRegex(ValueError, "invalid stream name"):
