@@ -7,8 +7,9 @@ import re
 from dataclasses import dataclass
 
 _SEGMENT = r"[a-z][a-z0-9-]{0,30}"
-STATION_NAME_RE = re.compile(rf"^{_SEGMENT}$")
-STREAM_NAME_RE = re.compile(rf"^{_SEGMENT}(\.{_SEGMENT}){{0,3}}$")
+# \Z, not $: with re.match, $ also matches before a final newline, which would let "cael\n" through.
+STATION_NAME_RE = re.compile(rf"^{_SEGMENT}\Z")
+STREAM_NAME_RE = re.compile(rf"^{_SEGMENT}(\.{_SEGMENT}){{0,3}}\Z")
 
 
 def key_id(public_key: bytes) -> bytes:
@@ -16,6 +17,49 @@ def key_id(public_key: bytes) -> bytes:
     if len(public_key) != 32:
         raise ValueError("Ed25519 public keys are 32 bytes")
     return hashlib.sha256(public_key).digest()[:8]
+
+
+# edwards25519 (RFC 8032 §5.1): field prime, curve constant d, and sqrt(-1).
+_P = 2**255 - 19
+_D = -121665 * pow(121666, _P - 2, _P) % _P
+_SQRT_M1 = pow(2, (_P - 1) // 4, _P)
+
+
+def _ed_add(a: tuple, b: tuple) -> tuple:
+    (x1, y1), (x2, y2) = a, b
+    t = _D * x1 * x2 * y1 * y2 % _P
+    return ((x1 * y2 + x2 * y1) * pow(1 + t, _P - 2, _P) % _P,
+            (y1 * y2 + x1 * x2) * pow(1 - t, _P - 2, _P) % _P)
+
+
+def check_public_key(public_key: bytes) -> bytes:
+    """Refuse an Ed25519 public key that is not a canonical encoding of a curve point, or that is
+    a small-order point (§9.3: verifiers SHOULD refuse small-order keys when loading the manifest).
+
+    Under a small-order key, a forged signature verifies for a fraction of messages, so anyone could
+    sign as that key-id. Decoding follows RFC 8032 §5.1.3; the order test is [8]A = identity.
+    """
+    if len(public_key) != 32:
+        raise ValueError("an Ed25519 public key is 32 bytes")
+    y = int.from_bytes(public_key, "little")
+    sign, y = y >> 255, y & ((1 << 255) - 1)
+    if y >= _P:
+        raise ValueError("not a canonical encoding (y >= p)")
+    u, v = (y * y - 1) % _P, (_D * y * y + 1) % _P
+    x = u * pow(v, 3, _P) * pow(u * pow(v, 7, _P), (_P - 5) // 8, _P) % _P
+    if v * x * x % _P == (-u) % _P:
+        x = x * _SQRT_M1 % _P
+    elif v * x * x % _P != u:
+        raise ValueError("not a point on edwards25519")
+    if x == 0 and sign:
+        raise ValueError("not a valid encoding (x = 0 with the sign bit set)")
+    # The sign bit only picks x or -x, and [8](-A) = -[8]A, so the order test does not need it applied.
+    pt = (x, y)
+    for _ in range(3):
+        pt = _ed_add(pt, pt)
+    if pt == (0, 1):
+        raise ValueError("a small-order point: forged signatures can verify under it (§9.3)")
+    return public_key
 
 
 def check_stream_name(name: str) -> str:

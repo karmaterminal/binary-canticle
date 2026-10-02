@@ -16,12 +16,14 @@ them loop until they expire.
 | §7.4-§7.8, §8.6 Listener | Dedup on the identity tuple: a repeat is a no-op, different bytes are an equivocation. Also sticky-pluck, supersession high-water marks, epoch regression, class capability, granted scope, binding scope (a `host` frame heard over UDP is a `scope-violation`) and per-class hop limits from the manifest, all checked before any state changes so a rejected frame is state-neutral; safety state (epochs, dedup digests, sticky PLUCKs, high-water marks) persisted atomically and re-loaded at start, by default (the CLI derives a state file and holds a lease on it; `--ephemeral` is an explicit, warned opt-out, and the library requires `state_path` or `ephemeral=True`), and the §7.8 warm-up for live-state keys, per-key dedup quotas that refuse new tuples rather than evict live ones (supersession marks have their own per-key limit, counted apart from dedup entries and scaled by how much longer marks live; presence keeps at most one share of streams; the beacon stream maps hold one advertised catalog, newest copy of a stream winning: #60), the §9.7 check that a PLUCK carries its held target's `expires_at` and `scope` (evidence `pluck-mismatch`), one class per `state_key` within an epoch (a change in the mark's epoch is dropped as `class-change`; §23.2 q21), and local expiry per RFC §14.6.3: clamped to the class max TTL, moved onto the receiver clock by δ̂, and never longer than the full TTL from first hearing (a PLUCK clamps to the largest class max TTL, since it does not carry its target's class). Presence covers ROOT_UNKNOWN, EQUIPPED_QUIET, EQUIPPED_SPEAKING, UNEQUIPPED_PRESENT and UNOBSERVABLE (with a `signed_off` reason). |
 | §10.4 Publisher grants | The station signs only the classes, scopes and streams its manifest entry grants, checked before a `seq` is allocated. The control socket has its own grant, narrower than the key's (`--socket-class`), and never accepts `regulatory`, `alarm` or `control`, because their op-level and typed-body checks (§10.4, §15.4) are not implemented here; `host` scope is refused because this station only speaks UDP; one station per key (an exclusive lease on the key file); epochs from a locked, fsynced counter. |
 | §11.1-§11.2 Bindings | Host-local submission over a unix socket (mode 0600, peer uid checked); UDP unicast and LAN multicast (`239.255.13.13:9999`, provisional per D22, IP TTL 1, don't-fragment). |
+| §11.2, §13.6, §15.7 Onboarding (#73) | `canticle doctor` checks Python, `cryptography` (with an RFC 8032 known answer), `stations.toml`, the manifest and the listener's UDP address, and only reports multicast. `stations.toml` locates the manifest and the listener's address. `canticle manifest verify` and `show` read the unsigned spike-0 manifest; manifests refuse small-order keys (§9.3) and key-ids that do not match their keys (§10.3). |
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
 | §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only gateway over one listener, and a read-only page to pick a station:stream and watch its live ring, with expiry and gaps shown honestly. |
 
 Not implemented here, and still open work (see RFC-0001 §23.3):
 - relay leases for internet listeners (§11.3)
-- signed fleet manifests and the genesis pin; the manifest here is plain JSON (§10.3)
+- signed fleet manifests and the genesis pin; the manifest here is plain JSON (§10.3), so `stations.toml` refuses a `[trust]` table
+- the daemon's key store (§15.7); keys are files
 - typed-body schemas, content policy and taint checks before signing (§15)
 - accord (§10.7) and control frames (§10.6)
 - the receptor's landing into agent sessions, banners and taint (§14)
@@ -29,25 +31,89 @@ Not implemented here, and still open work (see RFC-0001 §23.3):
 - the ringserver bridge (§18; see [`../ringserver-proofs/`](../ringserver-proofs/))
 - the capsid (§8.7)
 - work-conserving budget redistribution and burst budget accounting (§7.5-§7.6)
-- IPv6 groups and `canticle doctor`
 - the receiver side of `trail_seq` (§7.10: waiting up to one `loop_max_ms` for a gap at or above it, and relay repair). The station emits it and the listener holds it (amendment A1, #70); nothing acts on it yet.
+- IPv6 groups, and the multicast decision of §11.2's doctor (MTU, peer beacons, the 270 s querier check, Wi-Fi and container detection, broadcast fallback, recording the binding, and its exit codes). `canticle doctor` checks the host and only reports multicast.
 
 The decoder is stricter than the RFC in two places: it rejects floats and tags under every key, not only core keys 1-31; and it accepts only integer and text-string map keys at every depth, including extension values (#66), where the RFC says only that the frame map has integer keys.
 
-## Try it
+## Install and onboard
 
-Requires Python 3.11+ and `cryptography>=45`.
+Requires Python 3.11+ and `cryptography>=45`. Run these from the repository root.
+[`docs/state-layout.md`](docs/state-layout.md) says where each file lives, and why.
 
 ```sh
-cd prototype/canticle-station
-python3 -m venv .venv && . .venv/bin/activate && pip install -e .
+python3 -m venv ~/.venvs/canticle && . ~/.venvs/canticle/bin/activate
+pip install -e prototype/canticle-station
 
-canticle keygen --out cael.key --manifest fleet.json --name cael \
+# 1. A station key, added to the fleet manifest.
+mkdir -p -m 700 ~/.binary-canticle/keys
+canticle keygen --out ~/.binary-canticle/keys/cael.key --manifest ~/.binary-canticle/fleet.json --name cael \
   --classes chatter,live-state,root --streams chatter,lens.threat,root
+canticle manifest verify ~/.binary-canticle/fleet.json
 
-canticle listen --manifest fleet.json --bind 0.0.0.0:9999 --multicast &   # one JSON event per line; state under $XDG_STATE_HOME/canticle
-canticle station --key cael.key --manifest fleet.json --stream chatter --stream lens.threat:live-state --stream root:root \
-  --multicast --control ./cael.sock &
+# 2. stations.toml: where the manifest is, and where the listener hears.
+cat > ~/.binary-canticle/stations.toml <<'EOF'
+version = 1
+
+[manifest]
+path = "fleet.json"
+
+[listen]
+bind = "0.0.0.0:9999"
+multicast = false
+EOF
+
+# 3. Check the host: exit 0 when every check passes.
+canticle doctor
+
+# 4. Listen: one JSON event per line. No flags are needed now that stations.toml exists.
+canticle listen
+```
+
+- **`canticle keygen`** writes the seed (mode 0600, never over an existing file) and adds the station's entry,
+  with its key-id, to the manifest. A refused or failed command (a bad `--name`, an unknown class, a manifest
+  that does not verify or cannot be written) leaves no key and the old manifest as it was.
+- **`canticle manifest verify`** checks the manifest's structure, that every key is a well-formed Ed25519
+  point and not one of the small-order points RFC §9.3 says to refuse, and that every key-id is
+  SHA-256(public key)[0:8] (§10.3). It lists every problem and exits 1 if there is one. The manifest is
+  **unsigned** in this spike, and verify says so: whoever can write the file chooses the keys a listener
+  trusts. `canticle manifest show` prints each station's key-id, classes, scopes and stream ids, and also
+  exits 1 when verify would.
+- **`stations.toml`** holds locators only (RFC §13.6); the schema is in
+  [`docs/stations-toml.md`](docs/stations-toml.md). An unknown or misspelt key is an error. `listen`,
+  `doctor` and `manifest verify|show` read it when they are not given a manifest; `--manifest` works as
+  before and skips the file.
+- **`canticle doctor`** checks Python, `cryptography` (it must reproduce RFC 8032's TEST 1), `stations.toml`,
+  the manifest, and the listener's UDP address, which must be free or held by this listener. `--json` prints
+  the same checks for a script. It exits 1 if any check fails.
+- **Multicast is reported, never decided.** RFC §11.2 allows the multicast binding only after a doctor that
+  runs all seven of its steps has passed. This one joins the group on the default interface, sends a probe
+  with IP TTL 0 (it never leaves this host), and reports whether it came back. It never turns multicast on
+  and writes no configuration, and its exit codes are not §11.2's (0, 10, 20, 30). Setting
+  `multicast = true` is your decision.
+- **`canticle listen`** prints the `stations.toml` it used on stderr, and keeps its safety state under
+  `$XDG_STATE_HOME/canticle`.
+
+A healthy host with the listener running (from a run of these steps on 2026-10-02, paths shortened):
+
+```text
+ok      python        Python 3.11.15 (/home/you/.venvs/canticle/bin/python3.11)
+ok      cryptography  cryptography 50.0.2; Ed25519 reproduces RFC 8032 TEST 1
+ok      stations      /home/you/.binary-canticle/stations.toml: manifest /home/you/.binary-canticle/fleet.json, bind 0.0.0.0:9999, multicast off
+ok      manifest      /home/you/.binary-canticle/fleet.json: 1 station(s), 0 revoked; keys well-formed, key ids match. UNSIGNED: [...]
+ok      bind          0.0.0.0:9999 is in use by this listener, which holds /home/you/.local/state/canticle/listener-369385c1dd02.json.lease
+report  multicast     loopback probe heard: joined 239.255.13.13 and a probe sent with IP TTL 0 looped back; listener multicast off; a report only: [...]
+doctor: every check passed (exit 0). Multicast is reported, not decided (RFC §11.2).
+```
+
+To run the listener and stations as services, start from the example user units in
+[`docs/systemd/`](docs/systemd/). They are documentation only: nothing installs them.
+
+### Put something on air
+
+```sh
+canticle station --key ~/.binary-canticle/keys/cael.key --manifest ~/.binary-canticle/fleet.json \
+  --stream chatter --stream lens.threat:live-state --stream root:root --to 127.0.0.1:9999 --control ./cael.sock &
 
 canticle sing --control ./cael.sock --stream chatter --text "port-scan burst from 10.0.0.7" --ttl 30
 canticle sing --control ./cael.sock --stream lens.threat --state-key now \
@@ -56,7 +122,11 @@ canticle hush --control ./cael.sock --stream chatter --seq 1
 canticle status --control ./cael.sock
 ```
 
-On 2026-09-27 this ran as separate processes over multicast on one host. `sing` returned the effective TTL, loop and clamp, for example `{"ok": true, "stream": "chatter", "seq": 1, "ttl_s": 30.0, "loop_ms": 10000, "clamp": "none", "size": 151, ...}`. The listener printed:
+This station sends to the listener on this host. To reach listeners on other hosts, set `multicast = true`
+in their `stations.toml` and start the station with `--multicast` instead of `--to`, once you have decided
+that multicast is fine on this LAN.
+
+On 2026-09-27 an earlier form of these commands ran as separate processes over multicast on one host, with `--multicast` on the listener and the station. `sing` returned the effective TTL, loop and clamp, for example `{"ok": true, "stream": "chatter", "seq": 1, "ttl_s": 30.0, "loop_ms": 10000, "clamp": "none", "size": 151, ...}`. The listener printed:
 
 ```json
 {"event": "presence", "station": "cael", "state": "ROOT_UNKNOWN", ...}
@@ -122,7 +192,7 @@ Unnamed streams (not in the manifest) are verified and listed, but can't be tune
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 106 tests, about 7 s
+python -m unittest discover -s tests      # 170 tests, about 8 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -143,6 +213,15 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
   - the persisted epoch counter: strictly increasing across same-second restarts and a clock that steps back.
 - `test_listener.py` covers the presence state machine, local expiry, the §14.6.3 clock rule (including a station clock an hour behind), state-neutral capability rejection, per-key dedup quotas, the #60 per-key bounds (admitted-only stream hearing, one catalog of beacon stream maps with the newest copy winning, a separate mark limit that still fits honest state_key churn at the §7.4 floor, mark horizons that never shrink under mixed classes, stay bounded whatever the clock offset, tolerate a later rise in δ̂ and are not held open by refused older items, purges that pop only what expires, the resurface path's mark check, a plucked newer value that still supersedes, a plucked older item reported as plucked, refusals that do not advance the epoch, sticky PLUCKs timed on the current δ̂, a class change in the mark's epoch dropped as `class-change` while a new epoch may change it, marks persisting their class, PLUCK expiry clamp and target match, state v3 (marks carry their class, learned on resurface from older state) with v1 and v2 still loading), garbage input and station restarts (a new epoch's beacons count from 1 again; two starts in one second never reuse an identity tuple).
 - `test_udp_e2e.py` runs a real station and listener over loopback UDP and the unix control socket: sing, listen, hush, status and goodbye.
+- `test_manifest.py` covers the manifest checks and the commands that write or read it:
+  - the eight small-order points and malformed encodings refused by the key check, by `Manifest` (what the listener loads) and by `manifest verify`;
+  - key-ids: written by `keygen`, optional on read, and refused by verify and by the listener when they do not match the key;
+  - every problem `manifest verify` reports, its text and JSON output and exit status, `manifest show`, and the manifest path taken from `stations.toml`;
+  - names and stream names with a trailing newline, which `$` used to let through;
+  - `keygen` refusals and failed manifest writes that leave no key file behind and the old manifest as it was, a manifest's mode and symlink kept, and a second key under one name (a rotation, §10.3).
+- `test_stations.py` covers `stations.toml`: a full file, defaults, paths relative to the file and to `~`, a missing file, malformed TOML, wrong types and values, unknown keys, the refused `[trust]` table, and which locators `listen` uses (the file, flags over the file, `--manifest` skipping it).
+- `test_doctor.py` covers each check's pass and fail paths: Python and `cryptography` versions, the RFC 8032 known answer, the manifest, and the address (free, held by another socket, held by this listener or tuner through its lease, or by a listener with its own `--state`). Multicast stays a report whatever the probe finds, the probe datagram has IP TTL 0, doctor writes nothing, its bind probe never shares a listener's port, and a listener starting during its lease probe waits instead of refusing.
+- `test_onboarding.py` runs the onboarding above end to end: `keygen`, `stations.toml`, `doctor`, then `canticle listen` with no flags in a subprocess hearing a station's item over loopback UDP while doctor sees it holding the address.
 - `test_ambient.py` runs the emitter on a virtual clock: tick gaps, breaths and repeats, exact requests, the per-minute cap, stop by signal and by duration, refusals, an unreachable station, bounds and fixture loading.
 - `test_tuner.py` covers the tuner's view and gateway:
   - verified stations with heads, and unnamed streams that can't be tuned;
