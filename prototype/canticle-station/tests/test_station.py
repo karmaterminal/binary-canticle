@@ -210,18 +210,165 @@ class CarouselTest(unittest.TestCase):
         self.assertEqual((b.epoch, b.bseq, b.profile), (7, 1, "canticle-regulation/1"))
         self.assertTrue(900 <= b.next_beacon_ms <= 1100)
         entry = {e.stream_id: e for e in b.streams}[stream_id("chatter")]
-        self.assertEqual((entry.head_seq, entry.live, entry.loop_ms, entry.default_ttl_s), (1, 1, 10_000, 60))
+        self.assertEqual((entry.head_seq, entry.trail_seq, entry.live, entry.loop_ms, entry.default_ttl_s),
+                         (1, 1, 1, 10_000, 60))
         bye = wire.parse(st.goodbye(T0 + 100), lambda k: PK).body
         self.assertEqual(bye.next_beacon_ms, 0)
 
-    def test_beacon_pages_rotate_with_a_catalog_digest(self):
-        st = station(*[StreamConfig(f"s{i}", b_stream=500) for i in range(30)], b_station=16_000)
-        pages = [wire.parse(st._beacon(T0 + i), lambda k: PK).body for i in range(2)]
-        self.assertEqual([p.page for p in pages], [(0, 2), (1, 2)])
-        self.assertEqual(pages[0].catalog_digest, pages[1].catalog_digest)
-        self.assertEqual(sum(len(p.streams) for p in pages), 30)
-        self.assertTrue(all(len(st._beacon(T0)) <= wire.MAX_FRAME for _ in range(2)))
+    def test_trail_seq_tracks_the_on_air_set(self):
+        # F-PD A1 (§22.3, §9.8): trail_seq is the lowest seq of any ITEM or PLUCK still on air, head_seq + 1
+        # when nothing is, and it stays right through expiry, supersession, pluck and depth eviction.
+        st = station(StreamConfig("chatter", default_ttl_s=300, max_ttl_s=300),
+                     StreamConfig("lens.threat", cls="live-state"), depth=3)
+        ent = lambda name: {e.stream_id: e for e in st._entries()}[stream_id(name)]
+        self.assertEqual((ent("chatter").head_seq, ent("chatter").trail_seq, ent("chatter").live), (0, 1, 0))
+        st.sing(T0, "chatter", text="a", ttl_s=10)                                  # seq 1, off air at T0 + 9.9 s
+        st.sing(T0, "chatter", text="b", ttl_s=300)                                 # seq 2
+        st.sing(T0, "chatter", text="c", ttl_s=300)                                 # seq 3
+        self.assertEqual((ent("chatter").head_seq, ent("chatter").trail_seq, ent("chatter").live), (3, 1, 3))
+        b = wire.parse(st._beacon(T0 + 9_950), lambda k: PK).body                  # expiry: the beacon sweeps first
+        e = {e.stream_id: e for e in b.streams}[stream_id("chatter")]
+        self.assertEqual((e.head_seq, e.trail_seq, e.live), (3, 2, 2))
+        st.hush(T0 + 11_000, "chatter", 2)                                          # pluck: item 2 off, PLUCK seq 4 on
+        self.assertEqual((ent("chatter").head_seq, ent("chatter").trail_seq, ent("chatter").live), (4, 3, 2))
+        for text in ("d", "e", "f"):                                                # depth 3: item 3 is evicted by seq 7
+            st.sing(T0 + 12_000, "chatter", text=text, ttl_s=300)
+        self.assertEqual((ent("chatter").head_seq, ent("chatter").trail_seq, ent("chatter").live), (7, 4, 4))
+        st.sing(T0, "lens.threat", text="low", state_key="now")                     # supersession: seq 1 then 2
+        st.sing(T0 + 1_000, "lens.threat", text="high", state_key="now")
+        self.assertEqual((ent("lens.threat").head_seq, ent("lens.threat").trail_seq, ent("lens.threat").live), (2, 2, 1))
+        st.poll(T0 + 400_000)                                                       # everything has expired
+        self.assertEqual((ent("chatter").head_seq, ent("chatter").trail_seq, ent("chatter").live), (7, 8, 0))
+        self.assertEqual(st.status(T0 + 400_000)["streams"]["chatter"]["trail_seq"], 8)
 
+    def test_beacon_pages_rotate_with_a_catalog_digest(self):
+        st = station(*[StreamConfig(f"s{i}", b_stream=500) for i in range(120)], b_station=60_000)
+        first = wire.parse(st._beacon(T0), lambda k: PK).body
+        count = first.page[1]
+        self.assertGreater(count, 1)
+        pages = [first] + [wire.parse(st._beacon(T0 + i), lambda k: PK).body for i in range(1, count)]
+        self.assertEqual([p.page for p in pages], [(i, count) for i in range(count)])
+        self.assertEqual(len({p.catalog_digest for p in pages}), 1)
+        for p in pages:                                                             # no stream twice on one page
+            self.assertEqual(len({e.stream_id for e in p.streams}), len(p.streams))
+        self.assertEqual({e.stream_id for p in pages for e in p.streams}, {s.sid for s in st.streams.values()})
+        self.assertTrue(all(len(st._beacon(T0)) <= wire.MAX_FRAME for _ in range(count)))
+        small = station(*[StreamConfig(f"s{i}", b_stream=500) for i in range(30)], b_station=16_000)
+        self.assertIsNone(wire.parse(small._beacon(T0), lambda k: PK).body.page)     # fits one beacon: not paged
+
+    def test_beacon_paging_bound_matches_rfc_8_4(self):
+        # §8.4 paging bound (A1): with every entry field at its CDDL maximum, 17 entries fit a page (54 B each),
+        # so a catalog of 136 streams fits 8 pages and 137 does not. With lens (59 B) the RFC's 32-byte profile
+        # gives 15 per page; this station's 21-byte profile leaves room for 16, so its floor is 128.
+        cfg = lambda n, **kw: [StreamConfig(f"s{i}", b_stream=500, **kw) for i in range(n)]
+        st = station(*cfg(136), b_station=100_000)
+        worst = [wire.StreamEntry(*wire.StreamEntry.MAXIMA[:9]) for _ in range(136)]
+        pages = st._pages(worst)
+        self.assertEqual([len(p) for p in pages], [17] * 8)
+        for p in pages:                                                             # each worst-case page encodes within the limit
+            b = wire.Beacon(epoch=st.epoch, bseq=wire.U64, wallclock=wire.U64, next_beacon_ms=wire.U32,
+                            profile="canticle-regulation/1", streams=tuple(p), b_station=100_000,
+                            page=(7, 8), catalog_digest=bytes(8))
+            self.assertLessEqual(len(wire.encode_beacon(SK, b)), wire.MAX_FRAME)
+        with self.assertRaises(ValueError):
+            station(*cfg(137), b_station=100_000)
+        self.assertEqual(len(station(*cfg(128, lens=1), b_station=100_000)._pages(
+            [wire.StreamEntry(*wire.StreamEntry.MAXIMA[:9], lens=wire.U32) for _ in range(128)])), 8)
+        with self.assertRaises(ValueError):
+            station(*cfg(129, lens=1), b_station=100_000)
+
+    def assert_every_window_has_every_stream(self, st, beacons):
+        """§8.4: every stream appears at least once in every `count` consecutive beacons (an unpaged
+        beacon carries the whole catalog, count 1); each beacon fits the frame; count never exceeds 8."""
+        sids = {s.sid for s in st.streams.values()}
+        bodies = [wire.parse(b, lambda k: PK).body for b in beacons]
+        for b in beacons:
+            self.assertLessEqual(len(b), wire.MAX_FRAME)
+        for i, b in enumerate(bodies):
+            count = b.page[1] if b.page else 1
+            self.assertLessEqual(count, 8)
+            if i + count > len(bodies):
+                break
+            seen = {e.stream_id for w in bodies[i:i + count] for e in w.streams}
+            self.assertEqual(sids - seen, set(), f"beacons {i}..{i + count - 1} (pages "
+                             f"{[w.page for w in bodies[i:i + count]]}) miss streams")
+
+    def test_shrinking_entry_never_skips_a_stream_past_count(self):
+        # #71 review (Cael): at 6048276 the split was recomputed from actual sizes every beacon while pages
+        # were sent by index. Stream 0's one long-loop item expires, its entry shrinks 8 bytes, and stream 30
+        # moves from page 1 to page 0 between the two page sends: (1, present), (0, absent), shrink,
+        # (1, absent), (0, present), a gap of three beacons at count 2. The sweep cursor never moves backwards
+        # past an unsent stream, so a shrink cannot skip one.
+        st = station(*[StreamConfig(f"s{i}", b_stream=500 if i == 0 else 70_000, default_ttl_s=300, max_ttl_s=3_600,
+                                    lens=None if i < 2 else 100_000) for i in range(40)], b_station=3_000_000)
+        names = list(st.streams)
+        st.sing(T0, names[0], text="x", ttl_s=120, loop=70_000)                     # loop fields 5 B each until T0+120 s
+        for n in names[1:]:
+            st.sing(T0, n, text="y", ttl_s=300)
+        beacons = [st._beacon(T0 + dt) for dt in (1_000, 2_000, 100_000, 130_000, 131_000, 132_000, 133_000)]
+        self.assertEqual(st.streams[names[0]].ring, {})                              # the shrink happened mid-run
+        self.assertEqual(st._pages(st._entries())[0][-1].stream_id, st.streams[names[30]].sid)  # and moves the actual split
+        self.assert_every_window_has_every_stream(st, beacons)
+
+    def test_growing_entries_never_overflow_or_skip_a_stream(self):
+        # Growth, the other direction: the catalog is split at small sizes, then every head_seq jumps past
+        # 2^32 (each entry grows 8 bytes) between two pages. A partition fixed from the earlier actual sizes
+        # would overflow the frame or need a page past `count`; the sweep re-packs at the new sizes.
+        st = station(*[StreamConfig(f"s{i}", b_stream=500) for i in range(60)], b_station=60_000)
+        beacons = [st._beacon(T0 + 1_000 * i) for i in range(3)]
+        small = len(wire.parse(beacons[-1], lambda k: PK).body.streams)
+        for s in st.streams.values():
+            s.head_seq = 2**33
+        beacons += [st._beacon(T0 + 1_000 * i) for i in range(3, 12)]
+        self.assertLess(len(wire.parse(beacons[-1], lambda k: PK).body.streams), small)  # pages really shrank
+        self.assert_every_window_has_every_stream(st, beacons)
+
+    def test_every_window_of_count_beacons_has_every_stream_property(self):
+        # Property form of the #71 finding: random sings, loops, TTLs and head_seq jumps make entries grow and
+        # shrink between beacons, so the actual-size split moves, and a 31-stream catalog crosses in and out of
+        # fitting one beacon. Every window of `count` beacons must still carry every stream, every beacon must
+        # fit, and every paged beacon must be chosen from ACTUAL sizes (§8.4): exactly the first page of the
+        # actual-size greedy split of the catalog rotated to the cursor, i.e. the longest run that fits.
+        # At 6048276 (re-split every beacon, sent by index) 21 of these 24 seeds miss a stream in some window;
+        # at 42517e1 (split once at worst-case sizes) every window holds but the actual-size check fails.
+        moved = mixed = grew = shrank = 0
+        not_actual = []
+        for seed in range(24):
+            rng = random.Random(seed)
+            n = rng.choice((31, 34, 40, 90))
+            st = station(*[StreamConfig(f"s{i}", b_stream=rng.choice((500, 70_000, 70_000, 70_000)), default_ttl_s=300,
+                                        max_ttl_s=3_600, lens=rng.choice((None, 100_000, 100_000, 100_000)))
+                           for i in range(n)], b_station=n * 70_000)
+            names, now, beacons, splits, sizes = list(st.streams), T0, [], set(), None
+            for _ in range(150):
+                for _ in range(rng.randrange(8)):
+                    st.sing(now, rng.choice(names), text="z", ttl_s=rng.choice((10, 60, 300)),
+                            loop=rng.choice(("normal", 5_000, 70_000)))
+                if rng.random() < 0.1:                                                # head_seq jumps: wider entries
+                    st.streams[rng.choice(names)].head_seq += rng.choice((30, 300, 70_000, 2**33))
+                now += rng.choice((500, 1_000, 5_000, 40_000))
+                st._expire(now)                                                       # what _beacon sees at `now`
+                entries, cursor = st._entries(), getattr(st, "_cursor", 0)
+                new_sizes = [len(cbor.encode(e.to_cbor())) for e in entries]
+                if sizes is not None:
+                    grew += any(b > a for a, b in zip(sizes, new_sizes))
+                    shrank += any(b < a for a, b in zip(sizes, new_sizes))
+                sizes = new_sizes
+                beacons.append(st._beacon(now))
+                body = wire.parse(beacons[-1], lambda k: PK).body
+                if body.page is not None and list(body.streams) != st._pages(entries[cursor:] + entries[:cursor])[0]:
+                    not_actual.append((seed, len(beacons) - 1))                       # not the actual-size run
+                splits.add(tuple(len(p) for p in st._pages(entries)))
+            paged = {wire.parse(b, lambda k: PK).body.page is not None for b in beacons}
+            moved += len(splits) > 1
+            mixed += paged == {True, False}
+            with self.subTest(seed=seed, streams=n):
+                self.assert_every_window_has_every_stream(st, beacons)
+        self.assertEqual(not_actual, [], "paged beacons not chosen from actual sizes (seed, beacon)")
+        self.assertGreater(moved, 0)    # positive controls: the actual-size split did move,
+        self.assertGreater(mixed, 0)    # some catalog went in and out of paging,
+        self.assertGreater(grew, 0)     # and entries both grew
+        self.assertGreater(shrank, 0)   # and shrank between beacons
 
 class LateJoinerTest(unittest.TestCase):
     def test_late_listener_hears_every_live_item_within_one_loop(self):

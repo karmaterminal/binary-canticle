@@ -77,10 +77,18 @@ def parse_cases() -> list[dict]:
                                             cls=1, ctype=1, body=b"hello, station", hop=0, scope=1))
     rfc_v2 = wire.encode_pluck(s1, wire.Pluck(epoch=1, stream=1, seq=2, issued_at=T0 + 5_000,
                                               expires_at=T0 + 60_000, scope=1, target_seq=1))
+    # §9.8 post-A1 stream-entry: [stream_id, head_seq, trail_seq, live, loop_ms, loop_max_ms, default_ttl_s,
+    # max_ttl_s, b_stream, ? lens]. One item on air (seq 1), so head_seq = trail_seq = 1.
+    chat_entry = [stream_id("chatter"), 1, 1, 1, 10000, 10000, 60, 300, 4000]
     bcn = wire.Beacon(epoch=1, bseq=1, wallclock=NOW, next_beacon_ms=1000,
                       profile="canticle-regulation/1", b_station=16000,
-                      streams=(wire.StreamEntry(stream_id("chatter"), 1, 1, 10000, 10000, 60, 300, 4000),))
+                      streams=(wire.StreamEntry(*chat_entry),))
     beacon = wire.encode_beacon(s1, bcn)
+    beacon_lens = cbor.encode({**wire.beacon_map(bcn), 6: [chat_entry + [7]]})
+    # #70: a pre-A1 8-element entry (no trail_seq). Read as post-A1 it would shift every field after head_seq.
+    beacon_pre_a1 = cbor.encode({**wire.beacon_map(bcn), 6: [chat_entry[:2] + chat_entry[3:]]})
+    # #66 case 4: b_stream is `uint .size 4` in the §9.8 CDDL, so 2^60 is out of range, not accepted.
+    beacon_big_b = cbor.encode({**wire.beacon_map(bcn), 6: [chat_entry[:8] + [2**60]]})
     tampered = bytearray(rfc_v1)
     tampered[rfc_v1.index(b"hello")] = ord("j")
     good_map = cbor.encode(_item())
@@ -142,6 +150,12 @@ def parse_cases() -> list[dict]:
         ("item-null-body", _raw(wire.KIND_ITEM, s1, null_body), "bad-field",
          "#66: 8: null and no 9; an explicit null for an optional key is bad-field, not absence (§9.6 needs a body or a body_ref)"),
         ("beacon-null-catalog-digest", _raw(wire.KIND_BEACON, s1, null_digest), "bad-field", "#66: 9: null; same rule as item-null-body"),
+        ("beacon-entry-with-lens", _raw(wire.KIND_BEACON, s1, beacon_lens), "accept",
+         "§9.8 (A1): the 10-element stream-entry, lens = 7"),
+        ("beacon-pre-a1-8-field-entry", _raw(wire.KIND_BEACON, s1, beacon_pre_a1), "bad-field",
+         "#70: an 8-element stream-entry without trail_seq; a stale station fails loudly instead of being read shifted"),
+        ("beacon-b-stream-over-u32", _raw(wire.KIND_BEACON, s1, beacon_big_b), "bad-field",
+         "#66 case 4: b_stream = 2^60; §9.8 CDDL says uint .size 4"),
     ]
     assert len(oversize) == 1101
     return [{"name": n, "datagram_hex": d.hex(), "expect": e, "note": note} for n, d, e, note in cases]
