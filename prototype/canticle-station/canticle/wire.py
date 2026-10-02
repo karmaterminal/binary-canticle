@@ -248,9 +248,14 @@ def _item(m: dict) -> Item:
         _tstr(ctype, "ctype", 1, 64)
     else:
         _uint(ctype, "ctype", 0xFFFF)
-    body = m.get(8)
-    if body is not None and not isinstance(body, bytes):
-        raise Reject("bad-field", "body")
+    # An optional key that is present must carry a well-typed value: an explicit null is
+    # bad-field, not absence (#66). Otherwise `8: null` with no 9 passes the presence check
+    # above and yields an item with neither body nor body_ref.
+    body = None
+    if 8 in m:
+        body = m[8]
+        if not isinstance(body, bytes):
+            raise Reject("bad-field", "body")
     body_ref = None
     if 9 in m:
         br = m[9]
@@ -319,9 +324,11 @@ def _beacon(m: dict) -> Beacon:
         page = (_uint(pg[0], "page"), _uint(pg[1], "page", 8))
         if page[0] >= page[1]:
             raise Reject("bad-field", "page index")
-    digest = m.get(9)
-    if digest is not None and not (isinstance(digest, bytes) and len(digest) == 8):
-        raise Reject("bad-field", "catalog_digest")
+    digest = None
+    if 9 in m:  # present means well-typed; an explicit null is bad-field (#66)
+        digest = m[9]
+        if not (isinstance(digest, bytes) and len(digest) == 8):
+            raise Reject("bad-field", "catalog_digest")
     for k in (10, 11):
         if k in m and not isinstance(m[k], dict):
             raise Reject("bad-field", "capsid" if k == 10 else "relay")
@@ -398,7 +405,8 @@ def _parse(buf, resolve, now_ms, clock_offset_ms):
         if e.reason in ("map-key-order", "non-shortest", "indefinite-length", "duplicate-key"):
             raise Reject("non-deterministic", e.reason) from None
         raise Reject("bad-cbor", e.reason) from None
-    if not isinstance(m, dict) or not all(isinstance(k, int) for k in m):
+    # cbor.decode already refuses bool keys (#66); the bool exclusion here is defence in depth.
+    if not isinstance(m, dict) or not all(isinstance(k, int) and not isinstance(k, bool) for k in m):
         raise Reject("bad-cbor", "top level must be an integer-keyed map")
     if cbor.encode(m) != raw_map:
         raise Reject("non-deterministic")

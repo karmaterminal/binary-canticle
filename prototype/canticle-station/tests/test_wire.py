@@ -37,12 +37,30 @@ class CborTest(unittest.TestCase):
             b"\x81" * 5 + b"\x00": "depth",
             b"\x98\x21" + b"\x00" * 33: "too-many-entries",
             b"\x5a\xff\xff\xff\xff": "truncated",
+            # #66: map keys are integers or text strings only, at every depth
+            b"\xa1\xf4\x00": "map-key-type",            # {false: 0}
+            b"\xa1\xf5\x00": "map-key-type",            # {true: 0}
+            b"\xa1\xf6\x00": "map-key-type",            # {null: 0}
+            b"\xa1\x40\x00": "map-key-type",            # {h'': 0}
+            b"\xa1\x80\x00": "map-key-type",            # {[]: 0}
+            b"\xa1\xa0\x00": "map-key-type",            # {{}: 0}
+            b"\xa2\x00\x00\xf4\x00": "map-key-type",    # {0: 0, false: 0}: ordered, distinct bytes, one dict slot
+            b"\xa1\x01\xa2\x01\x00\xf5\x00": "map-key-type",  # {1: {1: 0, true: 0}}: nested
         }
         for data, reason in cases.items():
             with self.subTest(data=data.hex()):
                 with self.assertRaises(cbor.CborError) as cm:
                     cbor.decode(data)
                 self.assertEqual(cm.exception.reason, reason)
+
+    def test_encode_refuses_keys_the_decoder_rejects(self):
+        # #66: the encoder must never sign a map no receiver accepts. bool first: it is an int subclass.
+        for key in (True, False, None, b"k", (1,)):
+            with self.subTest(key=repr(key)):
+                with self.assertRaises(cbor.CborError) as cm:
+                    cbor.encode({key: 0})
+                self.assertEqual(cm.exception.reason, "map-key-type")
+        self.assertEqual(cbor.encode({0: 0, -1: 0, "k": 0}).hex(), "a300002000616b00")
 
 
     def test_map_keys_in_rfc8949_core_deterministic_order(self):
