@@ -368,7 +368,8 @@ def cmd_doctor(a) -> int:
     try:
         manifest, bind, multicast, source = _locators(a)
     except stations.StationsError as e:
-        manifest = bind = multicast = None
+        manifest = bind = None
+        multicast = a.multicast  # --(no-)multicast still counts; unknown (None) without it
         checks.append(doctor.Check("stations", "fail", _stations_hint(e)))
         checks += [doctor.Check(name, "skip", "needs stations.toml or --manifest") for name in ("manifest", "bind")]
     else:

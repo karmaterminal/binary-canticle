@@ -298,22 +298,26 @@ class DoctorCliTest(unittest.TestCase):
 
     def test_the_probe_runs_only_when_listener_multicast_is_on_or_asked_for(self):
         ran = []
-        cases = [  # (multicast in stations.toml, arguments, probe runs)
+        cases = [  # (multicast in stations.toml, None for no stations.toml; arguments; probe runs)
             (False, [], False),
             (True, [], True),
             (False, ["--multicast"], True),   # the listener this checks would join the group itself
             (False, ["--probe"], True),       # asked for, to try the group before turning multicast on
             (True, ["--no-probe"], False),
             (True, ["--manifest", str(self.fleet), "--bind", self.bind], False),  # stations.toml unread: off
+            (None, ["--multicast"], True),    # the flag counts even when stations.toml does not load
         ]
         for multicast, argv, runs in cases:
             with self.subTest(multicast=multicast, argv=argv):
-                self.configure(multicast=multicast)
+                if multicast is None:
+                    (self.conf / "stations.toml").unlink(missing_ok=True)
+                else:
+                    self.configure(multicast=multicast)
                 ran.clear()
                 out = io.StringIO()
                 with contextlib.redirect_stdout(out), \
                         mock.patch.object(doctor, "loopback_probe", lambda: ran.append(1) or (True, "looped back")):
-                    self.assertEqual(main(["doctor", "--json", *argv]), 0)
+                    self.assertEqual(main(["doctor", "--json", *argv]), 1 if multicast is None else 0)
                 m = {c["name"]: c for c in json.loads(out.getvalue())["checks"]}["multicast"]
                 self.assertEqual((len(ran), m["loopback"]), (1, True) if runs else (0, None))
 
