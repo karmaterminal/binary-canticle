@@ -156,6 +156,11 @@ class Listener:
             raise ValueError(f"unknown binding {binding!r}")
         self.binding = binding
         self.state_path = state_path
+        # A receptor (records.py) saves once per datagram, after its own records, with its state in the same
+        # file: autosave off, extra_state set. Two separate writes would leave a crash window (#79 review).
+        self.autosave = True
+        self.extra_state = None          # callable -> dict, saved under "receptor"
+        self.loaded_extra = None         # the "receptor" part of the loaded state, if any
         self.warmup = warmup  # hold live-state keys until warm-up completes (§7.8 rule 4)
         self._dirty = False
         self._restored: set = set()   # identities loaded from state, not yet re-surfaced here
@@ -212,7 +217,8 @@ class Listener:
             return [self._evidence(r.reason, kid if known else b"", r.detail)]
         self.last_frame, self.last_dedup = f, "first"
         events = self._beacon(f, now_ms) if f.kind == wire.KIND_BEACON else self._item_or_pluck(f, now_ms)
-        self._save_if_dirty()
+        if self.autosave:
+            self._save_if_dirty()
         return events
 
     def _epoch_ok(self, kid: bytes, epoch: int, now_ms: int, events: list, advance: bool = True) -> bool:
@@ -637,15 +643,16 @@ class Listener:
         self._purge_dedup(now_ms)
         self._purge_hwm(now_ms)
         events.extend(self._release_held(now_ms))
-        self._save_if_dirty()
+        if self.autosave:
+            self._save_if_dirty()
         for kid in list(self.stations):
             events.extend(self._presence(kid, now_ms))
         return events
 
     # ------------------------------------------------------------ persisted safety state
 
-    def _save_if_dirty(self) -> None:
-        if self.state_path is None or not self._dirty:
+    def _save_if_dirty(self, force: bool = False) -> None:
+        if self.state_path is None or not (self._dirty or force):
             return
         state = {
             "version": STATE_VERSION,
@@ -655,6 +662,8 @@ class Listener:
             "sticky_pluck": [[i[0].hex(), i[1], i[2], i[3], r] for i, r in self.sticky_pluck.items()],
             "hwm": [[k[0].hex(), k[1], k[2], *v] for k, v in self.hwm.items()],
         }
+        if self.extra_state is not None:
+            state["receptor"] = self.extra_state()
         atomic_write_json(self.state_path, state)
         self._dirty = False
 
@@ -664,6 +673,7 @@ class Listener:
         version = state.get("version")
         if version not in (1, 2, STATE_VERSION):
             raise ValueError(f"listener state {path}: unsupported version {version!r}")
+        self.loaded_extra = state.get("receptor")
         for kid_hex, (epoch, seen_at) in state["epochs"].items():
             st = self._st(bytes.fromhex(kid_hex))
             st.epoch_hwm, st.epoch_seen_at = epoch, seen_at

@@ -28,7 +28,7 @@ from typing import Callable, Optional
 
 from . import wire
 from .ids import CLASSES, CTYPES, SCOPES
-from .listener import STATE_VERSION, SKEW_MS, Event, Listener, atomic_write_json
+from .listener import STATE_VERSION, SKEW_MS, Event, Listener
 
 RECORD_V = "canticle-receptor-record/1"
 MAX_LINE = 64 * 1024          # bytes per line, newline included (§14.18.2 [PROPOSED DEFAULT])
@@ -146,13 +146,12 @@ class Receptor:
 
     def __init__(self, listener: Listener, emitter: Emitter, *, bind: str, multicast: Optional[str] = None,
                  transport: str = "lan", manifest_sha256: str = "", manifest_label: str = "",
-                 state_path=None, now_ms: int = 0):
+                 now_ms: int = 0):
         if not listener.receptor_mode or listener.tuned is not None:
             raise ValueError("a receptor needs a listener in receptor mode with no tune set (§14.18.1)")
         self.lst, self.em = listener, emitter
         self.bind, self.multicast, self.transport = bind, multicast, transport
         self.manifest_sha256, self.manifest_label = manifest_sha256, manifest_label
-        self.state_path = state_path
         self.started_at = now_ms
         self.last_datagram_at: Optional[int] = None
         # identity -> [local_expiry_at, issued_at, state_key, restored]: tuples surfaced and not yet retracted.
@@ -170,25 +169,53 @@ class Receptor:
         self.peers_closed = 0         # set by the transport: connections closed for a non-droppable record
         self._dropped_at_health = 0
         self._dirty = False
-        if state_path is not None and os.path.exists(state_path):
-            self._load(state_path)
+        # One state file, one atomic write per datagram: the listener's guards and this receptor's surfaced
+        # set and quarantines are saved together (self._save_if_dirty), so a crash cannot persist a PLUCK
+        # or a mark without the retract it implies (#79 review). start() reconciles anyway.
+        listener.autosave = False
+        listener.extra_state = self._state_json
+        if listener.loaded_extra is not None:
+            self._load(listener.loaded_extra)
 
     # ------------------------------------------------------------ lifecycle
 
     def start(self, now_ms: int) -> None:
-        """`hello`, then the first `landing_state`, then what the persisted state owes (§14.18.3)."""
-        st_version = STATE_VERSION
+        """`hello`, then the retracts the persisted state owes (reconcile), then the first `landing_state`
+        (§14.18.3). The host daemon serves no connection before this returns."""
         self.em.emit("hello", wire_version=wire.VERSION, record_version=RECORD_V, pid=os.getpid(), bind=self.bind,
                      multicast=self.multicast, transport=self.transport, manifest_sha256=self.manifest_sha256,
-                     manifest_label=self.manifest_label, state_version=st_version,
+                     manifest_label=self.manifest_label, state_version=STATE_VERSION,
                      receptor_state_version=RECEPTOR_STATE_VERSION, rule_version=RULE_VERSION)
+        self.reconcile(now_ms)
         self.em.emit("landing_state", **self.landing)
+
+    def reconcile(self, now_ms: int) -> int:
+        """Retract every surfaced tuple that the persisted guards say is withdrawn: its key revoked or gone
+        from the manifest, its key quarantined, a sticky PLUCK on it, a supersession mark newer than it, or
+        its local expiry passed. Idempotent: a retracted tuple leaves the surfaced set, so a second call
+        emits nothing. Returns the number of retracts."""
+        n = 0
         for ident in list(self.surfaced):
-            e = self.lst.manifest.entry(ident[0])
-            if e is None or e.revoked:
-                self._retract(ident, "revoked")
-        self._expire_restored(now_ms)
+            expiry, issued_at, state_key = self.surfaced[ident][:3]
+            kid, by = ident[0], None
+            entry = self.lst.manifest.entry(kid)
+            mark = self.lst.hwm.get((kid, ident[2], state_key)) if state_key is not None else None
+            if entry is None or entry.revoked:
+                reason = "revoked"
+            elif kid in self.quarantined:
+                reason = "quarantined"
+            elif ident in self.lst.sticky_pluck:
+                reason = "plucked"
+            elif mark is not None and (issued_at, ident[1], ident[3]) < mark[:3]:
+                reason, by = "superseded", (kid, mark[1], ident[2], mark[2])
+            elif expiry <= now_ms:
+                reason = "expired"
+            else:
+                continue
+            self._retract(ident, reason, by=by)
+            n += 1
         self._save_if_dirty()
+        return n
 
     def set_landing(self, **changes) -> bool:
         """Change the landing state and emit it if any part changed. This prototype has no MUTE, circuit
@@ -444,19 +471,19 @@ class Receptor:
     # ------------------------------------------------------------ persisted receptor state
 
     def _save_if_dirty(self) -> None:
-        if self.state_path is None or not self._dirty:
-            return
-        atomic_write_json(self.state_path, {
-            "version": RECEPTOR_STATE_VERSION,
-            "surfaced": [[i[0].hex(), i[1], i[2], i[3], r[0], r[1], r[2]] for i, r in self.surfaced.items()],
-            "quarantined": sorted(k.hex() for k in self.quarantined)})
+        """One atomic write of the listener's and this receptor's state, after this datagram's records."""
+        if self._dirty or self.lst._dirty:
+            self.lst._save_if_dirty(force=True)
         self._dirty = False
 
-    def _load(self, path) -> None:
-        with open(path) as f:
-            state = json.load(f)
+    def _state_json(self) -> dict:
+        return {"version": RECEPTOR_STATE_VERSION,
+                "surfaced": [[i[0].hex(), i[1], i[2], i[3], r[0], r[1], r[2]] for i, r in self.surfaced.items()],
+                "quarantined": sorted(k.hex() for k in self.quarantined)}
+
+    def _load(self, state: dict) -> None:
         if state.get("version") != RECEPTOR_STATE_VERSION:
-            raise ValueError(f"receptor state {path}: unsupported version {state.get('version')!r}")
+            raise ValueError(f"receptor state: unsupported version {state.get('version')!r}")
         for kid_hex, epoch, stream, seq, expiry, issued_at, state_key in state["surfaced"]:
             ident = (bytes.fromhex(kid_hex), epoch, stream, seq)
             self.surfaced[ident] = [expiry, issued_at, state_key, True]

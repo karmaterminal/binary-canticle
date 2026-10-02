@@ -271,7 +271,11 @@ and the `error` it may overcount by, and `other` for what no listed id accounts 
 per manifest key; `last_datagram_at`; records emitted and dropped and connections closed; and `state` `ok` or
 `degraded` with `no_datagrams` (none for 30 s), `records_lost` (a connection dropped a record since the last
 `health`) or `clock_skew` (a station's δ̂ beyond 5 s). The receptor keeps which tuples it surfaced, and which
-keys it quarantined, in `receptor.json` beside the listener's state, so a restart can still retract them.
+keys it quarantined, in the listener's state file (`"receptor"`), written with the listener's guards in one
+atomic replace per datagram. At start, after `hello` and before the first `landing_state` (so before any
+connection is served), `Receptor.reconcile` retracts every surfaced tuple the persisted guards say is withdrawn:
+key revoked or gone (`revoked`), key quarantined (`quarantined`), a sticky PLUCK on it (`plucked`), a newer
+supersession mark (`superseded`) or local expiry passed (`expired`). It is idempotent (#79 review).
 
 The listener change is opt-in: `Listener(receptor_mode=True)` reports the outcomes it was silent on and admits
 lower-epoch tuples as above. `canticle listen` and `canticle tuner` behave as before.
@@ -285,7 +289,7 @@ lower-epoch tuples as above. `canticle listen` and `canticle tuner` behave as be
   modulation (§14.7) here. It is always `mute: null`, `breaker: "closed"`, `modulation: []`;
   `Receptor.set_landing` is the hook, and only tests call it.
 - `quarantine_strengthen` / `quarantine_rescind`: reserved in the RFC, not emitted. A local quarantine has no
-  rescind here; it lasts until `receptor.json` is removed with the daemon stopped.
+  rescind here; it lasts until the daemon's state is removed with the daemon stopped.
 - Revocation retracts only at start: the daemon does not reload its manifest while running.
 - `gap` is always `"unavailable"` (§7.10's receiver side is not implemented); `station.principal` is always
   null (the spike manifest names none).
@@ -301,7 +305,7 @@ lower-epoch tuples as above. `canticle listen` and `canticle tuner` behave as be
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 224 tests, about 25 s
+python -m unittest discover -s tests      # 228 tests, about 25 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -337,7 +341,9 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
   `warmup_hold` and its release under the same `idem`, the three `held_*` retractions, lower epochs, local
   quarantine on equivocation), retractions on pluck, supersession and expiry, the restart rows (resurfaced
   items, a re-heard PLUCK, supersession and expiry of tuples surfaced before the restart, revocation at start,
-  quarantine kept), presence and beacon counters, unverified counters that never name a station, a 2 000-datagram
+  quarantine kept), the start-time reconcile (the #79 crash window: a PLUCK or a supersession mark persisted
+  without its retract, with no replay, is retracted at start before the first `landing_state`; also a
+  quarantined key, expiry while down, and one state file written once), presence and beacon counters, unverified counters that never name a station, a 2 000-datagram
   flood of key ids that keeps the table at 16 and the `health` record the same size, and the `health` states.
 - `test_daemon.py` runs the daemon in one event loop over loopback UDP and a unix socket in a temporary
   directory, for the local mixed-host proof cases of §14.18.2:

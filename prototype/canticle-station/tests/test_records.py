@@ -49,7 +49,7 @@ class Harness:
         self.lst = Listener(m or manifest(), state_path=st, ephemeral=state_dir is None, receptor_mode=True,
                             warmup=warmup, **kw)
         self.r = Receptor(self.lst, self.em, bind="127.0.0.1:9999", manifest_sha256="00" * 32, manifest_label="t",
-                          state_path=os.path.join(state_dir, "receptor.json") if state_dir else None, now_ms=T0)
+                          now_ms=T0)
         self.r.start(T0)
 
     def _sink(self, t, line):
@@ -325,8 +325,8 @@ class RestartTest(unittest.TestCase):
         a = Harness(state_dir=self.dir)
         a.hear(item(1))
         b = Harness(m=manifest(revoked=True), state_dir=self.dir)
-        self.assertEqual([r["type"] for r in b.recs], ["hello", "landing_state", "retract"])
-        self.assertEqual(b.recs[-1]["reason"], "revoked")
+        self.assertEqual([r["type"] for r in b.recs], ["hello", "retract", "landing_state"])
+        self.assertEqual(b.recs[1]["reason"], "revoked")
 
     def test_superseding_item_after_restart_retracts_the_old_value(self):
         a = Harness(state_dir=self.dir)
@@ -336,20 +336,73 @@ class RestartTest(unittest.TestCase):
         r = only(out, "retract")
         self.assertEqual((r["reason"], r["target"]["seq"], r["by"]["seq"]), ("superseded", 1, 2))
 
-    def test_pluck_reheard_after_restart(self):
+    def crash_between_writes(self, before: dict):
+        """Simulate the crash window of 946aba0 (#79 review): the listener's guards were saved, the receptor's
+        surfaced set was not. ``before`` is the state file as it was before the last datagram."""
+        path = Path(self.dir, "listener.json")
+        after = json.loads(path.read_text())
+        after["receptor"] = before["receptor"]
+        path.write_text(json.dumps(after))
+
+    def snapshot(self) -> dict:
+        return json.loads(Path(self.dir, "listener.json").read_text())
+
+    def assert_retracted_at_start(self, b, reason, target_seq):
+        """The retract is part of the start, before the first landing_state, so before any binding attaches."""
+        self.assertEqual([r["type"] for r in b.recs], ["hello", "retract", "landing_state"])
+        r = b.recs[1]
+        self.assertEqual((r["reason"], r["target"]["seq"]), (reason, target_seq))
+        self.assertEqual(b.r.surfaced, {})
+        self.assertEqual(b.r.reconcile(T0 + 1), 0)          # idempotent
+        self.assertEqual([x for x in b.tick(T0 + 1_000) if x["type"] == "retract"], [])
+        return r
+
+    def test_one_state_file_one_write(self):
         a = Harness(state_dir=self.dir)
         a.hear(item(1))
-        state = Path(self.dir, "receptor.json")
-        snapshot = state.read_text()
         a.hear(pluck(2, 1))
-        # The run ended after the listener kept the PLUCK and before the receptor recorded its retract.
-        state.write_text(snapshot)
+        st = self.snapshot()
+        self.assertEqual(sorted(os.listdir(self.dir)), ["listener.json"])
+        self.assertEqual(len(st["sticky_pluck"]), 1)
+        self.assertEqual(st["receptor"]["surfaced"], [])     # the PLUCK and its retract land together
+
+    def test_crash_window_pluck_without_replay(self):
+        """Elliott's repro (#79): PLUCK persisted, retract not, sender never repeats the PLUCK."""
+        a = Harness(state_dir=self.dir)
+        a.hear(item(1))
+        before = self.snapshot()
+        a.hear(pluck(2, 1))
+        self.crash_between_writes(before)
         b = Harness(state_dir=self.dir)
-        r = only(b.hear(pluck(2, 1), T0 + 50), "retract")
-        self.assertEqual((r["reason"], r["target"]["seq"]), ("plucked", 1))
-        c = Harness(state_dir=self.dir)    # the target is no longer surfaced: a counter only
-        self.assertEqual(c.hear(pluck(2, 1), T0 + 60), [])
+        self.assertEqual(len(b.lst.sticky_pluck), 1)
+        self.assert_retracted_at_start(b, "plucked", 1)
+        c = Harness(state_dir=self.dir)                       # persisted: nothing owed on the next start
+        self.assertEqual([r["type"] for r in c.recs], ["hello", "landing_state"])
+        self.assertEqual(c.hear(pluck(2, 1), T0 + 60), [])   # a re-heard PLUCK is then a counter only
         self.assertEqual(c.health(T0 + 60)["counters"]["admission"]["duplicate"], 1)
+
+    def test_crash_window_supersession_without_replay(self):
+        a = Harness(state_dir=self.dir)
+        a.hear(item(1, stream=LIVE, cls=3, state_key="k"))
+        before = self.snapshot()
+        a.hear(item(2, stream=LIVE, cls=3, state_key="k", t=T0 + 10), T0 + 10)
+        self.crash_between_writes(before)
+        b = Harness(state_dir=self.dir)
+        r = self.assert_retracted_at_start(b, "superseded", 1)
+        self.assertEqual(r["by"]["seq"], 2)
+
+    def test_quarantined_key_with_surfaced_tuples_retracts_at_start(self):
+        a = Harness(state_dir=self.dir)
+        a.hear(item(1))
+        st = self.snapshot()
+        st["receptor"]["quarantined"] = [KID.hex()]
+        Path(self.dir, "listener.json").write_text(json.dumps(st))
+        self.assert_retracted_at_start(Harness(state_dir=self.dir), "quarantined", 1)
+
+    def test_expired_while_down_retracts_at_start(self):
+        a = Harness(state_dir=self.dir)
+        a.hear(item(1, ttl=10_000, t=T0 - 20_000), T0 - 20_000)
+        self.assert_retracted_at_start(Harness(state_dir=self.dir), "expired", 1)
 
     def test_quarantine_survives_restart(self):
         a = Harness(state_dir=self.dir)

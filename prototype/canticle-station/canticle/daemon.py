@@ -251,7 +251,7 @@ class Daemon:
             group = runner.MCAST_GROUP if self.cfg.multicast else None
             return Receptor(lst, self.emitter, bind=self.cfg.bind, multicast=group, transport="lan",
                             manifest_sha256=hashlib.sha256(raw).hexdigest(), manifest_label=str(label),
-                            state_path=os.path.join(self.cfg.state_dir, "receptor.json"), now_ms=runner.now_ms())
+                            now_ms=runner.now_ms())
         except Exception as e:
             raise StartError("state_corrupt", f"{self.cfg.state_dir}: {type(e).__name__}: {e}") from None
 

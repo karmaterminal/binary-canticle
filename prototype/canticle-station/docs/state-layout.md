@@ -23,8 +23,8 @@ $XDG_STATE_HOME/canticle/                listener safety state; ~/.local/state/c
 ├── heard.jsonl                          the example listener unit's output: heard events, with their text
 └── daemon/                              `canticle daemon`'s state (--state-dir), mode 0700
     ├── daemon.lease                     held while the daemon runs: one daemon per state directory
-    ├── listener.json                    its listener's safety state, as listener-<tag>.json above
-    └── receptor.json                    tuples it surfaced and keys it quarantined, so a restart can retract them
+    └── listener.json                    its listener's safety state, as listener-<tag>.json above, and under
+                                         "receptor" the tuples it surfaced and keys it quarantined
 
 $XDG_RUNTIME_DIR/canticle-<name>.sock    a station's control socket (mode 0600, peer uid checked). Without
                                          --control it is canticle-<key_id>.sock, in /tmp if XDG_RUNTIME_DIR is unset
@@ -75,9 +75,13 @@ $XDG_RUNTIME_DIR/canticle/daemon.sock    the host daemon's record socket (§11.1
 - `canticle daemon` keeps everything under one directory, `$XDG_STATE_HOME/canticle/daemon` by default
   (`--state-dir` overrides it). Its lease stops a second daemon on the same directory; its UDP port, bound
   without `SO_REUSEADDR`, stops any other listener on the same address.
-- `receptor.json` lists the tuples the daemon told bindings were surfaced and not yet retracted, and the keys it
-  quarantined on equivocation. Deleting it (daemon stopped) loses the retractions owed after a restart, and
-  lifts every local quarantine. As with the listener state, never edit it.
+- `listener.json` holds the listener's guards (dedup, sticky PLUCKs, supersession marks, epochs) and, under
+  `"receptor"`, the tuples the daemon told bindings were surfaced and not yet retracted and the keys it
+  quarantined on equivocation. Both parts are written in one atomic replace per datagram, after that
+  datagram's records, so a crash never keeps a PLUCK or a mark without the retract it implies; at start the
+  daemon also retracts any surfaced tuple the guards say is withdrawn, before it serves a connection. Deleting
+  the file (daemon stopped) loses the retractions owed after a restart and lifts every local quarantine. Never
+  edit it.
 - `canticle doctor` recognises the daemon holding the address through its default lease. A daemon run with
   `--state-dir` is reported as "in use, and not by this listener".
 
