@@ -1,0 +1,30 @@
+# Example user unit: one canticle station (binary-canticle spike). Documented only; nothing installs it.
+#
+# The instance is the station's name: canticle-station@cael signs with ~/.binary-canticle/keys/cael.key
+# and takes its streams from ~/.binary-canticle/station-cael.env, for example:
+#
+#   CANTICLE_STATION_ARGS=--stream chatter --stream lens.threat:live-state
+#
+#   cp docs/systemd/canticle-station@.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now canticle-station@cael
+#   canticle sing --control "$XDG_RUNTIME_DIR/canticle-cael.sock" --stream chatter --text hello --ttl 30
+#
+# Paths follow docs/state-layout.md, with the package installed in a venv at ~/.venvs/canticle.
+# The key's epoch counter and lease live beside it; never run the same key on a second host.
+
+[Unit]
+Description=canticle station %i (binary-canticle spike)
+
+[Service]
+Type=exec
+EnvironmentFile=%h/.binary-canticle/station-%i.env
+UMask=0077
+# Unicast to this host's listener. Add --multicast only after an RFC §11.2 doctor has passed:
+# this spike's `canticle doctor` reports multicast but does not decide it.
+ExecStart=%h/.venvs/canticle/bin/canticle station --key %h/.binary-canticle/keys/%i.key --manifest %h/.binary-canticle/fleet.json --control %t/canticle-%i.sock --to 127.0.0.1:9999 $CANTICLE_STATION_ARGS
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target
