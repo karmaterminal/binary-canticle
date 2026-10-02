@@ -282,45 +282,6 @@ class DoctorCliTest(unittest.TestCase):
                 _listener_state(other)  # held for real: refused after the short wait
         lease.close()
 
-    def test_with_no_stations_toml_doctor_joins_no_group(self):
-        # #75: joining the group sends an IGMP report the LAN can see. A host that has not turned multicast on
-        # (here an empty HOME, with no stations.toml) must not send one from a check.
-        (self.conf / "fleet.json").unlink()
-        SpySocket.calls = []
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out), mock.patch.object(doctor.socket, "socket", SpySocket):
-            self.assertEqual(main(["doctor", "--json"]), 1)  # no stations.toml is a failed check
-        joins = [c for c in SpySocket.calls if c[:2] == (socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP)]
-        self.assertEqual(joins, [])
-        m = {c["name"]: c for c in json.loads(out.getvalue())["checks"]}["multicast"]
-        self.assertEqual((m["status"], m["loopback"], m["configured"]), ("report", None, None))
-        self.assertIn("loopback probe not run: joining 239.255.13.13 sends an IGMP report", m["detail"])
-
-    def test_the_probe_runs_only_when_listener_multicast_is_on_or_asked_for(self):
-        ran = []
-        cases = [  # (multicast in stations.toml, None for no stations.toml; arguments; probe runs)
-            (False, [], False),
-            (True, [], True),
-            (False, ["--multicast"], True),   # the listener this checks would join the group itself
-            (False, ["--probe"], True),       # asked for, to try the group before turning multicast on
-            (True, ["--no-probe"], False),
-            (True, ["--manifest", str(self.fleet), "--bind", self.bind], False),  # stations.toml unread: off
-            (None, ["--multicast"], True),    # the flag counts even when stations.toml does not load
-        ]
-        for multicast, argv, runs in cases:
-            with self.subTest(multicast=multicast, argv=argv):
-                if multicast is None:
-                    (self.conf / "stations.toml").unlink(missing_ok=True)
-                else:
-                    self.configure(multicast=multicast)
-                ran.clear()
-                out = io.StringIO()
-                with contextlib.redirect_stdout(out), \
-                        mock.patch.object(doctor, "loopback_probe", lambda: ran.append(1) or (True, "looped back")):
-                    self.assertEqual(main(["doctor", "--json", *argv]), 1 if multicast is None else 0)
-                m = {c["name"]: c for c in json.loads(out.getvalue())["checks"]}["multicast"]
-                self.assertEqual((len(ran), m["loopback"]), (1, True) if runs else (0, None))
-
     def test_multicast_is_never_decided_and_nothing_is_written(self):
         # §11.2: multicast may be used only after a doctor that runs every step passes. This one does not,
         # so even a probe that loops back must leave multicast off and write nothing.
@@ -328,7 +289,7 @@ class DoctorCliTest(unittest.TestCase):
         before = snapshot(self.dir)
         out = io.StringIO()
         with contextlib.redirect_stdout(out), mock.patch.object(doctor, "loopback_probe", lambda: (True, "looped back")):
-            code = main(["doctor", "--probe", "--json"])
+            code = main(["doctor", "--json"])
         m = {c["name"]: c for c in json.loads(out.getvalue())["checks"]}["multicast"]
         self.assertEqual((code, m["status"], m["loopback"], m["decided"], m["configured"]), (0, "report", True, False, False))
         self.assertEqual(snapshot(self.dir), before)  # no stations.toml change, no lease or state file

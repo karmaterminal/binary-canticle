@@ -19,13 +19,12 @@ Each holds a free address or lease for microseconds, and a listener starting at
 that instant retries its lease (``__main__._listener_state``); its bind does not.
 
 Multicast is a report, never a check. RFC §11.2 lets binding (b) be used only
-after a doctor that runs all seven of its steps has passed. This one can run a
-loopback probe only: it joins the group on the default interface and sends an
-unsigned nonce with IP TTL 0, which never leaves this host, on an ephemeral
-port: not §11.2's signed probe on ``x-test.doctor``. So it neither decides nor
-enables multicast, and it writes no configuration. Joining sends an IGMP report
-onto the LAN, and leaving a leave, so the probe runs only when this listener's
-multicast is on, or when ``--probe`` asks for it (``probe_plan``).
+after a doctor that runs all seven of its steps has passed. This one runs a
+loopback probe only: it joins the group on the default interface (so an IGMP
+report goes out there) and sends an unsigned nonce with IP TTL 0, which never
+leaves this host, on an ephemeral port: not §11.2's signed probe on
+``x-test.doctor``. So it neither decides nor enables multicast, and it writes
+no configuration.
 
 Exit status: 0 when no check fails, 1 when one does. These are not §11.2's
 multicast codes (0 multicast OK, 10, 20, 30): a 0 here says nothing about
@@ -223,29 +222,14 @@ def loopback_probe(group: str = runner.MCAST_GROUP, timeout_s: float = 1.0) -> t
         tx.close()
 
 
-def probe_plan(asked: Optional[bool], configured: Optional[bool]) -> tuple[bool, str]:
-    """Whether to run the loopback probe and, when not, why. ``asked`` is ``--probe`` (True), ``--no-probe``
-    (False) or neither (None); ``configured`` is the listener's multicast setting, None when it is unknown.
-
-    The probe's join is visible on the LAN as an IGMP report, so a check must not make it on its own: by
-    default it runs only when the listener's multicast is on, and that listener joins the group anyway."""
-    if asked is False:
-        return False, "skipped (--no-probe)"
-    if asked or configured:
-        return True, ""
-    return False, (f"not run: joining {runner.MCAST_GROUP} sends an IGMP report onto the LAN, so doctor probes only "
-                   "when listener multicast is on, or with --probe")
-
-
 def multicast_report(configured: Optional[bool], bind: Optional[str],
-                     probe: Optional[Callable[[], tuple]] = None, not_run: str = "skipped") -> Check:
-    """Status ``report``: never ``fail``, whatever the probe finds, and nothing here turns multicast on.
-    ``not_run`` says why there is no probe."""
+                     probe: Optional[Callable[[], tuple]] = None) -> Check:
+    """Status ``report``: never ``fail``, whatever the probe finds, and nothing here turns multicast on."""
     group = runner.MCAST_GROUP
     data: dict = {"decided": False, "group": group, "configured": configured}
     if probe is None:
         data["loopback"] = None
-        parts = [f"loopback probe {not_run}"]
+        parts = ["loopback probe skipped"]
     else:
         heard, why = probe()
         data["loopback"] = heard

@@ -368,8 +368,7 @@ def cmd_doctor(a) -> int:
     try:
         manifest, bind, multicast, source = _locators(a)
     except stations.StationsError as e:
-        manifest = bind = None
-        multicast = a.multicast  # --(no-)multicast still counts; unknown (None) without it
+        manifest = bind = multicast = None
         checks.append(doctor.Check("stations", "fail", _stations_hint(e)))
         checks += [doctor.Check(name, "skip", "needs stations.toml or --manifest") for name in ("manifest", "bind")]
     else:
@@ -378,8 +377,7 @@ def cmd_doctor(a) -> int:
                       if source else doctor.Check("stations", "skip", "not read: --manifest given"))
         checks.append(doctor.check_manifest(manifest))
         checks.append(doctor.check_bind(bind, _leases(a.state, manifest, bind)))
-    run, not_run = doctor.probe_plan(a.probe, multicast)
-    checks.append(doctor.multicast_report(multicast, bind, probe=doctor.loopback_probe if run else None, not_run=not_run))
+    checks.append(doctor.multicast_report(multicast, bind, probe=None if a.no_probe else doctor.loopback_probe))
     failed = any(c.status == "fail" for c in checks)
     if a.json:
         print(json.dumps({"ok": not failed, "checks": [c.to_json() for c in checks]}, indent=2))
@@ -570,13 +568,10 @@ def main(argv=None) -> int:
                        description="Checks Python, cryptography (with an Ed25519 known answer), stations.toml, the "
                        "manifest and the listener's UDP address, then reports multicast. Exit 0 when no check fails, "
                        "1 when one does. Multicast is reported, never decided or enabled: these are not RFC §11.2's "
-                       "exit codes, and a 0 says nothing about multicast. The multicast probe joins the group, so it "
-                       "runs only when the listener's multicast is on, or with --probe.")
+                       "exit codes, and a 0 says nothing about multicast.")
     _locator_args(d)
     d.add_argument("--state", help="the listener's --state, if it runs with one, to recognise it holding the address")
-    d.add_argument("--probe", action=argparse.BooleanOptionalAction,
-                   help=f"run the loopback probe, which joins {runner.MCAST_GROUP} (an IGMP report the LAN can see), or "
-                   "never run it (default: only when the listener's multicast is on)")
+    d.add_argument("--no-probe", action="store_true", help=f"skip the loopback probe to {runner.MCAST_GROUP}")
     d.add_argument("--json", action="store_true", help="print the checks as JSON")
     d.set_defaults(fn=cmd_doctor)
 
