@@ -23,6 +23,7 @@ import os
 import random
 import signal
 import sys
+import time
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -53,12 +54,17 @@ def cmd_keygen(a) -> int:
         if not d.is_dir():
             print(f"{d}: no such directory; no key written", file=sys.stderr)
             return 1
+    if a.manifest and os.path.realpath(out) == os.path.realpath(a.manifest):
+        print("--out and --manifest name the same file; no key written", file=sys.stderr)
+        return 1
     sk = Ed25519PrivateKey.generate()
     pub = wire.public_key_bytes(sk)
-    m = None
-    if a.manifest:
+    path = Path(a.manifest) if a.manifest else None
+    staged = None
+    if path is not None:
         # Everything that can refuse runs before the key file is written, so a mistake leaves no orphan key
-        # behind to block the corrected command with "exists; refusing to overwrite".
+        # behind to block the corrected command with "exists; refusing to overwrite". The new manifest is
+        # written beside the old one first, and replaces it only once the key is safely on disk.
         if not a.name or not STATION_NAME_RE.match(a.name):
             print("--manifest needs --name, matching [a-z][a-z0-9-]{0,30} (RFC §5.3); no key written", file=sys.stderr)
             return 1
@@ -69,22 +75,43 @@ def cmd_keygen(a) -> int:
             print(f"unknown {', '.join(unknown)} (classes: {', '.join(CLASS_BY_NAME)}; scopes: {', '.join(SCOPES)}); "
                   "no key written", file=sys.stderr)
             return 1
-        path = Path(a.manifest)
         try:
             m = Manifest.load(path) if path.exists() else Manifest()
+            same_name = [e.key_id.hex() for e in m if e.name == a.name]
             m.add(StationEntry(name=a.name, public_key=pub, classes=frozenset(CLASS_BY_NAME[c].code for c in classes),
                                streams=tuple(s for s in a.streams.split(",") if s),
                                scopes=frozenset(SCOPES[s] for s in scopes)))
+            staged = m.stage(path)
         except (OSError, ValueError, KeyError, TypeError) as e:
             why = e if isinstance(e, (OSError, ValueError)) else f"does not load ({type(e).__name__}: {e})"
             print(f"{path}: {why}; no key written (canticle manifest verify lists every problem)", file=sys.stderr)
             return 1
-    fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(fd, "w") as f:
-        f.write(sk.private_bytes_raw().hex() + "\n")
+        if same_name:
+            print(f"note: {a.name} already has key-id {', '.join(same_name)}; the manifest now trusts both keys until "
+                  "one is revoked (RFC §10.3 key rotation)", file=sys.stderr)
+    try:
+        fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except OSError as e:
+        if staged:
+            os.unlink(staged)
+        print(f"{out} exists; refusing to overwrite" if isinstance(e, FileExistsError) else f"{out}: {e}; no key written",
+              file=sys.stderr)
+        return 1
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(sk.private_bytes_raw().hex() + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+        if staged:
+            os.replace(staged, os.path.realpath(path))
+    except OSError as e:
+        out.unlink()  # this command created it, and it is in no manifest
+        if staged and os.path.exists(staged):
+            os.unlink(staged)
+        print(f"{e}; no key written", file=sys.stderr)
+        return 1
     info = {"key": str(out), "public_key": pub.hex(), "key_id": wire.key_id(pub).hex()}
-    if m is not None:
-        m.save(path)
+    if path is not None:
         info["manifest"] = str(path)
     print(json.dumps(info))
     return 0
@@ -243,6 +270,9 @@ def cmd_listen(a) -> int:
     return 0
 
 
+LEASE_WAIT_S = 0.5
+
+
 def _listener_state(a, role: str = "listen") -> tuple:
     """(state path or None, lease file handle) for a CLI listener; exits if another holds the state."""
     if a.ephemeral:
@@ -252,11 +282,18 @@ def _listener_state(a, role: str = "listen") -> tuple:
     state = a.state or _default_state(a.manifest, a.bind if role == "listen" else f"{a.bind}|{role}")
     os.makedirs(os.path.dirname(os.path.abspath(state)), exist_ok=True)
     lease = open(state + ".lease", "a")  # one listener per state file
-    try:
-        fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        print(f"another listener holds {state}; refusing to start", file=sys.stderr)
-        raise SystemExit(1)
+    # `canticle doctor` tests this lease with a shared lock held for microseconds; retrying briefly means a
+    # doctor run can never make a starting listener refuse. A listener that holds it stays held.
+    deadline = time.monotonic() + LEASE_WAIT_S
+    while True:
+        try:
+            fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                print(f"another listener holds {state}; refusing to start", file=sys.stderr)
+                raise SystemExit(1)
+            time.sleep(0.01)
     print(json.dumps({"listener_state": state}), file=sys.stderr, flush=True)
     return state, lease
 
@@ -403,10 +440,10 @@ def _manifest_show(a, path: str, data, problems: list) -> int:
         row["streams"] = [{"name": name, "stream_id": f"{sid:08x}"} for sid, name in e.stream_names.items()]
         rows.append(row)
     if a.json:
-        print(json.dumps({"path": path, "manifest": FORMAT, "signed": False, "problems": problems, "stations": rows},
-                         indent=2))
-        return 0
-    print(f"{path}: {FORMAT}, {len(rows)} station(s), UNSIGNED (nothing authenticates it; RFC §10.3)")
+        print(json.dumps({"path": path, "manifest": data.get("manifest"), "signed": False, "problems": problems,
+                          "stations": rows}, indent=2))
+        return 1 if problems else 0
+    print(f"{path}: {data.get('manifest')}, {len(rows)} station(s), UNSIGNED (nothing authenticates it; RFC §10.3)")
     for r in rows:
         streams = ", ".join("{} ({})".format(x["name"], x["stream_id"]) for x in r["streams"])
         print(f"{r['name']}  key_id {r['key_id']}{'  REVOKED' if r.get('revoked') else ''}")
@@ -416,7 +453,7 @@ def _manifest_show(a, path: str, data, problems: list) -> int:
         print(f"  streams     {streams or '-'}")
     if problems:
         print(f"verify: {len(problems)} problem(s); see canticle manifest verify {path}")
-    return 0
+    return 1 if problems else 0
 
 
 def cmd_vectors(a) -> int:
@@ -541,7 +578,7 @@ def main(argv=None) -> int:
     mf = sub.add_parser("manifest", help="verify or show a fleet manifest (unsigned in this spike)")
     msub = mf.add_subparsers(dest="action", required=True)
     for action, text in (("verify", "check structure, keys and key ids; exit 1 on any problem (no signature: spike-0 has none)"),
-                         ("show", "print each station's key id, grants and streams")):
+                         ("show", "print each station's key id, grants and streams; exit 1 if verify finds a problem")):
         x = msub.add_parser(action, help=text)
         x.add_argument("path", nargs="?", help="the manifest (default: the one stations.toml names)")
         x.add_argument("--stations", help=f"stations.toml to read when no path is given (default {stations.DEFAULT_PATH})")

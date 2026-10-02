@@ -7,8 +7,9 @@ import re
 from dataclasses import dataclass
 
 _SEGMENT = r"[a-z][a-z0-9-]{0,30}"
-STATION_NAME_RE = re.compile(rf"^{_SEGMENT}$")
-STREAM_NAME_RE = re.compile(rf"^{_SEGMENT}(\.{_SEGMENT}){{0,3}}$")
+# \Z, not $: with re.match, $ also matches before a final newline, which would let "cael\n" through.
+STATION_NAME_RE = re.compile(rf"^{_SEGMENT}\Z")
+STREAM_NAME_RE = re.compile(rf"^{_SEGMENT}(\.{_SEGMENT}){{0,3}}\Z")
 
 
 def key_id(public_key: bytes) -> bytes:

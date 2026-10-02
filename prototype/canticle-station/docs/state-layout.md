@@ -1,9 +1,9 @@
 # Where a host keeps canticle's files
 
 The README's onboarding steps and the example units in [`systemd/`](systemd/) assume the layout
-below. Only the listener's state directory and the control socket are defaults built into the code.
-Everything else is a path you pass on the command line, so another layout works as long as each
-process is given the same paths every time it starts.
+below. Three paths are defaults built into the code: `~/.binary-canticle/stations.toml`, the
+listener's state directory and the control socket. Everything else is a path you pass on the command
+line, so another layout works as long as each process is given the same paths every time it starts.
 
 ```text
 ~/.binary-canticle/                      configuration (RFC §13.6 names this directory)
@@ -31,8 +31,11 @@ $XDG_RUNTIME_DIR/canticle-<name>.sock    a station's control socket (mode 0600, 
 ## Keys
 
 - `canticle keygen --out` refuses to overwrite a file and creates the key with mode 0600. With
-  `--manifest` it writes the key only after the manifest has accepted the new entry, so a refused
-  command leaves no key behind.
+  `--manifest` it checks the new entry and writes the new manifest beside the old one first, writes
+  the key, then moves the new manifest into place. A refused or failed command leaves no key and the
+  old manifest as it was.
+- Two keys may carry one name: that is how RFC §10.3 rotates a key, with the old and new keys listed
+  side by side. `keygen` says so when the name already has a key.
 - The seed is plain hex on disk, and nothing else protects it in this spike: keep `keys/` at 0700,
   and out of any repository, backup or sync you would not trust with the key. RFC §15.7's daemon
   key store is not implemented.
@@ -51,7 +54,8 @@ $XDG_RUNTIME_DIR/canticle-<name>.sock    a station's control socket (mode 0600, 
   starts a new state file; the old one is no longer read.
 - The `.lease` file is locked (flock) for the life of the process, and a second listener on the
   same state refuses to start. `canticle doctor` probes the lease without creating it, to tell
-  "this listener holds the port" from "something else does".
+  "this listener holds the port" from "something else does". A listener that starts while doctor
+  is probing waits up to half a second for the lease instead of refusing.
 - `--state PATH` overrides the derived name. Give `canticle doctor` the same `--state PATH` and it
   recognises that listener too.
 - Deleting a state file gives up restart safety for what is still on air: the next start can

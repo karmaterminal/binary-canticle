@@ -12,11 +12,19 @@ Each check is ``ok`` or ``fail`` (or ``skip`` when an earlier failure leaves it 
   ``canticle listen`` (or ``canticle tuner``) whose state lease for this
   manifest and address is held.
 
+The address and lease probes never join a running listener's socket or take
+its lease: an exclusive bind fails at once on an address in use, and the lease
+is tested with a shared lock that a running listener's exclusive lock refuses.
+Each holds a free address or lease for microseconds, and a listener starting at
+that instant retries its lease (``__main__._listener_state``); its bind does not.
+
 Multicast is a report, never a check. RFC §11.2 lets binding (b) be used only
 after a doctor that runs all seven of its steps has passed. This one runs a
-loopback probe only: an unsigned nonce sent to the group on an ephemeral port
-with IP TTL 1, not §11.2's signed probe on ``x-test.doctor``. So it neither
-decides nor enables multicast, and it writes no configuration.
+loopback probe only: it joins the group on the default interface (so an IGMP
+report goes out there) and sends an unsigned nonce with IP TTL 0, which never
+leaves this host, on an ephemeral port: not §11.2's signed probe on
+``x-test.doctor``. So it neither decides nor enables multicast, and it writes
+no configuration.
 
 Exit status: 0 when no check fails, 1 when one does. These are not §11.2's
 multicast codes (0 multicast OK, 10, 20, 30): a 0 here says nothing about
@@ -148,10 +156,9 @@ def lease_held(path) -> bool:
         os.close(fd)
 
 
-def _binds(host: str, port: int, shared: bool) -> Optional[OSError]:
+def _binds(host: str, port: int) -> Optional[OSError]:
+    """Bind without SO_REUSEADDR, so the bind fails on any address in use instead of joining its socket."""
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        if shared:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             s.bind((host, port))
         except OSError as e:
@@ -168,7 +175,7 @@ def check_bind(bind: str, leases: dict) -> Check:
             raise ValueError
     except ValueError:
         return Check("bind", "fail", f"{bind!r} is not host:port", {"bind": bind})
-    err = _binds(host, port, shared=False)  # no SO_REUSEADDR: refused if any socket holds the address
+    err = _binds(host, port)
     if err is None:
         return Check("bind", "ok", f"{bind} is free", {"bind": bind, "held_by": None})
     if err.errno != errno.EADDRINUSE:
@@ -177,32 +184,34 @@ def check_bind(bind: str, leases: dict) -> Check:
         if lease_held(lease):
             return Check("bind", "ok", f"{bind} is in use by this {label}, which holds {lease}",
                          {"bind": bind, "held_by": label})
-    detail = f"{bind} is in use, and not by this listener (no process holds {', '.join(map(str, leases.values()))})."
-    if _binds(host, port, shared=True) is None:
-        detail += (" The holder shares the port (SO_REUSEADDR), as a canticle listener on another manifest or state "
-                   "file would: both would get multicast copies, but each unicast datagram reaches only one socket "
-                   "(RFC §4.2: one listener per host).")
-    detail += " If your listener runs with --state, pass the same --state here."
+    detail = (f"{bind} is in use, and not by this listener: no process holds {', '.join(map(str, leases.values()))}. "
+              "It may be another program, or a canticle listener on another manifest, --state or --bind spelling, or "
+              "one run with --ephemeral (which holds no lease); RFC §4.2 wants one listener per host. If your "
+              "listener runs with --state, pass the same --state here.")
     return Check("bind", "fail", detail, {"bind": bind, "held_by": "other"})
 
 
+PROBE_TTL = 0  # the probe datagram never leaves this host; only the join's IGMP report does
+
+
 def loopback_probe(group: str = runner.MCAST_GROUP, timeout_s: float = 1.0) -> tuple[bool, str]:
-    """Join ``group``, send it one random nonce on an ephemeral port (IP TTL 1, IP_MULTICAST_LOOP on), and wait
-    for the nonce to loop back. It shows that this host can join and send; it says nothing about the LAN."""
+    """Join ``group`` on the default interface, send it one random nonce on an ephemeral port (IP TTL 0,
+    IP_MULTICAST_LOOP on), and wait for the nonce to loop back. It shows that this host can join the group
+    and route to it; it says nothing about the LAN."""
     nonce = b"canticle-doctor/1 " + os.urandom(16)
     rx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
+        tx.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, PROBE_TTL)
+        tx.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
         rx.bind(("0.0.0.0", 0))
         rx.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(group) + socket.inet_aton("0.0.0.0"))
-        tx.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
-        tx.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
         tx.sendto(nonce, (group, rx.getsockname()[1]))
         deadline = time.monotonic() + timeout_s
         while (left := deadline - time.monotonic()) > 0:
             rx.settimeout(left)
             if rx.recvfrom(2048)[0] == nonce:
-                return True, f"a probe sent to {group} looped back"
+                return True, f"joined {group} and a probe sent with IP TTL 0 looped back"
         raise socket.timeout
     except socket.timeout:
         return False, f"nothing looped back from {group} within {timeout_s:g} s"

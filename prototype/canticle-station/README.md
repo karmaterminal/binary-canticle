@@ -71,13 +71,14 @@ canticle listen
 ```
 
 - **`canticle keygen`** writes the seed (mode 0600, never over an existing file) and adds the station's entry,
-  with its key-id, to the manifest. A refused command (a bad `--name`, an unknown class, a manifest that does
-  not verify) writes no key.
+  with its key-id, to the manifest. A refused or failed command (a bad `--name`, an unknown class, a manifest
+  that does not verify or cannot be written) leaves no key and the old manifest as it was.
 - **`canticle manifest verify`** checks the manifest's structure, that every key is a well-formed Ed25519
   point and not one of the small-order points RFC §9.3 says to refuse, and that every key-id is
   SHA-256(public key)[0:8] (§10.3). It lists every problem and exits 1 if there is one. The manifest is
   **unsigned** in this spike, and verify says so: whoever can write the file chooses the keys a listener
-  trusts. `canticle manifest show` prints each station's key-id, classes, scopes and stream ids.
+  trusts. `canticle manifest show` prints each station's key-id, classes, scopes and stream ids, and also
+  exits 1 when verify would.
 - **`stations.toml`** holds locators only (RFC §13.6); the schema is in
   [`docs/stations-toml.md`](docs/stations-toml.md). An unknown or misspelt key is an error. `listen`,
   `doctor` and `manifest verify|show` read it when they are not given a manifest; `--manifest` works as
@@ -86,9 +87,10 @@ canticle listen
   the manifest, and the listener's UDP address, which must be free or held by this listener. `--json` prints
   the same checks for a script. It exits 1 if any check fails.
 - **Multicast is reported, never decided.** RFC §11.2 allows the multicast binding only after a doctor that
-  runs all seven of its steps has passed. This one only sends a probe to the group over loopback and reports
-  whether it came back. It never turns multicast on and writes no configuration, and its exit codes are not
-  §11.2's (0, 10, 20, 30). Setting `multicast = true` is your decision.
+  runs all seven of its steps has passed. This one joins the group on the default interface, sends a probe
+  with IP TTL 0 (it never leaves this host), and reports whether it came back. It never turns multicast on
+  and writes no configuration, and its exit codes are not §11.2's (0, 10, 20, 30). Setting
+  `multicast = true` is your decision.
 - **`canticle listen`** prints the `stations.toml` it used on stderr, and keeps its safety state under
   `$XDG_STATE_HOME/canticle`.
 
@@ -100,7 +102,7 @@ ok      cryptography  cryptography 50.0.2; Ed25519 reproduces RFC 8032 TEST 1
 ok      stations      /home/you/.binary-canticle/stations.toml: manifest /home/you/.binary-canticle/fleet.json, bind 0.0.0.0:9999, multicast off
 ok      manifest      /home/you/.binary-canticle/fleet.json: 1 station(s), 0 revoked; keys well-formed, key ids match. UNSIGNED: [...]
 ok      bind          0.0.0.0:9999 is in use by this listener, which holds /home/you/.local/state/canticle/listener-369385c1dd02.json.lease
-report  multicast     loopback probe heard: a probe sent to 239.255.13.13 looped back; listener multicast off; a report only: [...]
+report  multicast     loopback probe heard: joined 239.255.13.13 and a probe sent with IP TTL 0 looped back; listener multicast off; a report only: [...]
 doctor: every check passed (exit 0). Multicast is reported, not decided (RFC §11.2).
 ```
 
@@ -190,7 +192,7 @@ Unnamed streams (not in the manifest) are verified and listed, but can't be tune
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 156 tests, about 11 s
+python -m unittest discover -s tests      # 165 tests, about 11 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -215,9 +217,10 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
   - the eight small-order points and malformed encodings refused by the key check, by `Manifest` (what the listener loads) and by `manifest verify`;
   - key-ids: written by `keygen`, optional on read, and refused by verify and by the listener when they do not match the key;
   - every problem `manifest verify` reports, its text and JSON output and exit status, `manifest show`, and the manifest path taken from `stations.toml`;
-  - `keygen` refusals that leave no key file behind.
+  - names and stream names with a trailing newline, which `$` used to let through;
+  - `keygen` refusals and failed manifest writes that leave no key file behind and the old manifest as it was, a manifest's mode and symlink kept, and a second key under one name (a rotation, §10.3).
 - `test_stations.py` covers `stations.toml`: a full file, defaults, paths relative to the file and to `~`, a missing file, malformed TOML, wrong types and values, unknown keys, the refused `[trust]` table, and which locators `listen` uses (the file, flags over the file, `--manifest` skipping it).
-- `test_doctor.py` covers each check's pass and fail paths: Python and `cryptography` versions, the RFC 8032 known answer, the manifest, and the address (free, held by another socket, held by this listener or tuner through its lease, or by a listener with its own `--state`). Multicast stays a report whatever the probe finds, and doctor writes nothing.
+- `test_doctor.py` covers each check's pass and fail paths: Python and `cryptography` versions, the RFC 8032 known answer, the manifest, and the address (free, held by another socket, held by this listener or tuner through its lease, or by a listener with its own `--state`). Multicast stays a report whatever the probe finds, the probe datagram has IP TTL 0, doctor writes nothing, its bind probe never shares a listener's port, and a listener starting during its lease probe waits instead of refusing.
 - `test_onboarding.py` runs the onboarding above end to end: `keygen`, `stations.toml`, `doctor`, then `canticle listen` with no flags in a subprocess hearing a station's item over loopback UDP while doctor sees it holding the address.
 - `test_ambient.py` runs the emitter on a virtual clock: tick gaps, breaths and repeats, exact requests, the per-minute cap, stop by signal and by duration, refusals, an unreachable station, bounds and fixture loading.
 - `test_tuner.py` covers the tuner's view and gateway:

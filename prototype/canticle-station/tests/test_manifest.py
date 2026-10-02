@@ -1,6 +1,7 @@
 """Manifest checks (RFC-0001 §9.3, §10.3), `canticle manifest verify|show` and `canticle keygen`."""
 
 import contextlib
+import errno
 import io
 import json
 import os
@@ -12,7 +13,7 @@ from unittest import mock
 
 from canticle import vectors, wire
 from canticle.__main__ import main
-from canticle.ids import check_public_key, stream_id
+from canticle.ids import check_public_key, check_stream_name, stream_id
 from canticle.manifest import Manifest, StationEntry, verify_json
 
 # The eight small-order points of edwards25519: the identity, the point of order 2, two of order 4
@@ -108,6 +109,8 @@ class VerifyTest(unittest.TestCase):
             (lambda d: d["stations"].append("cael"), "stations[3]: not an object"),
             (entry(revokd=True), "unknown field 'revokd'"),
             (entry(name="Cael"), "name 'Cael' does not match"),
+            (entry(name="test1\n"), "name 'test1\\n' does not match"),
+            (entry(streams=["chatter\n"]), "invalid stream name 'chatter\\n'"),
             (entry(public_key=good()["stations"][0]["public_key"].upper()), "64 lowercase hex"),
             (entry(public_key="d75a98"), "64 lowercase hex"),
             (entry(public_key=NOT_ON_CURVE), "not a point on edwards25519"),
@@ -129,6 +132,14 @@ class VerifyTest(unittest.TestCase):
                 problems = verify_json(data)
                 self.assertTrue(any(expected in p for p in problems), problems)
         self.assertEqual(verify_json(["not", "an", "object"]), ["the manifest is not a JSON object"])
+
+    def test_a_name_with_a_trailing_newline_is_refused(self):
+        # With re.match, `$` also matches before a final newline: "chatter\n" would hash to its own stream_id.
+        with self.assertRaisesRegex(ValueError, "invalid stream name"):
+            check_stream_name("chatter\n")
+        with self.assertRaisesRegex(ValueError, "invalid stream name"):
+            Manifest([StationEntry("cael", bytes.fromhex(good()["stations"][0]["public_key"]), frozenset({1}),
+                                   ("chatter\n",))])
 
     def test_a_manifest_without_problems_loads(self):
         data = good()
@@ -187,6 +198,15 @@ class ManifestCliTest(unittest.TestCase):
         self.assertEqual(rows[0]["streams"][0], {"name": "chatter", "stream_id": f"{stream_id('chatter'):08x}"})
         self.assertTrue(rows[2]["revoked"])
 
+    def test_show_exits_1_when_verify_finds_problems(self):
+        data = good()
+        data.update(manifest="canticle-fleet/v9", signed=True)
+        code, out, _ = run("manifest", "show", self.write(data))
+        self.assertEqual(code, 1, out)
+        self.assertIn(": canticle-fleet/v9, 3 station(s), UNSIGNED", out)
+        self.assertIn("verify: 2 problem(s)", out)
+        self.assertEqual(run("manifest", "show", self.write(data), "--json")[0], 1)
+
     def test_show_refuses_what_the_listener_would_refuse(self):
         data = good()
         data["stations"][0]["key_id"] = "11" * 8
@@ -242,6 +262,7 @@ class KeygenTest(unittest.TestCase):
         cases = [
             ((), None, "--manifest needs --name"),
             (("--name", "Cael"), None, "--manifest needs --name"),
+            (("--name", "cael\n"), None, "--manifest needs --name"),
             (("--name", "cael", "--classes", "chatter,gossip"), None, "unknown class 'gossip'"),
             (("--name", "cael", "--scopes", "host,mars"), None, "unknown scope 'mars'"),
             (("--name", "cael", "--streams", "Chatter"), None, "invalid stream name"),
@@ -263,6 +284,48 @@ class KeygenTest(unittest.TestCase):
                     self.assertFalse(self.fleet.exists())
                 else:
                     self.assertEqual(self.fleet.read_text(), manifest)
+
+    def test_a_failed_manifest_write_leaves_no_key(self):
+        # The manifest is written beside the old one and moved into place only after the key is on disk; if
+        # either step fails, the key is removed and the old manifest is left as it was.
+        self.fleet.write_text(json.dumps(good()))
+        before = self.fleet.read_text()
+        for target, fault in (("os.replace", OSError(errno.EROFS, "Read-only file system")),
+                              ("canticle.manifest.Manifest.stage", OSError(errno.ENOSPC, "No space left on device"))):
+            with self.subTest(target):
+                with mock.patch(target, side_effect=fault):
+                    code, _, err = self.keygen("--name", "cael")
+                self.assertEqual(code, 1)
+                self.assertIn("no key written", err)
+                self.assertFalse(self.key.exists())
+                self.assertEqual(self.fleet.read_text(), before)
+                self.assertEqual(sorted(p.name for p in self.dir.iterdir()), ["fleet.json"])  # no temporary file left
+
+    def test_keygen_refuses_one_file_for_key_and_manifest(self):
+        code, _, err = self.keygen("--name", "cael", key=self.fleet)
+        self.assertEqual(code, 1)
+        self.assertIn("name the same file", err)
+        self.assertEqual(list(self.dir.iterdir()), [])
+
+    def test_a_second_key_under_one_name_is_a_rotation(self):
+        # §10.3 rotation lists the old and new key side by side, so a name may have two keys; keygen says so.
+        self.assertEqual(self.keygen("--name", "cael")[0], 0)
+        code, _, err = self.keygen("--name", "cael", key=self.dir / "cael-2.key")
+        self.assertEqual(code, 0, err)
+        self.assertIn("cael already has key-id", err)
+        self.assertEqual(verify_json(json.loads(self.fleet.read_text())), [])
+
+    def test_the_manifest_keeps_its_mode_and_its_symlink(self):
+        real = self.dir / "conf"
+        real.mkdir()
+        (real / "fleet.json").write_text(json.dumps(good()))
+        os.chmod(real / "fleet.json", 0o640)
+        self.fleet.symlink_to(real / "fleet.json")
+        self.assertEqual(self.keygen("--name", "cael")[0], 0)
+        self.assertTrue(self.fleet.is_symlink())
+        self.assertEqual(stat.S_IMODE((real / "fleet.json").stat().st_mode), 0o640)
+        self.assertEqual(len(json.loads((real / "fleet.json").read_text())["stations"]), 4)
+        self.assertEqual(sorted(p.name for p in real.iterdir()), ["fleet.json"])
 
     def test_missing_directories_are_refused_before_the_key_is_written(self):
         code, _, err = self.keygen("--name", "cael", key=self.dir / "nowhere" / "cael.key")

@@ -13,7 +13,9 @@ checks a signature: spike-0 has none.
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -116,8 +118,36 @@ class Manifest:
     def load(cls, path) -> "Manifest":
         return cls.from_json(json.loads(Path(path).read_text()))
 
+    def stage(self, path) -> str:
+        """Write this manifest to a new file beside ``path`` and return its name. ``os.replace`` it over
+        ``path`` to commit, so a crash or a refusal never leaves a torn manifest. A symlink at ``path``
+        is followed, and an existing file's mode is kept."""
+        target = os.path.realpath(path)
+        try:
+            mode = os.stat(target).st_mode & 0o7777
+        except FileNotFoundError:
+            umask = os.umask(0)
+            os.umask(umask)
+            mode = 0o666 & ~umask
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(target), prefix=f".{os.path.basename(target)}.", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                os.fchmod(f.fileno(), mode)
+                f.write(json.dumps(self.to_json(), indent=2) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+        except BaseException:
+            os.unlink(tmp)
+            raise
+        return tmp
+
     def save(self, path) -> None:
-        Path(path).write_text(json.dumps(self.to_json(), indent=2) + "\n")
+        tmp = self.stage(path)
+        try:
+            os.replace(tmp, os.path.realpath(path))
+        except BaseException:
+            os.unlink(tmp)
+            raise
 
 
 def verify_json(data) -> list[str]:

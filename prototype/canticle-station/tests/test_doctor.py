@@ -1,5 +1,6 @@
 """`canticle doctor` (RFC-0001 §11.2, §15.7): its checks, its exit status, and what it must not do."""
 
+import argparse
 import contextlib
 import fcntl
 import io
@@ -7,12 +8,13 @@ import json
 import os
 import socket
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
 
 from canticle import doctor, vectors
-from canticle.__main__ import _default_state, main
+from canticle.__main__ import _default_state, _listener_state, main
 
 
 def free_port() -> int:
@@ -36,6 +38,15 @@ def take_lease(path) -> object:
     f = open(path, "a")
     fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
     return f
+
+
+class SpySocket(socket.socket):
+    """A real socket that records its setsockopt calls (doctor.socket.socket is patched with it)."""
+    calls: list = []
+
+    def setsockopt(self, *args):
+        SpySocket.calls.append(args)
+        return super().setsockopt(*args)
 
 
 def snapshot(root: Path) -> dict:
@@ -100,8 +111,16 @@ class ChecksTest(unittest.TestCase):
                         c = doctor.check_bind(f"127.0.0.1:{port}", leases)
                     self.assertEqual((c.status, c.data["held_by"]), ("fail", "other"))
                     self.assertIn("is in use, and not by this listener", c.detail)
-                    self.assertEqual("shares the port" in c.detail, shared)
+                    self.assertIn("--ephemeral (which holds no lease)", c.detail)
             self.assertEqual(os.listdir(d), [])  # probing a lease never creates it
+
+    def test_the_bind_probe_never_shares_a_listener_port(self):
+        # A probe bound with SO_REUSEADDR would join a running listener's port and could take its unicast datagrams.
+        port = free_port()
+        SpySocket.calls = []
+        with hold(port, shared=True), mock.patch.object(doctor.socket, "socket", SpySocket):
+            self.assertEqual(doctor.check_bind(f"127.0.0.1:{port}", {}).status, "fail")
+        self.assertNotIn((socket.SOL_SOCKET, socket.SO_REUSEADDR), [c[:2] for c in SpySocket.calls])
 
     def test_bind_held_by_this_listener(self):
         with tempfile.TemporaryDirectory() as d:
@@ -122,7 +141,7 @@ class ChecksTest(unittest.TestCase):
                 self.assertEqual(doctor.check_bind(f"127.0.0.1:{port}", leases).status, "fail")
 
     def test_bind_malformed(self):
-        for bind in ("127.0.0.1:0", "127.0.0.1:x", "127.0.0.1:70000", "256.0.0.1:9999"):
+        for bind in ("127.0.0.1:0", "127.0.0.1:x", "127.0.0.1:70000", "203.0.113.7:9999"):  # the last is not ours
             with self.subTest(bind):
                 self.assertEqual(doctor.check_bind(bind, {}).status, "fail")
 
@@ -140,6 +159,13 @@ class ChecksTest(unittest.TestCase):
         heard, why = doctor.loopback_probe(timeout_s=0.5)  # either answer is fine here; it must not raise
         self.assertIsInstance(heard, bool)
         self.assertTrue(why)
+
+    def test_the_probe_datagram_never_leaves_this_host(self):
+        SpySocket.calls = []
+        with mock.patch.object(doctor.socket, "socket", SpySocket):
+            doctor.loopback_probe(timeout_s=0.2)
+        ttl = [c[2] for c in SpySocket.calls if c[:2] == (socket.IPPROTO_IP, socket.IP_MULTICAST_TTL)]
+        self.assertEqual(ttl, [0])
 
     def test_render(self):
         checks = [doctor.Check("python", "ok", "Python 3.11"),
@@ -238,6 +264,23 @@ class DoctorCliTest(unittest.TestCase):
                 self.assertEqual(self.doctor("--state", state)[0], 0)        # found with the listener's --state
         finally:
             lease.close()
+
+    def test_a_lease_probe_never_stops_a_listener_from_starting(self):
+        # doctor's lease probe holds a shared lock for a moment. A listener starting then waits; it refuses only
+        # when another listener really holds the lease.
+        a = argparse.Namespace(ephemeral=False, state=None, manifest=str(self.fleet), bind=self.bind)
+        path = _default_state(str(self.fleet), self.bind) + ".lease"
+        os.makedirs(os.path.dirname(path))
+        probe = open(path, "a")
+        fcntl.flock(probe, fcntl.LOCK_SH)
+        threading.Timer(0.1, probe.close).start()
+        with contextlib.redirect_stderr(io.StringIO()):
+            state, lease = _listener_state(a)
+            self.assertEqual(state + ".lease", path)
+            other = argparse.Namespace(ephemeral=False, state=state, manifest=str(self.fleet), bind=self.bind)
+            with self.assertRaises(SystemExit):
+                _listener_state(other)  # held for real: refused after the short wait
+        lease.close()
 
     def test_multicast_is_never_decided_and_nothing_is_written(self):
         # §11.2: multicast may be used only after a doctor that runs every step passes. This one does not,
