@@ -4,8 +4,16 @@ Only the subset frame v2 needs is supported: unsigned and negative integers,
 byte strings, UTF-8 text strings, arrays, maps, false, true and null. The
 encoder emits RFC 8949 §4.2.1 core deterministic encoding. The decoder
 accepts nothing else: definite lengths only, shortest-form heads, map keys in
-strictly increasing bytewise order of their encodings (so no duplicates), no
-floats, no tags, bounded depth and entry counts, and no trailing bytes.
+strictly increasing bytewise order of their encodings (so no duplicates), map
+keys that are integers or text strings only, no floats, no tags, bounded depth
+and entry counts, and no trailing bytes.
+
+Map keys are integers or text strings at every depth (#66). A Python ``dict``
+cannot hold ``0`` and ``False`` (or ``1`` and ``True``) apart, so a bool key
+would collide with a core key, and ``None``, byte strings, arrays and maps have
+no place in any frame v2 key table. The decoder rejects them as
+``map-key-type`` before the collision can happen, and the encoder refuses to
+produce them.
 
 The spike rejects floats and tags everywhere. RFC-0001 only forbids them
 under core keys 1-31, so this is stricter than the RFC.
@@ -39,6 +47,12 @@ def _head(major: int, value: int) -> bytes:
     raise CborError("int-range")
 
 
+def _check_key(key) -> None:
+    # bool is an int subclass, so it must be excluded before the int check.
+    if isinstance(key, bool) or not isinstance(key, (int, str)):
+        raise CborError("map-key-type")
+
+
 def encode(obj) -> bytes:
     if obj is False:
         return b"\xf4"
@@ -56,6 +70,8 @@ def encode(obj) -> bytes:
     if isinstance(obj, (list, tuple)):
         return _head(4, len(obj)) + b"".join(encode(x) for x in obj)
     if isinstance(obj, dict):
+        for k in obj:
+            _check_key(k)
         items = sorted((encode(k), encode(v)) for k, v in obj.items())
         for a, b in zip(items, items[1:]):
             if a[0] == b[0]:
@@ -133,8 +149,7 @@ def _decode(r: _Reader, depth: int):
         if prev is not None and kbytes <= prev:
             raise CborError("map-key-order")
         prev = kbytes
-        if isinstance(key, (list, dict)):
-            raise CborError("complex-key")
+        _check_key(key)
         out[key] = _decode(r, depth + 1)
     return out
 

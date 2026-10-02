@@ -1,8 +1,8 @@
 # Where a host keeps canticle's files
 
 The README's onboarding steps and the example units in [`systemd/`](systemd/) assume the layout
-below. Three paths are defaults built into the code: `~/.binary-canticle/stations.toml`, the
-listener's state directory and the control socket. Everything else is a path you pass on the command
+below. Five paths are defaults built into the code: `~/.binary-canticle/stations.toml`, the
+listener's state directory, the control socket, and the host daemon's state directory and socket. Everything else is a path you pass on the command
 line, so another layout works as long as each process is given the same paths every time it starts.
 
 ```text
@@ -20,10 +20,16 @@ $XDG_STATE_HOME/canticle/                listener safety state; ~/.local/state/c
 ├── listener-<tag>.json                  dedup digests, sticky PLUCKs, supersession marks, epochs (§7.4-§7.8)
 ├── listener-<tag>.json.lease            held while that listener runs; doctor reads it to recognise "this listener"
 ├── listener-<tag'>.json(.lease)         the same for `canticle tuner`
-└── heard.jsonl                          the example listener unit's output: heard events, with their text
+├── heard.jsonl                          the example listener unit's output: heard events, with their text
+└── daemon/                              `canticle daemon`'s state (--state-dir), mode 0700
+    ├── daemon.lease                     held while the daemon runs: one daemon per state directory
+    └── listener.json                    its listener's safety state, as listener-<tag>.json above, and under
+                                         "receptor" the tuples it surfaced and keys it quarantined
 
 $XDG_RUNTIME_DIR/canticle-<name>.sock    a station's control socket (mode 0600, peer uid checked). Without
                                          --control it is canticle-<key_id>.sock, in /tmp if XDG_RUNTIME_DIR is unset
+$XDG_RUNTIME_DIR/canticle/daemon.sock    the host daemon's record socket (§11.1): directory 0700, socket 0600,
+                                         peer uid checked. No /tmp fallback: without XDG_RUNTIME_DIR pass --socket
 
 ~/.venvs/canticle/                       the venv the package is installed into (README, example units)
 ```
@@ -63,6 +69,21 @@ $XDG_RUNTIME_DIR/canticle-<name>.sock    a station's control socket (mode 0600, 
 - `XDG_STATE_HOME` must be the same for the listener and for the shell you run `canticle doctor`
   from, or doctor looks for the lease in the wrong place. The example listener unit pins it to
   `~/.local/state`.
+
+## Host daemon state
+
+- `canticle daemon` keeps everything under one directory, `$XDG_STATE_HOME/canticle/daemon` by default
+  (`--state-dir` overrides it). Its lease stops a second daemon on the same directory; its UDP port, bound
+  without `SO_REUSEADDR`, stops any other listener on the same address.
+- `listener.json` holds the listener's guards (dedup, sticky PLUCKs, supersession marks, epochs) and, under
+  `"receptor"`, the tuples the daemon told bindings were surfaced and not yet retracted and the keys it
+  quarantined on equivocation. Both parts are written in one atomic replace per datagram, after that
+  datagram's records, so a crash never keeps a PLUCK or a mark without the retract it implies; at start the
+  daemon also retracts any surfaced tuple the guards say is withdrawn, before it serves a connection. Deleting
+  the file (daemon stopped) loses the retractions owed after a restart and lifts every local quarantine. Never
+  edit it.
+- `canticle doctor` recognises the daemon holding the address through its default lease. A daemon run with
+  `--state-dir` is reported as "in use, and not by this listener".
 
 ## Logs
 

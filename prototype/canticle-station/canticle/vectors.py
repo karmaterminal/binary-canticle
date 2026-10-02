@@ -55,6 +55,15 @@ def _raw(kind: int, sk: Ed25519PrivateKey, map_bytes: bytes, kid: bytes | None =
     return unsigned + sk.sign(wire.SIGN_DOMAIN + unsigned)
 
 
+def _raw_map(entries: dict[bytes, bytes]) -> bytes:
+    """Map bytes from pre-encoded {key_bytes: value_bytes}, in RFC 8949 core deterministic order.
+
+    For maps a Python ``dict`` cannot hold, such as one with both ``0`` and ``false`` as keys (#66).
+    """
+    assert len(entries) < 24
+    return bytes([0xA0 + len(entries)]) + b"".join(k + v for k, v in sorted(entries.items()))
+
+
 def _item(kw: dict | None = None) -> dict:
     base = {1: 1, 2: stream_id("chatter"), 3: 1, 4: T0, 5: T0 + 60_000, 6: 1, 7: 1, 8: b"hello, station", 11: 0, 13: 1}
     base.update(kw or {})
@@ -68,9 +77,18 @@ def parse_cases() -> list[dict]:
                                             cls=1, ctype=1, body=b"hello, station", hop=0, scope=1))
     rfc_v2 = wire.encode_pluck(s1, wire.Pluck(epoch=1, stream=1, seq=2, issued_at=T0 + 5_000,
                                               expires_at=T0 + 60_000, scope=1, target_seq=1))
-    beacon = wire.encode_beacon(s1, wire.Beacon(epoch=1, bseq=1, wallclock=NOW, next_beacon_ms=1000,
-                                                profile="canticle-regulation/1", b_station=16000,
-                                                streams=(wire.StreamEntry(stream_id("chatter"), 1, 1, 10000, 10000, 60, 300, 4000),)))
+    # §9.8 post-A1 stream-entry: [stream_id, head_seq, trail_seq, live, loop_ms, loop_max_ms, default_ttl_s,
+    # max_ttl_s, b_stream, ? lens]. One item on air (seq 1), so head_seq = trail_seq = 1.
+    chat_entry = [stream_id("chatter"), 1, 1, 1, 10000, 10000, 60, 300, 4000]
+    bcn = wire.Beacon(epoch=1, bseq=1, wallclock=NOW, next_beacon_ms=1000,
+                      profile="canticle-regulation/1", b_station=16000,
+                      streams=(wire.StreamEntry(*chat_entry),))
+    beacon = wire.encode_beacon(s1, bcn)
+    beacon_lens = cbor.encode({**wire.beacon_map(bcn), 6: [chat_entry + [7]]})
+    # #70: a pre-A1 8-element entry (no trail_seq). Read as post-A1 it would shift every field after head_seq.
+    beacon_pre_a1 = cbor.encode({**wire.beacon_map(bcn), 6: [chat_entry[:2] + chat_entry[3:]]})
+    # #66 case 4: b_stream is `uint .size 4` in the §9.8 CDDL, so 2^60 is out of range, not accepted.
+    beacon_big_b = cbor.encode({**wire.beacon_map(bcn), 6: [chat_entry[:8] + [2**60]]})
     tampered = bytearray(rfc_v1)
     tampered[rfc_v1.index(b"hello")] = ord("j")
     good_map = cbor.encode(_item())
@@ -87,6 +105,18 @@ def parse_cases() -> list[dict]:
     float_map = bytes([0xAA]) + b"".join(
         cbor.encode(k) + (b"\xf9\x3c\x00" if k == 1 else cbor.encode(v)) for k, v in sorted(_item().items()))
     wrong_key = _raw(wire.KIND_ITEM, s2, good_map, kid=k1)
+    # #66: map keys are integers or text strings at every depth, including extension values. These are
+    # validly ordered (0x00 < 0x40 < 0xf4 < 0xf6) and validly signed; only the key type is wrong. A
+    # decoder that folds `false` into `0` (Python dict) would reject the first for the wrong reason
+    # and accept the third as a frame whose `true` key reads as key 1.
+    item_enc = {cbor.encode(k): cbor.encode(v) for k, v in _item().items()}
+    ext_bool_key = _raw_map({**item_enc, cbor.encode(19): _raw_map({b"\x00": b"\x00", b"\xf4": b"\x00"})})
+    ext_null_key = _raw_map({**item_enc, cbor.encode(19): _raw_map({b"\x00": b"\x00", b"\xf6": b"\x00"})})
+    ext_bstr_key = _raw_map({**item_enc, cbor.encode(19): _raw_map({b"\x00": b"\x00", b"\x40": b"\x00"})})
+    top_bool_key = _raw_map({**{k: v for k, v in item_enc.items() if k != cbor.encode(1)}, b"\xf5": cbor.encode(1)})
+    # #66: an optional key that is present must carry a well-typed value; an explicit null is bad-field.
+    null_body = cbor.encode({**_item(), 8: None})
+    null_digest = cbor.encode({**wire.beacon_map(bcn), 9: None})
     cases = [
         ("rfc-vector-1-item", rfc_v1, "accept", "RFC-0001 §9.13 vector 1"),
         ("rfc-vector-2-pluck", rfc_v2, "accept", "RFC-0001 §9.13 vector 2"),
@@ -111,6 +141,21 @@ def parse_cases() -> list[dict]:
         ("missing-state-key", wire.sign_frame(wire.KIND_ITEM, s1, _item({6: 3})), "missing-field", "live-state without state_key"),
         ("bad-version", b"BC\x03" + rfc_v1[3:], "bad-version", ""),
         ("prototype-b1-regression", b'{"a":1e400}', "short", "the 11-byte datagram that killed the prototype"),
+        ("extension-map-bool-key", _raw(wire.KIND_ITEM, s1, ext_bool_key), "bad-cbor",
+         "#66: key 19 holds {0: 0, false: 0}; keys are int or tstr at every depth (map-key-type, not non-deterministic)"),
+        ("extension-map-null-key", _raw(wire.KIND_ITEM, s1, ext_null_key), "bad-cbor", "#66: key 19 holds {0: 0, null: 0}"),
+        ("extension-map-bstr-key", _raw(wire.KIND_ITEM, s1, ext_bstr_key), "bad-cbor", "#66: key 19 holds {0: 0, h'': 0}"),
+        ("top-level-bool-key", _raw(wire.KIND_ITEM, s1, top_bool_key), "bad-cbor",
+         "#66: true where key 1 (epoch) belongs; a bool is never a field key"),
+        ("item-null-body", _raw(wire.KIND_ITEM, s1, null_body), "bad-field",
+         "#66: 8: null and no 9; an explicit null for an optional key is bad-field, not absence (§9.6 needs a body or a body_ref)"),
+        ("beacon-null-catalog-digest", _raw(wire.KIND_BEACON, s1, null_digest), "bad-field", "#66: 9: null; same rule as item-null-body"),
+        ("beacon-entry-with-lens", _raw(wire.KIND_BEACON, s1, beacon_lens), "accept",
+         "§9.8 (A1): the 10-element stream-entry, lens = 7"),
+        ("beacon-pre-a1-8-field-entry", _raw(wire.KIND_BEACON, s1, beacon_pre_a1), "bad-field",
+         "#70: an 8-element stream-entry without trail_seq; a stale station fails loudly instead of being read shifted"),
+        ("beacon-b-stream-over-u32", _raw(wire.KIND_BEACON, s1, beacon_big_b), "bad-field",
+         "#66 case 4: b_stream = 2^60; §9.8 CDDL says uint .size 4"),
     ]
     assert len(oversize) == 1101
     return [{"name": n, "datagram_hex": d.hex(), "expect": e, "note": note} for n, d, e, note in cases]

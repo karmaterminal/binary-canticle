@@ -7,6 +7,13 @@ Landing into agent sessions (§14) is out of scope here.
 With ``state_path`` set, the safety state that must survive a restart (epoch
 maxima, dedup digests, sticky PLUCKs, supersession high-water marks; §5.2, §7.4,
 §7.7, §7.8) is written atomically after every change and loaded at start.
+
+``receptor_mode=True`` is the BC-2 behaviour the record v1 emitter needs
+(``records.py``, RFC §14.18.3): it reports the outcomes this listener is otherwise
+silent on (``held`` events for `unnamed_stream`, `warmup_hold` and a lower epoch's
+new tuple, which it admits as `ringbuffer_only` instead of dropping; ``held_retract``
+events when a held item is dropped before release). ``last_frame`` and
+``last_dedup`` describe the most recent datagram. Without it, events are as before.
 """
 
 from __future__ import annotations
@@ -39,6 +46,8 @@ class Event:
     stream: Optional[str] = None
     seq: Optional[int] = None
     data: dict = field(default_factory=dict)
+    # The identity tuple the event is about (not printed): the record emitter needs it (§14.18.3).
+    ident: Optional[tuple] = field(default=None, compare=False)
 
     def to_json(self) -> dict:
         out = {"event": self.kind, "station": self.station, "key_id": self.key_id}
@@ -85,6 +94,28 @@ class _StationState:
         return min(self.offsets) if self.offsets else 0
 
 
+def atomic_write_json(path, obj) -> None:
+    """Write ``obj`` as JSON beside ``path``, fsync it, rename it into place and fsync the directory."""
+    path = os.fspath(path)
+    d = os.path.dirname(path) or "."
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=os.path.basename(path) + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(obj, f, separators=(",", ":"))
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+    dfd = os.open(d, os.O_RDONLY)
+    try:
+        os.fsync(dfd)
+    finally:
+        os.close(dfd)
+
+
 class _Expiries:
     """Min-heap of (time, key) over one table whose entries expire (#60 review). Purging pops only what
     is due, rather than scanning the table, so a key held at its limit cannot make every refusal or
@@ -111,7 +142,8 @@ class _Expiries:
 class Listener:
     def __init__(self, manifest: Manifest, tuned: Optional[set] = None, dedup_capacity: int = 100_000,
                  binding: str = "lan", state_path=None, warmup: bool = True, ephemeral: bool = False,
-                 per_key_quota: Optional[int] = None, per_key_mark_quota: Optional[int] = None):
+                 per_key_quota: Optional[int] = None, per_key_mark_quota: Optional[int] = None,
+                 receptor_mode: bool = False):
         # Restart safety is the default: without state_path a restarted listener could surface a
         # stale or withdrawn item (§7.4-§7.8). Tests and experiments must opt out explicitly.
         if state_path is None and not ephemeral:
@@ -124,6 +156,11 @@ class Listener:
             raise ValueError(f"unknown binding {binding!r}")
         self.binding = binding
         self.state_path = state_path
+        # A receptor (records.py) saves once per datagram, after its own records, with its state in the same
+        # file: autosave off, extra_state set. Two separate writes would leave a crash window (#79 review).
+        self.autosave = True
+        self.extra_state = None          # callable -> dict, saved under "receptor"
+        self.loaded_extra = None         # the "receptor" part of the loaded state, if any
         self.warmup = warmup  # hold live-state keys until warm-up completes (§7.8 rule 4)
         self._dirty = False
         self._restored: set = set()   # identities loaded from state, not yet re-surfaced here
@@ -141,6 +178,11 @@ class Listener:
         self.current: dict[tuple, _Heard] = {}  # identity -> heard item (on air, from this listener's view)
         self.stations: dict[bytes, _StationState] = {}
         self.evidence_counts: dict[str, int] = {}
+        self.receptor_mode = receptor_mode
+        # The last datagram's parsed frame (None when wire.parse rejected it) and its dedup outcome:
+        # "first", "duplicate" (a benign repeat, or an older/repeated beacon) or "resurfaced" (§14.18.3).
+        self.last_frame: Optional[wire.Frame] = None
+        self.last_dedup: Optional[str] = None
         if state_path is not None and os.path.exists(state_path):
             self._load(state_path)
 
@@ -167,13 +209,16 @@ class Listener:
     def hear(self, datagram: bytes, now_ms: int) -> list[Event]:
         kid = bytes(datagram[4:12]) if len(datagram) >= 12 else b""
         st = self.stations.get(kid)
+        self.last_frame, self.last_dedup = None, None
         try:
             f = wire.parse(datagram, self.manifest.resolve, now_ms, st.offset_ms if st else 0)
         except wire.Reject as r:
             known = kid and self.manifest.entry(kid) is not None
             return [self._evidence(r.reason, kid if known else b"", r.detail)]
+        self.last_frame, self.last_dedup = f, "first"
         events = self._beacon(f, now_ms) if f.kind == wire.KIND_BEACON else self._item_or_pluck(f, now_ms)
-        self._save_if_dirty()
+        if self.autosave:
+            self._save_if_dirty()
         return events
 
     def _epoch_ok(self, kid: bytes, epoch: int, now_ms: int, events: list, advance: bool = True) -> bool:
@@ -201,6 +246,7 @@ class Listener:
             return events
         st = self._st(f.key_id)
         if b.epoch == st.epoch_hwm and b.bseq <= st.bseq and st.last_beacon is not None:
+            self.last_dedup = "duplicate"
             return events  # older or repeated beacon
         st.bseq = b.bseq
         st.offsets.append(now_ms - b.wallclock)
@@ -254,6 +300,8 @@ class Listener:
             return events
         # Regression is checked now; a higher epoch is adopted only once the frame is admitted, so an
         # over-quota or mismatched frame cannot advance it (§10.9: refusals are state-neutral).
+        if self.receptor_mode and body.epoch < self._st(kid).epoch_hwm:
+            return self._lower_epoch(f, now_ms)
         if not self._epoch_ok(kid, body.epoch, now_ms, events, advance=False):
             return events
         ident = f.identity
@@ -272,6 +320,7 @@ class Listener:
                 h.last_heard = now_ms
             if ident not in self._restored:
                 self._heard_on(st, body.stream, now_ms)
+                self.last_dedup = "duplicate"
                 return events  # a repeat is a benign no-op (§7.4)
             # Accepted before a restart: its dedup, pluck and supersession state was kept, but this
             # process has not surfaced it yet. Surface it once, through the same checks.
@@ -281,6 +330,7 @@ class Listener:
                 return events
             self._heard_on(st, body.stream, now_ms)
             self._restored.discard(ident)
+            self.last_dedup = "resurfaced"
             resurface = True
             retain = seen[1]
         else:
@@ -318,10 +368,11 @@ class Listener:
             for k, (hid, _, _) in list(self.held.items()):
                 if hid == target:
                     del self.held[k]
+                    self._held_retract(hid, "held_plucked", by=ident, events=events)
             if target in self.current:
                 del self.current[target]
                 events.append(Event("withdrawn", self._name(kid), kid.hex(), name, body.target_seq,
-                                    {"by_seq": body.seq, "reason": body.reason}))
+                                    {"by_seq": body.seq, "reason": body.reason}, ident=target))
             return events
         it: wire.Item = body
         # A keyed item that arrives after its own PLUCK still superseded what came before it at the
@@ -378,17 +429,29 @@ class Listener:
             for other_ident, h in list(self.current.items()):
                 if other_ident[0] == kid and h.item.stream == it.stream and h.item.state_key == it.state_key:
                     del self.current[other_ident]
-                    events.append(Event("superseded", self._name(kid), kid.hex(), name, h.item.seq, {"by_seq": it.seq}))
+                    events.append(Event("superseded", self._name(kid), kid.hex(), name, h.item.seq, {"by_seq": it.seq},
+                                        ident=other_ident))
         if plucked:
             events.append(self._evidence("plucked", kid, "item arrived after its pluck", stream=name, seq=it.seq))
             return events
         if name is None or (self.tuned is not None and name not in self.tuned):
+            if self.receptor_mode and name is None:
+                events.append(Event("held", self._name(kid), kid.hex(), None, it.seq,
+                                    {"reason": "unnamed_stream"}, ident=ident))
             return events  # untuned or unnamed streams are held, not surfaced (§5.4)
         if it.cls == LIVE_STATE and self.warmup and not self._warm(kid, it.stream, now_ms):
-            self.held[(kid, it.stream, it.state_key)] = (ident, it, retain)
+            hkey = (kid, it.stream, it.state_key)
+            prev_held = self.held.get(hkey)
+            if prev_held is not None and prev_held[0] != ident:
+                self._held_retract(prev_held[0], "held_superseded", by=ident, events=events)
+            self.held[hkey] = (ident, it, retain)
+            if self.receptor_mode:
+                events.append(Event("held", self._name(kid), kid.hex(), name, it.seq,
+                                    {"reason": "warmup_hold"}, ident=ident))
             return events  # §7.8 rule 4: UNKNOWN until warm-up; released by tick()
         self.current[ident] = _Heard(it, ident, retain - SKEW_MS, now_ms, now_ms)
-        events.append(Event("item", self._name(kid), kid.hex(), name, it.seq, self._item_data(it, now_ms, st)))
+        events.append(Event("item", self._name(kid), kid.hex(), name, it.seq, self._item_data(it, now_ms, st),
+                            ident=ident))
         if name == "root":
             events.extend(self._presence(kid, now_ms))
         return events
@@ -470,23 +533,66 @@ class Listener:
         loop = st.stream_loop_max.get(stream) or CLASSES[LIVE_STATE].loop_floor_ms * 4 // 3
         return now_ms >= st.first_beacon_at + loop
 
+    def _held_retract(self, ident: tuple, reason: str, by: Optional[tuple] = None, events: Optional[list] = None) -> None:
+        """A held item dropped before release (§14.18.3 `held_*`), reported only in receptor mode."""
+        if self.receptor_mode and events is not None:
+            events.append(Event("held_retract", self._name(ident[0]), ident[0].hex(),
+                                self._stream_name(ident[0], ident[2]), ident[3], {"reason": reason, "by": by},
+                                ident=ident))
+
+    def _lower_epoch(self, f: wire.Frame, now_ms: int) -> list[Event]:
+        """Receptor mode: a frame whose epoch is below the key's highest (§5.2, §10.9 amendment BC-1). A
+        repeat of an accepted tuple is `duplicate`; a new tuple is admitted to dedup only, as `verified`
+        with reason `epoch_regression` and disposition `ringbuffer_only`: it supersedes, plucks and
+        surfaces nothing and advances no epoch. It still records evidence `epoch-regression`."""
+        kid, body, ident = f.key_id, f.body, f.identity
+        events: list[Event] = []
+        digest = hashlib.sha256(f.raw).digest()
+        seen = self.dedup.get(ident)
+        st = self._st(kid)
+        if seen is not None:
+            if seen[0] != digest:
+                events.append(self._evidence("equivocation", kid, f"two frames for {ident[1:]}",
+                                             stream=self._stream_name(kid, body.stream), seq=body.seq))
+                return events
+            if ident not in self._restored:
+                self.last_dedup = "duplicate"
+                return events
+            self._restored.discard(ident)
+            self.last_dedup = "resurfaced"
+        else:
+            if not self._room_for(kid, now_ms):
+                events.append(self._evidence("over-quota", kid, "per-key dedup quota full; live entries kept",
+                                             stream=self._stream_name(kid, body.stream), seq=body.seq))
+                return events
+            retain = wire.local_expiry_ms(body, st.offset_ms, first_heard_ms=now_ms) + SKEW_MS
+            self._remember(ident, digest, retain,
+                           (body.expires_at, body.scope) if f.kind == wire.KIND_ITEM else None)
+        self.evidence_counts["epoch-regression"] = self.evidence_counts.get("epoch-regression", 0) + 1
+        events.append(Event("held", self._name(kid), kid.hex(), self._stream_name(kid, body.stream), body.seq,
+                            {"reason": "epoch_regression"}, ident=ident))
+        return events
+
     def _release_held(self, now_ms: int) -> list[Event]:
         events: list[Event] = []
         for hkey, (ident, it, retain) in list(self.held.items()):
             kid = ident[0]
             if now_ms >= retain - SKEW_MS or ident in self.sticky_pluck:
                 del self.held[hkey]
+                self._held_retract(ident, "held_expired" if ident not in self.sticky_pluck else "held_plucked",
+                                   events=events)
                 continue
             if not self._warm(kid, it.stream, now_ms):
                 continue
             del self.held[hkey]
             prev = self.hwm.get(hkey)
             if prev is not None and (it.issued_at, it.epoch, it.seq) < prev[:3]:
+                self._held_retract(ident, "held_superseded", events=events)
                 continue  # a newer value was heard meanwhile
             st = self._st(kid)
             self.current[ident] = _Heard(it, ident, retain - SKEW_MS, now_ms, now_ms)
             events.append(Event("item", self._name(kid), kid.hex(), self._stream_name(kid, it.stream), it.seq,
-                                self._item_data(it, now_ms, st)))
+                                self._item_data(it, now_ms, st), ident=ident))
         return events
 
     def _remember(self, ident: tuple, digest: bytes, retain: int, meta: Optional[tuple] = None) -> None:
@@ -533,19 +639,20 @@ class Listener:
             if now_ms >= h.local_expiry:
                 del self.current[ident]
                 events.append(Event("expired", self._name(ident[0]), ident[0].hex(),
-                                    self._stream_name(ident[0], ident[2]), ident[3]))
+                                    self._stream_name(ident[0], ident[2]), ident[3], ident=ident))
         self._purge_dedup(now_ms)
         self._purge_hwm(now_ms)
         events.extend(self._release_held(now_ms))
-        self._save_if_dirty()
+        if self.autosave:
+            self._save_if_dirty()
         for kid in list(self.stations):
             events.extend(self._presence(kid, now_ms))
         return events
 
     # ------------------------------------------------------------ persisted safety state
 
-    def _save_if_dirty(self) -> None:
-        if self.state_path is None or not self._dirty:
+    def _save_if_dirty(self, force: bool = False) -> None:
+        if self.state_path is None or not (self._dirty or force):
             return
         state = {
             "version": STATE_VERSION,
@@ -555,24 +662,9 @@ class Listener:
             "sticky_pluck": [[i[0].hex(), i[1], i[2], i[3], r] for i, r in self.sticky_pluck.items()],
             "hwm": [[k[0].hex(), k[1], k[2], *v] for k, v in self.hwm.items()],
         }
-        path = os.fspath(self.state_path)
-        d = os.path.dirname(path) or "."
-        fd, tmp = tempfile.mkstemp(dir=d, prefix=os.path.basename(path) + ".", suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump(state, f, separators=(",", ":"))
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp, path)
-        except BaseException:
-            if os.path.exists(tmp):
-                os.unlink(tmp)
-            raise
-        dfd = os.open(d, os.O_RDONLY)
-        try:
-            os.fsync(dfd)
-        finally:
-            os.close(dfd)
+        if self.extra_state is not None:
+            state["receptor"] = self.extra_state()
+        atomic_write_json(self.state_path, state)
         self._dirty = False
 
     def _load(self, path) -> None:
@@ -581,6 +673,7 @@ class Listener:
         version = state.get("version")
         if version not in (1, 2, STATE_VERSION):
             raise ValueError(f"listener state {path}: unsupported version {version!r}")
+        self.loaded_extra = state.get("receptor")
         for kid_hex, (epoch, seen_at) in state["epochs"].items():
             st = self._st(bytes.fromhex(kid_hex))
             st.epoch_hwm, st.epoch_seen_at = epoch, seen_at

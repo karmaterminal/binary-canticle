@@ -41,12 +41,19 @@ def take_lease(path) -> object:
 
 
 class SpySocket(socket.socket):
-    """A real socket that records its setsockopt calls (doctor.socket.socket is patched with it)."""
+    """A real socket that records its setsockopt calls (doctor.socket.socket is patched with it). It records a
+    group join but never makes it, so no test sends an IGMP report from this host."""
     calls: list = []
 
     def setsockopt(self, *args):
         SpySocket.calls.append(args)
+        if args[:2] == (socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP):
+            return None
         return super().setsockopt(*args)
+
+
+def joins(calls) -> int:
+    return sum(c[:2] == (socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP) for c in calls)
 
 
 def snapshot(root: Path) -> dict:
@@ -156,9 +163,19 @@ class ChecksTest(unittest.TestCase):
         self.assertNotIn("bind_hears_group", doctor.multicast_report(True, "0.0.0.0:9999").data)
 
     def test_the_loopback_probe_answers(self):
-        heard, why = doctor.loopback_probe(timeout_s=0.5)  # either answer is fine here; it must not raise
+        SpySocket.calls = []
+        with mock.patch.object(doctor.socket, "socket", SpySocket):  # the join is recorded, never made
+            heard, why = doctor.loopback_probe(timeout_s=0.2)  # either answer is fine here; it must not raise
         self.assertIsInstance(heard, bool)
         self.assertTrue(why)
+        self.assertEqual(joins(SpySocket.calls), 1)
+
+    def test_should_probe(self):
+        for configured, force, never, want in ((None, False, False, False), (False, False, False, False),
+                                               (True, False, False, True), (False, True, False, True),
+                                               (True, False, True, False), (None, True, True, False)):
+            with self.subTest(configured=configured, force=force, never=never):
+                self.assertEqual(doctor.should_probe(configured, force=force, never=never), want)
 
     def test_the_probe_datagram_never_leaves_this_host(self):
         SpySocket.calls = []
@@ -289,7 +306,7 @@ class DoctorCliTest(unittest.TestCase):
         before = snapshot(self.dir)
         out = io.StringIO()
         with contextlib.redirect_stdout(out), mock.patch.object(doctor, "loopback_probe", lambda: (True, "looped back")):
-            code = main(["doctor", "--json"])
+            code = main(["doctor", "--probe", "--json"])  # forced: multicast is off, so it would be skipped
         m = {c["name"]: c for c in json.loads(out.getvalue())["checks"]}["multicast"]
         self.assertEqual((code, m["status"], m["loopback"], m["decided"], m["configured"]), (0, "report", True, False, False))
         self.assertEqual(snapshot(self.dir), before)  # no stations.toml change, no lease or state file
@@ -300,6 +317,48 @@ class DoctorCliTest(unittest.TestCase):
         with contextlib.redirect_stdout(out), mock.patch.object(doctor, "loopback_probe", lambda: (False, "no route")):
             self.assertEqual(main(["doctor"]), 0)
         self.assertIn("report  multicast     loopback probe failed: no route; listener multicast on", out.getvalue())
+
+    def spied(self, *argv):
+        """Run doctor with every socket a spy: (exit code, multicast check, group joins attempted)."""
+        SpySocket.calls = []
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), mock.patch.object(doctor.socket, "socket", SpySocket), \
+                mock.patch.object(doctor.loopback_probe, "__defaults__", (doctor.runner.MCAST_GROUP, 0.1)):
+            code = main(["doctor", "--json", *argv])
+        m = {c["name"]: c for c in json.loads(out.getvalue())["checks"]}["multicast"]
+        return code, m, joins(SpySocket.calls)
+
+    def test_no_stations_toml_never_joins_the_group(self):
+        # #75: a doctor in an empty HOME joined 239.255.13.13, sending an IGMP report the LAN can see.
+        code, m, joined = self.spied()
+        self.assertEqual((code, joined, m["status"], m["loopback"]), (1, 0, "report", None))
+        self.assertIn("multicast not configured — probe skipped", m["detail"])
+
+    def test_multicast_off_never_joins_the_group(self):
+        self.configure(multicast=False)
+        code, m, joined = self.spied()
+        self.assertEqual((code, joined, m["status"], m["configured"]), (0, 0, "report", False))
+        self.assertIn("multicast not configured — probe skipped", m["detail"])
+        self.assertEqual(self.spied("--manifest", str(self.fleet), "--bind", self.bind)[::2], (0, 0))
+
+    def test_multicast_on_runs_the_probe(self):
+        self.configure(multicast=True)
+        code, m, joined = self.spied()
+        self.assertEqual((code, joined, m["status"], m["configured"]), (0, 1, "report", True))
+        self.assertIsInstance(m["loopback"], bool)
+        self.assertEqual(self.spied("--no-multicast")[::2], (0, 0))        # the flag wins over the file
+        self.configure(multicast=False)
+        self.assertEqual(self.spied("--multicast")[::2], (0, 1))
+
+    def test_probe_and_no_probe_flags(self):
+        code, m, joined = self.spied("--probe")                            # forced, even with no stations.toml
+        self.assertEqual((code, joined, m["status"], m["configured"]), (1, 1, "report", None))
+        self.configure(multicast=True)
+        code, m, joined = self.spied("--no-probe")                         # never, even with multicast on
+        self.assertEqual((code, joined, m["loopback"]), (0, 0, None))
+        self.assertIn("loopback probe skipped (--no-probe)", m["detail"])
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            main(["doctor", "--probe", "--no-probe"])
 
 
 if __name__ == "__main__":

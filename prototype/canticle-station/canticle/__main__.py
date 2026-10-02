@@ -6,7 +6,8 @@
     python -m canticle hush    --control ... --stream chatter --seq 1
     python -m canticle listen  --manifest fleet.json --bind 0.0.0.0:9999      # one JSON event per line
     python -m canticle listen                                                # the same, from ~/.binary-canticle/stations.toml
-    python -m canticle doctor  [--json]                                      # check this host; exit 1 if a check fails
+    python -m canticle daemon                                                # the host daemon: records over $XDG_RUNTIME_DIR/canticle/daemon.sock
+    python -m canticle doctor  [--json] [--probe|--no-probe]                 # check this host; exit 1 if a check fails
     python -m canticle manifest verify|show [fleet.json]
     python -m canticle ambient --control ... --stream hymn --fixture hymn.txt --duration 600   # background emitter
     python -m canticle tuner   --manifest fleet.json --multicast --http 127.0.0.1:8765         # read-only web view
@@ -16,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import errno
 import fcntl
 import hashlib
 import json
@@ -266,8 +268,45 @@ def cmd_listen(a) -> int:
             loop.add_signal_handler(sig, stop.set)
         await runner.run_listener(lst, bind, on_event, runner.MCAST_GROUP if a.multicast else None, stop)
 
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except OSError as e:
+        if e.errno != errno.EADDRINUSE:
+            raise
+        print(f"{a.bind}: address in use; refusing to listen. If the canticle daemon runs on this host, it is the "
+              "host's one listener (RFC §4.2): read its records from its socket instead", file=sys.stderr)
+        return 1
     return 0
+
+
+def cmd_daemon(a) -> int:
+    from .daemon import Daemon, DaemonConfig, default_socket_path, default_state_dir
+    try:
+        manifest, bind, multicast, source = _locators(a)
+    except stations.StationsError as e:
+        print(_stations_hint(e), file=sys.stderr)
+        return 1
+    sock = a.socket or default_socket_path()
+    if sock is None:
+        print("XDG_RUNTIME_DIR is not set: pass --socket (RFC §11.1 wants a per-user runtime directory)",
+              file=sys.stderr)
+        return 1
+    uids = frozenset(a.allow_uid) if a.allow_uid else frozenset({os.getuid()})
+    cfg = DaemonConfig(manifest=manifest, bind=bind, multicast=multicast, socket_path=sock,
+                       state_dir=a.state_dir or default_state_dir(), allowed_uids=uids,
+                       health_interval_ms=int(a.health_interval * 1000))
+    print(json.dumps({"daemon": {"manifest": manifest, "bind": bind, "multicast": multicast, "socket": sock,
+                                 "state_dir": cfg.state_dir, "allowed_uids": sorted(uids),
+                                 "stations": str(source) if source else None}}), file=sys.stderr, flush=True)
+
+    async def main() -> int:
+        stop = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, stop.set)
+        return await Daemon(cfg).run(stop)
+
+    return asyncio.run(main())
 
 
 LEASE_WAIT_S = 0.5
@@ -357,9 +396,12 @@ def cmd_tuner(a) -> int:
 
 
 def _leases(state, manifest: str, bind: str) -> dict:
-    """The state leases a running `canticle listen` or `canticle tuner` holds for this manifest and bind."""
+    """The state leases a running `canticle listen`, `canticle tuner` or `canticle daemon` (default state
+    directory) holds."""
+    from .daemon import default_state_dir
     return {"listener": (state or _default_state(manifest, bind)) + ".lease",
-            "tuner": _default_state(manifest, f"{bind}|tuner") + ".lease"}
+            "tuner": _default_state(manifest, f"{bind}|tuner") + ".lease",
+            "daemon": os.path.join(default_state_dir(), "daemon.lease")}
 
 
 def cmd_doctor(a) -> int:
@@ -377,7 +419,10 @@ def cmd_doctor(a) -> int:
                       if source else doctor.Check("stations", "skip", "not read: --manifest given"))
         checks.append(doctor.check_manifest(manifest))
         checks.append(doctor.check_bind(bind, _leases(a.state, manifest, bind)))
-    checks.append(doctor.multicast_report(multicast, bind, probe=None if a.no_probe else doctor.loopback_probe))
+    run_probe = doctor.should_probe(multicast, force=a.probe, never=a.no_probe)
+    checks.append(doctor.multicast_report(
+        multicast, bind, probe=doctor.loopback_probe if run_probe else None,
+        skipped=doctor.PROBE_SKIPPED_FLAG if a.no_probe else doctor.PROBE_SKIPPED_UNCONFIGURED))
     failed = any(c.status == "fail" for c in checks)
     if a.json:
         print(json.dumps({"ok": not failed, "checks": [c.to_json() for c in checks]}, indent=2))
@@ -564,14 +609,32 @@ def main(argv=None) -> int:
     u.add_argument("--log", help="append every listener event, as JSON lines, here")
     u.set_defaults(fn=cmd_tuner)
 
+    dm = sub.add_parser("daemon", help="the host daemon: one UDP listener, record v1 to every binding over a unix socket",
+                        description="Owns this host's canticle UDP port and serves receptor record v1 (RFC §14.18.3) "
+                        "over a unix SOCK_STREAM socket (§11.1, D35). Records are not printed: frame records carry "
+                        "item text. hello, fatal and bye are copied to stderr.")
+    _locator_args(dm)
+    dm.add_argument("--socket", help="unix socket path (default $XDG_RUNTIME_DIR/canticle/daemon.sock; "
+                    "its directory must be 0700)")
+    dm.add_argument("--state-dir", help="safety state and lease (default $XDG_STATE_HOME/canticle/daemon)")
+    dm.add_argument("--allow-uid", type=int, action="append", help="uid allowed to connect (repeatable; default: own uid)")
+    dm.add_argument("--health-interval", type=float, default=10.0, help="seconds between health records")
+    dm.set_defaults(fn=cmd_daemon)
+
     d = sub.add_parser("doctor", help="check that this host can run a listener; exit 1 if a check fails",
                        description="Checks Python, cryptography (with an Ed25519 known answer), stations.toml, the "
-                       "manifest and the listener's UDP address, then reports multicast. Exit 0 when no check fails, "
+                       "manifest and the listener's UDP address, then reports multicast; its loopback probe runs only when "
+                       "multicast is configured or --probe is given. Exit 0 when no check fails, "
                        "1 when one does. Multicast is reported, never decided or enabled: these are not RFC §11.2's "
                        "exit codes, and a 0 says nothing about multicast.")
     _locator_args(d)
     d.add_argument("--state", help="the listener's --state, if it runs with one, to recognise it holding the address")
-    d.add_argument("--no-probe", action="store_true", help=f"skip the loopback probe to {runner.MCAST_GROUP}")
+    probe = d.add_mutually_exclusive_group()
+    probe.add_argument("--probe", action="store_true",
+                       help=f"run the loopback probe to {runner.MCAST_GROUP} even when multicast is not configured "
+                       "(it joins the group, so an IGMP report goes out on the default interface)")
+    probe.add_argument("--no-probe", action="store_true",
+                       help=f"never run the loopback probe to {runner.MCAST_GROUP}, even when multicast is configured")
     d.add_argument("--json", action="store_true", help="print the checks as JSON")
     d.set_defaults(fn=cmd_doctor)
 

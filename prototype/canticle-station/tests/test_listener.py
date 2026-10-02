@@ -316,7 +316,7 @@ class PerKeyBoundsTest(unittest.TestCase):
 
     def test_over_quota_frames_do_not_make_a_station_speak(self):
         lst = self.lst(quota=2)
-        lst.hear(self.beacon(1, [[self.CHAT, 1, 1, 5000, 5000, 60, 300, 4000]]), T0)
+        lst.hear(self.beacon(1, [[self.CHAT, 1, 1, 1, 5000, 5000, 60, 300, 4000]]), T0)
         root = wire.sign_frame(wire.KIND_ITEM, SK, {1: 1, 2: stream_id("root"), 3: 1, 4: T0, 5: T0 + 600_000, 6: 9,
                                                     7: 7, 8: cbor.encode({1: "watch"}), 10: "root", 11: 0, 13: 1})
         lst.hear(root, T0)
@@ -328,7 +328,7 @@ class PerKeyBoundsTest(unittest.TestCase):
 
     def test_beacon_maps_hold_one_catalog(self):
         lst = self.lst()
-        entry = lambda sid: [sid, 1, 1, 5000, 5000, 60, 300, 4000]
+        entry = lambda sid: [sid, 1, 1, 1, 5000, 5000, 60, 300, 4000]
         for b in range(1, 201):                                                      # unpaged: each is the whole catalog
             lst.hear(self.beacon(b, [entry(0x20000 + b * 32 + j) for j in range(32)]), T0)
         st = lst.stations[SK_ID]
@@ -526,8 +526,8 @@ class PerKeyBoundsTest(unittest.TestCase):
         # §8.4 lets a changed stream ride the next beacon whatever its page, so one stream can sit on
         # two held pages; the entry from the more recent beacon must win (#60 review).
         lst = self.lst()
-        b = lambda head, loop: [self.CHAT, head, 1, loop, loop, 60, 300, 4000]   # stream-entry, §9.8 order
-        other = [0x77, 1, 1, 5000, 5000, 60, 300, 4000]
+        b = lambda head, loop: [self.CHAT, head, head, 1, loop, loop, 60, 300, 4000]   # stream-entry, §9.8 order (post-A1)
+        other = [0x77, 1, 1, 1, 5000, 5000, 60, 300, 4000]
         lst.hear(self.beacon(1, [b(5, 10_000)], page=(1, 3)), T0)
         lst.hear(self.beacon(2, [other, b(6, 12_000)], page=(0, 3)), T0)
         st = lst.stations[SK_ID]
@@ -536,6 +536,19 @@ class PerKeyBoundsTest(unittest.TestCase):
         self.assertEqual(st.stream_entries[self.CHAT].head_seq, 6)
         lst.hear(self.beacon(4, [b(7, 15_000)], page=(1, 3)), T0)
         self.assertEqual((st.stream_entries[self.CHAT].head_seq, st.stream_loops[self.CHAT]), (7, 15_000))
+
+    def test_trail_seq_is_held_from_the_latest_beacon(self):
+        # A1 (§9.8): the listener keeps trail_seq with the entry. It only holds it (§7.10's wait-or-repair is
+        # not built here), and a pre-A1 8-element entry is refused rather than read shifted (#70).
+        lst = self.lst()
+        lst.hear(self.beacon(1, [[self.CHAT, 9, 4, 3, 5000, 5000, 60, 300, 4000]]), T0)
+        st = lst.stations[SK_ID]
+        self.assertEqual((st.stream_entries[self.CHAT].head_seq, st.stream_entries[self.CHAT].trail_seq), (9, 4))
+        lst.hear(self.beacon(2, [[self.CHAT, 10, 11, 0, 0, 0, 60, 300, 4000]]), T0)   # nothing on air: head + 1
+        self.assertEqual(st.stream_entries[self.CHAT].trail_seq, 11)
+        evs = lst.hear(self.beacon(3, [[self.CHAT, 12, 0, 5000, 5000, 60, 300, 4000]]), T0)  # pre-A1 shape
+        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["bad-field"])
+        self.assertEqual(st.stream_entries[self.CHAT].trail_seq, 11)                 # the refused beacon changed nothing
 
     def test_resurface_after_restart_needs_a_mark_slot(self):
         with tempfile.TemporaryDirectory() as d:

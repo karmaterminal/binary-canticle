@@ -33,8 +33,7 @@ DEFAULT_B_STREAM = 4_000         # bit/s, §7.5
 DEFAULT_B_STATION = 16_000       # bit/s, §7.5
 STATION_HARD_CAP_S = 86_400      # D3
 DEFAULT_STREAM_MAX_TTL_S = 300   # D3
-BEACON_ENTRIES_PER_PAGE = 24     # §8.4 (worst case ~26-27 fit in 1 100 B)
-MAX_PAGES = 8
+MAX_PAGES = 8                    # §8.4: pages are chosen by encoded size, and count never exceeds 8
 PROFILE = "canticle-regulation/1"
 NEVER_SHED = {"control", "alarm"}
 
@@ -170,8 +169,25 @@ class Station:
         configs = list(streams)
         ids = stream_ids(c.name for c in configs)  # refuses collisions (§5.4)
         by_name = {v: k for k, v in ids.items()}
-        if len(configs) > BEACON_ENTRIES_PER_PAGE * MAX_PAGES:
-            raise ValueError("too many streams for beacon rotation (§8.4)")
+        # §8.4 paging (A1, #71). The fixed beacon fields at their widest encodings, measured once, so a page
+        # that fits this budget fits the 1 100-byte frame whatever bseq, wallclock or the page field hold.
+        self._beacon_overhead = len(wire.encode_beacon(sk, wire.Beacon(
+            epoch=self.epoch, bseq=wire.U64, wallclock=wire.U64, next_beacon_ms=wire.U32, profile=PROFILE,
+            streams=(), b_station=b_station, page=(MAX_PAGES - 1, MAX_PAGES), catalog_digest=bytes(8))))
+        # The schedule (see _beacon) is a cyclic sweep of the catalog: each paged beacon carries the longest
+        # run of entries from a cursor that fits the frame at their ACTUAL encoded sizes, and the cursor moves
+        # past them. `per_page` is how many entries any page holds at least: the largest entry this catalog
+        # can ever encode (every field at its CDDL maximum, lens if any stream has one), packed greedily.
+        # `count` = ceil(n / per_page) is fixed for the station's life. More than 8 is refused (§8.4).
+        n = len(configs)
+        biggest = wire.StreamEntry(*wire.StreamEntry.MAXIMA[:9],
+                                   lens=wire.U32 if any(c.lens is not None for c in configs) else None)
+        self._per_page = len(self._pages([biggest] * max(n, 1))[0])
+        self._page_count = -(-n // self._per_page)
+        if self._page_count > MAX_PAGES:
+            raise ValueError(f"{n} streams cannot fit {MAX_PAGES} beacon pages at the §8.4 bound; "
+                             "split them across stations")
+        self._cursor = 0  # catalog position (stream order) the next paged beacon starts from
         self.streams: dict[str, _Stream] = {}
         self._key_due: list = []  # heap of (forget_at, stream name, state_key), lazily invalidated
         for c in configs:
@@ -359,17 +375,22 @@ class Station:
             if held is not None and held[1] <= now_ms:
                 del self.streams[stream].key_classes[key]
 
+    def _expire(self, now_ms: int) -> None:
+        """Take frames that stop looping now off the air (§7.3), so the ring is the live set."""
+        for st in self.streams.values():
+            for seq, oa in list(st.ring.items()):
+                if oa.expires_at - now_ms < STOP_BEFORE_EXPIRY_MS:
+                    del st.ring[seq]
+
     def poll(self, now_ms: int) -> list[bytes]:
         """Frames due at ``now_ms``: beacons, bursts and loop repeats, in that order."""
         self._forget_keys(now_ms)
+        self._expire(now_ms)
         out: list[bytes] = []
         if now_ms >= self.next_beacon_at:
             out.append(self._beacon(now_ms))
         for st in self.streams.values():
             for seq, oa in list(st.ring.items()):
-                if oa.expires_at - now_ms < STOP_BEFORE_EXPIRY_MS:
-                    del st.ring[seq]
-                    continue
                 if oa.refresh_at is not None and now_ms >= oa.refresh_at:
                     if now_ms < oa.horizon:
                         # keep provenance flags (WAKE_DERIVED above all) and add REFRESH (§7.9)
@@ -433,12 +454,37 @@ class Station:
         out = []
         for st in self.streams.values():
             loops = [oa.loop_ms for oa in st.ring.values()]
+            # §9.8 (A1): trail_seq is the lowest seq of any ITEM or PLUCK still on air, head_seq + 1 when
+            # nothing is. The ring is exactly the on-air set: expiry (_expire), supersession and pluck
+            # (sing, hush) and depth eviction (_admit) all delete from it, so the minimum is always right.
             out.append(wire.StreamEntry(
-                stream_id=st.sid, head_seq=st.head_seq, live=len(st.ring),
+                stream_id=st.sid, head_seq=st.head_seq, trail_seq=min(st.ring) if st.ring else st.head_seq + 1,
+                live=len(st.ring),
                 loop_ms=int(statistics.median(loops)) if loops else 0, loop_max_ms=max(loops) if loops else 0,
                 default_ttl_s=int(st.cfg.default_ttl_s), max_ttl_s=int(st.cfg.max_ttl_s),
                 b_stream=st.cfg.b_stream, lens=st.cfg.lens))
         return out
+
+    def _pages(self, entries: list[wire.StreamEntry]) -> list[list[wire.StreamEntry]]:
+        """Split entries into pages greedily in order, by encoded size, so each page stays within the
+        1 100-byte frame (§8.4). A page is always the longest prefix that fits: the next entry would
+        overflow the budget or the 32-entry array. _beacon sends the first page of the catalog rotated to
+        the cursor; __init__ uses it on worst-case entries to find `per_page`."""
+        budget = wire.MAX_FRAME - self._beacon_overhead  # overhead counts the empty streams array (1 byte)
+        pages: list[list[wire.StreamEntry]] = []
+        page: list[wire.StreamEntry] = []
+        used = 0
+        for e in entries:
+            n = len(cbor.encode(e.to_cbor()))
+            header = 1 if len(page) + 1 >= 24 else 0  # the array header grows to 2 bytes at 24 entries
+            # §9.4: an array holds at most 32 entries, whatever the bytes say
+            if page and (len(page) >= cbor.MAX_ENTRIES or used + n + header > budget):
+                pages.append(page)
+                page, used = [], 0
+            page.append(e)
+            used += n
+        pages.append(page)
+        return pages
 
     def catalog_digest(self) -> bytes:
         cat = [[st.sid, int(st.cfg.default_ttl_s), int(st.cfg.max_ttl_s), st.cfg.b_stream]
@@ -446,15 +492,45 @@ class Station:
         return hashlib.sha256(cbor.encode(cat)).digest()[:8]
 
     def _beacon(self, now_ms: int, goodbye: bool = False) -> bytes:
+        self._expire(now_ms)  # trail_seq and live count the on-air set as of now
         self.bseq += 1
         nxt = 0 if goodbye else int(self.beacon_period_ms * self.rng.uniform(0.9, 1.1))
         entries = self._entries()
         page = digest = None
-        if len(entries) > BEACON_ENTRIES_PER_PAGE:
-            pages = [entries[i:i + BEACON_ENTRIES_PER_PAGE] for i in range(0, len(entries), BEACON_ENTRIES_PER_PAGE)]
-            idx = self.page_index % len(pages)
+        # §8.4 rotation (#71). A catalog that fits one beacon at its actual sizes goes out whole, unpaged.
+        # Otherwise this beacon carries page [index, count]: the first page of the actual-size greedy split
+        # of the catalog rotated to start at the cursor, i.e. the longest run of streams from the cursor
+        # (wrapping past the end) whose actual encodings fit the frame. The cursor then moves past them, and
+        # `index` counts paged beacons modulo the fixed `count`.
+        #
+        # Why every stream appears at least once in every `count` consecutive beacons, however entries
+        # grow or shrink between beacons:
+        #   1. Any page holds at least per_page entries. Each actual entry encodes no larger than `biggest`
+        #      (its fields are within the CDDL maxima), and the actual fixed fields within the measured
+        #      overhead, so per_page actual entries fit wherever the run starts; the greedy run is the
+        #      longest prefix that fits, so it is at least that long. It is also shorter than n: had all n
+        #      fit, the unrotated split would have been one page too, and the beacon would go unpaged.
+        #   2. Take any stream s, sent in beacon t (or a stream not yet sent, with t the start). Right
+        #      after t the cursor sits at most n - 1 places before s, counting cyclically. A paged beacon
+        #      moves the cursor at least per_page places without passing s unsent, and an unpaged beacon
+        #      carries s outright. So s goes out within ceil(n / per_page) = count beacons after t, and
+        #      the gap between two appearances of s never exceeds count: any window of count consecutive
+        #      beacons contains one.
+        #   3. count <= 8 is the refusal in __init__, and every beacon fits the frame by construction.
+        # Sizes enter only through the run length in 1, which bounds the run from below whatever the sizes
+        # do, so neither a shrink (#71, Cael: a stream moving onto a page already sent) nor growth (a page
+        # that no longer fits) can stretch a gap. A receiver that keeps the last page heard per index holds,
+        # once count paged beacons have come in a row, exactly the last count beacons, which by 2 cover
+        # the whole catalog. `count` is a bound, not the number of distinct pages: when entries are small,
+        # a run carries more than n / count of them and streams come round more often than it promises.
+        pages = self._pages(entries)
+        if len(pages) > 1:
+            c = self._cursor
+            run = self._pages(entries[c:] + entries[:c])[0]
+            self._cursor = (c + len(run)) % len(entries)
+            idx = self.page_index % self._page_count
             self.page_index += 1
-            page, digest, entries = (idx, len(pages)), self.catalog_digest(), pages[idx]
+            page, digest, entries = (idx, self._page_count), self.catalog_digest(), run
         b = wire.Beacon(epoch=self.epoch, bseq=self.bseq, wallclock=now_ms, next_beacon_ms=nxt, profile=PROFILE,
                         streams=tuple(entries), b_station=self.b_station, page=page, catalog_digest=digest)
         self.next_beacon_at = now_ms + nxt
@@ -471,7 +547,8 @@ class Station:
         return {
             "key_id": self.key_id.hex(), "epoch": self.epoch, "b_station": self.b_station,
             "streams": {
-                name: {"stream_id": f"{st.sid:08x}", "head_seq": st.head_seq, "b_stream": st.cfg.b_stream,
+                name: {"stream_id": f"{st.sid:08x}", "head_seq": st.head_seq,
+                       "trail_seq": min(st.ring) if st.ring else st.head_seq + 1, "b_stream": st.cfg.b_stream,
                        "default_ttl_s": st.cfg.default_ttl_s, "max_ttl_s": st.cfg.max_ttl_s,
                        "on_air": [{"seq": oa.seq, "kind": "pluck" if oa.kind == wire.KIND_PLUCK else "item",
                                    "state_key": oa.state_key, "remaining_s": round((oa.expires_at - now_ms) / 1000, 1),
