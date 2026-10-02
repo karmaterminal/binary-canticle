@@ -233,6 +233,42 @@
    "datagram_hex": "7b2261223a31653430307d",
    "expect": "short",
    "note": "the 11-byte datagram that killed the prototype"
+  },
+  {
+   "name": "extension-map-bool-key",
+   "datagram_hex": "4243020121fe31dfa154a261ab0101021a1ab3c5890301041b000001a0c4506c00051b000001a0c451566006010701084e68656c6c6f2c2073746174696f6e0b000d0113a20000f40048061317654945869b7abb21876c3873e7d58fdb81582d813e91fd8d319399cca1a0f432fc9321a470af885737c37a7ebe5809470d87a7b4e1d8bf385ec6c10d",
+   "expect": "bad-cbor",
+   "note": "#66: key 19 holds {0: 0, false: 0}; keys are int or tstr at every depth (map-key-type, not non-deterministic)"
+  },
+  {
+   "name": "extension-map-null-key",
+   "datagram_hex": "4243020121fe31dfa154a261ab0101021a1ab3c5890301041b000001a0c4506c00051b000001a0c451566006010701084e68656c6c6f2c2073746174696f6e0b000d0113a20000f6000968c97fec3ea1ba4af10b089112e8878b32a27789ccc6115bfb8c1370b3851c927cc4d9d0e9cf325adc58073de199c7a0c53a77d562fd6a3c62747b1049870f",
+   "expect": "bad-cbor",
+   "note": "#66: key 19 holds {0: 0, null: 0}"
+  },
+  {
+   "name": "extension-map-bstr-key",
+   "datagram_hex": "4243020121fe31dfa154a261ab0101021a1ab3c5890301041b000001a0c4506c00051b000001a0c451566006010701084e68656c6c6f2c2073746174696f6e0b000d0113a20000400008d77c9bf728af88462b323094b8cb68f3a4309f8e3035f940cf289e45226ac45373496f39f9e14fdfcf32824dc0fe1209dfb4fed89a663ad20aac7affe20303",
+   "expect": "bad-cbor",
+   "note": "#66: key 19 holds {0: 0, h'': 0}"
+  },
+  {
+   "name": "top-level-bool-key",
+   "datagram_hex": "4243020121fe31dfa154a261aa021a1ab3c5890301041b000001a0c4506c00051b000001a0c451566006010701084e68656c6c6f2c2073746174696f6e0b000d01f5015106101eeed8166c8812cd5ca5490f3a1bd11e1ac18dc106ed59aece97f6135c219defe4932c860571cf8732b15b300a5a92e3966b69e8e671ba94b6d1ff9f08",
+   "expect": "bad-cbor",
+   "note": "#66: true where key 1 (epoch) belongs; a bool is never a field key"
+  },
+  {
+   "name": "item-null-body",
+   "datagram_hex": "4243020121fe31dfa154a261aa0101021a1ab3c5890301041b000001a0c4506c00051b000001a0c45156600601070108f60b000d01ac13eb26978cb1f9f95c5fdb938a9b9ddec78f552cf5037af2dfc47c711c83c1ecb71cb103fe8ccc706d0a51404ebfea5918a8ed093699728da21bc0c87d950c",
+   "expect": "bad-field",
+   "note": "#66: 8: null and no 9; an explicit null for an optional key is bad-field, not absence (\u00a79.6 needs a body or a body_ref)"
+  },
+  {
+   "name": "beacon-null-catalog-digest",
+   "datagram_hex": "4243020221fe31dfa154a261a801010201031b000001a0c4509310041903e8057563616e7469636c652d726567756c6174696f6e2f310681881a1ab3c5890101192710192710183c19012c190fa008193e8009f623d72682bd66ae11d2bb01b4c7dd37f32149c6a6a5fe0271bb6ab244a068abcf36ac0f9ba2db7a8e0ba80b534d535e3dd2006b5cda1310abb94124fdafd31e05",
+   "expect": "bad-field",
+   "note": "#66: 9: null; same rule as item-null-body"
   }
  ],
  "sequences": [
