@@ -63,7 +63,8 @@ bind = "0.0.0.0:9999"
 multicast = false
 EOF
 
-# 3. Check the host: exit 0 when every check passes.
+# 3. Check the host: exit 0 when every check passes. With multicast = false (as above) it does not touch
+#    the multicast group; --probe runs the loopback probe anyway, --no-probe never runs it.
 canticle doctor
 
 # 4. Listen: one JSON event per line. No flags are needed now that stations.toml exists.
@@ -85,16 +86,21 @@ canticle listen
   before and skips the file.
 - **`canticle doctor`** checks Python, `cryptography` (it must reproduce RFC 8032's TEST 1), `stations.toml`,
   the manifest, and the listener's UDP address, which must be free or held by this listener. `--json` prints
-  the same checks for a script. It exits 1 if any check fails.
+  the same checks for a script. It exits 1 if any check fails; the multicast line never changes the exit status.
 - **Multicast is reported, never decided.** RFC §11.2 allows the multicast binding only after a doctor that
-  runs all seven of its steps has passed. This one joins the group on the default interface, sends a probe
-  with IP TTL 0 (it never leaves this host), and reports whether it came back. It never turns multicast on
-  and writes no configuration, and its exit codes are not §11.2's (0, 10, 20, 30). Setting
-  `multicast = true` is your decision.
+  runs all seven of its steps has passed. This one has a loopback probe only: it joins the group on the
+  default interface, sends a probe with IP TTL 0 (the probe never leaves this host), and reports whether it
+  came back. The join itself sends an IGMP report the LAN can see, so the probe runs only when multicast is
+  configured (`multicast = true` in `stations.toml`, or `--multicast`). Otherwise doctor reports
+  `multicast not configured — probe skipped` and joins nothing. `--probe` runs the probe anyway;
+  `--no-probe` never runs it, even with multicast on. Doctor never turns multicast on and writes no
+  configuration, and its exit codes are not §11.2's (0, 10, 20, 30). Setting `multicast = true` is your
+  decision.
 - **`canticle listen`** prints the `stations.toml` it used on stderr, and keeps its safety state under
   `$XDG_STATE_HOME/canticle`.
 
-A healthy host with the listener running (from a run of these steps on 2026-10-02, paths shortened):
+A healthy host with the listener running (from a run of these steps on 2026-10-02, paths shortened; the
+multicast line is as doctor prints it since #75):
 
 ```text
 ok      python        Python 3.11.15 (/home/you/.venvs/canticle/bin/python3.11)
@@ -102,7 +108,7 @@ ok      cryptography  cryptography 50.0.2; Ed25519 reproduces RFC 8032 TEST 1
 ok      stations      /home/you/.binary-canticle/stations.toml: manifest /home/you/.binary-canticle/fleet.json, bind 0.0.0.0:9999, multicast off
 ok      manifest      /home/you/.binary-canticle/fleet.json: 1 station(s), 0 revoked; keys well-formed, key ids match. UNSIGNED: [...]
 ok      bind          0.0.0.0:9999 is in use by this listener, which holds /home/you/.local/state/canticle/listener-369385c1dd02.json.lease
-report  multicast     loopback probe heard: joined 239.255.13.13 and a probe sent with IP TTL 0 looped back; listener multicast off; a report only: [...]
+report  multicast     multicast not configured — probe skipped (--probe runs it anyway); listener multicast off; a report only: [...]
 doctor: every check passed (exit 0). Multicast is reported, not decided (RFC §11.2).
 ```
 
@@ -220,7 +226,7 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
   - names and stream names with a trailing newline, which `$` used to let through;
   - `keygen` refusals and failed manifest writes that leave no key file behind and the old manifest as it was, a manifest's mode and symlink kept, and a second key under one name (a rotation, §10.3).
 - `test_stations.py` covers `stations.toml`: a full file, defaults, paths relative to the file and to `~`, a missing file, malformed TOML, wrong types and values, unknown keys, the refused `[trust]` table, and which locators `listen` uses (the file, flags over the file, `--manifest` skipping it).
-- `test_doctor.py` covers each check's pass and fail paths: Python and `cryptography` versions, the RFC 8032 known answer, the manifest, and the address (free, held by another socket, held by this listener or tuner through its lease, or by a listener with its own `--state`). Multicast stays a report whatever the probe finds, the probe datagram has IP TTL 0, doctor writes nothing, its bind probe never shares a listener's port, and a listener starting during its lease probe waits instead of refusing.
+- `test_doctor.py` covers each check's pass and fail paths: Python and `cryptography` versions, the RFC 8032 known answer, the manifest, and the address (free, held by another socket, held by this listener or tuner through its lease, or by a listener with its own `--state`). Multicast stays a report whatever the probe finds, the probe datagram has IP TTL 0, the probe joins the group only when multicast is configured or `--probe` is given (`--no-probe` always wins; a socket spy records the join and never makes it), doctor writes nothing, its bind probe never shares a listener's port, and a listener starting during its lease probe waits instead of refusing.
 - `test_onboarding.py` runs the onboarding above end to end: `keygen`, `stations.toml`, `doctor`, then `canticle listen` with no flags in a subprocess hearing a station's item over loopback UDP while doctor sees it holding the address.
 - `test_ambient.py` runs the emitter on a virtual clock: tick gaps, breaths and repeats, exact requests, the per-minute cap, stop by signal and by duration, refusals, an unreachable station, bounds and fixture loading.
 - `test_tuner.py` covers the tuner's view and gateway:
