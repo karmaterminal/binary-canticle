@@ -171,7 +171,11 @@ async def run_listener(listener: Listener, bind: tuple[str, int], on_event: Call
     stop = stop or asyncio.Event()
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(bind)
+    try:
+        sock.bind(bind)
+    except OSError:
+        sock.close()
+        raise
     if group:
         mreq = socket.inet_aton(group) + socket.inet_aton("0.0.0.0")
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)

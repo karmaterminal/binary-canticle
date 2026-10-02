@@ -1,0 +1,30 @@
+# Example user unit: the canticle host daemon (binary-canticle spike, RFC-0001 §11.1, D35). Documented only;
+# nothing installs it.
+#
+#   cp docs/systemd/canticle-daemon.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now canticle-daemon
+#   loginctl enable-linger "$USER"   # optional: keep listening while you are logged out
+#
+# It is the host's one listener (RFC §4.2): do not also run canticle-listener.service on the same address;
+# whichever starts second fails to bind. It reads ~/.binary-canticle/stations.toml (docs/stations-toml.md).
+# Bindings read records from $XDG_RUNTIME_DIR/canticle/daemon.sock (%t is XDG_RUNTIME_DIR for a user unit).
+# Paths follow docs/state-layout.md, with the package installed in a venv at ~/.venvs/canticle.
+
+[Unit]
+Description=canticle host daemon (binary-canticle spike)
+
+[Service]
+Type=exec
+Environment=XDG_STATE_HOME=%h/.local/state
+UMask=0077
+# Records carry item text and go only to the socket; stderr (hello, fatal, bye) goes to the journal.
+ExecStart=%h/.venvs/canticle/bin/canticle daemon --socket %t/canticle/daemon.sock
+# TERM makes it emit `bye`; a binding treats an exit without `bye` as a failed receive (§14.18.2).
+KillSignal=SIGTERM
+TimeoutStopSec=5s
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

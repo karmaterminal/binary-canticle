@@ -19,6 +19,8 @@ them loop until they expire.
 | §11.2, §13.6, §15.7 Onboarding (#73) | `canticle doctor` checks Python, `cryptography` (with an RFC 8032 known answer), `stations.toml`, the manifest and the listener's UDP address, and only reports multicast. `stations.toml` locates the manifest and the listener's address. `canticle manifest verify` and `show` read the unsigned spike-0 manifest; manifests refuse small-order keys (§9.3) and key-ids that do not match their keys (§10.3). |
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
 | §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only gateway over one listener, and a read-only page to pick a station:stream and watch its live ring, with expiry and gaps shown honestly. |
+| §14.18.3 Record v1 (BC-2, #77) | `canticle/records.py`: the listener's outcomes as receptor record v1 (`hello`, `landing_state`, `frame`, `retract`, `presence`, `health`, `fatal`, `bye`) under the disposition mapping, with fixed health counters and a bounded table of unverified key ids (D34). See [Record v1 and the host daemon](#record-v1-and-the-host-daemon-bc-2-d35-77). |
+| §11.1, §14.18.2 Host daemon (D35, #77) | `canticle daemon`: the host's one UDP listener, carrying record v1 to every binding over a unix `SOCK_STREAM` socket with peer-credential checks, a two-record bootstrap per connection and per-connection isolation. |
 
 Not implemented here, and still open work (see RFC-0001 §23.3):
 - relay leases for internet listeners (§11.3)
@@ -195,10 +197,132 @@ Unnamed streams (not in the manifest) are verified and listed, but can't be tune
 
 [`proofs/web-lanes/`](proofs/web-lanes/) holds a bounded run as root (`run.sh`), its analysis (`analyze.py`) and the results. The station and emitters run in one network namespace; the listeners, tuner and headless Chromium run in another, joined by a veth pair over LAN multicast. That is **same-host** evidence, on one kernel and one clock. It is not a second host.
 
+## Record v1 and the host daemon (BC-2, D35, #77)
+
+```sh
+canticle daemon                       # reads stations.toml; socket $XDG_RUNTIME_DIR/canticle/daemon.sock
+canticle daemon --manifest fleet.json --bind 0.0.0.0:9999 --socket /run/user/1000/canticle/daemon.sock
+```
+
+`canticle daemon` is the standalone host daemon of RFC-0001 §4.2 and §11.1 (amendment BC-1a, D35). It owns
+the host's canticle UDP port and carries receptor record v1 (§14.18.3) to every harness binding on the host.
+A binding (frond-ear's `host-daemon` source, the OpenClaw P1 plugin) connects to the socket and reads one JSON
+record per line.
+
+**The daemon (`canticle/daemon.py`).**
+
+- **One listener.** The UDP port is bound without `SO_REUSEADDR`, so a second daemon, or a `canticle listen`
+  (which sets it), fails to bind; `canticle listen` then says so and exits 1. A lease on the state directory
+  (`daemon.lease`) stops a second daemon on the same state.
+- **Socket.** `SOCK_STREAM`, in a directory of mode 0700 (created if missing; an existing one that is not ours
+  or not 0700 is refused) with the socket at 0600. Every connection's `SO_PEERCRED` uid must be in
+  `--allow-uid` (default: the daemon's own uid); where `SO_PEERCRED` is unavailable every connection is refused.
+  A stale socket file is replaced; one a live daemon answers on is not.
+- **Bootstrap.** Connections are accepted only after the run's first `landing_state`. Each opens with the run's
+  `hello` and latest `landing_state`, the same bytes with their original `rec_seq`, then the live stream. Taking
+  the two and joining the fan-out is one step of the event loop, with nothing awaited between.
+- **Isolation.** Each connection has a queue of at most 1 024 records, and the kernel holds at most one more
+  line (the transport's write buffer limit is 0). A `frame`, `presence` or `health` record that does not fit
+  is dropped for that connection only, and counted (`health.records.dropped`, and `records_lost` in the next
+  `health`). A `retract`, `landing_state`, `hello`, `fatal` or `bye` that does not fit, or that the kernel has
+  not taken within 2 s, closes that connection only. At most 16 connections; more are refused at accept. The
+  receive path only ever appends to queues.
+- **Lifecycle.** Start: lease, manifest, state, UDP bind (and the multicast join if configured), then `hello`
+  and the first `landing_state`, then the socket. A failure emits `fatal` (`state_locked`, `manifest_invalid`,
+  `state_corrupt`, `state_not_durable`, `bind_failed`, `socket_failed`) and exits 1. SIGTERM or SIGINT emits
+  `bye`, waits up to 2 s for it to reach each connection, closes them and removes the socket.
+- **Durable publish (write-ahead, #79 review).** Each datagram and each tick is one batch. The records it
+  implies are held, the safety state is saved (one atomic replace), and only then are the records numbered and
+  sent. If the save fails, none of that batch is sent, retracts included, and no `rec_seq` is spent. The run
+  then ends: `fatal` with reason `state_not_durable` (an error elsewhere in the record path ends it the same
+  way, reason `internal`), up to 2 s for it to reach each connection, then exit 1, with no `bye`. This
+  follows the RFC rather than limping on: a receptor's `health.state` is only `ok` or `degraded`
+  (§14.18.3), supersession marks MUST persist across restart (§7.8), `fatal` precedes any non-zero exit, and
+  the binding's supervision restarts the receptor with backoff after `fatal` (§14.18.2). A binding treats
+  `fatal` as receive health `failed` and delivers nothing more from the run, so withholding a retract
+  withdraws nothing it would still deliver. The restarted daemon starts from the last saved state and
+  reconciles it (below).
+- **Output.** Records go only to the socket: `frame` records carry item text (RFC §19.7). `hello`, `fatal` and
+  `bye` are copied to stderr.
+- **Inbound.** Publishing over the socket (sing/hush, §15) is not in this slice: bytes a peer sends are read,
+  counted and discarded. End of stream from a peer closes its connection (a half-closed peer is not supported).
+
+**Record v1 (`canticle/records.py`).** Every record has `v`, `type`, `rec_seq` (from 1, strictly increasing,
+never reused) and `run` (128 random bits, hex, chosen at start). Times are integer ms. Lines are ASCII (non-ASCII
+escaped), at most 64 KiB and nesting depth 8; a record that would break that is a bug and raises, never sent.
+`idem` is `canticle:<key_id hex>:<epoch>:<stream_id as 8 hex digits>:<seq>`; the RFC leaves the radix of
+`stream_id` open, and the prototype shows stream ids as 8 hex digits everywhere else.
+
+| Mapping row (§14.18.3) | Emitted |
+|---|---|
+| new verified item on a named stream | `frame`, `verified`, `surface`, with `body` (New: no tune set under a binding) |
+| stream id with no known name | `frame`, `ringbuffer_only`, `unnamed_stream`, with `body` (New) |
+| live-state item held in warm-up | `frame`, `ringbuffer_only`, `warmup_hold`; on release a second `frame`, same `idem`, `surface` (New) |
+| held item expired, plucked or superseded before release | `retract` `held_expired` / `held_plucked` / `held_superseded` (New) |
+| repeat of an accepted tuple | `health` counter (`admission.duplicate`) |
+| item re-heard after a restart | `frame` with `dedup: "resurfaced"` |
+| PLUCK re-heard after a restart | `retract` for its target if the target was surfaced before the restart, else a counter (New) |
+| superseding item after a restart | `retract` `superseded` for a value surfaced before the restart (New) |
+| older or repeated beacon | `health` counter (`beacon.duplicate`; a lower-epoch beacon `beacon.epoch_regression`) |
+| class or scope beyond the key's grant | `frame`, `capability_exceeded`, `ringbuffer_only`, no body |
+| scope narrower than the binding (a `host` frame over UDP) | `frame`, `scope_violation`, `drop`, no body |
+| unknown class code | `frame`, `verified`, `ringbuffer_only`, `unknown_class`, with body |
+| hop above the class limit | `frame`, `hop_limit`, `drop`, no body |
+| lower epoch, new tuple | `frame`, `verified`, `ringbuffer_only`, `epoch_regression`; supersedes and surfaces nothing (New) |
+| lower epoch, repeat | `health` counter (`duplicate`) (New) |
+| over quota, pluck mismatch, plucked, superseded, class change | `frame`, that result, `drop`, no body |
+| equivocation | `frame`, `equivocation`, `quarantine_set`, no body; the key is quarantined locally (persisted), its surfaced tuples get `retract` `quarantined`, and its later items are `ringbuffer_only`, reason `key_quarantined` (New) |
+| unverified (`unknown_key`, `bad_signature`, `revoked`, time window, `malformed`, `crit_unknown`, `version`) | `health` counters only, never attributed to a station (New) |
+| valid PLUCK; supersession or local expiry of a surfaced tuple | `retract` `plucked` / `superseded` / `expired` |
+| key revoked with surfaced tuples | `retract` `revoked`, at start, for tuples surfaced before the restart |
+
+`health` (every 10 s) carries fixed counters per admission result, disposition, retract reason, beacon outcome
+and unverified reason; the unverified key ids, at most 16, kept by space-saving (each listed with its `count`
+and the `error` it may overcount by, and `other` for what no listed id accounts for); dedup occupancy; beacon age
+per manifest key; `last_datagram_at`; records emitted and dropped and connections closed; and `state` `ok` or
+`degraded` with `no_datagrams` (none for 30 s), `records_lost` (a connection dropped a record since the last
+`health`) or `clock_skew` (a station's δ̂ beyond 5 s). The receptor keeps which tuples it surfaced, and which
+keys it quarantined, in the listener's state file (`"receptor"`), written with the listener's guards in one
+atomic replace per datagram. At start, after `hello` and before the first `landing_state` (so before any
+connection is served), `Receptor.reconcile` retracts every surfaced tuple the persisted guards say is withdrawn:
+key revoked or gone (`revoked`), key quarantined (`quarantined`), a sticky PLUCK on it (`plucked`), a newer
+supersession mark (`superseded`) or local expiry passed (`expired`). It is idempotent (#79 review).
+
+The listener change is opt-in: `Listener(receptor_mode=True)` reports the outcomes it was silent on and admits
+lower-epoch tuples as above. `canticle listen` and `canticle tuner` behave as before.
+
+**Not emitted yet, or emitted differently** (each a known gap, not a silent one):
+
+- `stream_name_ambiguous`: never emitted. The manifest refuses two names for one stream id at load (§5.4).
+- Stream grants: the manifest grants no streams yet, so no item is `capability_exceeded` for its stream (as
+  the RFC notes for BC-2).
+- `landing_state` never changes on its own: there is no MUTE (§10.6), circuit breaker (§14.8.3) or
+  modulation (§14.7) here. It is always `mute: null`, `breaker: "closed"`, `modulation: []`;
+  `Receptor.set_landing` is the hook, and only tests call it.
+- `quarantine_strengthen` / `quarantine_rescind`: reserved in the RFC, not emitted. A local quarantine has no
+  rescind here; it lasts until the daemon's state is removed with the daemon stopped.
+- Revocation retracts only at start: the daemon does not reload its manifest while running.
+- `gap` is always `"unavailable"` (§7.10's receiver side is not implemented); `station.principal` is always
+  null (the spike manifest names none).
+- `frame.sha256` and `frame.bytes` point at a hearer-ring copy only for a frame that reaches the ring at §14.1
+  step 5, that is, admission `verified` (`surface` or `ringbuffer_only`, including `unnamed_stream`,
+  `unknown_class`, `warmup_hold` and `epoch_regression`). A frame refused at steps 3-4 has none, and both
+  fields are `null`: `capability_exceeded`, `scope_violation`, `hop_limit`, `over_quota`, `pluck_mismatch`,
+  `plucked`, `superseded`, `class_change` and `equivocation` (#79 review). This spike keeps no hearer ring
+  (§14.4): for a verified frame the two are the hash and size its ring copy would have.
+- Fields a frame does not carry are null: a PLUCK's `class`, `hop`, `state_key`, `purpose`, `intensity` and
+  `lens`; the `stream` of an unnamed stream; the `class` of an unknown class code; and `frame.sha256` and
+  `frame.bytes` of a refused frame (above). frond-ear#34's consumer requires `stream` and `class` strings, an
+  integer `hop`, a string `sha256` and an integer `bytes` on every `frame`, so it counts those records as
+  `malformed_record` rather than not deliverable. None of them is deliverable either way.
+- The stdout child-process transport of §14.18.2 is not a separate command: only the daemon carries records.
+- Mixed-host proof cases (4) and (6) need a harness binding and OC-0, and are not run here. Case (1) is shown
+  with sockets in one test host (a second daemon and a `canticle listen` both fail to bind), not with `ss`.
+
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 173 tests, about 15 s
+python -m unittest discover -s tests      # 233 tests, about 25 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -229,6 +353,35 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
 - `test_doctor.py` covers each check's pass and fail paths: Python and `cryptography` versions, the RFC 8032 known answer, the manifest, and the address (free, held by another socket, held by this listener or tuner through its lease, or by a listener with its own `--state`). Multicast stays a report whatever the probe finds, the probe datagram has IP TTL 0, the probe joins the group only when multicast is configured or `--probe` is given (`--no-probe` always wins; a socket spy records the join and never makes it), doctor writes nothing, its bind probe never shares a listener's port, and a listener starting during its lease probe waits instead of refusing.
 - `test_onboarding.py` runs the onboarding above end to end: `keygen`, `stations.toml`, `doctor`, then `canticle listen` with no flags in a subprocess hearing a station's item over loopback UDP while doctor sees it holding the address.
 - `test_ambient.py` runs the emitter on a virtual clock: tick gaps, breaths and repeats, exact requests, the per-minute cap, stop by signal and by duration, refusals, an unreachable station, bounds and fixture loading.
+- `test_records.py` covers record v1 row by row: the envelope (`hello` then `landing_state`, `rec_seq`, `run`,
+  framing limits), every mapping row above including the BC-2 "New" rows (surface, `unnamed_stream`,
+  `warmup_hold` and its release under the same `idem`, the three `held_*` retractions, lower epochs, local
+  quarantine on equivocation), retractions on pluck, supersession and expiry, the restart rows (resurfaced
+  items, a re-heard PLUCK, supersession and expiry of tuples surfaced before the restart, revocation at start,
+  quarantine kept), the start-time reconcile (the #79 crash window: a PLUCK or a supersession mark persisted
+  without its retract, with no replay, is retracted at start before the first `landing_state`; also a
+  quarantined key, expiry while down, and one state file written once), write-ahead publishing (a failed save
+  sends nothing, spends no `rec_seq` and ends the receptor, at start, on a datagram and on a tick; a restart
+  without replay owes nothing), null receipt pointers on every pre-ring refusal, presence and beacon counters, unverified counters that never name a station, a 2 000-datagram
+  flood of key ids that keeps the table at 16 and the `health` record the same size, and the `health` states.
+- `test_daemon.py` runs the daemon in one event loop over loopback UDP and a unix socket in a temporary
+  directory, for the local mixed-host proof cases of §14.18.2:
+  - (1) a second daemon on the same state refuses (`state_locked`); a second daemon on the port, the embedded
+    listener and a `canticle listen` subprocess all fail to bind it;
+  - (2) two bindings receive byte-identical streams for a station's carousel;
+  - (3) one binding leaving and rejoining leaves the other's stream equal to everything the daemon emitted, with
+    no gap, and the rejoin gets the same bootstrap;
+  - (5) a late join: `hello` 1, `landing_state` 50, connect at 99, and the joiner receives 1, 50, 100... byte for
+    byte as the first binding did;
+  - (7) a peer that never reads, while the healthy one receives `frame`, `retract` and `landing_state` in order,
+    within a second and with no gap: closed at once when its full queue cannot take the `retract`, or after the
+    2 s bound when the queue has room but the kernel does not; its queue and write buffer stay within bounds and
+    the daemon keeps receiving datagrams;
+  - a failed save with a connected peer: the peer receives `fatal` (`state_not_durable`) and end of stream,
+    never the frame; the daemon exits 1, and the restarted daemon, with no replay, owes nothing, and hears the
+    item as new when it comes again;
+  - socket and directory modes, a refused peer uid, the peer limit, bytes from a peer ignored, `bye` and end of
+    stream on a clean stop, a live socket not taken over and a loose socket directory refused.
 - `test_tuner.py` covers the tuner's view and gateway:
   - verified stations with heads, and unnamed streams that can't be tuned;
   - the live ring, then labelled expiry and withdrawal;
