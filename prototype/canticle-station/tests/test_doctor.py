@@ -361,7 +361,8 @@ class DoctorCliTest(unittest.TestCase):
             main(["doctor", "--probe", "--no-probe"])
 
     def test_the_multicast_flag_counts_when_stations_toml_does_not_load(self):
-        # --multicast configures multicast (README step 3), whether or not a stations.toml loads.
+        # --multicast configures multicast whether or not a stations.toml loads (README, "Multicast is reported,
+        # never decided").
         code, m, joined = self.spied("--multicast")                        # no stations.toml
         self.assertEqual((code, joined, m["configured"]), (1, 1, True))
         (self.conf / "stations.toml").write_text("not toml [")
