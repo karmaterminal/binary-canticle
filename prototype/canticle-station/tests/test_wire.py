@@ -100,6 +100,39 @@ class WireTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             wire.encode_item(SK, wire.Item(ctype=1, body=b"x" * 981, **base))
 
+    def test_stream_entry_shape_and_bounds(self):
+        # §9.8 (A1) / #70: 9 elements, or 10 with lens. A pre-A1 8-element entry is bad-field, never read shifted.
+        # #66 case 4: `.size 4` fields are u32, head_seq and trail_seq u64 (the CDDL bounds).
+        entry = [1, 5, 3, 2, 5000, 5000, 60, 300, 4000]
+        mk = lambda e: wire.sign_frame(wire.KIND_BEACON, SK, {1: 1, 2: 1, 3: 1790000000000, 4: 1000, 5: "p", 6: [e], 8: 16000})
+        e = wire.parse(mk(entry), lambda k: PK).body.streams[0]
+        self.assertEqual((e.stream_id, e.head_seq, e.trail_seq, e.live, e.b_stream, e.lens), (1, 5, 3, 2, 4000, None))
+        self.assertEqual(wire.parse(mk(entry + [7]), lambda k: PK).body.streams[0].lens, 7)
+        u64 = wire.parse(mk(entry[:1] + [2**64 - 1, 2**64 - 1] + entry[3:]), lambda k: PK).body.streams[0]
+        self.assertEqual((u64.head_seq, u64.trail_seq), (2**64 - 1, 2**64 - 1))
+        bad = {
+            "pre-A1 8 elements": entry[:2] + entry[3:],
+            "7 elements": entry[:7],
+            "11 elements": entry + [7, 8],
+            "stream_id > u32": [2**32] + entry[1:],
+            "b_stream > u32": entry[:8] + [2**32],
+            "b_stream 2^60 (#66 case 4)": entry[:8] + [2**60],
+            "lens > u32": entry + [2**32],
+            "live > u32": entry[:3] + [2**32] + entry[4:],
+            "bool element": entry[:3] + [True] + entry[4:],
+            "not a list": 7,
+        }
+        for label, bad_entry in bad.items():
+            with self.subTest(label):
+                with self.assertRaises(wire.Reject) as cm:
+                    wire.parse(mk(bad_entry), lambda k: PK)
+                self.assertEqual(cm.exception.reason, "bad-field")
+        for key, over in ((4, 2**32), (8, 2**32)):                       # next_beacon_ms and b_station are u32 (§9.8)
+            with self.subTest(key=key):
+                with self.assertRaises(wire.Reject) as cm:
+                    wire.parse(wire.sign_frame(wire.KIND_BEACON, SK, {1: 1, 2: 1, 3: 1790000000000, 4: 1000, 5: "p", 6: [], 8: 16000, key: over}), lambda k: PK)
+                self.assertEqual(cm.exception.reason, "bad-field")
+
     def test_stream_ids(self):
         self.assertEqual(stream_id("chatter"), int.from_bytes(__import__("hashlib").sha256(b"canticle-stream/v2\x00chatter").digest()[:4], "big"))
         with self.assertRaises(ValueError):

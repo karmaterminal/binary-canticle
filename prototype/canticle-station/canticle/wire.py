@@ -88,10 +88,21 @@ class Pluck:
     extra: dict = field(default_factory=dict, compare=False)
 
 
+U32, U64 = 2**32 - 1, 2**64 - 1
+
+
 @dataclass(frozen=True)
 class StreamEntry:
+    """One §9.8 ``stream-entry`` (post-A1): 9 elements, or 10 with ``lens``.
+
+    ``trail_seq`` (amendment A1, #54) is the lowest ``seq`` of any ITEM or PLUCK still on air on the
+    stream in this epoch, or ``head_seq + 1`` when nothing is. A pre-A1 8-element entry has no
+    length that tells it from a post-A1 one, so it is ``bad-field`` rather than read shifted (#70).
+    """
+
     stream_id: int
     head_seq: int
+    trail_seq: int
     live: int
     loop_ms: int
     loop_max_ms: int
@@ -100,8 +111,13 @@ class StreamEntry:
     b_stream: int
     lens: Optional[int] = None
 
+    # §9.8 CDDL: `.size 4` fields are u32, `head_seq` and `trail_seq` (`.size 8`) are u64.
+    FIELDS = ("stream_id", "head_seq", "trail_seq", "live", "loop_ms", "loop_max_ms",
+              "default_ttl_s", "max_ttl_s", "b_stream", "lens")
+    MAXIMA = (U32, U64, U64, U32, U32, U32, U32, U32, U32, U32)
+
     def to_cbor(self) -> list:
-        out = [self.stream_id, self.head_seq, self.live, self.loop_ms, self.loop_max_ms,
+        out = [self.stream_id, self.head_seq, self.trail_seq, self.live, self.loop_ms, self.loop_max_ms,
                self.default_ttl_s, self.max_ttl_s, self.b_stream]
         return out + [self.lens] if self.lens is not None else out
 
@@ -312,9 +328,12 @@ def _beacon(m: dict) -> Beacon:
         raise Reject("bad-field", "streams")
     entries = []
     for e in m[6]:
-        if not isinstance(e, list) or len(e) not in (8, 9):
-            raise Reject("bad-field", "stream-entry")
-        vals = [_uint(v, "stream-entry") for v in e]
+        # 9 elements, or 10 with lens (§9.8 post-A1). A pre-A1 8-element entry is bad-field: accepting
+        # it would read the fields shifted, since there is no other way to tell the shapes apart (#70).
+        if not isinstance(e, list) or len(e) not in (9, 10):
+            raise Reject("bad-field", f"stream-entry has {len(e) if isinstance(e, list) else 'no'} elements; §9.8 has 9 or 10")
+        vals = [_uint(v, f"stream-entry.{name}", maximum)
+                for v, name, maximum in zip(e, StreamEntry.FIELDS, StreamEntry.MAXIMA)]
         entries.append(StreamEntry(*vals))
     page = None
     if 7 in m:
@@ -333,9 +352,9 @@ def _beacon(m: dict) -> Beacon:
         if k in m and not isinstance(m[k], dict):
             raise Reject("bad-field", "capsid" if k == 10 else "relay")
     return Beacon(
-        epoch=_uint(m[1], "epoch", 2**32 - 1), bseq=_uint(m[2], "bseq"), wallclock=_uint(m[3], "wallclock"),
-        next_beacon_ms=_uint(m[4], "next_beacon_ms"), profile=_tstr(m[5], "profile", 1, 32),
-        streams=tuple(entries), b_station=_uint(m[8], "b_station"), page=page, catalog_digest=digest,
+        epoch=_uint(m[1], "epoch", U32), bseq=_uint(m[2], "bseq"), wallclock=_uint(m[3], "wallclock"),
+        next_beacon_ms=_uint(m[4], "next_beacon_ms", U32), profile=_tstr(m[5], "profile", 1, 32),
+        streams=tuple(entries), b_station=_uint(m[8], "b_station", U32), page=page, catalog_digest=digest,
         capsid=m.get(10), relay=m.get(11),
         extra={k: v for k, v in m.items() if k not in _UNDERSTOOD[KIND_BEACON]},
     )

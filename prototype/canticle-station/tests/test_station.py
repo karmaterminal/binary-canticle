@@ -210,17 +210,70 @@ class CarouselTest(unittest.TestCase):
         self.assertEqual((b.epoch, b.bseq, b.profile), (7, 1, "canticle-regulation/1"))
         self.assertTrue(900 <= b.next_beacon_ms <= 1100)
         entry = {e.stream_id: e for e in b.streams}[stream_id("chatter")]
-        self.assertEqual((entry.head_seq, entry.live, entry.loop_ms, entry.default_ttl_s), (1, 1, 10_000, 60))
+        self.assertEqual((entry.head_seq, entry.trail_seq, entry.live, entry.loop_ms, entry.default_ttl_s),
+                         (1, 1, 1, 10_000, 60))
         bye = wire.parse(st.goodbye(T0 + 100), lambda k: PK).body
         self.assertEqual(bye.next_beacon_ms, 0)
 
+    def test_trail_seq_tracks_the_on_air_set(self):
+        # F-PD A1 (§22.3, §9.8): trail_seq is the lowest seq of any ITEM or PLUCK still on air, head_seq + 1
+        # when nothing is, and it stays right through expiry, supersession, pluck and depth eviction.
+        st = station(StreamConfig("chatter", default_ttl_s=300, max_ttl_s=300),
+                     StreamConfig("lens.threat", cls="live-state"), depth=3)
+        ent = lambda name: {e.stream_id: e for e in st._entries()}[stream_id(name)]
+        self.assertEqual((ent("chatter").head_seq, ent("chatter").trail_seq, ent("chatter").live), (0, 1, 0))
+        st.sing(T0, "chatter", text="a", ttl_s=10)                                  # seq 1, off air at T0 + 9.9 s
+        st.sing(T0, "chatter", text="b", ttl_s=300)                                 # seq 2
+        st.sing(T0, "chatter", text="c", ttl_s=300)                                 # seq 3
+        self.assertEqual((ent("chatter").head_seq, ent("chatter").trail_seq, ent("chatter").live), (3, 1, 3))
+        b = wire.parse(st._beacon(T0 + 9_950), lambda k: PK).body                  # expiry: the beacon sweeps first
+        e = {e.stream_id: e for e in b.streams}[stream_id("chatter")]
+        self.assertEqual((e.head_seq, e.trail_seq, e.live), (3, 2, 2))
+        st.hush(T0 + 11_000, "chatter", 2)                                          # pluck: item 2 off, PLUCK seq 4 on
+        self.assertEqual((ent("chatter").head_seq, ent("chatter").trail_seq, ent("chatter").live), (4, 3, 2))
+        for text in ("d", "e", "f"):                                                # depth 3: item 3 is evicted by seq 7
+            st.sing(T0 + 12_000, "chatter", text=text, ttl_s=300)
+        self.assertEqual((ent("chatter").head_seq, ent("chatter").trail_seq, ent("chatter").live), (7, 4, 4))
+        st.sing(T0, "lens.threat", text="low", state_key="now")                     # supersession: seq 1 then 2
+        st.sing(T0 + 1_000, "lens.threat", text="high", state_key="now")
+        self.assertEqual((ent("lens.threat").head_seq, ent("lens.threat").trail_seq, ent("lens.threat").live), (2, 2, 1))
+        st.poll(T0 + 400_000)                                                       # everything has expired
+        self.assertEqual((ent("chatter").head_seq, ent("chatter").trail_seq, ent("chatter").live), (7, 8, 0))
+        self.assertEqual(st.status(T0 + 400_000)["streams"]["chatter"]["trail_seq"], 8)
+
     def test_beacon_pages_rotate_with_a_catalog_digest(self):
-        st = station(*[StreamConfig(f"s{i}", b_stream=500) for i in range(30)], b_station=16_000)
-        pages = [wire.parse(st._beacon(T0 + i), lambda k: PK).body for i in range(2)]
-        self.assertEqual([p.page for p in pages], [(0, 2), (1, 2)])
-        self.assertEqual(pages[0].catalog_digest, pages[1].catalog_digest)
-        self.assertEqual(sum(len(p.streams) for p in pages), 30)
-        self.assertTrue(all(len(st._beacon(T0)) <= wire.MAX_FRAME for _ in range(2)))
+        st = station(*[StreamConfig(f"s{i}", b_stream=500) for i in range(120)], b_station=60_000)
+        first = wire.parse(st._beacon(T0), lambda k: PK).body
+        count = first.page[1]
+        self.assertGreater(count, 1)
+        pages = [first] + [wire.parse(st._beacon(T0 + i), lambda k: PK).body for i in range(1, count)]
+        self.assertEqual([p.page for p in pages], [(i, count) for i in range(count)])
+        self.assertEqual(len({p.catalog_digest for p in pages}), 1)
+        self.assertEqual(sorted(e.stream_id for p in pages for e in p.streams), sorted(s.sid for s in st.streams.values()))
+        self.assertTrue(all(len(st._beacon(T0)) <= wire.MAX_FRAME for _ in range(count)))
+        small = station(*[StreamConfig(f"s{i}", b_stream=500) for i in range(30)], b_station=16_000)
+        self.assertIsNone(wire.parse(small._beacon(T0), lambda k: PK).body.page)     # fits one beacon: not paged
+
+    def test_beacon_paging_bound_matches_rfc_8_4(self):
+        # §8.4 paging bound (A1): with every entry field at its CDDL maximum, 17 entries fit a page (54 B each),
+        # so a catalog of 136 streams fits 8 pages and 137 does not. With lens (59 B) the RFC's 32-byte profile
+        # gives 15 per page; this station's 21-byte profile leaves room for 16, so its floor is 128.
+        cfg = lambda n, **kw: [StreamConfig(f"s{i}", b_stream=500, **kw) for i in range(n)]
+        st = station(*cfg(136), b_station=100_000)
+        worst = [wire.StreamEntry(*wire.StreamEntry.MAXIMA[:9]) for _ in range(136)]
+        pages = st._pages(worst)
+        self.assertEqual([len(p) for p in pages], [17] * 8)
+        for p in pages:                                                             # each worst-case page encodes within the limit
+            b = wire.Beacon(epoch=st.epoch, bseq=wire.U64, wallclock=wire.U64, next_beacon_ms=wire.U32,
+                            profile="canticle-regulation/1", streams=tuple(p), b_station=100_000,
+                            page=(7, 8), catalog_digest=bytes(8))
+            self.assertLessEqual(len(wire.encode_beacon(SK, b)), wire.MAX_FRAME)
+        with self.assertRaises(ValueError):
+            station(*cfg(137), b_station=100_000)
+        self.assertEqual(len(station(*cfg(128, lens=1), b_station=100_000)._pages(
+            [wire.StreamEntry(*wire.StreamEntry.MAXIMA[:9], lens=wire.U32) for _ in range(128)])), 8)
+        with self.assertRaises(ValueError):
+            station(*cfg(129, lens=1), b_station=100_000)
 
 
 class LateJoinerTest(unittest.TestCase):

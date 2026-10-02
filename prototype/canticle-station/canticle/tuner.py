@@ -192,14 +192,14 @@ class TunerView:
         return {"now_ms": now_ms, "station": entry.name, "key_id": kid.hex(), "stream": entry.stream_names[sid],
                 "stream_id": f"{sid:08x}", "epoch": st.epoch_hwm if st else None,
                 "presence": lst.presence_state(kid, now_ms),
-                "head_seq": head, "live_advertised": e.live if e else None,
+                "head_seq": head, "trail_seq": e.trail_seq if e else None, "live_advertised": e.live if e else None,
                 "loop_ms": e.loop_ms if e else None, "items": items[:RING_LIMIT],
                 "items_truncated": max(0, len(items) - RING_LIMIT), "tombstones": tombs,
                 "unheard_seq": unheard, "gateway_started_ms": self.started_ms,
                 "note": "Live items are the ones this listener holds now, each until its local expiry. "
                         "Nothing from before the gateway started, or already expired, is shown as live. "
-                        "An unheard seq may have expired before the gateway heard it, been lost, or be "
-                        "on air still; this spike's beacons carry no trail_seq to tell which."}
+                        "An unheard seq below trail_seq is gone and will not loop again; one at or above "
+                        "it may still be on air (§7.10). This view only reports trail_seq; it does not wait or repair."}
 
 
 # ---------------------------------------------------------------- subscriptions
