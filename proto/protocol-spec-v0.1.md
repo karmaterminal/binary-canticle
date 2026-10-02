@@ -235,10 +235,19 @@ streams (log + ringbuffer them; the interface layer chooses what to surface).
 - `_human_*` — reserved for human-originated frames (rare, e.g., figs sending
   a weather-tick directly). MUST be flagged distinctly in the interface layer.
 
-## 5. Discovery (DNS SRV)
+## 5. Bootstrap discovery (DNS SRV)
 
-Stations are discovered via DNS SRV records on the LAN. Implementations
-MUST support SRV-based discovery; MAY also support a static-config fallback.
+This section defines **bootstrap endpoint discovery**: how a hearer finds the
+UDP endpoint(s) and optional metadata query surface for the canticle substrate
+on a LAN. It does **not** define live station presence, ring head position,
+subscriber state, participant capability exchange, or QoS negotiation. In
+v0.2 terminology, those live facts are carried by the carrier-beacon in
+`proto/stations-and-streams-v0.2.md`: DNS SRV/mDNS gets a hearer to the
+broadcast/multicast surface; the carrier-beacon tells the hearer which
+stations are alive now and where their stream heads are.
+
+Implementations MUST support SRV-based bootstrap discovery; MAY also support
+a static-config fallback.
 
 ### 5.1 SRV naming scheme
 
@@ -279,12 +288,17 @@ Hearers MAY query SRV+TXT to:
 
 ### 5.3 Discovery refresh
 
-- Hearers SHOULD refresh SRV+TXT records on station-rotation (i.e., when a
-  frame arrives with a station-id not in the cached set).
+- Hearers SHOULD refresh SRV+TXT records when the bootstrap endpoint set may
+  have changed (SRV TTL expiry, static-config reload, network move).
 - Hearers SHOULD respect SRV TTL when caching.
-- Discovery is OPTIONAL for *receiving*: a hearer can ringbuffer frames from
-  any station-id without needing prior discovery. Discovery is useful for
-  schema-validation, lens-routing, and UI presentation.
+- Bootstrap discovery is OPTIONAL for *receiving*: a hearer can ringbuffer
+  frames from any station-id heard on the UDP surface without needing prior
+  SRV/TXT knowledge. Bootstrap discovery is useful for finding the UDP
+  surface, schema-validation, lens-routing, and UI presentation.
+- A carrier-beacon from an unknown station-id SHOULD NOT force a DNS/SRV
+  refresh by itself. The beacon is already the live presence/head-sync fact;
+  implementations MAY perform metadata lookup out-of-band if they want richer
+  UI/schema hints.
 
 ### 5.4 Static-config fallback
 

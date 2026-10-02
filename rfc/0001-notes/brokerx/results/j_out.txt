@@ -1,0 +1,29 @@
+{
+ "J1_snapshot_all20_s": 0.0037,
+ "J2_ttl6_src_gone_s": 6.03,
+ "J2_dst_created_at3_first_seen_s": 3.26,
+ "J2_dst_gone_s": 9.3,
+ "J2_dst_hdrs": "NATS/1.0\r\nNats-TTL: 6s\r\nNats-Stream-Source: SRC 1 > > src.item\r\n\r\n",
+ "J3b_core_heard_via_republish": 3,
+ "J3_core_sub_heard": 0,
+ "J3_js_fires": 4,
+ "J3_fire_times_s": [
+  1.08,
+  2.08,
+  3.08,
+  4.08
+ ],
+ "J3_bytes_identical_to_item": true,
+ "J3_stream_seqs": [
+  3,
+  4,
+  5,
+  6
+ ],
+ "J3_headers_first": {
+  "Nats-Scheduler": "sched.st1.7.99",
+  "Nats-Schedule-Next": "2026-09-27T07:56:34Z"
+ },
+ "J4_ttl_500ms": "rejected: nats: BadRequestError: code=400 err_code=10165 description='invalid per-message TTL'",
+ "J4_every_500ms": "rejected: nats: BadRequestError: code=400 err_code=10189 description='message schedules pattern is invalid'"
+}

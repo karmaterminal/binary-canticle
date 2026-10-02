@@ -1,0 +1,2 @@
+# Verbatim nats-server output kept as evidence; its trailing whitespace is the server's.
+rfc/0001-notes/brokerx/results/*.log -whitespace

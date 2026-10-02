@@ -1,0 +1,4 @@
+cryptography>=45
+simpledali==0.8.3
+simplemseed==1.0.2
+-e ../ringserver-udp-cue

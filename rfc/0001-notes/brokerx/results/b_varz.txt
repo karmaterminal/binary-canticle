@@ -1,0 +1,1 @@
+{'version': '2.14.7', 'in_msgs': 496, 'out_msgs': 14973, 'in_bytes': 355136, 'out_bytes': 10720668, 'mem': 22282240, 'connections': 0}

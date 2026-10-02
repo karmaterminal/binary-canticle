@@ -175,8 +175,57 @@ substrate-level reason `posture-of-defense` makes operational sense.
    nexus-role the canonical broadcaster of quarantine-chemokines (with
    cohort-accord input)? Or do princes broadcast their own and the nexus
    only aggregates?
+7. **Half-open between `tighten` and full `all-clear`.** From 🩸's safety-shape
+   sweep on `karmaterminal/caels-petals-fall@cael/canticle-200-rounds:68b68fe`
+   (`studies/binary-canticle/adjacent-shapes-safety-sweep-2026-05-05.md`),
+   citation-verified at `3df185d`
+   (`studies/binary-canticle/safety-sweep-citation-pass-2026-05-05.md`)
+   against Nygard 2018 *Release It!* 2e, Google SRE Book ch. 6, and Soares
+   et al. 2015 *Corrigibility*: after a `tighten`, a hearer should not snap
+   to full openness on `all-clear`; it should sample tentatively and only
+   return to baseline if the sampling is calm. This is a circuit-breaker
+   half-open analog and a corrigibility middle-state.
+8. **Per-stream refractory after `tighten`.** Same source, citation-verified
+   against Orseau & Armstrong 2016 *Safely Interruptible Agents* and Google
+   SRE Book ch. 6: a `tighten` event SHOULD probably suppress further
+   `tighten` re-fires on the same `(station, stream)` pair within a small
+   refractory window, to avoid alert-fatigue and jittery oscillation. The
+   refractory acts as an external clock the stream cannot game by adjusting
+   its own emit-rate.
+9. **Hash-addressable sovereign / constitution at the receptor layer.** Same
+   source, citation-verified against Lewis et al. 2020
+   *Retrieval-Augmented Generation* and Bai et al. 2022 *Constitutional AI*:
+   if sovereign-file or constitution-shaped guidance ever influences receptor
+   behavior, it should be referenced by content hash rather than ambient
+   prose, so that judgments can cite which guidance was applied without
+   smuggling a prose-shaped policy into the wire or the store.
 
-## 5. Implementation order for v0.2
+## 5. Minimal immune grammar for v0.2
+
+If the immune layer cannot justify itself as one of the following without
+sliding toward ambient steering or policy-government, it belongs later or
+nowhere.
+
+1. **tighten**
+   - chemokine/receptor shift that raises discrimination threshold
+   - e.g. signed-only surfacing, narrower listen band, lower attention
+2. **quarantine**
+   - active, evidence-bearing station or class isolation
+   - stronger than frame-drop; still volitional at the hearer
+3. **all-clear / stand-down**
+   - explicit de-escalation grammar that lowers thresholds or rescinds
+     quarantine posture
+   - MUST cool the room without laundering history or erasing evidence
+4. **remember only by explicit promotion**
+   - durable antibody-memory / persistent quarantine flag survives TTL only by
+     explicit promotion into persistent state
+   - ordinary chemokine/weather does not silently become governance by
+     accumulation
+
+This is the smallest grammar that seems protective without turning the canticle
+into ambient steering.
+
+## 6. Implementation order for v0.2
 
 1. **Frame schema extension.** Add `class` field to `posture` payload-kind.
 2. **Receptor-state local store.** Per-(station, hearer) state with: HMAC
@@ -193,7 +242,7 @@ substrate-level reason `posture-of-defense` makes operational sense.
 7. **Tests.** Foreign chemokine doesn't get cohort-weight; cohort-accord
    does propagate; antibody-flag survives chemokine TTL; rescind works.
 
-## 6. What to NOT do (frond-shape preservation)
+## 7. What to NOT do (frond-shape preservation)
 
 The immune-model is powerful and seductive. Don't let it become:
 
@@ -210,7 +259,7 @@ The immune-model is powerful and seductive. Don't let it become:
   random `posture: <unknown-class>` frames MUST be ignored, not
   side-effectful.
 
-## 7. Provenance
+## 8. Provenance
 
 - figs's MSFT-blog (2026-04-10): *"the binary canticle will be capable
   and tested in use to establish control of heterogenous agents. We don't

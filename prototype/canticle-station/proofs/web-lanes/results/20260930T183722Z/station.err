@@ -1,0 +1,2 @@
+{"station": "609f71e7fbdbcd9b", "epoch": 1790793453, "control": "/tmp/tmp.zirxY4637w/room.sock", "dests": ["239.255.13.13:9999"], "streams": ["hymn", "lens.weather"]}
+control socket /tmp/tmp.zirxY4637w/room.sock

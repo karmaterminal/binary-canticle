@@ -1,0 +1,259 @@
+{
+ "experiment": "e4_late_joiner",
+ "run_id": "20260927T232539Z-9518-adbb",
+ "tag": "loss300",
+ "loss_permille": 300,
+ "duration_s": 600.0,
+ "items": 20,
+ "trial_timeout_s": 120,
+ "slots_per_arm": 10,
+ "frame_bytes": 327,
+ "sing": {
+  "slow": {
+   "stream": "lens.state",
+   "seq": 1,
+   "epoch": 1790551541,
+   "issued_at": 1790551541172,
+   "expires_at": 1790552441172,
+   "ttl_s": 900.0,
+   "loop_ms": 5000,
+   "clamp": "none",
+   "size": 327,
+   "kind": "item"
+  },
+  "fast": {
+   "stream": "ctl.state",
+   "seq": 1,
+   "epoch": 1790551541,
+   "issued_at": 1790551541172,
+   "expires_at": 1790552441172,
+   "ttl_s": 900.0,
+   "loop_ms": 1000,
+   "clamp": "none",
+   "size": 327,
+   "kind": "item"
+  }
+ },
+ "loop_ms": {
+  "slow": [
+   13080
+  ],
+  "fast": [
+   1000
+  ]
+ },
+ "relay_snapshots": 176,
+ "relay_renewals": 93,
+ "tcp_snapshots": 304,
+ "granted_bps": 32000,
+ "nft": {
+  "offered": 178253,
+  "dropped_loss": 53150,
+  "measured_loss": 0.29817
+ },
+ "arms": {
+  "carousel-4kbps": {
+   "trials": 143,
+   "completed": 135,
+   "timeouts": 0,
+   "errors": 0,
+   "cut_at_end": 8,
+   "t_full_km_ms": {
+    "n": 143,
+    "events": 135,
+    "censored": 8,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 37433.6,
+    "p90": 56730.9,
+    "p95": 67758.1,
+    "p99": 77792.8,
+    "p99.9": 81594.6,
+    "max_event": 81594.6
+   },
+   "t_full_completed_ms": {
+    "n": 135,
+    "unit": "ms",
+    "mean": 39753.8,
+    "median": 37149.4,
+    "p90": 56240.5,
+    "p95": 65499.5,
+    "p99": 77562.8,
+    "p99.9": 81085.2,
+    "max": 81594.6,
+    "min": 20207.7,
+    "conditional_on": "completion: timed-out and cut-off joins excluded"
+   }
+  },
+  "carousel-1s": {
+   "trials": 1012,
+   "completed": 1012,
+   "timeouts": 0,
+   "errors": 0,
+   "cut_at_end": 0,
+   "t_full_km_ms": {
+    "n": 1012,
+    "events": 1012,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 2917.9,
+    "p90": 4607.4,
+    "p95": 5111.8,
+    "p99": 6652.4,
+    "p99.9": 8523.7,
+    "max_event": 8892.0
+   },
+   "t_full_completed_ms": {
+    "n": 1012,
+    "unit": "ms",
+    "mean": 3119.3,
+    "median": 2919.3,
+    "p90": 4606.2,
+    "p95": 5110.9,
+    "p99": 6604.1,
+    "p99.9": 8521.6,
+    "max": 8892.0,
+    "min": 1046.1,
+    "conditional_on": "completion: timed-out and cut-off joins excluded"
+   }
+  },
+  "tcp-snapshot": {
+   "trials": 307,
+   "completed": 283,
+   "timeouts": 17,
+   "errors": 0,
+   "cut_at_end": 7,
+   "t_full_km_ms": {
+    "n": 307,
+    "events": 283,
+    "censored": 24,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 2242.4,
+    "p90": 67663.6,
+    "p95": null,
+    "p99": null,
+    "p99.9": null,
+    "censored_beyond_ms": 120001.6,
+    "max_event": 116964.7
+   },
+   "t_full_completed_ms": {
+    "n": 283,
+    "unit": "ms",
+    "mean": 8731.8,
+    "median": 2031.5,
+    "p90": 24923.7,
+    "p95": 56588.5,
+    "p99": 86582.4,
+    "p99.9": 116535.7,
+    "max": 116964.7,
+    "min": 0.5,
+    "conditional_on": "completion: timed-out and cut-off joins excluded"
+   },
+   "connect_ms": {
+    "n": 283,
+    "unit": "ms",
+    "mean": 818.0,
+    "median": 1000.8,
+    "p90": 2048.8,
+    "p95": 3059.3,
+    "p99": 4280.9,
+    "p99.9": 5106.4,
+    "max": 5107.4,
+    "min": 0.2
+   },
+   "error_kinds": [
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError",
+    "TimeoutError"
+   ]
+  },
+  "lease-snapshot": {
+   "trials": 176,
+   "completed": 168,
+   "timeouts": 0,
+   "errors": 0,
+   "cut_at_end": 8,
+   "t_full_km_ms": {
+    "n": 176,
+    "events": 168,
+    "censored": 8,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 28545.4,
+    "p90": 55487.9,
+    "p95": 61308.6,
+    "p99": 87757.7,
+    "p99.9": 93417.4,
+    "max_event": 93417.4
+   },
+   "t_full_completed_ms": {
+    "n": 168,
+    "unit": "ms",
+    "mean": 31028.5,
+    "median": 27632.5,
+    "p90": 51599.6,
+    "p95": 60168.8,
+    "p99": 84850.6,
+    "p99.9": 92472.2,
+    "max": 93417.4,
+    "min": 6552.6,
+    "conditional_on": "completion: timed-out and cut-off joins excluded"
+   },
+   "handshake_ms": {
+    "n": 168,
+    "unit": "ms",
+    "mean": 5187.0,
+    "median": 1004.3,
+    "p90": 16004.0,
+    "p95": 23006.6,
+    "p99": 43662.9,
+    "p99.9": 59506.7,
+    "max": 62012.2,
+    "min": 0.2
+   },
+   "hello_sent": {
+    "n": 168,
+    "unit": "datagrams",
+    "mean": 1.9,
+    "median": 1.0,
+    "p90": 3.3,
+    "p95": 4.7,
+    "p99": 6.0,
+    "p99.9": 8.8,
+    "max": 9.0,
+    "min": 1.0
+   },
+   "renew_sent": 125,
+   "timeout_stages": [],
+   "sessions_with_listen_ok": 168
+  }
+ },
+ "env": {
+  "kernel": "6.18.44-fc-v37",
+  "cpus": 4,
+  "python": "3.11.15",
+  "hz": 250,
+  "tcp_retries2": "15",
+  "tcp_congestion_control_ns": "bbr",
+  "tcp_rmem": "4096\t131072\t33554432",
+  "tcp_wmem": "4096\t16384\t4194304",
+  "rmem_max": "4194304",
+  "date": "2026-09-27T23:35:47Z"
+ }
+}

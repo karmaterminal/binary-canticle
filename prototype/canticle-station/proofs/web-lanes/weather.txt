@@ -1,0 +1,6 @@
+# Topical channel fixture: lens.weather (#57, #58). Invented readings, no real observations.
+wind 12 kt from the west, steady
+light rain moving east
+pressure falling slowly
+clear overhead, cold
+fog in the low valley

@@ -1,0 +1,513 @@
+{
+ "experiment": "e1_freshness",
+ "run_id": "20260927T232539Z-9515-1d9e",
+ "tag": "u10-lossdata100",
+ "update_s": 10.0,
+ "loss_permille": 100,
+ "loss_direction": "data-only",
+ "outage_s": 0,
+ "duration_s": 900.0,
+ "receivers": 20,
+ "body_bytes": 200,
+ "frame_bytes": 328,
+ "warmup_s": 5,
+ "drain_s": 20,
+ "outages": [],
+ "nft": {
+  "offered": 69848,
+  "dropped_loss": 6568,
+  "eligible": 66128,
+  "measured_loss": 0.09932
+ },
+ "snmp": {
+  "Tcp.OutSegs": 7320,
+  "Tcp.InSegs": 7320,
+  "Tcp.RetransSegs": 388,
+  "Tcp.OutRsts": 0,
+  "Tcp.EstabResets": 0,
+  "Udp.OutDatagrams": 62140,
+  "Udp.InDatagrams": 55960,
+  "Udp.RcvbufErrors": 0,
+  "Udp.InErrors": 0,
+  "TcpExt.TCPTimeouts": 68,
+  "TcpExt.TCPLossProbes": 320,
+  "TcpExt.TCPLossProbeRecovery": 254,
+  "TcpExt.TCPFastRetrans": 0,
+  "TcpExt.TCPSlowStartRetrans": 0,
+  "TcpExt.TCPSpuriousRTOs": 0,
+  "TcpExt.TCPAbortOnTimeout": 0,
+  "TcpExt.TCPRetransFail": 0
+ },
+ "arms": {
+  "udp-live": {
+   "updates_measured": 89,
+   "samples": 1780,
+   "delivered": 1780,
+   "censored": 0,
+   "delivered_fraction": 1.0,
+   "update_latency_km_ms": {
+    "n": 1780,
+    "events": 1780,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 1.3,
+    "p90": 2.4,
+    "p95": 1002.2,
+    "p99": 1011.7,
+    "p99.9": 4004.4,
+    "max_event": 10001.8
+   },
+   "delivered_latency_ms": {
+    "n": 1780,
+    "unit": "ms",
+    "mean": 105.8,
+    "median": 1.3,
+    "p90": 2.5,
+    "p95": 1002.2,
+    "p99": 1011.6,
+    "p99.9": 2448.2,
+    "max": 10001.8,
+    "min": 0.3,
+    "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
+   },
+   "exact_hold_latency_ms": {
+    "n": 1779,
+    "unit": "ms",
+    "mean": 100.3,
+    "median": 1.3,
+    "p90": 2.4,
+    "p95": 1002.1,
+    "p99": 1011.6,
+    "p99.9": 2006.0,
+    "max": 4004.4,
+    "min": 0.3
+   },
+   "skipped_updates": 1,
+   "stale_time_fraction": 0.010645,
+   "staleness_ms_time_weighted": {
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 59.7,
+    "p99.9": 1520.9,
+    "max": 10000.4
+   },
+   "arrivals": 1799,
+   "superseded_deliveries": 0,
+   "superseded_delivery_fraction": 0.0,
+   "sender": {
+    "datagrams": 26740,
+    "item_datagrams": 8500,
+    "bytes": 5566180,
+    "errors": 0,
+    "sing": [
+     {
+      "stream": "lens.state",
+      "seq": 1,
+      "epoch": 1790551545,
+      "issued_at": 1790551546706,
+      "expires_at": 1790551726706,
+      "ttl_s": 180.0,
+      "loop_ms": 5000,
+      "clamp": "none",
+      "size": 327,
+      "kind": "item"
+     }
+    ]
+   },
+   "receiver": {
+    "datagrams": 24124,
+    "evidence": {}
+   }
+  },
+  "udp-ctl": {
+   "updates_measured": 89,
+   "samples": 1780,
+   "delivered": 1780,
+   "censored": 0,
+   "delivered_fraction": 1.0,
+   "update_latency_km_ms": {
+    "n": 1780,
+    "events": 1780,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 1.1,
+    "p90": 3.5,
+    "p95": 1002.1,
+    "p99": 1013.9,
+    "p99.9": 4001.9,
+    "max_event": 4002.4
+   },
+   "delivered_latency_ms": {
+    "n": 1780,
+    "unit": "ms",
+    "mean": 106.9,
+    "median": 1.1,
+    "p90": 3.5,
+    "p95": 1002.1,
+    "p99": 1013.8,
+    "p99.9": 4001.6,
+    "max": 4002.4,
+    "min": 0.3,
+    "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
+   },
+   "exact_hold_latency_ms": {
+    "n": 1780,
+    "unit": "ms",
+    "mean": 106.9,
+    "median": 1.1,
+    "p90": 3.5,
+    "p95": 1002.1,
+    "p99": 1013.8,
+    "p99.9": 4001.6,
+    "max": 4002.4,
+    "min": 0.3
+   },
+   "skipped_updates": 0,
+   "stale_time_fraction": 0.010528,
+   "staleness_ms_time_weighted": {
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 46.8,
+    "p99.9": 1315.4,
+    "max": 4001.6
+   },
+   "arrivals": 1800,
+   "superseded_deliveries": 0,
+   "superseded_delivery_fraction": 0.0,
+   "sender": {
+    "datagrams": 35400,
+    "item_datagrams": 17200,
+    "bytes": 8429820,
+    "errors": 0,
+    "sing": [
+     {
+      "stream": "ctl.state",
+      "seq": 1,
+      "epoch": 1790551545,
+      "issued_at": 1790551546708,
+      "expires_at": 1790551846708,
+      "ttl_s": 300.0,
+      "loop_ms": 1000,
+      "clamp": "none",
+      "size": 327,
+      "kind": "item"
+     }
+    ]
+   },
+   "receiver": {
+    "datagrams": 31836,
+    "evidence": {}
+   }
+  },
+  "tcp-stream": {
+   "updates_measured": 89,
+   "samples": 1780,
+   "delivered": 1780,
+   "censored": 0,
+   "delivered_fraction": 1.0,
+   "update_latency_km_ms": {
+    "n": 1780,
+    "events": 1780,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 1.1,
+    "p90": 2.2,
+    "p95": 206.4,
+    "p99": 413.5,
+    "p99.9": 829.8,
+    "max_event": 846.4
+   },
+   "delivered_latency_ms": {
+    "n": 1780,
+    "unit": "ms",
+    "mean": 21.3,
+    "median": 1.1,
+    "p90": 2.2,
+    "p95": 206.4,
+    "p99": 413.5,
+    "p99.9": 693.1,
+    "max": 846.4,
+    "min": 0.2,
+    "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
+   },
+   "exact_hold_latency_ms": {
+    "n": 1780,
+    "unit": "ms",
+    "mean": 21.3,
+    "median": 1.1,
+    "p90": 2.2,
+    "p95": 206.4,
+    "p99": 413.5,
+    "p99.9": 693.1,
+    "max": 846.4,
+    "min": 0.2
+   },
+   "skipped_updates": 0,
+   "stale_time_fraction": 0.00214,
+   "staleness_ms_time_weighted": {
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "p99.9": 124.0,
+    "max": 842.7
+   },
+   "arrivals": 1800,
+   "superseded_deliveries": 0,
+   "superseded_delivery_fraction": 0.0,
+   "tcp": {
+    "total_retrans": [
+     8,
+     12,
+     8,
+     10,
+     6,
+     10,
+     10,
+     7,
+     11,
+     10,
+     3,
+     8,
+     11,
+     6,
+     11,
+     7,
+     11,
+     9,
+     10,
+     6
+    ],
+    "frames_written": null,
+    "coalesced": null,
+    "sender_errors": [],
+    "receiver_errors": [],
+    "rejected_on_arrival": {},
+    "loss_episodes": {
+     "count": 3,
+     "open_at_end": 0,
+     "closed_duration_ms": {
+      "n": 3,
+      "unit": "ms",
+      "mean": 424.8,
+      "median": 430.4,
+      "p90": 433.4,
+      "p95": 433.8,
+      "p99": 434.1,
+      "p99.9": 434.2,
+      "max": 434.2,
+      "min": 409.8
+     },
+     "max_backoff_hist": {
+      "1": 3
+     },
+     "longest": [
+      {
+       "dur_ms": 434.2,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 350.423,
+       "open_at_end": false
+      },
+      {
+       "dur_ms": 430.4,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 630.235,
+       "open_at_end": false
+      },
+      {
+       "dur_ms": 409.8,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 220.437,
+       "open_at_end": false
+      }
+     ]
+    }
+   },
+   "tcp_info_trace_conn0": [
+    {
+     "t": -0.999,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    },
+    {
+     "t": 220.437,
+     "rto_ms": 408.0,
+     "backoff": 1,
+     "retransmits": 1,
+     "unacked": 1,
+     "notsent_bytes": 0,
+     "ca_state": "Loss"
+    },
+    {
+     "t": 220.847,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    }
+   ]
+  },
+  "tcp-latest": {
+   "updates_measured": 89,
+   "samples": 1780,
+   "delivered": 1780,
+   "censored": 0,
+   "delivered_fraction": 1.0,
+   "update_latency_km_ms": {
+    "n": 1780,
+    "events": 1780,
+    "censored": 0,
+    "unit": "ms",
+    "method": "kaplan-meier",
+    "median": 1.0,
+    "p90": 205.6,
+    "p95": 208.0,
+    "p99": 221.1,
+    "p99.9": 653.4,
+    "max_event": 846.2
+   },
+   "delivered_latency_ms": {
+    "n": 1780,
+    "unit": "ms",
+    "mean": 26.2,
+    "median": 1.0,
+    "p90": 205.6,
+    "p95": 208.0,
+    "p99": 219.0,
+    "p99.9": 641.0,
+    "max": 846.2,
+    "min": 0.2,
+    "conditional_on": "delivery: observed catch-ups only, censored samples excluded"
+   },
+   "exact_hold_latency_ms": {
+    "n": 1780,
+    "unit": "ms",
+    "mean": 26.2,
+    "median": 1.0,
+    "p90": 205.6,
+    "p95": 208.0,
+    "p99": 219.0,
+    "p99.9": 641.0,
+    "max": 846.2,
+    "min": 0.2
+   },
+   "skipped_updates": 0,
+   "stale_time_fraction": 0.002603,
+   "staleness_ms_time_weighted": {
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "p99.9": 139.2,
+    "max": 844.7
+   },
+   "arrivals": 1800,
+   "superseded_deliveries": 0,
+   "superseded_delivery_fraction": 0.0,
+   "tcp": {
+    "total_retrans": [
+     11,
+     11,
+     14,
+     13,
+     15,
+     10,
+     6,
+     11,
+     15,
+     9,
+     11,
+     11,
+     12,
+     9,
+     9,
+     14,
+     8,
+     13,
+     7,
+     5
+    ],
+    "frames_written": 1800,
+    "coalesced": 0,
+    "sender_errors": [],
+    "receiver_errors": [],
+    "rejected_on_arrival": {},
+    "loss_episodes": {
+     "count": 3,
+     "open_at_end": 0,
+     "closed_duration_ms": {
+      "n": 3,
+      "unit": "ms",
+      "mean": 426.7,
+      "median": 431.5,
+      "p90": 434.3,
+      "p95": 434.6,
+      "p99": 434.9,
+      "p99.9": 435.0,
+      "max": 435.0,
+      "min": 413.7
+     },
+     "max_backoff_hist": {
+      "1": 3
+     },
+     "longest": [
+      {
+       "dur_ms": 435.0,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 230.427,
+       "open_at_end": false
+      },
+      {
+       "dur_ms": 431.5,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 690.238,
+       "open_at_end": false
+      },
+      {
+       "dur_ms": 413.7,
+       "max_backoff": 1,
+       "max_rto_ms": 408.0,
+       "start": 520.228,
+       "open_at_end": false
+      }
+     ]
+    }
+   },
+   "tcp_info_trace_conn0": [
+    {
+     "t": -0.999,
+     "rto_ms": 204.0,
+     "backoff": 0,
+     "retransmits": 0,
+     "unacked": 0,
+     "notsent_bytes": 0,
+     "ca_state": "Open"
+    }
+   ]
+  }
+ },
+ "env": {
+  "kernel": "6.18.44-fc-v37",
+  "cpus": 4,
+  "python": "3.11.15",
+  "hz": 250,
+  "tcp_retries2": "15",
+  "tcp_congestion_control_ns": "bbr",
+  "tcp_rmem": "4096\t131072\t33554432",
+  "tcp_wmem": "4096\t16384\t4194304",
+  "rmem_max": "4194304",
+  "date": "2026-09-27T23:41:13Z"
+ }
+}

@@ -1,0 +1,2 @@
+rss_kB nats-server idle=15836
+rss_kB nats-server=21688 station=28224 listeners(50)=30656

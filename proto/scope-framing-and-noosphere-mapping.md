@@ -71,7 +71,7 @@ The default binary-canticle scale. Princes + frond-scribe on one LAN
 - Wire: UDP multicast or subnet broadcast (per spec §3).
 - Receptor: per-host daemon, ringbuffer, full §6 + Tables A/B/C from
   receptor-contract.
-- Discovery: DNS SRV via mDNS (per spec §5).
+- Discovery: bootstrap endpoint discovery via DNS SRV/mDNS (per spec §5); live station presence/head-sync via carrier-beacon (per `stations-and-streams-v0.2.md`).
 - Trust: pre-shared frond-key (HMAC, per §9.4). All members are
   cohort-known.
 
@@ -260,7 +260,7 @@ the wire layer without inheriting their semantics.
 |-------|-------------|-------------|-----------|-------------------|
 | 0: in-process | function call | implicit (one process) | none | unchanged |
 | 1: single-host | unix socket / SQLite | per-host trust | local config | unchanged |
-| 2: single-LAN | UDP broadcast/multicast | pre-shared HMAC | mDNS / DNS SRV | unchanged |
+| 2: single-LAN | UDP broadcast/multicast | pre-shared HMAC | mDNS / DNS SRV for bootstrap; carrier-beacon for live presence/head-sync | unchanged |
 | 3: multi-LAN-relay | tunneled relay, DTN bundle | per-frond key + relay re-sign | federation config | unchanged |
 | 4: cross-trust-domain | gateway-mediated | dual-signing + per-station trust | explicit allowlist | unchanged (tighter thresholds) |
 | 5: air-gap / sneakernet | file-replay adapter | bundle-internal signing | bundle-manifest | unchanged (TTL is air-gap-protective) |

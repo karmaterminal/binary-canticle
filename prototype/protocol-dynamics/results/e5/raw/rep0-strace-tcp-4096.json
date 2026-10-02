@@ -1,0 +1,81 @@
+{
+ "repeat": 0,
+ "strace_pass": true,
+ "mode": "tcp",
+ "n": 1000,
+ "backlog": 4096,
+ "new_relay_ready_after_kill_s": 0.14,
+ "all_served_after_kill_s": 0.6971,
+ "served_after_kill_s": {
+  "n": 1000,
+  "unit": "s",
+  "mean": 0.6,
+  "median": 0.6,
+  "p90": 0.7,
+  "p95": 0.7,
+  "p99": 0.7,
+  "p99.9": 0.7,
+  "max": 0.7,
+  "min": 0.2
+ },
+ "served_within_s": {
+  "0.5": 29,
+  "1": 1000,
+  "2": 1000,
+  "4": 1000,
+  "8": 1000,
+  "16": 1000,
+  "32": 1000
+ },
+ "listener_attempts_during": {
+  "connect": 2005,
+  "refused": 1005,
+  "snapshot_timeout": 0
+ },
+ "initial_attempts": {
+  "up": true,
+  "connect": 1000,
+  "refused": 0,
+  "snapshot_timeout": 0,
+  "all_served_after_start_s": 0.329,
+  "kernel": {
+   "TcpExt.ListenOverflows": 0,
+   "TcpExt.SyncookiesSent": 0,
+   "TcpExt.TCPSynRetrans": 0,
+   "Udp.RcvbufErrors": 0
+  }
+ },
+ "new_relay_syscalls": {
+  "total": 6075,
+  "by_call": {
+   "getsockname": 2000,
+   "accept4": 1013,
+   "sendto": 1000,
+   "epoll_ctl": 1000,
+   "ioctl": 1000,
+   "epoll_wait": 52,
+   "brk": 5,
+   "mmap": 5
+  }
+ },
+ "new_relay_cpu_s": 0.48,
+ "packets_offered": 10888,
+ "snmp": {
+  "Tcp.ActiveOpens": 2005,
+  "Tcp.PassiveOpens": 1023,
+  "Tcp.AttemptFails": 982,
+  "Tcp.OutRsts": 1005,
+  "Tcp.OutSegs": 14888,
+  "TcpExt.ListenOverflows": 0,
+  "TcpExt.ListenDrops": 0,
+  "TcpExt.TCPSynRetrans": 0,
+  "TcpExt.SyncookiesSent": 0,
+  "TcpExt.TCPReqQFullDrop": 0,
+  "TcpExt.TCPReqQFullDoCookies": 0,
+  "TcpExt.TCPTimeouts": 0,
+  "Udp.InDatagrams": 0,
+  "Udp.OutDatagrams": 0,
+  "Udp.RcvbufErrors": 0,
+  "Udp.NoPorts": 0
+ }
+}
