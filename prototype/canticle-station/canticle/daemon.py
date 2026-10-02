@@ -16,6 +16,15 @@ socket:
   ``hello``, ``fatal`` or ``bye`` that does not fit, or is not accepted by the kernel
   within 2 s, closes that connection only. At most 16 connections; more are refused at
   accept. The receive path never waits on a connection;
+- join snapshot (amendment BC-1b, D36): ``hello`` says ``join_snapshot: true``. A binding asks with
+  ``{"op":"join_snapshot","v":"canticle-receptor-record/1"}`` as its first line; every other inbound
+  line is ignored and counted. The cut (watermark *W* = the run's last ``rec_seq``, dropped records
+  included; the entries; queuing them behind what the connection already holds) is one synchronous
+  step of the event loop. ``snapshot`` records carry ``rec_seq`` *W* and ``snap_seq`` 1..n, then
+  ``snapshot_end`` {watermark, count, truncated, omitted}. At most ``min(511, free − 513)`` entries and
+  1 MiB of entry lines, so 512 slots stay free for the live tail; with fewer than 513 free slots the cut
+  is deferred until the connection drains, and the connection is closed if it has not within 2 s.
+  Snapshot records are never dropped: one unwritten for 2 s closes the connection;
 - a clean stop emits ``bye``; a failure to start emits ``fatal`` (on stderr: no
   connection exists yet) and exits non-zero;
 - write-ahead: a datagram's or tick's records go out only after the safety state they
@@ -46,7 +55,8 @@ from typing import Callable, Optional
 from . import runner
 from .listener import Listener
 from .manifest import Manifest
-from .records import DROPPABLE, HEALTH_INTERVAL_MS, Emitter, Receptor, StateNotDurable
+from .records import (DROPPABLE, HEALTH_INTERVAL_MS, MAX_DEPTH, MAX_LINE, RECORD_V, Emitter, Receptor,
+                      StateNotDurable, _depth, encode_line)
 
 QUEUE_MAX = 1024          # records per connection (§14.18.2 [PROPOSED DEFAULT])
 MAX_PEERS = 16            # connections (§14.18.2 [PROPOSED DEFAULT])
@@ -55,6 +65,11 @@ WATCH_S = 0.05            # how often the write bound is checked
 TICK_MS = 250
 SHUTDOWN_FLUSH_S = 2.0    # how long a clean stop waits for `bye` to reach each connection
 LOG_TYPES = ("hello", "fatal", "bye")   # records copied to stderr (no item text in any of them)
+SNAPSHOT_ENTRIES_MAX = 511          # entries per join snapshot (§14.18.3 BC-1b [PROPOSED DEFAULT])
+SNAPSHOT_BYTES_MAX = 1 << 20        # bytes of entry lines per join snapshot ([PROPOSED DEFAULT])
+SNAPSHOT_RESERVE = 512              # queue slots kept free for the live tail at the cut
+SNAPSHOT_DEFER_S = 2.0              # a cut deferred this long (the binding is not draining) closes the connection
+SNAPSHOT_COUNTERS = ("requested", "served", "truncated", "deferred", "closed", "ignored")
 
 
 def default_socket_path() -> Optional[str]:
@@ -78,6 +93,10 @@ class DaemonConfig:
     max_peers: int = MAX_PEERS
     queue_max: int = QUEUE_MAX
     write_bound_s: float = WRITE_BOUND_S
+    snapshot_entries_max: int = SNAPSHOT_ENTRIES_MAX
+    snapshot_bytes_max: int = SNAPSHOT_BYTES_MAX
+    snapshot_reserve: int = SNAPSHOT_RESERVE
+    snapshot_defer_s: float = SNAPSHOT_DEFER_S
     health_interval_ms: Optional[int] = HEALTH_INTERVAL_MS   # None: no periodic health (tests)
     tick_ms: Optional[int] = TICK_MS                         # None: no periodic tick (tests)
     log: Callable[[str], None] = field(default=lambda s: print(s, file=sys.stderr, flush=True))
@@ -94,15 +113,21 @@ class Peer:
 
     def __init__(self, daemon: "Daemon", writer: asyncio.StreamWriter, bootstrap: list):
         self.daemon, self.writer = daemon, writer
-        self.queue: deque = deque()      # (droppable, line)
+        self.queue: deque = deque()      # (droppable, line, is_snapshot)
         self.unwritten: deque = deque()  # monotonic enqueue times of non-droppable lines not yet written
         self.wake = asyncio.Event()
         self.dropped = 0
         self.inbound_bytes = 0
+        self.snap_state: Optional[str] = None   # None | "deferred" | "served"
+        self.snap_deferred_at: Optional[float] = None
+        self.snap_unwritten = 0          # snapshot / snapshot_end lines queued and not yet written
         self.closed = False
         self.tasks: list = []
         for type_, line in bootstrap:
             self.offer(type_, line)
+
+    def free(self) -> int:
+        return self.daemon.cfg.queue_max - len(self.queue)
 
     def offer(self, type_: str, line: bytes) -> bool:
         """Queue a line; False when a non-droppable one does not fit (the caller closes this peer)."""
@@ -112,7 +137,10 @@ class Peer:
                 self.dropped += 1
                 return True
             return False
-        self.queue.append((droppable, line))
+        snap = type_ in ("snapshot", "snapshot_end")
+        if snap:
+            self.snap_unwritten += 1
+        self.queue.append((droppable, line, snap))
         if not droppable:
             self.unwritten.append(time.monotonic())
         self.wake.set()
@@ -121,28 +149,60 @@ class Peer:
     def overdue(self, now: float) -> bool:
         return bool(self.unwritten) and now - self.unwritten[0] > self.daemon.cfg.write_bound_s
 
+    def deferral_overdue(self, now: float) -> bool:
+        return self.snap_state == "deferred" and now - self.snap_deferred_at > self.daemon.cfg.snapshot_defer_s
+
     async def write_loop(self) -> None:
         try:
             while True:
                 while not self.queue:
                     self.wake.clear()
                     await self.wake.wait()
-                droppable, line = self.queue.popleft()
+                droppable, line, snap = self.queue.popleft()
+                if self.snap_state == "deferred":
+                    self.daemon.try_cut(self)   # the queue just gained a slot: one synchronous step
                 self.writer.write(line)
                 await self.writer.drain()   # returns once the kernel holds the line (write buffer limit 0)
                 if not droppable:
                     self.unwritten.popleft()
+                if snap:
+                    self.snap_unwritten -= 1
         except (ConnectionError, OSError):
             self.daemon.close_peer(self, "write_error")
 
     async def read_loop(self, reader: asyncio.StreamReader) -> None:
-        """Requests are not served in this slice (§15 is out of scope): read, count and discard."""
+        """The first line may be a join-snapshot request (BC-1b); it is acted on the moment its newline is read.
+        Every other line is ignored and counted. Publishing requests (§15) are not served in this slice."""
+        first = bytearray()      # the first line, until its newline; dropped once over MAX_LINE
+        first_done = over = False
         try:
             while data := await reader.read(65536):
                 self.inbound_bytes += len(data)
+                if first_done:
+                    self._ignore_lines(data.count(b"\n"))
+                    continue
+                nl = data.find(b"\n")
+                if nl < 0:
+                    if not over:
+                        first += data
+                        if len(first) >= MAX_LINE:     # over-long: discarded up to its newline (§14.18.2)
+                            over, first = True, bytearray()
+                    continue
+                first_done = True
+                if not over:
+                    first += data[:nl]
+                if over or not self.daemon.request_snapshot(self, bytes(first)):
+                    self._ignore_lines(1)
+                self._ignore_lines(data.count(b"\n", nl + 1))
+                first = bytearray()
         except (ConnectionError, OSError):
             pass
         self.daemon.close_peer(self, "eof")
+
+    def _ignore_lines(self, n: int) -> None:
+        """Count ``n`` inbound lines that are not served (a later request, or anything else)."""
+        if n:
+            self.daemon.snap_count("ignored", n)
 
 
 class Daemon:
@@ -154,7 +214,8 @@ class Daemon:
         self.ready = False
         self.counts = {"accepted": 0, "refused_uid": 0, "refused_full": 0, "refused_not_ready": 0,
                        "closed_stalled": 0, "closed_queue_full": 0, "closed_eof": 0, "closed_write_error": 0,
-                       "dropped": 0, "receive_errors": 0}
+                       "closed_snapshot_error": 0, "dropped": 0, "receive_errors": 0}
+        self.snapshots = dict.fromkeys(SNAPSHOT_COUNTERS, 0)   # reported in `health` as `snapshots`
         self.emitter = Emitter(self.publish)
         self.receptor: Optional[Receptor] = None
         self.udp: Optional[socket.socket] = None
@@ -182,9 +243,78 @@ class Daemon:
                 if self.receptor is not None:
                     self.receptor.records_dropped += 1
 
+    # ------------------------------------------------------------ join snapshot (BC-1b, D36)
+
+    def snap_count(self, what: str, n: int = 1) -> None:
+        self.snapshots[what] += n
+
+    def request_snapshot(self, peer: Peer, line: bytes) -> bool:
+        """The peer's first line. True when it is a join-snapshot request (then served or deferred), False
+        when it is anything else (the caller counts it as ignored)."""
+        try:
+            req = json.loads(line)
+            ok = (_depth(req) <= MAX_DEPTH and isinstance(req, dict) and req.get("op") == "join_snapshot"
+                  and req.get("v") == RECORD_V)
+        except (ValueError, RecursionError):
+            ok = False
+        if not ok or peer.closed or self.failed is not None or peer.snap_state is not None:
+            return False
+        self.snap_count("requested")
+        if peer.free() < self.cfg.snapshot_reserve + 1:
+            # No room even for snapshot_end plus the live-tail reserve: defer the cut until the peer drains.
+            peer.snap_state, peer.snap_deferred_at = "deferred", time.monotonic()
+            self.snap_count("deferred")
+            return True
+        self._cut(peer)
+        return True
+
+    def try_cut(self, peer: Peer) -> None:
+        if peer.snap_state == "deferred" and not peer.closed and peer.free() >= self.cfg.snapshot_reserve + 1:
+            self._cut(peer)
+
+    def _cut(self, peer: Peer) -> None:
+        try:
+            self._cut_now(peer)
+        except Exception:                   # never leave a half-served snapshot: end this connection only
+            if not peer.closed and not peer.snap_unwritten:
+                self.snap_count("closed")
+            self.close_peer(peer, "snapshot_error")
+
+    def _cut_now(self, peer: Peer) -> None:
+        """The cut: one synchronous step, no await, no receive-path work between taking W, capturing the state
+        and queuing it. Everything already queued for the peer is <= W; every later record queues behind."""
+        cfg, em = self.cfg, self.emitter
+        w = em.rec_seq                      # the last record the run emitted, dropped ones included
+        entries = self.receptor.snapshot_entries(runner.now_ms())
+        cap = min(cfg.snapshot_entries_max, peer.free() - cfg.snapshot_reserve - 1)
+        lines, size = [], 0
+        for entry in entries[:max(cap, 0)]:
+            try:
+                line = encode_line({"v": RECORD_V, "type": "snapshot", "rec_seq": w, "run": em.run,
+                                    "snap_seq": len(lines) + 1, "entry": entry})
+            except ValueError:              # beyond the framing limits: stop here, the rest is omitted
+                break
+            if size + len(line) > cfg.snapshot_bytes_max:
+                break
+            lines.append(line)
+            size += len(line)
+        omitted = len(entries) - len(lines)
+        end = encode_line({"v": RECORD_V, "type": "snapshot_end", "rec_seq": w, "run": em.run, "watermark": w,
+                           "count": len(lines), "truncated": omitted > 0, "omitted": omitted})
+        peer.snap_state = "served"
+        for line in lines + [end]:
+            if not peer.offer("snapshot", line):    # cannot happen within the cap; never dropped: close
+                self.close_peer(peer, "queue_full")
+                return
+        self.snap_count("served")
+        if omitted:
+            self.snap_count("truncated")
+
     def close_peer(self, peer: Peer, why: str) -> None:
         if peer.closed:
             return
+        if peer.snap_state == "deferred" or peer.snap_unwritten:
+            self.snap_count("closed")       # a snapshot that never completed on this connection
         peer.closed = True
         self.peers.discard(peer)
         self.counts[f"closed_{why}"] += 1
@@ -227,7 +357,7 @@ class Daemon:
         while True:
             await asyncio.sleep(WATCH_S)
             now = time.monotonic()
-            for peer in [p for p in self.peers if p.overdue(now)]:
+            for peer in [p for p in self.peers if p.overdue(now) or p.deferral_overdue(now)]:
                 self.close_peer(peer, "stalled")
 
     # ------------------------------------------------------------ start
@@ -256,7 +386,7 @@ class Daemon:
             group = runner.MCAST_GROUP if self.cfg.multicast else None
             return Receptor(lst, self.emitter, bind=self.cfg.bind, multicast=group, transport="lan",
                             manifest_sha256=hashlib.sha256(raw).hexdigest(), manifest_label=str(label),
-                            now_ms=runner.now_ms())
+                            now_ms=runner.now_ms(), join_snapshot=True)
         except Exception as e:
             raise StartError("state_corrupt", f"{self.cfg.state_dir}: {type(e).__name__}: {e}") from None
 
@@ -320,6 +450,7 @@ class Daemon:
         try:
             self._take_lease()
             self.receptor = self._load()
+            self.receptor.snapshots = self.snapshots
             self.udp = self._bind_udp()
             self.receptor.bind = "%s:%d" % self.udp.getsockname()[:2]   # the port actually bound (port 0 in tests)
             try:

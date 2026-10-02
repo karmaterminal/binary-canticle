@@ -170,13 +170,14 @@ class Receptor:
 
     def __init__(self, listener: Listener, emitter: Emitter, *, bind: str, multicast: Optional[str] = None,
                  transport: str = "lan", manifest_sha256: str = "", manifest_label: str = "",
-                 now_ms: int = 0):
+                 now_ms: int = 0, join_snapshot: bool = False):
         if not listener.receptor_mode or listener.tuned is not None:
             raise ValueError("a receptor needs a listener in receptor mode with no tune set (§14.18.1)")
         self.lst, self.em = listener, emitter
         self.bind, self.multicast, self.transport = bind, multicast, transport
         self.manifest_sha256, self.manifest_label = manifest_sha256, manifest_label
         self.started_at = now_ms
+        self.join_snapshot = join_snapshot   # hello says so when the transport serves join snapshots (BC-1b)
         self.last_datagram_at: Optional[int] = None
         # identity -> [local_expiry_at, issued_at, state_key, restored]: tuples surfaced and not yet retracted.
         # Each is also a dedup entry of the listener, so the listener's per-key quotas bound it.
@@ -184,6 +185,12 @@ class Receptor:
         self.restored: set = set()                 # surfaced before this run, not heard since
         self.held_at: dict[tuple, tuple] = {}      # warm-up held identity -> (frame, first hearing, dedup); as listener.held
         self.quarantined: set = set()              # key ids quarantined locally on equivocation (§10.8)
+        # Join snapshot state (amendment BC-1b, D36), this run only, never persisted:
+        # identity -> fields of the latest deliverable `frame` record this run emitted for a tuple still surfaced
+        # (a subset of `surfaced`, so bounded by the same quotas); key id hex -> fields of the station's latest
+        # `presence` record (bounded by the manifest).
+        self.deliverable: dict[tuple, dict] = {}
+        self.presence: dict[str, dict] = {}
         self.landing = {"mute": None, "breaker": "closed", "until": None, "modulation": []}
         self.counters = {"admission": dict.fromkeys(ADMISSIONS, 0), "disposition": dict.fromkeys(DISPOSITIONS, 0),
                          "retract": dict.fromkeys(RETRACT_REASONS, 0), "beacon": dict.fromkeys(BEACONS, 0),
@@ -191,6 +198,7 @@ class Receptor:
         self.keys = KeyTable()
         self.records_dropped = 0      # set by the transport: records it dropped for some connection
         self.peers_closed = 0         # set by the transport: connections closed for a non-droppable record
+        self.snapshots: Optional[dict] = None   # set by a transport that serves join snapshots: its counters
         self._dropped_at_health = 0
         self._dirty = False
         # One state file, one atomic write per datagram: the listener's guards and this receptor's surfaced
@@ -231,10 +239,11 @@ class Receptor:
         self._batch(lambda: self._start(now_ms))
 
     def _start(self, now_ms: int) -> None:
+        extra = {"join_snapshot": True} if self.join_snapshot else {}
         self.em.emit("hello", wire_version=wire.VERSION, record_version=RECORD_V, pid=os.getpid(), bind=self.bind,
                      multicast=self.multicast, transport=self.transport, manifest_sha256=self.manifest_sha256,
                      manifest_label=self.manifest_label, state_version=STATE_VERSION,
-                     receptor_state_version=RECEPTOR_STATE_VERSION, rule_version=RULE_VERSION)
+                     receptor_state_version=RECEPTOR_STATE_VERSION, rule_version=RULE_VERSION, **extra)
         self._reconcile(now_ms)
         self.em.emit("landing_state", **self.landing)
 
@@ -381,8 +390,9 @@ class Receptor:
         if ident[0] in self.quarantined:
             self._frame(f, now_ms, "verified", "ringbuffer_only", ["key_quarantined"], dedup, heard_at)
             return
-        rec_expiry = self._frame(f, now_ms, "verified", "surface", [], dedup, heard_at)
-        self.surfaced[ident] = [rec_expiry, f.body.issued_at, f.body.state_key, False]
+        rec = self._frame(f, now_ms, "verified", "surface", [], dedup, heard_at)
+        self.surfaced[ident] = [rec["times"]["local_expiry_at"], f.body.issued_at, f.body.state_key, False]
+        self.deliverable[ident] = rec
         self.restored.discard(ident)
         self._dirty = True
 
@@ -406,6 +416,7 @@ class Receptor:
     def _retract(self, target: tuple, reason: str, by: Optional[tuple] = None, force: bool = False) -> None:
         """One `retract`. Supersession, expiry, revocation and quarantine retract only surfaced tuples;
         a valid PLUCK always does (``force``)."""
+        self.deliverable.pop(target, None)
         if self.surfaced.pop(target, None) is None and not force:
             return
         self.restored.discard(target)
@@ -427,8 +438,8 @@ class Receptor:
         self.counters["disposition"][disposition] += 1
 
     def _frame(self, f: wire.Frame, now_ms: int, admission: str, disposition: str, reasons: list, dedup: str,
-               heard_at: Optional[int] = None) -> int:
-        """Emit one `frame` record (§14.18.3 table); returns its local_expiry_at."""
+               heard_at: Optional[int] = None) -> dict:
+        """Emit one `frame` record (§14.18.3 table); returns its fields (without v, type, rec_seq, run)."""
         self._count(admission, disposition)
         kid, b = f.key_id, f.body
         ident = f.identity
@@ -483,13 +494,15 @@ class Receptor:
             if b.body_ref is not None:
                 rec["body_ref"] = {"url": b.body_ref[0], "sha256": b.body_ref[1].hex(), "size": b.body_ref[2]}
         self.em.emit("frame", **rec)
-        return local_expiry
+        return rec
 
     def _presence_events(self, events: list) -> None:
         for ev in events:
             if ev.kind == "presence":
-                self.em.emit("presence", station={"name": ev.station, "principal": None}, key_id=ev.key_id,
-                             state=ev.data["state"], last_beacon_at=ev.data.get("last_beacon_ms"))
+                rec = {"station": {"name": ev.station, "principal": None}, "key_id": ev.key_id,
+                       "state": ev.data["state"], "last_beacon_at": ev.data.get("last_beacon_ms")}
+                self.presence[ev.key_id] = rec
+                self.em.emit("presence", **rec)
 
     # ------------------------------------------------------------ time
 
@@ -536,7 +549,24 @@ class Receptor:
             counters=self.counters, unverified=self.keys.to_json(),
             dedup={"entries": len(self.lst.dedup), "capacity": self.lst.dedup_capacity},
             beacon_age_ms=ages, surfaced=len(self.surfaced), quarantined=sorted(k.hex() for k in self.quarantined),
-            records={"emitted": self.em.rec_seq, "dropped": self.records_dropped, "peers_closed": self.peers_closed})
+            records={"emitted": self.em.rec_seq, "dropped": self.records_dropped, "peers_closed": self.peers_closed},
+            **({"snapshots": dict(self.snapshots)} if self.snapshots is not None else {}))
+
+    # ------------------------------------------------------------ join snapshot (amendment BC-1b, D36)
+
+    def snapshot_entries(self, now_ms: int) -> list:
+        """The run's current state as join-snapshot entries, in truncation order (§14.18.3, *Join snapshot*):
+        one `presence` entry per station with a current presence state (by key id), then one `frame` entry per
+        tuple this run emitted a deliverable `frame` record for and has not retracted, whose local_expiry_at has
+        not passed; alarm class first, then newest heard_at first (idem breaks ties). Each frame entry is that
+        record's fields, `dedup` as emitted. Held and other non-deliverable items are never here. Synchronous:
+        the caller takes the watermark in the same event-loop step."""
+        if self.em._staged is not None:
+            raise RuntimeError("snapshot taken inside a record batch")
+        out = [{"presence": self.presence[k]} for k in sorted(self.presence)]
+        live = [r for r in self.deliverable.values() if r["times"]["local_expiry_at"] > now_ms]
+        live.sort(key=lambda r: (r["class"] != "alarm", -r["times"]["heard_at"], r["idem"]))
+        return out + [{"frame": r} for r in live]
 
     # ------------------------------------------------------------ persisted receptor state
 
