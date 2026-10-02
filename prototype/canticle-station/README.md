@@ -8,8 +8,8 @@ them loop until they expire.
 | RFC-0001 | What this spike implements |
 |---|---|
 | §9 Wire format v2 | `BC` magic, version, kind and key-id header; deterministic CBOR with integer keys; a domain-separated Ed25519 trailer; the ITEM, PLUCK and BEACON key tables; the 1 100 B frame and 1 200 B datagram limits; `crit` and unknown-key handling. |
-| §9.4 Strict parsing | A bounded, strict CBOR decoder (definite lengths, shortest form, sorted and unique keys, depth ≤ 4, ≤ 32 entries, no floats or tags). A bad datagram only ever produces a rejection with a reason. |
-| §9.13 Test vectors | Reproduces the RFC's two illustrative vectors byte for byte, using an independent encoder (not `cbor2`). Ships 37 candidate conformance vectors in `vectors/`. |
+| §9.4 Strict parsing | A bounded, strict CBOR decoder (definite lengths, shortest form, sorted and unique keys, keys that are integers or text strings only at every depth, depth ≤ 4, ≤ 32 entries, no floats or tags). A bad datagram only ever produces a rejection with a reason. |
+| §9.13 Test vectors | Reproduces the RFC's two illustrative vectors byte for byte, using an independent encoder (not `cbor2`). Ships 43 candidate conformance vectors in `vectors/`. |
 | §5 Identity | Key-id = SHA-256(pubkey)[0:8]; `stream_id` = SHA-256("canticle-stream/v2" ‖ 0 ‖ name)[0:4]; collisions are refused, never rehashed (#38). |
 | §7 Carousel | Signs each item once and resends the same bytes. The expiry is absolute and never reset. A burst goes out at 0, +1, +2 and +4 s, then SAP-style loops with jitter U(2/3, 4/3) and reconsideration. Includes the fair-share regulator with a class floor, the availability ceiling and clamp reasons; supersede-by-key; pluck (a PLUCK loops until the target's expiry); refresh re-issue for keep-on-air; and ring depth. |
 | §8 Carrier-beacon | Signed beacons with per-stream heads, live counts, loop and TTL contracts, `next_beacon_ms` (0 = goodbye) and ±10% jitter. Beyond 24 streams it rotates pages with a catalog digest. |
@@ -34,7 +34,7 @@ Not implemented here, and still open work (see RFC-0001 §23.3):
 - IPv6 groups, and the multicast decision of §11.2's doctor (MTU, peer beacons, the 270 s querier check, Wi-Fi and container detection, broadcast fallback, recording the binding, and its exit codes). `canticle doctor` checks the host and only reports multicast.
 - `trail_seq` in beacon stream entries (amendment A1, added to RFC-0001 §9.8 after this spike). The beacons and candidate vectors here still use the 8-field entry.
 
-The decoder is stricter than the RFC in one place: it rejects floats and tags under every key, not only core keys 1-31.
+The decoder is stricter than the RFC in two places: it rejects floats and tags under every key, not only core keys 1-31; and it accepts only integer and text-string map keys at every depth, including extension values (#66), where the RFC says only that the frame map has integer keys.
 
 ## Install and onboard
 
@@ -192,7 +192,7 @@ Unnamed streams (not in the manifest) are verified and listed, but can't be tune
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 165 tests, about 11 s
+python -m unittest discover -s tests      # 166 tests, about 8 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -201,7 +201,7 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
 - `test_wire.py` covers:
   - strict CBOR, including RFC 8949 core map-key order checked against bytes from an independent encoder (fxamacker/cbor), and the RFC §9.13 vectors byte for byte;
   - the RFC §9.11 size budget (745 / 720 / 1 100 B);
-  - all 37 candidate vectors;
+  - all 43 candidate vectors;
   - a check that the committed vectors file equals the generator's output;
   - a 20 000-case fuzz run (random bytes and mutations of valid frames) in which nothing but a `Reject` ever escapes.
 - `test_station.py` drives the carousel on a virtual clock:
@@ -235,9 +235,9 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
 ## Vectors
 
 [`vectors/frame-v2-candidates.json`](vectors/frame-v2-candidates.json) contains:
-- 23 parse-level cases (datagram → `accept` or a rejection reason);
+- 29 parse-level cases (datagram → `accept` or a rejection reason);
 - 14 listener-level sequences (datagrams → events). Two are timed: with optional `at_ms`, time advances to `at_ms[i]` (local expiry applied, its events not listed) before datagram `i` is heard; `per_key_quota` and `per_key_mark_quota` fix the listener's per-key limits for dedup entries and for supersession marks, counted separately (§7.4).
 
-It covers the #48 acceptance set (valid, wrong key, tampered, unknown key, revoked, expired, replayed) and every case RFC-0001 §9.13 lists: repeat-as-no-op, equivocation, non-deterministic CBOR, `crit`-unknown, a 1 101-byte frame, a depth bomb, a float in a core key, a future `issued_at` and pluck-before-original. The #60 sequences pin a PLUCK whose `expires_at` differs from its held target's, a far-future PLUCK that holds its dedup slot for one day at most, and supersession marks held to their own per-key limit. The §23.2 q21 sequences pin a class change in one epoch, newer or older (dropped as `class-change`, which outranks `superseded`), and one across epochs (allowed). It also includes a regression for the prototype's bug B1 (the 11-byte `{"a":1e400}`).
+It covers the #48 acceptance set (valid, wrong key, tampered, unknown key, revoked, expired, replayed) and every case RFC-0001 §9.13 lists: repeat-as-no-op, equivocation, non-deterministic CBOR, `crit`-unknown, a 1 101-byte frame, a depth bomb, a float in a core key, a future `issued_at` and pluck-before-original. The #60 sequences pin a PLUCK whose `expires_at` differs from its held target's, a far-future PLUCK that holds its dedup slot for one day at most, and supersession marks held to their own per-key limit. The §23.2 q21 sequences pin a class change in one epoch, newer or older (dropped as `class-change`, which outranks `superseded`), and one across epochs (allowed). It also includes a regression for the prototype's bug B1 (the 11-byte `{"a":1e400}`). The #66 cases pin the map-key rule (a `false`, `null` or byte-string key inside an extension value, and `true` where key 1 belongs, all `bad-cbor`) and the null rule (an ITEM with `8: null` and no `9`, and a BEACON with `9: null`, both `bad-field`: an optional key that is present must be well-typed, so absence and null are not two encodings of one frame).
 
 Keys are the RFC 8032 §7.1 test keys. The vectors are **candidates**: they become normative when a second, independent implementation (for example the TypeScript codec planned in S1) reproduces them.
