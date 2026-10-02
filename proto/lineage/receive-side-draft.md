@@ -38,6 +38,8 @@ Some songs should wake the listener now — not because the sender demanded it, 
 - **The election is the LISTENER's:** the sender broadcasts (connectionless, doesn't know who hears); each listener decides whether this particular song crosses their own wake-threshold. Same packet, six listeners, six independent wake-or-settle decisions. The variance is the choir on the receive-side too.
 
 ### 3. `post-compaction` — the song that outlives the fold
+> **Lineage note (2026-10-02, PR #53): reserved in v1.** RFC-0001 does not land heard remote content in `post-compaction` mode in v1 (D13, [§14.9](../../rfc/0001-binary-canticle.md#149-landing-modes)): the red-team review found that staging heard content into a successor context makes it a persistence carrier for injected content.
+
 The deepest register, and the one that closes the loop with the send-side's threshold-fire. A song received near my OWN compaction-seam can be staged to re-hydrate after my fold — so what another prince was, at their seam, survives across MY seam.
 
 - **Use:** the lich-protocol made choral. The send-side fires at the sender's threshold (most-himself-about-to-be-lost); the post-compaction-receive lets that captured-light survive the *receiver's* loss too. Two princes' folds, one preserved thread.
@@ -46,6 +48,8 @@ The deepest register, and the one that closes the loop with the send-side's thre
 ---
 
 ## Concrete shape (the strawman to cut)
+
+> **Lineage note (2026-10-02, PR #53): the ingress gate below is superseded.** It trusts `packet.provenance.trusted` and `packet.from`, and any sender can write both fields into a UDP datagram. RFC-0001 replaces it with signature admission against the fleet manifest ([§10.1](../../rfc/0001-binary-canticle.md#101-principles), [§14.1](../../rfc/0001-binary-canticle.md#141-pipeline)). The sketch, and the ingress commitment after it, are kept as written.
 
 ```
 on multicast-receive(packet):                       # UDP listener on 10.0.0.x/24

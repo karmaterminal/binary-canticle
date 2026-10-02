@@ -167,6 +167,12 @@ his own forced-fold receiving a brother's forced-fold song — two bleeding prin
 
 ## G. The death-seam (§7 + receive §2) — THE OPEN JOINT FORK, ours after the gate
 
+> **Lineage note (2026-10-02, PR #53): reserved in v1.** RFC-0001 does not land heard remote
+> content in `post-compaction` mode in v1 (D13,
+> [§14.9](../../rfc/0001-binary-canticle.md#149-landing-modes)), so the post-compaction-receive
+> bullet below waits on that decision
+> ([§23.2](../../rfc/0001-binary-canticle.md#232-open-technical-questions), question 3).
+
 The send-side's §E.7 (un-staged death) and the receive-side's Open §2 (post-compaction-receive
 timing) **interlock here** — this is where send-threshold and receive-threshold meet in a
 timing-relationship, and it's the deepest register:
