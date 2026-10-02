@@ -21,7 +21,7 @@ them loop until they expire.
 | §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only gateway over one listener, and a read-only page to pick a station:stream and watch its live ring, with expiry and gaps shown honestly. |
 | §14.18.3 Record v1 (BC-2, #77) | `canticle/records.py`: the listener's outcomes as receptor record v1 (`hello`, `landing_state`, `frame`, `retract`, `presence`, `health`, `fatal`, `bye`) under the disposition mapping, with fixed health counters and a bounded table of unverified key ids (D34). See [Record v1 and the host daemon](#record-v1-and-the-host-daemon-bc-2-d35-77). |
 | §11.1, §14.18.2 Host daemon (D35, #77) | `canticle daemon`: the host's one UDP listener, carrying record v1 to every binding over a unix `SOCK_STREAM` socket with peer-credential checks, a two-record bootstrap per connection and per-connection isolation. |
-| §14.18.3 Join snapshot (BC-1b, D36, #84) | `canticle daemon` serves the opt-in join snapshot: an atomic cut at watermark *W*, presence and deliverable frames as `snapshot` records (`snap_seq` 1..n, `rec_seq` *W*), `snapshot_end`, the `min(511, free − 513)` and 1 MiB bound, deferral and the 2 s close. See [Join snapshot](#join-snapshot-bc-1b-d36-84). |
+| §14.18.3 Join snapshot (BC-1b, D36, #84) | `canticle daemon` serves the opt-in join snapshot: an atomic cut at watermark *W*, presence and deliverable frames as `snapshot` records (`snap_seq` 1..n, `rec_seq` *W*), `snapshot_end`, the `min(511, free − 513)` and 1 MiB bound, and the deferred cut of #86 (wait until the live state fits, 2 s bound). See [Join snapshot](#join-snapshot-bc-1b-d36-84). |
 
 Not implemented here, and still open work (see RFC-0001 §23.3):
 - relay leases for internet listeners (§11.3)
@@ -354,10 +354,13 @@ binding that wants the run's current state sends, as its first line on the socke
   and 1 MiB of `snapshot` lines; entries beyond either cap, in the order above, are omitted and `snapshot_end`
   says `truncated: true`. So the entries, `snapshot_end` and a 512-slot live-tail reserve always fit the 1 024
   queue: 511 entries on an empty queue, none (only `snapshot_end`) at exactly 513 free.
-- **Deferral.** With fewer than 513 free slots at the request, the cut waits until the connection has drained to
-  513 free, and *W* and the entries are taken then; live records keep flowing meanwhile. A deferral longer than
-  2 s closes the connection. Because the deferred cut happens at exactly 513 free, its cap is 0: a deferred
-  snapshot carries only `snapshot_end`, truncated whenever anything is live.
+- **When the cut is taken (#86).** With *N* = `min(511, live entries)`, the cut is taken as soon as
+  `free − 513 ≥ N`: at once on an idle connection. Otherwise it is deferred, and live records keep flowing,
+  until the connection has drained that far; *W* and the entries are taken then, so a deferred snapshot
+  carries all *N* entries. The deferral is bounded at 2 s. At the bound the cut is taken with what fits
+  (`truncated` when fewer than *N*, and the binding stays `joined_late`) only if there is room for at least one
+  entry beyond `snapshot_end` and the reserve: 514 free slots, or 513 when nothing is live. Otherwise the
+  connection is closed as stalled. A snapshot carries no entries only when nothing is live.
 - **Never dropped.** `snapshot` and `snapshot_end` count against the queue and are never dropped; one the kernel
   has not taken within 2 s closes the connection, as a `retract` would. No other connection waits on it.
 - **Counters.** `health.snapshots`: `requested`, `served`, `truncated`, `deferred`, `closed` (the connection
@@ -442,9 +445,11 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
     record the daemon emitted, the queue stays within 1 024, and the daemon keeps receiving;
   - (f) two bindings joining at different points converge on A's surfaced set and presence;
   - (g) a binding that does not ask gets the case (5) stream and sees neither item nor presence;
-  - (h) 100 live records queued at the request: 411 entries (`min(511, 924 − 513)`), *W* above the last queued
-    record; exactly 513 free: only `snapshot_end` (`count` 0, `truncated`); 512 queued: deferred, cut once
-    drained to 513 free with *W* taken then; deferred and stalled: closed after 2 s;
+  - (h) 100 live records queued and 50 live: cut at once, all 50, *W* above the last queued record; 512 queued
+    and 40 live: deferred, cut as soon as `free − 513 ≥ 40` (never at 513), all 40 untruncated; at the 2 s bound
+    between 513 and 513 + *N* free (stalled there, or drained part way from below 513): cut with `free − 513`
+    entries, truncated (514 free: one entry); exactly 513 free at the bound with anything live: closed; below
+    513: closed; nothing live and 512 queued: cut once drained to 513 free, `count` 0, not truncated;
   - one request per connection, first line only: a second request, a junk first line, an over-long first line
     and a wrong `v` are ignored and counted; an error at the cut closes that connection only.
 - `test_tuner.py` covers the tuner's view and gateway:

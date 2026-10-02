@@ -539,84 +539,199 @@ class CutErrorTest(SnapshotCase):
 
 
 class ProofCase5hQueuedTest(SnapshotCase):
-    """(h) live records already queued at the request; the boundaries 513 free, 512 queued, stalled deferral."""
+    """(h) live records already queued at the request, and when the cut is taken (BC-1b as amended by #86):
+    N = min(511, live entries); cut as soon as free − 513 ≥ N, else defer for at most 2 s; at the bound, cut with
+    what fits if at least 513 slots are free, else close as stalled."""
+
+    REQ_LINE = REQ.rstrip(b"\n")
 
     def _live(self, d, n=600):
         st = self.station()
         self.many(d, st, n, runner.now_ms())
 
-    def test_queued_live_records_snapshot_truncated_to_fit(self):
+    def _record_cuts(self, d):
+        """Note the queue's free slots and N at every cut."""
+        cuts = []
+        orig = d._cut_now
+
+        def cut(peer):
+            cuts.append((peer.free(), d.receptor.snapshot_size(runner.now_ms()), time.monotonic()))
+            orig(peer)
+        d._cut_now = cut
+        return cuts
+
+    async def _read_to_end(self, d, s, got):
+        reader = asyncio.create_task(self.drain(s, got))
+        self.pad(d, d.emitter.rec_seq + 1)
+        n = d.emitter.rec_seq
+        await until(lambda: got and json.loads(got[-1])["rec_seq"] == n, timeout=10)
+        reader.cancel()
+
+    def test_queued_live_records_and_the_whole_state_fits_cut_at_once(self):
         async def scenario(d, port):
-            self._live(d)
+            self._live(d, 50)
             s = self.stall(d)
             peer = await self.stalled_peer(d, s, 100)
-            self.assertTrue(d.request_snapshot(peer, REQ.rstrip(b"\n")))
-            w = d.emitter.rec_seq
-            q = len(peer.queue)
+            self.assertTrue(d.request_snapshot(peer, self.REQ_LINE))
+            self.assertEqual(peer.snap_state, "served")             # 924 − 513 ≥ 50: no deferral
+            w, q = d.emitter.rec_seq, len(peer.queue)
             got: list = []
-            reader = asyncio.create_task(self.drain(s, got))
-            self.pad(d, d.emitter.rec_seq + 1)
-            n = d.emitter.rec_seq
-            await until(lambda: got and json.loads(got[-1])["rec_seq"] == n, timeout=10)
-            reader.cancel()
+            await self._read_to_end(d, s, got)
             s.close()
-            return got, w, q
-        (got, w, q), _ = self.run_with(scenario)
+            return got, w, q, dict(d.snapshots)
+        (got, w, q, snaps), _ = self.run_with(scenario)
         p = parse(got)
-        self.assertEqual(q, 100 + 411 + 1)                           # min(511, 924 - 513) = 411, then snapshot_end
-        self.assertEqual((p["end"]["count"], p["end"]["truncated"], p["end"]["omitted"]), (411, True, 600 - 411))
+        self.assertEqual(q, 100 + 50 + 1)
+        self.assertEqual((p["end"]["count"], p["end"]["truncated"]), (50, False))
         self.assertEqual(p["end"]["watermark"], w)
-        self.assertGreaterEqual(w, p["before"][-1]["rec_seq"])
+        self.assertGreaterEqual(w, p["before"][-1]["rec_seq"])     # W ≥ the last live record queued before it
         self.assertEqual(p["after"][0]["rec_seq"], w + 1)
+        self.assertEqual(snaps["deferred"], 0)
 
-    def test_exactly_513_free_slots_sends_only_snapshot_end(self):
+    def test_deferred_cut_waits_until_all_n_entries_fit(self):
+        """Live records queued so that the state does not fit: the cut waits until free − 513 ≥ N, never at
+        exactly 513 free, and the snapshot carries all N entries, untruncated."""
         async def scenario(d, port):
-            self._live(d, 3)
-            s = self.stall(d)
-            peer = await self.stalled_peer(d, s, 1024 - 513)
-            self.assertTrue(d.request_snapshot(peer, REQ.rstrip(b"\n")))
-            tail = [json.loads(line) for _, line, _ in list(peer.queue)[-2:]]
-            free = peer.free()
-            s.close()
-            return tail, free
-        (tail, free), _ = self.run_with(scenario)
-        self.assertEqual(tail[-1]["type"], "snapshot_end")
-        self.assertNotEqual(tail[-2]["type"], "snapshot")
-        self.assertEqual((tail[-1]["count"], tail[-1]["truncated"], tail[-1]["omitted"]), (0, True, 3))
-        self.assertEqual(free, 512)
-
-    def test_512_queued_defers_the_cut_until_drained(self):
-        async def scenario(d, port):
-            self._live(d, 3)
+            self._live(d, 40)
             s = self.stall(d)
             peer = await self.stalled_peer(d, s, 512)
-            self.assertTrue(d.request_snapshot(peer, REQ.rstrip(b"\n")))
+            cuts = self._record_cuts(d)
+            self.assertTrue(d.request_snapshot(peer, self.REQ_LINE))
             self.assertEqual(peer.snap_state, "deferred")
             self.pad(d, d.emitter.rec_seq + 5)                       # live records keep flowing meanwhile
             got: list = []
             reader = asyncio.create_task(self.drain(s, got))
             await until(lambda: peer.snap_state == "served", what="deferred cut taken")
             w = d.emitter.rec_seq
+            reader.cancel()
+            await self._read_to_end(d, s, got)
+            s.close()
+            return got, w, cuts, dict(d.snapshots)
+        (got, w, cuts, snaps), _ = self.run_with(scenario)
+        p = parse(got)
+        self.assertEqual(len(cuts), 1)
+        free, n, _ = cuts[0]
+        self.assertEqual(n, 40)
+        self.assertGreaterEqual(free - 513, n)                       # not at 513 free
+        self.assertLess(free - 513, n + 2)                           # but as soon as it fit
+        self.assertEqual(p["end"]["watermark"], w)                   # W taken at the deferred cut
+        self.assertGreaterEqual(w, p["before"][-1]["rec_seq"])
+        self.assertEqual((p["end"]["count"], p["end"]["truncated"], p["end"]["omitted"]), (40, False, 0))
+        self.assertEqual((snaps["deferred"], snaps["served"], snaps["truncated"], snaps["closed"]), (1, 1, 0, 0))
+
+    def test_partial_drain_at_the_bound_cuts_with_what_fits(self):
+        """Between 513 and 513 + N free slots at 2 s: the cut is taken at the bound, truncated to what fits."""
+        async def scenario(d, port):
+            self._live(d, 600)                                       # N = 511
+            s = self.stall(d)
+            peer = await self.stalled_peer(d, s, 300)                # 724 free: 211 fit, N does not
+            cuts = self._record_cuts(d)
+            t0 = time.monotonic()
+            self.assertTrue(d.request_snapshot(peer, self.REQ_LINE))
+            self.assertEqual(peer.snap_state, "deferred")
+            await until(lambda: peer.snap_state == "served", timeout=4, what="cut at the bound")
+            elapsed = time.monotonic() - t0
+            q = len(peer.queue)
+            got: list = []
+            await self._read_to_end(d, s, got)
+            s.close()
+            return got, cuts, elapsed, q, dict(d.snapshots)
+        (got, cuts, elapsed, q, snaps), _ = self.run_with(scenario)
+        p = parse(got)
+        self.assertGreaterEqual(elapsed, 2.0)
+        self.assertLess(elapsed, 3.0)
+        self.assertEqual(cuts[0][0], 724)
+        self.assertEqual((p["end"]["count"], p["end"]["truncated"], p["end"]["omitted"]), (211, True, 600 - 211))
+        self.assertEqual(q, 1024 - 512)                              # the reserve stays free
+        self.assertEqual((snaps["deferred"], snaps["served"], snaps["truncated"], snaps["closed"]), (1, 1, 1, 0))
+
+    def test_partial_drain_from_below_513_cuts_at_the_bound_with_what_fits(self):
+        """B starts below 513 free, drains part way (to between 513 and 513 + N) and stalls again."""
+        async def scenario(d, port):
+            self._live(d, 600)                                       # N = 511
+            s = self.stall(d)
+            peer = await self.stalled_peer(d, s, 600)                # 424 free
+            cuts = self._record_cuts(d)
+            t0 = time.monotonic()
+            self.assertTrue(d.request_snapshot(peer, self.REQ_LINE))
+            loop = asyncio.get_running_loop()
+            buf = b""
+            while len(peer.queue) > 350:                             # read some, then stop reading
+                buf += await loop.sock_recv(s, 4096)
+            await until(lambda: peer.snap_state == "served", timeout=4, what="cut at the bound")
+            elapsed = time.monotonic() - t0
             self.pad(d, d.emitter.rec_seq + 1)
             n = d.emitter.rec_seq
-            await until(lambda: got and json.loads(got[-1])["rec_seq"] == n, timeout=10)
-            reader.cancel()
+            while not buf.endswith(b"\n") or json.loads(buf.rsplit(b"\n", 2)[-2])["rec_seq"] != n:
+                buf += await asyncio.wait_for(loop.sock_recv(s, 65536), 5)
             s.close()
-            return got, w, dict(d.snapshots)
-        (got, w, snaps), _ = self.run_with(scenario)
+            return [x + b"\n" for x in buf.split(b"\n")[:-1]], cuts, elapsed, dict(d.snapshots)
+        (got, cuts, elapsed, snaps), _ = self.run_with(scenario)
         p = parse(got)
-        self.assertEqual(p["end"]["watermark"], w)                  # W taken at the deferred cut
-        self.assertGreater(w, p["before"][-1]["rec_seq"] - 1)
-        # The cut happens the moment B has drained to 513 free slots (BC-1b), where the cap min(511, free - 513)
-        # is 0: only snapshot_end goes out, truncated, and B stays joined_late.
-        self.assertEqual((p["end"]["count"], p["end"]["truncated"], p["end"]["omitted"]), (0, True, 3))
-        self.assertEqual((snaps["deferred"], snaps["served"], snaps["closed"]), (1, 1, 0))
+        free = cuts[0][0]
+        self.assertGreaterEqual(elapsed, 2.0)
+        self.assertTrue(513 <= free < 513 + 511, free)
+        self.assertEqual((p["end"]["count"], p["end"]["truncated"], p["end"]["omitted"]),
+                         (free - 513, True, 600 - (free - 513)))   # truncated: the binding stays joined_late
+        self.assertEqual((snaps["deferred"], snaps["served"], snaps["truncated"], snaps["closed"]), (1, 1, 1, 0))
 
-    def test_deferred_and_stalled_is_closed_after_2_s(self):
+    def _at_bound(self, live, queued):
+        """A stalled peer with ``queued`` records and ``live`` live entries asks; what happens at the 2 s bound."""
+        async def scenario(d, port):
+            if live:
+                self._live(d, live)
+            s = self.stall(d)
+            peer = await self.stalled_peer(d, s, queued)
+            cuts = self._record_cuts(d)
+            self.assertTrue(d.request_snapshot(peer, self.REQ_LINE))
+            self.assertEqual(peer.snap_state, "deferred")
+            await until(lambda: peer.closed or peer.snap_state == "served", timeout=4, what="the bound")
+            tail = [json.loads(line) for _, line, _ in list(peer.queue)[-2:]] if not peer.closed else []
+            free = peer.free()
+            s.close()
+            return peer.closed, tail, free, cuts, dict(d.snapshots), dict(d.counts)
+        return self.run_with(scenario)[0]
+
+    def test_514_free_at_the_bound_carries_one_entry_truncated(self):
+        closed, tail, free, cuts, snaps, counts = self._at_bound(3, 1024 - 514)
+        self.assertFalse(closed)
+        self.assertEqual(cuts[0][0], 514)
+        self.assertEqual(tail[-2]["type"], "snapshot")
+        self.assertEqual((tail[-1]["count"], tail[-1]["truncated"], tail[-1]["omitted"]), (1, True, 2))
+        self.assertEqual(free, 512)
+        self.assertEqual((snaps["served"], snaps["truncated"], snaps["closed"]), (1, 1, 0))
+
+    def test_exactly_513_free_at_the_bound_with_live_state_is_closed(self):
+        closed, tail, free, cuts, snaps, counts = self._at_bound(3, 1024 - 513)
+        self.assertTrue(closed)
+        self.assertEqual(cuts, [])                                   # no empty, truncated snapshot
+        self.assertEqual((snaps["deferred"], snaps["served"], snaps["closed"], counts["closed_stalled"]), (1, 0, 1, 1))
+
+    def test_nothing_live_cuts_at_513_free_with_count_0_not_truncated(self):
         async def scenario(d, port):
             s = self.stall(d)
+            peer = await self.stalled_peer(d, s, 512)                # 512 free: deferred even with N = 0
+            cuts = self._record_cuts(d)
+            self.assertTrue(d.request_snapshot(peer, self.REQ_LINE))
+            self.assertEqual(peer.snap_state, "deferred")
+            got: list = []
+            reader = asyncio.create_task(self.drain(s, got))
+            await until(lambda: peer.snap_state == "served", what="cut")
+            reader.cancel()
+            await self._read_to_end(d, s, got)
+            s.close()
+            return got, cuts
+        (got, cuts), _ = self.run_with(scenario)
+        self.assertEqual(cuts[0][:2], (513, 0))
+        p = parse(got)
+        self.assertEqual((p["end"]["count"], p["end"]["truncated"], p["end"]["omitted"]), (0, False, 0))
+
+    def test_deferred_and_stalled_below_513_free_is_closed_at_the_bound(self):
+        async def scenario(d, port):
+            self._live(d, 3)
+            s = self.stall(d)
             peer = await self.stalled_peer(d, s, 600)
-            self.assertTrue(d.request_snapshot(peer, REQ.rstrip(b"\n")))
+            self.assertTrue(d.request_snapshot(peer, self.REQ_LINE))
             t0 = time.monotonic()
             await until(lambda: peer.closed, timeout=4, what="deferral closed")
             elapsed = time.monotonic() - t0

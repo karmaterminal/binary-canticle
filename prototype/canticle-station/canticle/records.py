@@ -568,6 +568,11 @@ class Receptor:
         live.sort(key=lambda r: (r["class"] != "alarm", -r["times"]["heard_at"], r["idem"]))
         return out + [{"frame": r} for r in live]
 
+    def snapshot_size(self, now_ms: int) -> int:
+        """How many entries ``snapshot_entries(now_ms)`` would return, without building them (the deferral check
+        runs on every slot a deferred connection frees)."""
+        return len(self.presence) + sum(1 for r in self.deliverable.values() if r["times"]["local_expiry_at"] > now_ms)
+
     # ------------------------------------------------------------ persisted receptor state
 
     def _save_if_dirty(self) -> None:

@@ -22,8 +22,10 @@ socket:
   included; the entries; queuing them behind what the connection already holds) is one synchronous
   step of the event loop. ``snapshot`` records carry ``rec_seq`` *W* and ``snap_seq`` 1..n, then
   ``snapshot_end`` {watermark, count, truncated, omitted}. At most ``min(511, free − 513)`` entries and
-  1 MiB of entry lines, so 512 slots stay free for the live tail; with fewer than 513 free slots the cut
-  is deferred until the connection drains, and the connection is closed if it has not within 2 s.
+  1 MiB of entry lines, so 512 slots stay free for the live tail. With N = ``min(511, live entries)``,
+  the cut is taken as soon as ``free − 513 ≥ N`` (at once on an idle connection); until then it is
+  deferred, for at most 2 s (#86). At the bound it is taken with what fits if there is room for at least
+  one entry (514 free; 513 when nothing is live), and the connection is closed as stalled otherwise.
   Snapshot records are never dropped: one unwritten for 2 s closes the connection;
 - a clean stop emits ``bye``; a failure to start emits ``fatal`` (on stderr: no
   connection exists yet) and exits non-zero;
@@ -68,7 +70,7 @@ LOG_TYPES = ("hello", "fatal", "bye")   # records copied to stderr (no item text
 SNAPSHOT_ENTRIES_MAX = 511          # entries per join snapshot (§14.18.3 BC-1b [PROPOSED DEFAULT])
 SNAPSHOT_BYTES_MAX = 1 << 20        # bytes of entry lines per join snapshot ([PROPOSED DEFAULT])
 SNAPSHOT_RESERVE = 512              # queue slots kept free for the live tail at the cut
-SNAPSHOT_DEFER_S = 2.0              # a cut deferred this long (the binding is not draining) closes the connection
+SNAPSHOT_DEFER_S = 2.0              # the longest a cut waits for the whole live state to fit (#86)
 SNAPSHOT_COUNTERS = ("requested", "served", "truncated", "deferred", "closed", "ignored")
 
 
@@ -260,17 +262,34 @@ class Daemon:
         if not ok or peer.closed or self.failed is not None or peer.snap_state is not None:
             return False
         self.snap_count("requested")
-        if peer.free() < self.cfg.snapshot_reserve + 1:
-            # No room even for snapshot_end plus the live-tail reserve: defer the cut until the peer drains.
+        if self._fits(peer):
+            self._cut(peer)
+        else:
+            # The live state does not fit yet: defer the cut while the peer drains; live records keep flowing.
             peer.snap_state, peer.snap_deferred_at = "deferred", time.monotonic()
             self.snap_count("deferred")
-            return True
-        self._cut(peer)
         return True
 
+    def _fits(self, peer: Peer) -> bool:
+        """``free − 513 ≥ N`` with N = min(511, live entries) (amendment BC-1b, #86): the queue has room for the
+        whole snapshot (up to the entry cap), snapshot_end and the live-tail reserve."""
+        n = min(self.cfg.snapshot_entries_max, self.receptor.snapshot_size(runner.now_ms()))
+        return peer.free() - self.cfg.snapshot_reserve - 1 >= n
+
     def try_cut(self, peer: Peer) -> None:
-        if peer.snap_state == "deferred" and not peer.closed and peer.free() >= self.cfg.snapshot_reserve + 1:
+        if peer.snap_state == "deferred" and not peer.closed and self._fits(peer):
             self._cut(peer)
+
+    def deferral_bound(self, peer: Peer) -> None:
+        """The 2 s bound of a deferred cut (#86, as tightened on #87): take it with what fits only when the queue
+        has room for at least one entry beyond snapshot_end and the reserve (514 free slots; 513 when nothing is
+        live), truncated when fewer than N. Otherwise the peer is not draining and is closed as stalled. So no
+        empty, truncated snapshot is ever sent while anything is live."""
+        live = self.receptor.snapshot_size(runner.now_ms())
+        if peer.free() >= self.cfg.snapshot_reserve + 1 + (1 if live else 0):
+            self._cut(peer)
+        else:
+            self.close_peer(peer, "stalled")
 
     def _cut(self, peer: Peer) -> None:
         try:
@@ -357,8 +376,10 @@ class Daemon:
         while True:
             await asyncio.sleep(WATCH_S)
             now = time.monotonic()
-            for peer in [p for p in self.peers if p.overdue(now) or p.deferral_overdue(now)]:
+            for peer in [p for p in self.peers if p.overdue(now)]:
                 self.close_peer(peer, "stalled")
+            for peer in [p for p in self.peers if p.deferral_overdue(now)]:
+                self.deferral_bound(peer)
 
     # ------------------------------------------------------------ start
 
