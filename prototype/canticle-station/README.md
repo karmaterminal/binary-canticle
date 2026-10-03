@@ -21,6 +21,7 @@ them loop until they expire.
 | §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only gateway over one listener, and a read-only page to pick a station:stream and watch its live ring, with expiry and gaps shown honestly. |
 | §14.18.3 Record v1 (BC-2, #77) | `canticle/records.py`: the listener's outcomes as receptor record v1 (`hello`, `landing_state`, `frame`, `retract`, `presence`, `health`, `fatal`, `bye`) under the disposition mapping, with fixed health counters and a bounded table of unverified key ids (D34). See [Record v1 and the host daemon](#record-v1-and-the-host-daemon-bc-2-d35-77). |
 | §11.1, §14.18.2 Host daemon (D35, #77) | `canticle daemon`: the host's one UDP listener, carrying record v1 to every binding over a unix `SOCK_STREAM` socket with peer-credential checks, a two-record bootstrap per connection and per-connection isolation. |
+| §14.18.3 Join snapshot (BC-1b, D36, #84) | `canticle daemon` serves the opt-in join snapshot: an atomic cut at watermark *W*, presence and deliverable frames as `snapshot` records (`snap_seq` 1..n, `rec_seq` *W*), `snapshot_end`, the `min(511, free − 513)` and 1 MiB bound, and the deferred cut of #86 (wait until the live state fits, 2 s bound). See [Join snapshot](#join-snapshot-bc-1b-d36-84). |
 
 Not implemented here, and still open work (see RFC-0001 §23.3):
 - relay leases for internet listeners (§11.3)
@@ -244,8 +245,10 @@ record per line.
   reconciles it (below).
 - **Output.** Records go only to the socket: `frame` records carry item text (RFC §19.7). `hello`, `fatal` and
   `bye` are copied to stderr.
-- **Inbound.** Publishing over the socket (sing/hush, §15) is not in this slice: bytes a peer sends are read,
-  counted and discarded. End of stream from a peer closes its connection (a half-closed peer is not supported).
+- **Inbound.** A peer's first line may be a join-snapshot request ([Join snapshot](#join-snapshot-bc-1b-d36-84)). Publishing over the socket
+  (sing/hush, §15) is not in this slice: every other line a peer sends is read, counted
+  (`health.snapshots.ignored`) and discarded. End of stream from a peer closes its connection (a half-closed
+  peer is not supported).
 
 **Record v1 (`canticle/records.py`).** Every record has `v`, `type`, `rec_seq` (from 1, strictly increasing,
 never reused) and `run` (128 random bits, hex, chosen at start). Times are integer ms. Lines are ASCII (non-ASCII
@@ -319,6 +322,50 @@ lower-epoch tuples as above. `canticle listen` and `canticle tuner` behave as be
 - Mixed-host proof cases (4) and (6) need a harness binding and OC-0, and are not run here. Case (1) is shown
   with sockets in one test host (a second daemon and a `canticle listen` both fail to bind), not with `ss`.
 
+### Join snapshot (BC-1b, D36, #84)
+
+A late join is a state transfer (RFC-0001 §14.18.3, *Join snapshot*). `hello` says `join_snapshot: true`. A
+binding that wants the run's current state sends, as its first line on the socket and without waiting for
+`hello`:
+
+```json
+{"op": "join_snapshot", "v": "canticle-receptor-record/1"}
+```
+
+- **One per connection, first line only.** Only the first line is read as a request. Any other line, a second
+  request included, and a first line that is not exactly this request (another `op`, another `v`, more than
+  64 KiB or nesting depth 8), is ignored and counted. A binding that does not ask receives exactly the stream
+  of *Joining a run*, and stays `joined_late`.
+- **The cut** is one synchronous step of the event loop, with no receive-path work between: the watermark *W*
+  is the run's last `rec_seq` (records dropped for any connection included); the entries are captured; and
+  they are queued behind whatever the connection already holds, all of it at or below *W*. The connection
+  reads `hello`, `landing_state`, any live records up to *W*, the `snapshot` records, `snapshot_end`, then live
+  records from *W* + 1. A `retract`, PLUCK, expiry or presence change after the cut is a live record above *W*.
+- **Content.** First one `presence` entry per station with a presence state this run (its latest `presence`
+  record's fields, by key id); then one `frame` entry per tuple for which this run emitted a deliverable
+  `frame` record (`verified`, `surface`) and no `retract`, whose `local_expiry_at` has not passed: alarm class
+  first, then newest `heard_at` first. A frame entry is that record's fields as emitted, without `v`, `type`,
+  `rec_seq` and `run`, `dedup` included. Held (`warmup_hold`) and other non-deliverable items are not entries,
+  and neither is a tuple surfaced before a restart and not heard since (this run emitted no record for it).
+- **Records.** `{"type": "snapshot", "rec_seq": W, "snap_seq": n, "entry": {"presence": {...}}}` or
+  `{"entry": {"frame": {...}}}`; then `{"type": "snapshot_end", "rec_seq": W, "watermark": W, "count": n,
+  "truncated": bool, "omitted": k}`. `omitted` is always present (0 when the snapshot is complete).
+- **Bound.** At most `min(511, free − 513)` entries, `free` being the connection's free queue slots at the cut,
+  and 1 MiB of `snapshot` lines; entries beyond either cap, in the order above, are omitted and `snapshot_end`
+  says `truncated: true`. So the entries, `snapshot_end` and a 512-slot live-tail reserve always fit the 1 024
+  queue: 511 entries on an empty queue, none (only `snapshot_end`) at exactly 513 free.
+- **When the cut is taken (#86).** With *N* = `min(511, live entries)`, the cut is taken as soon as
+  `free − 513 ≥ N`: at once on an idle connection. Otherwise it is deferred, and live records keep flowing,
+  until the connection has drained that far; *W* and the entries are taken then, so a deferred snapshot
+  carries all *N* entries. The deferral is bounded at 2 s. At the bound the cut is taken with what fits
+  (`truncated` when fewer than *N*, and the binding stays `joined_late`) only if there is room for at least one
+  entry beyond `snapshot_end` and the reserve: 514 free slots, or 513 when nothing is live. Otherwise the
+  connection is closed as stalled. A snapshot carries no entries only when nothing is live.
+- **Never dropped.** `snapshot` and `snapshot_end` count against the queue and are never dropped; one the kernel
+  has not taken within 2 s closes the connection, as a `retract` would. No other connection waits on it.
+- **Counters.** `health.snapshots`: `requested`, `served`, `truncated`, `deferred`, `closed` (the connection
+  ended before its snapshot was written, or its deferral ran out) and `ignored` (inbound lines not served).
+
 ## Tests
 
 ```sh
@@ -382,6 +429,29 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
     item as new when it comes again;
   - socket and directory modes, a refused peer uid, the peer limit, bytes from a peer ignored, `bye` and end of
     stream on a clean stop, a live socket not taken over and a loose socket directory refused.
+- `test_join_snapshot.py` runs proof case (5) with a join snapshot (BC-1b, D36), daemon side, with a binding's
+  validation and view-application model in the test:
+  - (a) `hello` 1, `landing_state` 50, I1 at 60, S's presence at 70, a held item, I2 at 80 plucked at 90, B asks
+    at 99: B gets 1, 50, S's presence and I1 (byte-equal to the records A saw, minus the envelope), no I2 and no
+    held item, `snapshot_end` *W* 99, then the same live records as A from 100;
+  - (b) a PLUCK and a new item in the same event-loop step right after the cut each arrive once, after
+    `snapshot_end`, from *W* + 1; a PLUCK before the cut, and a local expiry passed at the cut whose tick runs
+    after it, leave no plucked or expired item in the snapshot;
+  - (c) entries keep `idem` and `dedup` as emitted (`resurfaced` after a restart); a tuple restored from state
+    but not heard this run is not an entry;
+  - (d) 600 live items and an alarm on an empty queue: 511 entries, presence then the alarm then newest first,
+    `truncated`, `omitted` 91; the 1 MiB cap (scaled down) truncates; a truncated snapshot merges;
+  - (e) a binding that asks and never reads is closed within the 2 s bound mid-snapshot, A's stream is every
+    record the daemon emitted, the queue stays within 1 024, and the daemon keeps receiving;
+  - (f) two bindings joining at different points converge on A's surfaced set and presence;
+  - (g) a binding that does not ask gets the case (5) stream and sees neither item nor presence;
+  - (h) 100 live records queued and 50 live: cut at once, all 50, *W* above the last queued record; 512 queued
+    and 40 live: deferred, cut as soon as `free − 513 ≥ 40` (never at 513), all 40 untruncated; at the 2 s bound
+    between 513 and 513 + *N* free (stalled there, or drained part way from below 513): cut with `free − 513`
+    entries, truncated (514 free: one entry); exactly 513 free at the bound with anything live: closed; below
+    513: closed; nothing live and 512 queued: cut once drained to 513 free, `count` 0, not truncated;
+  - one request per connection, first line only: a second request, a junk first line, an over-long first line
+    and a wrong `v` are ignored and counted; an error at the cut closes that connection only.
 - `test_tuner.py` covers the tuner's view and gateway:
   - verified stations with heads, and unnamed streams that can't be tuned;
   - the live ring, then labelled expiry and withdrawal;
@@ -394,9 +464,9 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
 ## Vectors
 
 [`vectors/frame-v2-candidates.json`](vectors/frame-v2-candidates.json) contains:
-- 32 parse-level cases (datagram → `accept` or a rejection reason);
+- 34 parse-level cases (datagram → `accept` or a rejection reason);
 - 14 listener-level sequences (datagrams → events). Two are timed: with optional `at_ms`, time advances to `at_ms[i]` (local expiry applied, its events not listed) before datagram `i` is heard; `per_key_quota` and `per_key_mark_quota` fix the listener's per-key limits for dedup entries and for supersession marks, counted separately (§7.4).
 
-It covers the #48 acceptance set (valid, wrong key, tampered, unknown key, revoked, expired, replayed) and every case RFC-0001 §9.13 lists: repeat-as-no-op, equivocation, non-deterministic CBOR, `crit`-unknown, a 1 101-byte frame, a depth bomb, a float in a core key, a future `issued_at` and pluck-before-original. The #60 sequences pin a PLUCK whose `expires_at` differs from its held target's, a far-future PLUCK that holds its dedup slot for one day at most, and supersession marks held to their own per-key limit. The §23.2 q21 sequences pin a class change in one epoch, newer or older (dropped as `class-change`, which outranks `superseded`), and one across epochs (allowed). It also includes a regression for the prototype's bug B1 (the 11-byte `{"a":1e400}`). The #66 cases pin the map-key rule (a `false`, `null` or byte-string key inside an extension value, and `true` where key 1 belongs, all `bad-cbor`) and the null rule (an ITEM with `8: null` and no `9`, and a BEACON with `9: null`, both `bad-field`: an optional key that is present must be well-typed, so absence and null are not two encodings of one frame). The A1 cases (#70) pin the post-A1 `stream-entry` of §9.8: `valid-beacon` and `beacon-null-catalog-digest` carry the 9-element entry with `trail_seq`, `beacon-entry-with-lens` the 10-element one, a pre-A1 8-element entry is `bad-field` (it would otherwise be read with every field after `head_seq` shifted), and `b_stream = 2^60` is `bad-field` (`uint .size 4` in the CDDL, #66 case 4).
+It covers the #48 acceptance set (valid, wrong key, tampered, unknown key, revoked, expired, replayed) and every case RFC-0001 §9.13 lists: repeat-as-no-op, equivocation, non-deterministic CBOR, `crit`-unknown, a 1 101-byte frame, a depth bomb, a float in a core key, a future `issued_at` and pluck-before-original. The #60 sequences pin a PLUCK whose `expires_at` differs from its held target's, a far-future PLUCK that holds its dedup slot for one day at most, and supersession marks held to their own per-key limit. The §23.2 q21 sequences pin a class change in one epoch, newer or older (dropped as `class-change`, which outranks `superseded`), and one across epochs (allowed). It also includes a regression for the prototype's bug B1 (the 11-byte `{"a":1e400}`). The #66 cases pin the map-key rule (a `false`, `null` or byte-string key inside an extension value, and `true` where key 1 belongs, all `bad-cbor`) and the null rule (an ITEM with `8: null` and no `9`, and a BEACON with `9: null`, both `bad-field`: an optional key that is present must be well-typed, so absence and null are not two encodings of one frame). The A1 cases (#70) pin the post-A1 `stream-entry` of §9.8: `valid-beacon` and `beacon-null-catalog-digest` carry the 9-element entry with `trail_seq`, `beacon-entry-with-lens` the 10-element one, a pre-A1 8-element entry is `bad-field` (it would otherwise be read with every field after `head_seq` shifted), and `b_stream = 2^60` is `bad-field` (`uint .size 4` in the CDDL, #66 case 4). The #72 cases pin the receiver rule of §9.8: `beacon-trail-seq-empty-window` (`trail_seq = head_seq + 1`, nothing on air) is accepted, and `beacon-trail-seq-over-head-plus-one` (`head_seq + 2`) is `bad-field`.
 
 Keys are the RFC 8032 §7.1 test keys. The vectors are **candidates**: they become normative when a second, independent implementation (for example the TypeScript codec planned in S1) reproduces them.

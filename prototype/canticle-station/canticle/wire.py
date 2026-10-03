@@ -98,6 +98,7 @@ class StreamEntry:
     ``trail_seq`` (amendment A1, #54) is the lowest ``seq`` of any ITEM or PLUCK still on air on the
     stream in this epoch, or ``head_seq + 1`` when nothing is. A pre-A1 8-element entry has no
     length that tells it from a post-A1 one, so it is ``bad-field`` rather than read shifted (#70).
+    A ``trail_seq`` above ``head_seq + 1`` is ``bad-field`` too (§9.8, #72).
     """
 
     stream_id: int
@@ -334,6 +335,10 @@ def _beacon(m: dict) -> Beacon:
             raise Reject("bad-field", f"stream-entry has {len(e) if isinstance(e, list) else 'no'} elements; §9.8 has 9 or 10")
         vals = [_uint(v, f"stream-entry.{name}", maximum)
                 for v, name, maximum in zip(e, StreamEntry.FIELDS, StreamEntry.MAXIMA)]
+        # §9.8 (#72): a sender builds trail_seq as min(ring) <= head_seq, or head_seq + 1 when nothing is
+        # on air. Anything larger is no station state. Python ints don't wrap, so head_seq = 2^64-1 is safe.
+        if vals[2] > vals[1] + 1:
+            raise Reject("bad-field", "stream-entry.trail_seq exceeds head_seq + 1 (§9.8)")
         entries.append(StreamEntry(*vals))
     page = None
     if 7 in m:

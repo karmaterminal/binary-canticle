@@ -89,6 +89,10 @@ def parse_cases() -> list[dict]:
     beacon_pre_a1 = cbor.encode({**wire.beacon_map(bcn), 6: [chat_entry[:2] + chat_entry[3:]]})
     # #66 case 4: b_stream is `uint .size 4` in the §9.8 CDDL, so 2^60 is out of range, not accepted.
     beacon_big_b = cbor.encode({**wire.beacon_map(bcn), 6: [chat_entry[:8] + [2**60]]})
+    # #72 (§9.8): trail_seq is min(ring) <= head_seq, or head_seq + 1 for an empty window. head_seq + 1 is
+    # valid (nothing on air); head_seq + 2 describes no station state and is bad-field.
+    beacon_empty = cbor.encode({**wire.beacon_map(bcn), 6: [chat_entry[:2] + [2, 0, 0, 0] + chat_entry[6:]]})
+    beacon_trail_over = cbor.encode({**wire.beacon_map(bcn), 6: [chat_entry[:2] + [3] + chat_entry[3:]]})
     tampered = bytearray(rfc_v1)
     tampered[rfc_v1.index(b"hello")] = ord("j")
     good_map = cbor.encode(_item())
@@ -156,6 +160,10 @@ def parse_cases() -> list[dict]:
          "#70: an 8-element stream-entry without trail_seq; a stale station fails loudly instead of being read shifted"),
         ("beacon-b-stream-over-u32", _raw(wire.KIND_BEACON, s1, beacon_big_b), "bad-field",
          "#66 case 4: b_stream = 2^60; §9.8 CDDL says uint .size 4"),
+        ("beacon-trail-seq-empty-window", _raw(wire.KIND_BEACON, s1, beacon_empty), "accept",
+         "#72: trail_seq = head_seq + 1 = 2, live = 0; the empty retained window (§9.8)"),
+        ("beacon-trail-seq-over-head-plus-one", _raw(wire.KIND_BEACON, s1, beacon_trail_over), "bad-field",
+         "#72: trail_seq = head_seq + 2 = 3; a receiver MUST treat it as bad-field (§9.8)"),
     ]
     assert len(oversize) == 1101
     return [{"name": n, "datagram_hex": d.hex(), "expect": e, "note": note} for n, d, e, note in cases]
