@@ -76,37 +76,39 @@ openclaw skills info binary-canticle      # expect "Ready" and "Visible to model
 - The skill declares Linux and the `python3` and `git` binaries in `metadata.openclaw`. Where one is
   missing, OpenClaw lists the skill as needing setup and does not show it to the model.
 
-Once the skill is published to ClawHub (below), it installs with `openclaw skills install @<owner>/binary-canticle`
-and updates with `openclaw skills update @<owner>/binary-canticle`. To remove it, run
-`clawhub --workdir <dir> uninstall @<owner>/binary-canticle`, where `<dir>` is the root it was installed
+Once the skill is published to ClawHub (below), it installs with
+`openclaw skills install @karmafeast/binary-canticle` and updates with
+`openclaw skills update @karmafeast/binary-canticle`. To remove it, run
+`clawhub --workdir <dir> uninstall @karmafeast/binary-canticle`, where `<dir>` is the root it was installed
 into: the agent workspace, or for a `--global` install `~/.openclaw` (`$OPENCLAW_STATE_DIR` when that is set).
 `clawhub` finds the skill through the lock file under `--workdir`, which defaults to the current directory.
 
 ## Publishing to ClawHub
 
-The skill is **not published**. Publication is a separate gate that figs decides (#88), and nobody runs a
-publish until all four of these are settled:
+The skill is **not published**. Publication is a separate gate that figs decides (#88). figs settled the
+first two conditions on 2026-10-02, and nobody runs a publish until the other two are met:
 
-1. **License.** This repository has no LICENSE yet. ClawHub releases every skill it publishes under
-   MIT-0, whatever the repository's own license says, and allows no other license terms in `SKILL.md`.
-2. **Publisher.** Who publishes, and under which ClawHub handle (`--owner`) and byline.
+1. **License: MIT.** The repository's [`LICENSE`](../../LICENSE) is MIT. ClawHub releases every skill it
+   publishes under MIT-0, whatever the repository's license says, and allows no other license terms in
+   `SKILL.md`, so the skill's frontmatter names none.
+2. **Publisher: figs,** from the `karmafeast` ClawHub account.
 3. **The receive contract.** The D36 join snapshot of binary-canticle#85 and karmaterminal/frond-ear#45
    works against a real host daemon.
 4. **A mixed-host proof** with a real harness binding (RFC §14.18.2 cases 4 and 6).
 
-The publisher then works from a clean checkout of the commit to publish, logged in to ClawHub as that
-publisher. First a dry run, which reports the version it would publish and changes nothing:
+figs then works from a clean checkout of the commit to publish, logged in to ClawHub as `karmafeast`.
+First a dry run, which reports the version it would publish and changes nothing:
 
 ```sh
 clawhub skill publish plugins/binary-canticle/skills/binary-canticle \
-  --slug binary-canticle --name "Binary Canticle" --owner <handle> --version <version> \
+  --slug binary-canticle --name "Binary Canticle" --owner karmafeast --version <version> \
   --source-repo karmaterminal/binary-canticle --source-commit "$(git rev-parse HEAD)" \
   --source-path plugins/binary-canticle/skills/binary-canticle --dry-run
 ```
 
 Then the same command without `--dry-run`. Use the `version` from
 [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json), so both channels name one release.
-`openclaw skills verify @<handle>/binary-canticle` then shows ClawHub's scan and the source provenance.
+`openclaw skills verify @karmafeast/binary-canticle` then shows ClawHub's scan and the source provenance.
 
 ## Changing the skill
 

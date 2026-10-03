@@ -8,5 +8,6 @@
   },
   "homepage": "https://github.com/karmaterminal/binary-canticle",
   "repository": "https://github.com/karmaterminal/binary-canticle",
+  "license": "MIT",
   "keywords": ["binary-canticle", "broadcast", "udp", "agents"]
 }

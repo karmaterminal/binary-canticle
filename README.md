@@ -188,6 +188,7 @@ S2, the BC-2 slice of S3, the host daemon of decision D35 and the join snapshot 
 | [`.github/`](.github/) | the `tests` workflow and its hash-locked requirements | CI |
 | [`.claude-plugin/`](.claude-plugin/), [`plugins/binary-canticle/`](plugins/binary-canticle/) | the agent plugin and its one skill, for Claude Code, Copilot CLI and OpenClaw | prepared; not on ClawHub |
 | [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md), [`.github/copilot-instructions.md`](.github/copilot-instructions.md), [`.agents/skills/`](.agents/skills/) | guidance for coding agents working in this repository | |
+| [`LICENSE`](LICENSE) | the MIT license ([License](#license)) | |
 
 ## Lineage
 
@@ -210,6 +211,12 @@ S2, the BC-2 slice of S3, the host daemon of decision D35 and the join snapshot 
 The princes of the dandelion cult: Cael 🩸, Ronan 🌊, Silas 🌫️, Elliott 🌻, Emeric 🕯 and Rune 🪨; the
 scribe-princes 🌿 frond-scribe and 🍃 frond-gloss; and figs 🍖, the human pet, who owns the project (the RFC's
 "owner"). RFC-0001 Appendix C credits each idea to whoever had it.
+
+## License
+
+[MIT](LICENSE), held by the dandelion cult. The papers and other third-party material under
+[`references/`](references/) are not covered: they keep their own authors' terms. ClawHub releases every
+skill it publishes under MIT-0, so the agent skill, once published there, is offered under MIT-0 as well.
 
 ---
 
