@@ -35,6 +35,7 @@ Which document wins, highest first:
 | `reports/` | Dated assessments the RFC cites. |
 | `.github/workflows/tests.yml`, `.github/ci/` | CI and its hash-locked requirements. |
 | `.agents/skills/` | Procedures for recurring changes (below). |
+| `.claude-plugin/marketplace.json`, `plugins/binary-canticle/` | The agent plugin: one skill for people who run `canticle`, installed into Claude Code, Copilot CLI or OpenClaw. Its README has the install commands. |
 
 ## Set up and test
 
@@ -96,6 +97,19 @@ git status --porcelain
   update there; say so in your pull request.
 - The step-by-step procedure is
   [`.agents/skills/canticle-wire-change/SKILL.md`](.agents/skills/canticle-wire-change/SKILL.md).
+
+## The agent plugin
+
+- `plugins/binary-canticle/skills/binary-canticle/SKILL.md` is one file that three tools read. Keep its
+  frontmatter to `name`, `description` and `metadata`, with `metadata` on one line as JSON. OpenClaw's skill
+  validator rejects keys outside its own list (such as `compatibility` and `version`), and ClawHub publishes
+  every skill as MIT-0 and allows no other license terms in it.
+- Bump `version` in `plugins/binary-canticle/.claude-plugin/plugin.json` whenever anything under
+  `plugins/binary-canticle/` changes, or installed copies won't update.
+- Never add a second marketplace manifest (`marketplace.json`, `.plugin/` or `.github/plugin/`). Copilot CLI
+  reads the first one it finds and would ignore `.claude-plugin/marketplace.json`.
+- Check with `claude plugin validate --strict .` and `claude plugin validate --strict plugins/binary-canticle`.
+- When the skill states a command, a flag or a default, check it against the code first.
 
 ## Trust, keys and deployment: do not improvise
 

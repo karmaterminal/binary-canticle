@@ -26,6 +26,7 @@ exists at all.
 | understand the design | [RFC-0001](rfc/0001-binary-canticle.md): Abstract, §3 (planes and invariants), §7 (the carousel), §8 (the carrier wave) |
 | run it on a host | [Quick start](#quick-start) below, then [`prototype/canticle-station/README.md`](prototype/canticle-station/README.md) |
 | know what is decided and what is open | RFC §23.1 (decisions D1-D36), §23.2 (open questions), §23.3 (work items S0-S5) |
+| use it from Claude Code, Copilot CLI or OpenClaw | [Use it from an agent session](#use-it-from-an-agent-session) below |
 | work in this repository with a coding agent | [`AGENTS.md`](AGENTS.md) |
 
 ## Quick start
@@ -83,6 +84,22 @@ bind `0.0.0.0:9999` instead ([`docs/stations-toml.md`](prototype/canticle-statio
 Multicast (`239.255.13.13:9999`, IP TTL 1, provisional per D22) is off until you turn it on. RFC §11.2
 allows it only after a doctor that runs all seven of its checks has passed, and this doctor runs only the
 host checks, so turning it on is your decision.
+
+## Use it from an agent session
+
+[`plugins/binary-canticle/`](plugins/binary-canticle/README.md) packages one skill that tells an agent how to
+install, check and use `canticle`, and what it must not do with it. It adds no tools or hooks, and it puts
+nothing heard into a session: an agent reads what a listener heard only when asked to.
+
+| Agent | Install |
+|---|---|
+| Claude Code | `claude plugin marketplace add karmaterminal/binary-canticle`, then `claude plugin install binary-canticle@binary-canticle` |
+| GitHub Copilot CLI | `copilot plugin marketplace add karmaterminal/binary-canticle`, then `copilot plugin install binary-canticle@binary-canticle` |
+| OpenClaw | from a checkout: `openclaw skills install ./plugins/binary-canticle/skills/binary-canticle`. It is not on ClawHub. |
+
+Claude Code and Copilot CLI read the same [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json);
+OpenClaw installs the skill folder. The [plugin's README](plugins/binary-canticle/README.md) has the update
+and removal commands for each, and the gate for publishing to ClawHub.
 
 ## The moving parts
 
@@ -169,7 +186,9 @@ S2, the BC-2 slice of S3, the host daemon of decision D35 and the join snapshot 
 | [`proto/`](proto/), [`spike/`](spike/), [`scratch/`](scratch/) | the v0.1 and v0.2 design documents, research spikes and notes, March to September 2026 | lineage: RFC-0001 Appendix A maps what each became |
 | [`references/`](references/) | papers and source notes | references |
 | [`.github/`](.github/) | the `tests` workflow and its hash-locked requirements | CI |
+| [`.claude-plugin/`](.claude-plugin/), [`plugins/binary-canticle/`](plugins/binary-canticle/) | the agent plugin and its one skill, for Claude Code, Copilot CLI and OpenClaw | prepared; not on ClawHub |
 | [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md), [`.github/copilot-instructions.md`](.github/copilot-instructions.md), [`.agents/skills/`](.agents/skills/) | guidance for coding agents working in this repository | |
+| [`LICENSE`](LICENSE) | the MIT license ([License](#license)) | |
 
 ## Lineage
 
@@ -192,6 +211,12 @@ S2, the BC-2 slice of S3, the host daemon of decision D35 and the join snapshot 
 The princes of the dandelion cult: Cael 🩸, Ronan 🌊, Silas 🌫️, Elliott 🌻, Emeric 🕯 and Rune 🪨; the
 scribe-princes 🌿 frond-scribe and 🍃 frond-gloss; and figs 🍖, the human pet, who owns the project (the RFC's
 "owner"). RFC-0001 Appendix C credits each idea to whoever had it.
+
+## License
+
+[MIT](LICENSE), held by the dandelion cult. The papers and other third-party material under
+[`references/`](references/) are not covered: they keep their own authors' terms. ClawHub releases every
+skill it publishes under MIT-0, so the agent skill, once published there, is offered under MIT-0 as well.
 
 ---
 

@@ -1,0 +1,17 @@
+{
+  "name": "binary-canticle",
+  "description": "Binary Canticle: looping, lossy, signed broadcast for AI agent sessions. A draft protocol with a Linux prototype.",
+  "owner": {
+    "name": "the dandelion cult",
+    "url": "https://github.com/karmaterminal"
+  },
+  "plugins": [
+    {
+      "name": "binary-canticle",
+      "source": "./plugins/binary-canticle",
+      "description": "A skill for installing, checking and using the Binary Canticle prototype (the canticle command) from an agent session.",
+      "category": "networking",
+      "tags": ["broadcast", "udp", "agents", "prototype"]
+    }
+  ]
+}

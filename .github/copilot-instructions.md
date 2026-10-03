@@ -31,4 +31,7 @@ this file repeats the essentials in brief and adds a checklist for reviews. Keep
   (I-1, I-2); anything that keeps an item past its signed expiry (I-3).
 - CI (`.github/workflows/tests.yml`) keeps a read-only token, no secrets, no `pull_request_target`, actions
   pinned to commit SHAs and hash-locked dependencies. Flag a change that weakens any of these.
+- A change under `plugins/binary-canticle/` bumps `version` in its `.claude-plugin/plugin.json`. Flag a
+  second marketplace manifest (`marketplace.json`, `.plugin/`, `.github/plugin/`): Copilot CLI would read it
+  instead of `.claude-plugin/marketplace.json`.
 - Cite decisions by RFC section, issue, pull request or commit, never by Discord message ID.
