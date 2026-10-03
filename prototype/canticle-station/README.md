@@ -369,7 +369,7 @@ binding that wants the run's current state sends, as its first line on the socke
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 234 tests, about 25 s
+python -m unittest discover -s tests      # 254 tests, about 25 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
