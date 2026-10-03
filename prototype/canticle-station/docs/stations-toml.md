@@ -27,7 +27,7 @@ multicast = false              # join 239.255.13.13 (provisional, D22); off unle
 | `version` | integer | yes | | Schema version. Must be `1`. |
 | `manifest.path` | string | yes | | The fleet manifest. A relative path is relative to the directory holding `stations.toml`, not the working directory; `~` expands to your home. |
 | `listen.bind` | string | no | `"0.0.0.0:9999"` | `IPv4-address:port` the listener binds, port 1-65535. `0.0.0.0` hears every interface; `127.0.0.1` hears only this host. IPv6 is not supported. |
-| `listen.multicast` | boolean | no | `false` | Join the LAN multicast group. A listener bound to an address other than `0.0.0.0` does not hear the group; `canticle doctor` says so. |
+| `listen.multicast` | boolean | no | `false` | Join the LAN multicast group. A listener bound to an address other than `0.0.0.0` does not hear the group; `canticle doctor` says so. `canticle doctor` runs its loopback probe, which joins the group, only when this is `true` (or `--multicast` is given), or with `--probe`. |
 
 The whole `[listen]` table is optional.
 
