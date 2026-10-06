@@ -10,7 +10,7 @@
 | karmaterminal/binary-canticle | `main` @ `a03bc8cffdb80e85645f5db5b16f59dd94fc801f` | repository paths; `§n` is RFC-0001 at this commit |
 | karmaterminal/frond-ear | `main` @ `014d96fb9eb2761af6ac0af7941c7e8c63a65ab7` | `fe/` |
 
-- When this was last checked, OpenClaw `main` was 11 commits past `9e56928`, at `3102a85`. None of those commits touches a file cited here, and none adds canticle code or a UDP listener.
+- On 2026-10-06 at 17:42Z, OpenClaw `main` was 18 commits past `9e56928`, at `5aafce8`. None of those commits touches a file cited here, and none adds canticle code or a UDP listener.
 - RFC-0001 cites OpenClaw at `6e6458a`, frozen by D29 (§14.18, §16.1-§16.4). §6 lists what moved between the two commits.
 - `report §n` is `reports/2026-10-01-openclaw-interface-demands.md`.
 - Every unmarked claim was read in source at these refs. Inferences are marked. Nothing was executed.
@@ -249,8 +249,8 @@ Moved, with the same behaviour. A diff of `host-hook-state.ts`, `attempt-prompt-
 | `src/auto-reply/reply/session-system-events.ts:121-122` | `:133-135` |
 | `src/auto-reply/reply/get-reply-directives.ts:319-323` | `:312-316` |
 | `src/config/io.load.ts:118`; `src/config/zod-schema.root-support.ts:135-186` | `:114`; `:136-187` |
-| `src/plugins/config-activation-shared.ts:226-232` | `:165` |
-| `src/config/plugin-auto-enable.shared.ts:108-121`, `:455-473` | `:414-434`, with `src/config/plugin-auto-enable.materialize.ts:215-231` |
+| `src/plugins/config-activation-shared.ts:226-232` | `:157-166` |
+| `src/config/plugin-auto-enable.shared.ts:108-121`, `:455-473` | `:87-100`, `:414-432`, with `src/config/plugin-auto-enable.materialize.ts:215-231` |
 | `src/config/validation-plugin-config.ts:345-395` | `:379-401` (that an invalid block refuses Gateway boot was not re-traced) |
 | `src/infra/session-delivery-queue-storage.ts:153` | `:151` |
 | `src/infra/system-events.ts:25-37` (`SystemEvent`) | `:26-40` |
