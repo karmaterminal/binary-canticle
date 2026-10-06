@@ -1,7 +1,7 @@
 # OpenClaw surfaces vs missing surfaces
 
 *2026-05-05. Working checklist / workboard draft. Derived from cohort discussion around Binary Canticle v0.2 and inter-node signalling planes.*
-
+> **Lineage note (2026-10-06, #25): superseded.** The current board, re-checked row by row at OpenClaw `9e56928`, is [`reports/2026-10-06-openclaw-surfaces-vs-missing-surfaces.md`](../reports/2026-10-06-openclaw-surfaces-vs-missing-surfaces.md). This 2026-05-05 text is kept as written, on the line numbers RFC-0001 cites.
 ## Keeper sentence
 
 **Nerves, hormones, memory, executive control — not one omnibus bus.**
