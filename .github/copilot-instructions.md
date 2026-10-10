@@ -38,4 +38,7 @@ this file repeats the essentials in brief and adds a checklist for reviews. Keep
   instead of `.claude-plugin/marketplace.json`.
 - A change under `prototype/openclaw-canticle/` keeps its README (tools, bounds, departures) in step with the
   code. Flag anything that installs, enables or publishes it, or turns on `publish.enabled` by default.
+- A change under `prototype/canticle-station/docs/pilot-host/` keeps its README, the guard and
+  `tests/test_pilot_host.py` in step. Flag anything that installs or applies the kit on a host, or that lets the
+  guard start the daemon on a wildcard bind or without the table's two drops.
 - Cite decisions by RFC section, issue, pull request or commit, never by Discord message ID.
