@@ -121,6 +121,12 @@ never to a call that names no session.
   (a content type the daemon cannot name shows as its registry number); a body by reference is named, never
   fetched. A session not listed in `listen.payloadSessions` is refused (`payload_not_allowed`). A read that
   shows any payload sets `untrusted: true` and taints the session.
+- **Look-alikes are defanged too.** Defanging matches on a folded copy of the payload: the look-alike angle
+  brackets, zero-width characters and soft hyphen that OpenClaw's own sanitizer folds
+  (`src/security/external-content.ts`), and every fullwidth form. So `＜＜＜`, `‹‹‹` or a zero-width character
+  between brackets breaks a marker as `<<<` does. A triple bracket becomes `&lt;&lt;&lt;` / `&gt;&gt;&gt;`,
+  which no fold turns back into one. (`canticle tap` still matches ASCII only and writes `‹‹‹`, a look-alike
+  OpenClaw folds.)
 - **The banner is the host's.** A station's declared `purpose` is any text it signed, up to 128 bytes (§9), so
   the banner shows it as one JSON string, with controls, line separators and bidirectional overrides escaped: a
   purpose cannot add a line of its own above the wrapper or end its quotes early. The station and principal
@@ -193,7 +199,7 @@ heard-back time, any withdrawal, and the last event. The payload itself is kept 
 | State | Kind | Means |
 |---|---|---|
 | `pending` | local intent | Written ahead, request in flight. A row is never left `pending`: it ends `on_air`, `unknown` or `failed`. |
-| `on_air` (shown as `expiring` in its last 20 % of life, at least its last 10 s) | station-confirmed | The station's receipt, or this binding heard its frame with the same body. |
+| `on_air` (shown as `expiring` in its last 20 % of life, at least its last 10 s, and as `expired` once past its expiry) | station-confirmed | The station's receipt, or this binding heard its frame with the same body. |
 | `unknown` | local | Sent, unconfirmed. It ends as `unknown` (`lapsed_unconfirmed`) once it could no longer be on air. |
 | `withdrawn` | station-confirmed | Plucked: the station's reply, the daemon's `retract` with reason `plucked`, or the item gone from the station after a pluck this binding sent whose reply was lost. A withdrawal not yet sent when the item left the station ends `stopped` (`gone_before_pluck`). |
 | `expired` | receipt or daemon | Past the receipt's expiry, or a `retract` for expiry. |
@@ -201,6 +207,11 @@ heard-back time, any withdrawal, and the last event. The payload itself is kept 
 | `stopped` | station | The station restarted (a new epoch: its ring is not persisted) or no longer holds it. |
 | `failed` | local or station | The station refused it, was unreachable once the row was written, or the process died before sending (`not_sent`). |
 
+- **Reads and calls see the clock.** A row past its expiry reads `expired` before the next reconcile ends it,
+  drops off the `live` list, and shows no time left; an `unknown` row leaves that list once it could no longer be
+  on air. Every sing and hush ends such rows first, so the same payload sings anew and a hush answers `expired`
+  without asking the station. A row the daemon's retract ends while a reconcile waits on the station keeps that
+  ending, and one whose life ran out meanwhile ends `expired`.
 - **Aging is not a retry mandate.** A row is sent at most once. Nothing is inferred from a row being queued.
   Withdrawn, expired, superseded, stopped and failed rows are never sung again.
 - **The station is the authority** for epoch, seq and expiry. Before it sings, the outbox checks that the station
@@ -365,10 +376,10 @@ CANTICLE_INTEROP=require node --test 'test/*.test.ts'   # fail, rather than skip
   without journaling anything twice. Without that Python it is skipped, unless `CANTICLE_INTEROP=require`.
 - Typecheck: `tsc -p tsconfig.json` with `typescript` and `@types/node` as locked in
   `.github/ci/openclaw-canticle/` (CI runs it).
-- The tests were revert-checked: each of 93 source changes that undo one rule (the write-ahead save, the epoch
+- The tests were revert-checked: each of 107 source changes that undo one rule (the write-ahead save, the epoch
   check before a pluck, the send window for evidence, the payload gate, the banner's quoting, the name grammar,
-  where a journaled item stands, the binding name on ids, the lease, a refusal's failed result, …) makes at least
-  one test fail.
+  where a journaled item stands, the look-alike folds, an outbox row's expiry between reconciles, the binding name
+  on ids, the lease, a refusal's failed result, …) makes at least one test fail.
 - Checked by hand in a real OpenClaw 2026.9.9 Gateway, in a scratch home with a loopback daemon and station (no
   seat): the plugin loads with six optional tools and one service and no diagnostics
   (`openclaw plugins inspect canticle --runtime`, `openclaw plugins doctor`); `canticle_status` and

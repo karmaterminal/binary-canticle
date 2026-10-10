@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { type BindingConfig, sessionMatches, tuned } from "./config.ts";
 import { DaemonLink } from "./daemon.ts";
 import { type Entry, type HeardEntry, Journal } from "./journal.ts";
-import { type HushOutcome, Outbox, OutboxClosed, type Row, type SingOutcome, isTerminal, shownState } from "./outbox.ts";
+import { type HushOutcome, Outbox, OutboxClosed, type Row, type SingOutcome, isLive, shownState } from "./outbox.ts";
 import { Receiver, type ViewItem } from "./receive.ts";
 import { type HeardFrame, type Obj, STATION_NAME, STREAM_NAME, isObj } from "./records.ts";
 import { type Air, heardMarks, iso, presenceText, renderEntry, renderViewItem } from "./render.ts";
@@ -1006,12 +1006,13 @@ export class Binding {
     const now = this.clock();
     const rows = out
       .rows()
-      .filter((r) => which === "all" || !isTerminal(r))
+      .filter((r) => which === "all" || isLive(r, now))
       .sort((a, b) => b.created_at - a.created_at)
       .slice(0, 50);
     const lines = rows.map((r) => {
       const v = rowView(r, now);
-      return `${r.id} ${v.state} ${r.stream}${r.class !== null ? ` class=${r.class}` : ""}${r.state_key !== null ? ` key=${r.state_key}` : ""} body=${r.body.size}B sha256=${r.body.sha256.slice(0, 12)}…${v.on_air !== null ? ` epoch ${v.on_air.epoch} seq ${v.on_air.seq} left ${v.on_air.remaining_s}s` : ""}${r.heard_at !== null ? " heard" : ""}${r.withdraw !== null ? ` withdraw=${r.withdraw.outcome ?? "requested"}` : ""}${r.ended !== null ? ` (${r.ended.reason})` : ""}`;
+      const left = v.state === "on_air" || v.state === "expiring" ? ` left ${v.on_air?.remaining_s ?? 0}s` : ""; // only while it can be on air
+      return `${r.id} ${v.state} ${r.stream}${r.class !== null ? ` class=${r.class}` : ""}${r.state_key !== null ? ` key=${r.state_key}` : ""} body=${r.body.size}B sha256=${r.body.sha256.slice(0, 12)}…${v.on_air !== null ? ` epoch ${v.on_air.epoch} seq ${v.on_air.seq}${left}` : ""}${r.heard_at !== null ? " heard" : ""}${r.withdraw !== null ? ` withdraw=${r.withdraw.outcome ?? "requested"}` : ""}${r.ended !== null ? ` (${r.ended.reason})` : ""}`;
     });
     return {
       text: [`[canticle:outbox] ${rows.length} ${which} row(s); ${Object.entries(out.summary(now)).map(([k, v]) => `${k}=${v}`).join(", ") || "empty"}`, ...lines].join("\n"),

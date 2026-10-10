@@ -205,6 +205,9 @@ export class Outbox {
 
   private async singNow(req: SingRequest): Promise<SingOutcome> {
     const now = this.clock();
+    if (this.expire(now)) {
+      this.save(); // a row past its expiry is no longer live: it must not answer this call as on air
+    }
     const bad = this.check(req);
     if (bad !== null) {
       this.counts.refused += 1;
@@ -432,6 +435,9 @@ export class Outbox {
       return { status: "not_found", reason: "no_such_row", row: null };
     }
     const now = this.clock();
+    if (this.expire(now)) {
+      this.save();
+    }
     if (row.ended !== null) {
       return { status: hushStatusOf(row), reason: row.ended.reason, row };
     }
@@ -498,21 +504,29 @@ export class Outbox {
     }
   }
 
+  /** End on-air rows past their expiry and lapse unknown rows that could no longer be on air. Every operation runs
+   * this first, so none acts on a row the clock has already ended; reads use shownState. Returns whether a row
+   * changed. */
+  private expire(now: number): boolean {
+    let changed = false;
+    for (const r of this.rowsById.values()) {
+      if (r.state === "on_air" && r.receipt !== null && r.receipt.expires_at <= now) {
+        this.end(r, "expired", "expired", now);
+        changed = true;
+      } else if (r.state === "unknown" && r.ended === null && r.latest_expiry !== null && r.latest_expiry <= now) {
+        this.end(r, "unknown", "lapsed_unconfirmed", now);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
   /** Expire what has passed its expiry, check on-air rows against the station, retry pending withdrawals, and
    * forget old ended rows. Never re-sends anything. */
   reconcile(): Promise<void> {
     return this.exclusive(async () => {
       const now = this.clock();
-      let changed = false;
-      for (const r of this.rowsById.values()) {
-        if (r.state === "on_air" && r.receipt !== null && r.receipt.expires_at <= now) {
-          this.end(r, "expired", "expired", now);
-          changed = true;
-        } else if (r.state === "unknown" && r.ended === null && r.latest_expiry !== null && r.latest_expiry <= now) {
-          this.end(r, "unknown", "lapsed_unconfirmed", now);
-          changed = true;
-        }
-      }
+      let changed = this.expire(now);
       const live = this.rows().filter((r) => r.state === "on_air" && r.ended === null);
       if (live.length > 0) {
         const v = this.verifyStation(await this.station({ op: "status" }), null, this.clock());
@@ -520,7 +534,11 @@ export class Outbox {
         if (typeof v !== "string") {
           for (const r of live) {
             const rc = r.receipt as Receipt;
-            if (rc.epoch !== v.epoch) {
+            if (r.ended !== null) {
+              continue; // ended while the station was asked (the daemon's retract): that answer stands
+            } else if (rc.expires_at <= at) {
+              this.end(r, "expired", "expired", at); // gone from the station because its life ran out
+            } else if (rc.epoch !== v.epoch) {
               this.end(r, "stopped", "station_restarted", at); // the station's ring is not persisted
             } else if (!(v.onAir.get(r.stream)?.has(rc.seq) ?? false)) {
               // Gone from the station. Only a pluck this binding sent (its reply lost) makes that a withdrawal; a
@@ -633,13 +651,26 @@ export class Outbox {
   }
 }
 
-/** pending, on_air, expiring, unknown, withdrawn, expired, superseded, stopped or failed. */
+/** pending, on_air, expiring, unknown, withdrawn, expired, superseded, stopped or failed, as of ``now``: an on-air
+ * row past its expiry reads expired before the next reconcile ends it. */
 export function shownState(r: Row, now: number): string {
   if (r.state === "on_air" && r.receipt !== null) {
-    const ttlMs = r.receipt.expires_at - r.receipt.issued_at;
-    return r.receipt.expires_at - now <= Math.max(10_000, 0.2 * ttlMs) ? "expiring" : "on_air";
+    const left = r.receipt.expires_at - now;
+    if (left <= 0) {
+      return "expired";
+    }
+    return left <= Math.max(10_000, 0.2 * (r.receipt.expires_at - r.receipt.issued_at)) ? "expiring" : "on_air";
   }
   return r.state;
+}
+
+/** Whether a row could still be on air as of ``now``: pending, on air and not past its expiry, or unknown and not
+ * past the latest expiry it could have. */
+export function isLive(r: Row, now: number): boolean {
+  if (isTerminal(r) || shownState(r, now) === "expired") {
+    return false;
+  }
+  return !(r.state === "unknown" && r.latest_expiry !== null && r.latest_expiry <= now);
 }
 
 export function isTerminal(r: Row): boolean {
