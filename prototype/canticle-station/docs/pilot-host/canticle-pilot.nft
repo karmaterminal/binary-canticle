@@ -1,0 +1,38 @@
+#!/usr/sbin/nft -f
+# The canticle pilot table (binary-canticle#103): on a LAN pilot host, drop datagrams to the daemon's address and
+# port unless they come from a pilot peer on the LAN interface. Documented only; the host owner installs it
+# (README.md beside this file), and canticle-nft.service loads it at boot.
+#
+# Edit the four defines and nothing else. LOCAL and PORT must be the address and port in CANTICLE_BIND
+# (~/.binary-canticle/pilot.env): the daemon's guard refuses to start unless this table drops datagrams to exactly
+# that address and port. The samples are documentation addresses (RFC 5737), so this file as shipped scopes nothing.
+#
+# - Its own table, so it never edits the distro's ruleset, and its own base chain at priority -10, so it runs
+#   before a distro filter chain at priority 0. A drop is final; the accept policy leaves every other packet to
+#   the chains after this one. It opens nothing.
+# - Destination-scoped: only datagrams to LOCAL:PORT are touched; loopback, other addresses and other ports
+#   pass through it untouched.
+# - iifname compares a name, so the rules load before the interface exists (a Wi-Fi link at boot).
+# - Write $LAN_IF bare in the rules: nft does not expand a variable inside quotes, and a quoted "$LAN_IF" would
+#   compare against that literal text and drop the peers too. The quotes belong in the define.
+# - Loading it again replaces the table in one transaction (the first two commands), so a reload never leaves
+#   the port unscoped and never doubles the rules.
+#
+# Check:    sudo nft -c -f canticle-pilot.nft     (needs root, and changes nothing)
+# Rollback: sudo nft delete table inet canticle   (stop the daemon first: README.md, Rollback)
+
+define LOCAL = 192.0.2.10        # this host's LAN address: the address in CANTICLE_BIND
+define LAN_IF = "lan0"           # the interface the peers' datagrams arrive on (ip -br addr)
+define PEERS = { 192.0.2.20 }    # the pilot peers' addresses, comma-separated: { 10.0.0.246, 10.0.0.250 }
+define PORT = 9999               # the port in CANTICLE_BIND
+
+table inet canticle
+delete table inet canticle
+
+table inet canticle {
+	chain in {
+		type filter hook input priority -10; policy accept;
+		ip daddr $LOCAL udp dport $PORT iifname != $LAN_IF counter drop
+		ip daddr $LOCAL udp dport $PORT ip saddr != $PEERS counter drop
+	}
+}

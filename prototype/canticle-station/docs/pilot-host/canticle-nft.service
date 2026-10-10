@@ -1,0 +1,44 @@
+# Example system unit: load the canticle pilot table (canticle-pilot.nft) at boot, before the network and before
+# any user manager (binary-canticle#103). Documented only; the host owner installs it as root (README.md beside
+# this file, step 1):
+#
+#   sudo install -D -m 0644 canticle-pilot.nft /etc/canticle/canticle-pilot.nft    # then edit its defines
+#   sudo install -m 0644 canticle-nft.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now canticle-nft.service
+#
+# It is a system unit because loading nft rules needs root; the daemon is a user unit under the seat's uid, and
+# systemd can't order one against the other. So the order holds two ways:
+# - at boot, this unit runs before network-pre.target and systemd-user-sessions.service, and since systemd 252
+#   the user manager that starts the daemon waits for systemd-user-sessions.service;
+# - at every daemon start, the guard in pilot.conf reads the table back and refuses to start without it.
+#
+# It leaves the distro's /etc/nftables.conf alone. Debian's and Arch's nftables.service flush the whole ruleset
+# when they stop or restart, and a reload does too when the config starts with `flush ruleset` (Debian's does).
+# So this unit loads the table again right after nftables.service starts, restarts or reloads. A plain
+# `systemctl stop nftables` still leaves the table gone: start this unit again, or stop the daemon.
+#
+# There is no ExecStop, so stopping or disabling this unit never opens the port under a running daemon.
+# Rollback, after the daemon is stopped: sudo systemctl disable --now canticle-nft.service
+#                                        sudo nft delete table inet canticle
+
+[Unit]
+Description=canticle pilot firewall scope (table inet canticle)
+Documentation=https://github.com/karmaterminal/binary-canticle/tree/main/prototype/canticle-station/docs/pilot-host
+DefaultDependencies=no
+Wants=network-pre.target
+Before=network-pre.target systemd-user-sessions.service shutdown.target
+Conflicts=shutdown.target
+After=nftables.service
+PartOf=nftables.service
+ReloadPropagatedFrom=nftables.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/canticle/canticle-pilot.nft
+ExecReload=/usr/sbin/nft -f /etc/canticle/canticle-pilot.nft
+ProtectSystem=full
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target nftables.service

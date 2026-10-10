@@ -1,10 +1,12 @@
-# Root-free test suites for prototype/canticle-station and the
+# Test suites for prototype/canticle-station and the
 # prototype/protocol-dynamics harness.
 #
-# These jobs do not run run_all.sh, network namespaces or nftables, and they
-# do not rerun or certify the privileged E1-E5 measurements. Those remain a
-# separately attested run: see prototype/protocol-dynamics/SUMMARY.md and
-# `python summarize.py verify`.
+# The suites run without root. One station-tests step runs as root: it checks
+# and loads the pilot-host nft table (docs/pilot-host/, #103) with nft inside a
+# throwaway network namespace, so nothing reaches the runner's own ruleset.
+# These jobs do not run run_all.sh, and they do not rerun or certify the
+# privileged E1-E5 measurements. Those remain a separately attested run: see
+# prototype/protocol-dynamics/SUMMARY.md and `python summarize.py verify`.
 #
 # Boundary: read-only token, no secrets, no pull_request_target or other
 # privileged triggers, actions pinned to reviewed commits, dependencies
@@ -46,6 +48,17 @@ jobs:
         env:
           PYTHONPATH: prototype/canticle-station
         run: python -m unittest discover -s prototype/canticle-station/tests -v
+      - name: Check the pilot nft table with nft (root, throwaway network namespace)
+        env:
+          PYTHONPATH: prototype/canticle-station
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          if ! command -v nft >/dev/null && ! [ -x /usr/sbin/nft ]; then
+            echo "::notice::nft is not installed on this runner, so test_pilot_host.NftTest is skipped"
+            exit 0
+          fi
+          sudo --preserve-env=PYTHONPATH,PYTHONDONTWRITEBYTECODE CANTICLE_REQUIRE_NFT=1 "$(command -v python)" \
+            -m unittest discover -s prototype/canticle-station/tests -p test_pilot_host.py -k NftTest -v
       - name: Check the tests left the tree unchanged
         run: |
           git diff --exit-code
