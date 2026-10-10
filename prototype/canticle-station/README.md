@@ -415,7 +415,7 @@ decides who may connect. Exit status: 0 ok; 1 no socket, refused or timed out; 2
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 296 tests, about 80 s
+python -m unittest discover -s tests      # 297 tests, about 80 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -512,9 +512,11 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
 - `test_pilot_host.py` covers the pilot-host kit (#103):
   - the daemon's start guard under every POSIX shell found, with stub `id`, `sudo` and `nft`: a wildcard or
     malformed bind and a missing or unreadable table are refused, and so is a table that scopes another address,
-    port or interface, hooks output, or accepts where it should drop;
+    port or interface, hooks output, accepts where it should drop, or has its drops where nothing reaches them
+    (in a chain without the hook, or after an accept, return or jump);
   - the shipped table, checked and loaded twice with the real nft in a throwaway network namespace, and the guard
-    reading it back (`NftTest`: it needs nft and root or unprivileged user namespaces, and skips without them);
+    reading it back, and refusing two such tables as nft lists them (`NftTest`: it needs nft and root or
+    unprivileged user namespaces, and skips without them);
   - the units, and the README's worked examples against the tested values.
 - `test_tuner.py` covers the tuner's view and gateway:
   - verified stations with heads, and unnamed streams that can't be tuned;

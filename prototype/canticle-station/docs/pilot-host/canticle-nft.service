@@ -8,9 +8,11 @@
 #
 # It is a system unit because loading nft rules needs root; the daemon is a user unit under the seat's uid, and
 # systemd can't order one against the other. So the order holds two ways:
-# - at boot, this unit runs before network-pre.target and systemd-user-sessions.service, and since systemd 252
-#   the user manager that starts the daemon waits for systemd-user-sessions.service;
+# - at boot, this unit runs before network-pre.target and systemd-logind.service. logind starts every user
+#   manager, a lingering user's as logind itself starts, so the manager that starts the daemon comes after the
+#   table. (systemd-user-sessions.service would not do: user@.service stopped waiting for it in systemd 252.)
 # - at every daemon start, the guard in pilot.conf reads the table back and refuses to start without it.
+# Before= only orders: if the table fails to load, logins still work, and the guard keeps the daemon down.
 #
 # It leaves the distro's /etc/nftables.conf alone. Debian's and Arch's nftables.service flush the whole ruleset
 # when they stop or restart, and a reload does too when the config starts with `flush ruleset` (Debian's does).
@@ -26,7 +28,7 @@ Description=canticle pilot firewall scope (table inet canticle)
 Documentation=https://github.com/karmaterminal/binary-canticle/tree/main/prototype/canticle-station/docs/pilot-host
 DefaultDependencies=no
 Wants=network-pre.target
-Before=network-pre.target systemd-user-sessions.service shutdown.target
+Before=network-pre.target systemd-logind.service shutdown.target
 Conflicts=shutdown.target
 After=nftables.service
 PartOf=nftables.service

@@ -227,10 +227,10 @@ journalctl --user -u canticle-daemon --since "$T_STOP" -o cat |
   grep -E '"type":"(hello|bye|fatal)"|canticle-pilot-guard'
 ```
 
-Expect `active` and `running`, a new `MainPID` (PID1), and `NRestarts` still N0: a start by hand isn't a
-restart. One `ss` line on `ADDR:9999` with `pid=PID1`. The journal shows, in order: a bye with `"run"` R0, the
-guard's `canticle-pilot-guard: ok: bind ADDR:9999; ...` line, and a hello with a new `"run"` (R1) and
-`"pid"` PID1. No `fatal`.
+Expect `active` and `running`, a new `MainPID` (PID1), and `NRestarts=0`: systemd resets the counter when a unit
+is started by hand, so N0 doesn't carry over. One `ss` line on `ADDR:9999` with `pid=PID1`. The journal shows,
+in order: a bye with `"run"` R0, the guard's `canticle-pilot-guard: ok: bind ADDR:9999; ...` line, and a hello
+with a new `"run"` (R1) and `"pid"` PID1. No `fatal`.
 
 **A5, the ear is back (observer A, within 120 s of T_START).** The ear backs off 1, 2, 4, 8, 16, then 30 s
 between tries, so it can take up to 30 s after the daemon is back. `ear_status.canticle`:
@@ -309,10 +309,11 @@ journalctl --user -u canticle-daemon --since "$T_KILL" -o cat |
   grep -E 'Main process exited|Scheduled restart|"type":"(hello|bye|fatal)"|canticle-pilot-guard'
 ```
 
-Expect `active` and `running`, a new `MainPID` (PID1), and `NRestarts` N0 + 1. One `ss` line on `ADDR:9999`
-with `pid=PID1`. The journal shows `canticle-daemon.service: Main process exited, code=killed, status=9/KILL`,
-then `Scheduled restart job, restart counter is at ...`, the guard's `ok` line, and a hello with a new `"run"`
-(R1) and `"pid"` PID1. There is no bye for R0.
+Expect `active` and `running`, a new `MainPID` (PID1), and `NRestarts` N0 + 1, with N0 as P2 read it before
+this case. One `ss` line on `ADDR:9999` with `pid=PID1`. The journal shows
+`canticle-daemon.service: Main process exited, code=killed, status=9/KILL`, then
+`Scheduled restart job, restart counter is at ...`, the guard's `ok` line, and a hello with a new `"run"` (R1)
+and `"pid"` PID1. There is no bye for R0.
 
 **B4, the ear is back (observer A, within 120 s of the daemon's return).** As A5, except:
 `lastFailure` is `{"reason": "exit_without_bye", "at": ..., "run": "R0"}`, and `counts.exit_without_bye` and
@@ -384,7 +385,7 @@ Pins: binary-canticle `SHA` (daemon and tap) · frond-ear `SHA` (ear) · daemon 
 | preconditions | counters C0 `N/N`; PID0 `PID`, N0 `N`; R0 `RUN`; one socket on `ADDR:9999` | connected, ok, `[]`, complete; run R0 | `run=RUN8`, complete, `receive: ok` |
 | items (a) | | P `E/S` plucked; E `E/S` expired; L `E/S` expires `TIME` | the same |
 | (a) during | bye R0; no socket | stopped, `[]`, ENOENT; lastFailure unchanged; hear: ended (bye), `unknown` | ended (bye), `exit=0` |
-| (a) after | active; PID1 `PID`; NRestarts N0; guard ok; hello R1 `RUN` | connected, R1, complete, ok, `[]`; each live item once, same `expires=`; no P, no E | `run=RUN8`, complete, ok; L 1, P 0, E 0, records-lost 0; `expires_at` equal, `resurfaced` |
+| (a) after | active; PID1 `PID`; NRestarts 0; guard ok; hello R1 `RUN` | connected, R1, complete, ok, `[]`; each live item once, same `expires=`; no P, no E | `run=RUN8`, complete, ok; L 1, P 0, E 0, records-lost 0; `expires_at` equal, `resurfaced` |
 | items (b) | | P, E, L as above | the same |
 | (b) during | `status=9/KILL`; restart scheduled; no bye | failed, `exit_without_bye`, ECONNREFUSED | ended without bye, `exit=3` |
 | (b) after | active; NRestarts N0 + 1; guard ok; hello R1 `RUN` | connected, R1, complete, ok, `[]`; lastFailure `exit_without_bye` on R0; counts +1, +1; items as (a) | as (a) |

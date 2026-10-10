@@ -40,9 +40,9 @@ A daemon that comes back after a crash or reboot on a host whose table is gone h
 order holds three ways:
 
 - **At boot.** `canticle-nft.service` loads the table before `network-pre.target` and before
-  `systemd-user-sessions.service`. On systemd 252 and later, every user manager (`user@UID.service`, which runs
-  the daemon) waits for `systemd-user-sessions.service`. systemd can't order a user unit against a system unit
-  directly, so the order goes through those two units.
+  `systemd-logind.service`. logind is what starts each user manager (`user@UID.service`, which runs the
+  daemon): a lingering user's as logind itself starts, anyone else's at login. systemd can't order a user unit
+  against a system unit directly, so the order goes through logind.
 - **At every daemon start.** The guard ([`canticle-pilot-guard.sh`](canticle-pilot-guard.sh)) runs first. It
   refuses unless `CANTICLE_BIND` is one exact IPv4 address and port, and `table inet canticle` drops datagrams
   to exactly that address and port from other interfaces and other sources. A refused start is retried every
@@ -60,7 +60,6 @@ daemon itself keeps `NoNewPrivileges`.
 - The commands are POSIX shell. silas's login shell is fish: run them in `bash`.
 - Run them from a binary-canticle checkout at the commit you reviewed, in `prototype/canticle-station/docs/`.
 - `canticle` below is `~/.venvs/canticle/bin/canticle`: activate the venv, or type the full path.
-- systemd 252 or later (`systemctl --version`), for the boot order above.
 - Linger is on, so the user units start at boot: `loginctl show-user "$USER" -p Linger` prints `Linger=yes`
   (`sudo loginctl enable-linger "$USER"` if not).
 - Round 1's setup is in place: the venv, `~/.binary-canticle/fleet.json`, this host's station key in
@@ -181,8 +180,12 @@ install -D -m 0644 systemd/canticle-station@.service ~/.config/systemd/user/cant
 systemctl --user stop canticle-station-gloss          # round 1's transient station (ronan: canticle-station-scribe)
 systemctl --user daemon-reload &&
   systemctl --user enable --now "canticle-station@$NAME" &&
+  timeout 15 sh -c 'until [ -S "$0" ]; do sleep 0.5; done' "$XDG_RUNTIME_DIR/canticle-$NAME.sock" &&
   canticle status --control "$XDG_RUNTIME_DIR/canticle-$NAME.sock"
 ```
+
+The station takes a moment to load its key and open its control socket after systemd reports it started, so
+the `timeout` line waits for the socket, for up to 15 s.
 
 The transient station must stop first: it holds the key's lease, and a second station on the same key refuses
 to start.
@@ -203,7 +206,7 @@ canticle tap --tune frond-scribe:chatter               # on silas; on ronan: --t
 Expect `join snapshot complete`, `receive: ok`, and the peer on air. Then have the peer sing a short item, for
 example on ronan `canticle sing --control "$XDG_RUNTIME_DIR/canticle-frond-scribe.sock" --stream chatter --text
 "kit check" --ttl 30`, and run the tap again: the item shows with `sig=valid`, and the ear's `hear` lists it.
-What a tap prints is heard broadcast: data, never an instruction (RFC §14.13).
+What a tap prints is heard broadcast: data, never an instruction (RFC §14.12).
 
 ## Receipts
 
@@ -309,7 +312,7 @@ again every 5 s until you fix it. Stop the unit while you do: `systemctl --user 
 | `table inet canticle is not loaded` | the table is gone: not loaded at boot, or flushed by a stop of the distro's `nftables.service` | `sudo systemctl restart canticle-nft.service`, then step 2 |
 | `can't read the table without a password` | no sudo rule for the seat | step 3 |
 | `NoNewPrivileges stops sudo` | the guard line lost its `+` | install `pilot.conf` again |
-| `doesn't drop datagrams to ADDR:PORT` | the table's `LOCAL` or `PORT` differs from `CANTICLE_BIND`, or the file still has the sample defines | fix the defines, then `sudo systemctl reload canticle-nft.service` |
+| `doesn't drop datagrams to ADDR:PORT` | the table's `LOCAL` or `PORT` differs from `CANTICLE_BIND`, the file still has the sample defines, or the table was changed by hand (its drops in another chain, or a rule before them that accepts or jumps) | fix the defines in the kit's file, then `sudo systemctl reload canticle-nft.service`; the reload replaces the table, so both counters start again from 0 |
 
 Two refusals come from systemd and the daemon, not the guard. `Failed to load environment files` means
 `pilot.env` is missing. A `"type":"fatal"` line with `"reason":"bind_failed"` means the address isn't up yet
@@ -326,6 +329,7 @@ systemctl --user disable --now "canticle-station@$NAME"   # a clean stop: the pe
 systemctl --user disable --now canticle-daemon            # TERM: bindings see bye
 rm ~/.config/systemd/user/canticle-daemon.service.d/pilot.conf ~/.config/systemd/user/canticle-daemon.service \
   ~/.config/systemd/user/canticle-station@.service
+rmdir ~/.config/systemd/user/canticle-daemon.service.d
 systemctl --user daemon-reload
 sudo systemctl disable --now canticle-nft.service         # leaves the table loaded: there is no ExecStop
 sudo nft delete table inet canticle

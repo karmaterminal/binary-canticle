@@ -83,20 +83,34 @@ if [ "$status" -ne 0 ]; then
 	refuse 69 "can't read table inet canticle ($first): $hint"
 fi
 
-# The two drops as nft lists them, in a base chain on the input hook:
-#   ip daddr ADDR udp dport PORT iifname != "IF" counter packets N bytes N drop
-#   ip daddr ADDR udp dport PORT ip saddr != PEERS counter packets N bytes N drop
+# The two drops as nft lists them, in one chain on the input hook, with no rule before them that could let a
+# datagram past them (accept, return, jump, goto, queue):
+#   chain in {
+#     type filter hook input priority filter - 10; policy accept;
+#     ip daddr ADDR udp dport PORT iifname != "IF" counter packets N bytes N drop
+#     ip daddr ADDR udp dport PORT ip saddr != PEERS counter packets N bytes N drop
+#   }
+# Drops in a chain without the hook, or after such a rule, don't count: nothing would reach them.
 if ! printf '%s\n' "$listing" | awk -v want="ip daddr $addr udp dport $port " '
-	/ hook input / { hook = 1 }
-	index($0, want) {
-		drop = 0
-		for (i = 1; i <= NF; i++) if ($i == "drop") drop = 1
-		if (drop && index($0, " iifname != ")) iif = 1
-		if (drop && index($0, " ip saddr != ")) src = 1
+	$1 == "chain" && $NF == "{" { chain = 1; hook = iif = src = passed = 0; next }
+	!chain { next }
+	$1 == "}" { if (hook && iif && src) ok = 1; chain = 0; next }
+	$1 == "type" { hook = ($2 == "filter" && $3 == "hook" && $4 == "input"); next }
+	{
+		drop = pass = 0
+		for (i = 1; i <= NF; i++) {
+			if ($i == "drop") drop = 1
+			if ($i == "accept" || $i == "return" || $i == "jump" || $i == "goto" || $i == "queue") pass = 1
+		}
+		if (pass && !(iif && src)) passed = 1
+		if (drop && !pass && !passed && index($0, want)) {
+			if (index($0, " iifname != ")) iif = 1
+			if (index($0, " ip saddr != ")) src = 1
+		}
 	}
-	END { exit !(hook && iif && src) }
+	END { exit !ok }
 '; then
-	refuse 65 "table inet canticle doesn't drop datagrams to $addr:$port from other interfaces and other sources: set LOCAL and PORT in /etc/canticle/canticle-pilot.nft to match CANTICLE_BIND, then sudo systemctl reload canticle-nft.service"
+	refuse 65 "table inet canticle doesn't drop datagrams to $addr:$port from other interfaces and other sources, in its input chain and before any other verdict: load the kit's canticle-pilot.nft with LOCAL and PORT matching CANTICLE_BIND, then sudo systemctl reload canticle-nft.service"
 fi
 
 echo "canticle-pilot-guard: ok: bind $addr:$port; table inet canticle drops datagrams to it from other interfaces and other sources" >&2

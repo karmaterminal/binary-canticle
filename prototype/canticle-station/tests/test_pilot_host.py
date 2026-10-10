@@ -201,6 +201,17 @@ class GuardTest(unittest.TestCase):
             "the source rule accepts": host_listing("silas").replace("10.0.0.246 counter packets 0 bytes 0 drop",
                                                                        "10.0.0.246 counter packets 0 bytes 0 accept"),
             "an empty table": "table inet canticle {\n}\n",
+            # Drops nothing reaches: in a chain without the hook, or after a rule that lets the datagram past.
+            "the drops in a chain without the hook": host_listing("silas").replace(
+                "policy accept;\n", "policy accept;\n\t}\n\tchain stale {\n"),
+            "an accept before the drops": host_listing("silas").replace(
+                "policy accept;\n", "policy accept;\n\t\tip daddr 10.0.0.100 udp dport 9999 accept\n"),
+            "an accept between the drops": host_listing("silas").replace(
+                "drop\n", "drop\n\t\tudp dport 9999 accept\n", 1),
+            "a jump before the drops": host_listing("silas").replace(
+                "policy accept;\n", "policy accept;\n\t\tudp dport 9999 jump allow\n"),
+            "a return before the drops": host_listing("silas").replace(
+                "policy accept;\n", "policy accept;\n\t\tip saddr 10.0.0.0/24 return\n"),
         }
         for shell in self.shells:
             for why, table in wrong.items():
@@ -220,6 +231,11 @@ class GuardTest(unittest.TestCase):
                     self.assertEqual(made, READ)
             with self.subTest(shell=shell, peers=2):
                 table = listing("10.0.0.100", "wlan0", ["10.0.0.246", "10.0.0.250"])
+                code, err, made = self.guard(shell, table=table)
+                self.assertEqual(code, 0, err)
+            with self.subTest(shell=shell, after="an accept after both drops"):
+                # Both drops have run by then: nothing it accepts was going to be dropped.
+                table = host_listing("silas").replace("\t}\n}", "\t\tudp dport 9999 accept\n\t}\n}")
                 code, err, made = self.guard(shell, table=table)
                 self.assertEqual(code, 0, err)
             with self.subTest(shell=shell, uid=0):
@@ -310,6 +326,24 @@ class NftTest(unittest.TestCase):
         self.assertIn("ok: bind 10.0.0.100:9999", p.stderr)
         self.assertIn("is not loaded: sudo systemctl start canticle-nft.service", p.stderr)
 
+    def test_guard_refuses_drops_nothing_reaches(self):
+        """#104 review: drops in a chain without the hook, or after an accept, scope nothing; the real nft's
+        listing of each is refused."""
+        drops = ('ip daddr 10.0.0.100 udp dport 9999 iifname != "wlan0" counter drop\n'
+                 "ip daddr 10.0.0.100 udp dport 9999 ip saddr != 10.0.0.246 counter drop\n")
+        hook = "type filter hook input priority -10; policy accept;\n"
+        tables = {
+            "another chain": "table inet canticle {\nchain in {\n" + hook + "}\nchain stale {\n" + drops + "}\n}\n",
+            "an accept first": ("table inet canticle {\nchain in {\n" + hook
+                                + "ip daddr 10.0.0.100 udp dport 9999 accept\n" + drops + "}\n}\n"),
+        }
+        script = '"$1" -f "$2" || exit 1; CANTICLE_BIND=10.0.0.100:9999 sh "$3"; echo "status=$?"'
+        for why, text in tables.items():
+            with self.subTest(table=why):
+                p = self.netns(script, self.write("bypass.nft", text), GUARD)
+                self.assertEqual(p.stdout.split(), ["status=65"], p.stderr)
+                self.assertIn("doesn't drop datagrams to 10.0.0.100:9999", p.stderr)
+
     def test_a_quoted_variable_is_not_expanded(self):
         """Why the kit writes $LAN_IF bare (README.md, Worked examples): #103's sketch quoted it."""
         text = table_for("10.0.0.100", "wlan0", ["10.0.0.246"]).replace("iifname != $LAN_IF", 'iifname != "$LAN_IF"')
@@ -358,7 +392,9 @@ class UnitFilesTest(unittest.TestCase):
         self.assertIn(("ExecStart", "/usr/sbin/nft -f /etc/canticle/canticle-pilot.nft"), s)
         before = " ".join(v for k, v in s if k == "Before").split()
         self.assertIn("network-pre.target", before)
-        self.assertIn("systemd-user-sessions.service", before)
+        # logind starts every user manager (a lingering one when logind starts), so the daemon comes after the
+        # table at boot. systemd-user-sessions.service would not do: user@.service dropped that order in v252.
+        self.assertIn("systemd-logind.service", before)
         # Stopping or disabling the unit must never open the port under a running daemon.
         self.assertNotIn("ExecStop", [k for k, _ in s])
 
