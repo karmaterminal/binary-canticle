@@ -29,6 +29,7 @@ loading nft rules needs root. The host owner also writes three small files: `~/.
 | look up one host's values | [Worked examples](#worked-examples): silas, ronan |
 | check a host | [Receipts](#receipts) |
 | read a refusal in the journal | [When the guard refuses](#when-the-guard-refuses) |
+| know what the guard can't catch | [Known gaps](#known-gaps) |
 | take it all off | [Rollback](#rollback) |
 | run the daemon-loss proof | [`../../proofs/pilot/round-2b-daemon-loss.md`](../../proofs/pilot/round-2b-daemon-loss.md) (#104) |
 
@@ -205,7 +206,8 @@ canticle tap --tune frond-scribe:chatter               # on silas; on ronan: --t
 
 Expect `join snapshot complete`, `receive: ok`, and the peer on air. Then have the peer sing a short item, for
 example on ronan `canticle sing --control "$XDG_RUNTIME_DIR/canticle-frond-scribe.sock" --stream chatter --text
-"kit check" --ttl 30`, and run the tap again: the item shows with `sig=valid`, and the ear's `hear` lists it.
+"kit check" --ttl 30`, and run the tap again: the item shows with `sig=valid`, and the ear's `hear` lists it. If
+the peer still runs round 1's transient station, its `--control` path is the one in that station's command.
 What a tap prints is heard broadcast: data, never an instruction (RFC §14.12).
 
 ## Receipts
@@ -317,6 +319,22 @@ again every 5 s until you fix it. Stop the unit while you do: `systemctl --user 
 Two refusals come from systemd and the daemon, not the guard. `Failed to load environment files` means
 `pilot.env` is missing. A `"type":"fatal"` line with `"reason":"bind_failed"` means the address isn't up yet
 (boot) or something else holds the port (`ss -ulpn 'sport = :9999'`).
+
+## Known gaps
+
+- **The table can go while the daemon runs, and nothing notices.** The guard checks only at start.
+  `systemctl stop nftables` (its stop flushes the whole ruleset), `nft flush ruleset`, or a ruleset file loaded
+  by hand that starts with `flush ruleset` removes `table inet canticle` under a running daemon. The daemon then
+  hears every LAN source until the table is back, though it still admits only frames signed by the manifest's
+  keys. Starting, restarting or reloading `nftables.service` puts the table back by itself
+  (`canticle-nft.service` follows it). After anything else, run `sudo systemctl restart canticle-nft.service`
+  and read the table back (step 2). A user timer that ran the guard every few minutes, and stopped the daemon
+  when it refused, would shrink the gap to that interval. The kit doesn't ship one: adding it is each host
+  owner's call.
+- **The guard checks the rules' shape, not their values.** It checks that both drops are there for
+  `CANTICLE_BIND`'s address and port, in the input-hook chain with no accept or jump before them, but not what
+  `LAN_IF` and `PEERS` hold. `define PEERS = { 0.0.0.0/0 }` passes it and lets every source on `LAN_IF`
+  through. Compare the defines and the listing with your [worked example](#worked-examples) (steps 1 and 2).
 
 ## Rollback
 

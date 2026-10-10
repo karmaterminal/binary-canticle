@@ -79,18 +79,23 @@ Commands below carry silas's values, with ronan's in a comment.
 2. **The singer's chatter stream allows 300 s items** (the singer, on the other host):
 
    ```sh
-   canticle status --control "$XDG_RUNTIME_DIR/canticle-frond-scribe.sock" |     # ronan run: canticle-frond-gloss.sock
+   CONTROL=$XDG_RUNTIME_DIR/canticle-frond-scribe.sock     # ronan run: canticle-frond-gloss.sock
+   canticle status --control "$CONTROL" |
      python3 -c 'import json, sys; print(json.load(sys.stdin)["streams"]["chatter"]["default_ttl_s"])'
    ```
+
+   `CONTROL` is the control socket of a station on the kit's template (the kit README, step 5). A round 1
+   transient station has the `--control` path in its command instead, and its start line shows it:
+   `journalctl --user -u canticle-station-scribe -o cat | grep '^{"station"' | tail -n 1` (ronan run:
+   `canticle-station-gloss`). silas's round 1 station used `~/.binary-canticle/frond-gloss.sock` (read
+   2026-10-10). Set `CONTROL` to that path here and in [Items](#items-each-case).
 
    Expect `300`. A station caps every item at its stream's default TTL, which is
    60 s for chatter unless set, and case (a)'s 30 s outage plus the ear's reconnect backoff (up to 30 s more)
    can outlast a 60 s item. If it prints 60, set `CANTICLE_STATION_ARGS=--stream chatter:chatter:300` in
    `~/.binary-canticle/station-NAME.env` and run `systemctl --user restart canticle-station@NAME`, after telling
    that host's owner; the station takes a new epoch. A round 1 transient station takes
-   `--stream chatter:chatter:300` in its command instead, and prints its control socket at start:
-   `journalctl --user -u canticle-station-scribe -o cat | grep '^{"station"'` (ronan run:
-   `canticle-station-gloss`).
+   `--stream chatter:chatter:300` in its command instead.
 
 ## Pins
 
@@ -171,16 +176,17 @@ gateway's unit has another name, `systemctl --user list-units 'openclaw*'` shows
 
 The singer sings three items, and both observers see each one. L is #104's "fresh item sung and heard by both
 observers". The singer posts each command's JSON reply: its `epoch`, `seq` and `expires_at`. Use `a` or `b`
-in the text for the case.
+in the text for the case. `CONTROL` is the station's socket, as in [Before the day](#before-the-day), item 2.
 
 ```sh
-canticle sing --control "$XDG_RUNTIME_DIR/canticle-frond-scribe.sock" --stream chatter --ttl 300 --text "round 2b a P"
+CONTROL=$XDG_RUNTIME_DIR/canticle-frond-scribe.sock     # ronan run: canticle-frond-gloss.sock
+canticle sing --control "$CONTROL" --stream chatter --ttl 300 --text "round 2b a P"
 ```
 
 | Step | The singer | Observer A, `hear` | Observer B, the tap file |
 |---|---|---|---|
 | I1 | sing P as above; post its `seq` (SEQ_P) | lists `item=EPOCH/SEQ_P` | `[canticle:heard]`, then `item=EPOCH/SEQ_P` |
-| I2 | `canticle hush --control ... --stream chatter --seq SEQ_P` (its reply's `seq` is the pluck's own) | P gone | `[canticle:withdrawn] station="frond-scribe" stream=chatter item=EPOCH/SEQ_P reason=plucked` |
+| I2 | `canticle hush --control "$CONTROL" --stream chatter --seq SEQ_P` (its reply's `seq` is the pluck's own) | P gone | `[canticle:withdrawn] station="frond-scribe" stream=chatter item=EPOCH/SEQ_P reason=plucked` |
 | I3 | sing E with `--ttl 60 --text "round 2b a E"`; post its `seq` (SEQ_E) | lists E, then not after 60 s | E heard, then `[canticle:withdrawn] ... item=EPOCH/SEQ_E reason=expired` |
 | I4 | once E's withdrawn line is in: sing L with `--ttl 300 --text "round 2b a L"`; post `seq` (SEQ_L) and `expires_at` | lists L once; its `expires=` is the singer's `expires_at` to the second | L once |
 | I5 | | writes down every live item's `item=` and `expires=`: L, and an earlier case's L while it lives | the same, from the file |
@@ -282,10 +288,13 @@ Each live item shows `expires_at` equal to the singer's `expires_at`, to the mil
 **B1 (host owner).** Kill the daemon, so its run ends without `bye`:
 
 ```sh
-date -u '+%F %T UTC' && kill -9 "$(systemctl --user show -p MainPID --value canticle-daemon)"
+pid=$(systemctl --user show -p MainPID --value canticle-daemon)
+if [ "${pid:-0}" -gt 0 ]; then date -u '+%F %T UTC' && kill -9 "$pid"; else echo "MainPID=$pid: no daemon to kill"; fi
 ```
 
-Post the time (T_KILL). Don't start it: systemd does, after `RestartSec` (5 s).
+Post the time (T_KILL). Don't start it: systemd does, after `RestartSec` (5 s). `MainPID` is 0 when the unit has
+no running process, and `kill -9 0` would kill your own shell's process group, so the `if` kills only a real
+pid. If it prints `no daemon to kill`, nothing was killed: run P2 again.
 
 **B2, during the outage.** It lasts about 5 s, so these may be missed; B4's `lastFailure` and `counts` keep the
 same facts.
@@ -341,11 +350,13 @@ sudo nft list table inet canticle
 - **No wake:** both counts are `0`, and `MainPID` and `NRestarts` are as at P5. This is journal-level evidence
   only: it can't rule out an event that was never logged. If the gateway logs the prince's own commands, the
   tap's command line can match `canticle`; that is not a wake, so quote the line. Any other line is a stop.
-- **The table:** both drop counters are as at P1. Each drop takes only datagrams from another interface or
-  another source, so the peer's datagrams pass both, and the table counts no accepts: the peer's traffic shows
-  as the items coming back, and as counters that don't move. A counter that moved means the table dropped
-  something from elsewhere. Write down how many; it isn't this case's failure unless the peer's items went
-  missing too.
+- **The table:** still loaded, with the same two drops as at P1, and both drop counters as at P1. The guard
+  checked it when the daemon started again, and only then: if `nftables.service` was stopped or the ruleset
+  flushed after that, the daemon hears every source (the kit README, *Known gaps*). Each drop takes only
+  datagrams from another interface or another source, so the peer's datagrams pass both, and the table counts
+  no accepts: the peer's traffic shows as the items coming back, and as counters that don't move. A counter
+  that moved means the table dropped something from elsewhere. Write down how many; it isn't this case's
+  failure unless the peer's items went missing too.
 
 ## Stop conditions
 
@@ -353,6 +364,7 @@ sudo nft list table inet canticle
 |---|---|
 | the daemon isn't `active` 60 s after A3's start or B1's kill | [Rollback](#rollback) |
 | the guard refuses (`canticle-pilot-guard: refusing to start the daemon: ...`), or `ss` shows another address or a second socket | `systemctl --user stop canticle-daemon`; the kit README's *When the guard refuses* says what each refusal means |
+| the table is gone, or its drops differ from P1's | `systemctl --user stop canticle-daemon` at once: it hears every source until the table is back. Post the listing, then load the table again (`sudo systemctl restart canticle-nft.service`) before [Rollback](#rollback) starts the daemon |
 | the ear isn't `connected` 120 s after the daemon is back | post `ear_status.canticle` (`state`, `lastError`). Don't restart the ear to get past it: its owner decides |
 | an item shows twice in one `hear` or one tap file, P or E shows after the loss, or an item comes back with another `expires=` or `expires_at` | stop the run and post both observers' output |
 | the gateway's `MainPID` changed or its `NRestarts` rose, or a no-wake read finds a line other than the tap's own command | stop the run and post the lines |
@@ -390,7 +402,7 @@ Pins: binary-canticle `SHA` (daemon and tap) · frond-ear `SHA` (ear) · daemon 
 | (b) during | `status=9/KILL`; restart scheduled; no bye | failed, `exit_without_bye`, ECONNREFUSED | ended without bye, `exit=3` |
 | (b) after | active; NRestarts N0 + 1; guard ok; hello R1 `RUN` | connected, R1, complete, ok, `[]`; lastFailure `exit_without_bye` on R0; counts +1, +1; items as (a) | as (a) |
 | gateway, (a) and (b) | `0` lines T0 to T1, `0` after K0; MainPID and NRestarts unchanged (journal-level evidence only) | | |
-| table, (a) and (b) | drop counters `N/N` and `N/N`, as at P1 | | |
+| table, (a) and (b) | loaded, the same two drops as at P1; drop counters `N/N` and `N/N`, as at P1 | | |
 | stop conditions | none hit, or which | | |
 ```
 
