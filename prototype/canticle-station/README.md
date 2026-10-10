@@ -381,7 +381,9 @@ OpenClaw prince before the P1 plugin, #97). It connects to the daemon's socket (
 `$XDG_RUNTIME_DIR/canticle/daemon.sock`), sends the join-snapshot request and nothing else, validates the
 stream as a binding must (*Joining a run*), and prints:
 
-- a header: the run, the manifest hash, whether the join snapshot was complete, truncated (older live items may
+- a header: the run, the manifest hash, this connection's **receive** health (`records_lost` once a live
+  `rec_seq` skips after the snapshot's watermark, which means the daemon dropped records for this connection and
+  the view may be incomplete; `joined_late` without a complete snapshot), whether the join snapshot was complete, truncated (older live items may
   be missing) or not offered (only items heard after the connection), the presence of the tuned stations, and
   health once the daemon has sent one on this connection (`no_datagrams` is shown as *every station unknown, not
   offline*);
@@ -395,7 +397,7 @@ carries `untrusted: true`, the §14.13 notice and `sig` (from the record's admis
 `--json` only) prints the daemon's records as received, for debugging; never hand that output to a session.
 
 With `--follow` it then prints new items, `[canticle:withdrawn]` (pluck, supersession, expiry), presence and
-health changes, and `[canticle:ended]` when the daemon says `bye` or `fatal` or the connection closes. A
+health changes, `[canticle:records-lost]` on a live gap, and `[canticle:ended]` when the daemon says `bye` or `fatal` or the connection closes. A
 daemon restart ends the connection (exit 3); run `tap` again to join the new run with a fresh snapshot, so
 nothing from the old run is shown as current.
 
@@ -407,7 +409,7 @@ decides who may connect. Exit status: 0 ok; 1 no socket, refused or timed out; 2
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 274 tests, about 65 s
+python -m unittest discover -s tests      # 276 tests, about 65 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 

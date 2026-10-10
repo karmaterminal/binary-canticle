@@ -12,7 +12,8 @@ import unittest
 
 from canticle import runner
 from canticle.records import RECORD_V
-from canticle.tap import NOTICE, REQUEST, TapError, TapView, defang, json_item, parse_tune, render_item, tap
+from canticle.tap import (NOTICE, REQUEST, TapError, TapView, defang, json_change, json_item, parse_tune, render_change,
+                          render_item, summary, summary_json, tap)
 
 from test_daemon import until
 from test_join_snapshot import SnapshotCase
@@ -75,6 +76,33 @@ class TapViewTest(unittest.TestCase):
         v.apply(frame("a", 3, expiry=100))
         self.assertEqual(v.live(99)[0]["idem"], "a")
         self.assertEqual(v.live(100), [])
+
+    def test_live_gap_after_the_watermark_is_records_lost(self):
+        """bc#98 review (🌊): a skip after snapshot_end means the daemon dropped records for this connection
+        (§14.18.3 *Fail-closed rules*); text and JSON both say records_lost. The bootstrap/join skip is not one."""
+        v = TapView()
+        bootstrap(v)
+        v.apply(frame("tail", 7))                           # before the cut: the skip from landing_state (2) is fine
+        v.apply(rec("snapshot_end", 8, watermark=8, count=0, truncated=False, omitted=0))
+        self.assertEqual(v.receive(), {"health": "ok", "reasons": [], "records_lost": 0})
+        self.assertEqual([k for k, _ in v.apply(frame("a", 9))], ["item"], "W+1: no gap")
+        changes = v.apply(frame("b", 12))                  # 10 and 11 never arrived
+        self.assertEqual([k for k, _ in changes], ["records_lost", "item"])
+        self.assertEqual(changes[0][1], {"missing": 2, "total": 2})
+        self.assertEqual(v.receive(), {"health": "degraded", "reasons": ["records_lost"], "records_lost": 2})
+        text = summary(v, 0)
+        self.assertIn("receive: degraded (records_lost: 2 record(s) missing", text)
+        self.assertEqual(summary_json(v, 0)["receive"]["reasons"], ["records_lost"])
+        self.assertIn("[canticle:records-lost] 2 record(s) missing", render_change(*changes[0], 0))
+        self.assertEqual(json_change(*changes[0])["receive"], {"health": "degraded", "reasons": ["records_lost"]})
+
+    def test_without_a_snapshot_only_the_first_live_skip_is_exempt(self):
+        v = TapView()
+        bootstrap(v, join=False)
+        self.assertEqual([k for k, _ in v.apply(frame("a", 10))], ["item"], "bootstrap -> first live: exempt")
+        self.assertEqual([k for k, _ in v.apply(frame("b", 11))], ["item"])
+        self.assertEqual([k for k, _ in v.apply(frame("c", 13))], ["records_lost", "item"])
+        self.assertEqual(v.receive()["reasons"], ["records_lost", "joined_late"])
 
     def test_same_millisecond_items_order_by_sequence(self):
         """Two items heard in the same ms: the later sequence is newer (bc#98 review: no random tie-break)."""

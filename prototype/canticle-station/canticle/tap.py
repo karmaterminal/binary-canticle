@@ -133,10 +133,22 @@ class TapView:
         self._last: Optional[int] = None
         self._snaps: list = []
         self._in_snapshot = False
+        self.records_lost = 0        # rec_seq values missing on this connection after the point of continuity
+        self._continuous = False     # from snapshot_end (or, without a snapshot, the first live record) on
 
     @property
     def ready(self) -> bool:
         return self.snapshot != "pending"
+
+    def receive(self) -> dict:
+        """This connection's receive health (§14.18.3 *Fail-closed rules*), separate from the daemon's own
+        ``health``: ``records_lost`` after a live ``rec_seq`` gap, ``joined_late`` without a complete snapshot."""
+        reasons = []
+        if self.records_lost:
+            reasons.append("records_lost")
+        if self.snapshot in ("truncated", "unsupported"):
+            reasons.append("joined_late")
+        return {"health": "degraded" if reasons else "ok", "reasons": reasons, "records_lost": self.records_lost}
 
     def matches(self, station: str, stream: str) -> bool:
         return any((s in ("*", station)) and (t in ("*", stream)) for s, t in self.tune)
@@ -180,8 +192,17 @@ class TapView:
             self._bad(f"{type_} inside a join snapshot")
         if seq <= self._last:
             self._bad(f"rec_seq {seq} after {self._last}")
+        # The skip from the bootstrap (or from records queued before the cut) to the first record after it is
+        # expected; from the watermark on, a skip means the daemon dropped records for this connection.
+        missing = seq - self._last - 1 if self._continuous else 0
         self._last = seq
-        return self._live(rec, type_)
+        if self.snapshot == "unsupported":
+            self._continuous = True
+        changes = self._live(rec, type_)
+        if missing > 0:
+            self.records_lost += missing
+            changes = [("records_lost", {"missing": missing, "total": self.records_lost})] + changes
+        return changes
 
     def _snapshot_record(self, rec: dict, type_: str, seq: int) -> list:
         if self.snapshot != "pending":
@@ -210,6 +231,7 @@ class TapView:
             self.frames, self.presence = frames, presence
             self.snapshot = "complete"
         self._last, self._snaps, self._in_snapshot = w, [], False
+        self._continuous = True
         return []
 
     def _live(self, rec: dict, type_: str) -> list:
@@ -257,12 +279,25 @@ def _presence_line(view: TapView, now_ms: int) -> str:
     return "on air: " + (", ".join(rows) if rows else "no tuned station has reported presence")
 
 
+def _receive_line(view: TapView) -> str:
+    r = view.receive()
+    if r["health"] == "ok":
+        return "receive: ok"
+    parts = []
+    if r["records_lost"]:
+        parts.append(f"records_lost: {r['records_lost']} record(s) missing on this connection, so the view below may "
+                     "be incomplete")
+    if "joined_late" in r["reasons"]:
+        parts.append("joined_late: items live before this connection may be missing")
+    return "receive: degraded (" + "; ".join(parts) + ")"
+
+
 def _health_line(view: TapView) -> str:
     h = view.health
     if h is None:
-        return "health: not reported yet on this connection (the daemon sends it every few seconds)"
+        return "daemon health: not reported yet on this connection (the daemon sends it every few seconds)"
     reasons = h.get("reasons") or []
-    line = f"health: {h.get('state')}" + (f" ({', '.join(reasons)})" if reasons else "")
+    line = f"daemon health: {h.get('state')}" + (f" ({', '.join(reasons)})" if reasons else "")
     if "no_datagrams" in reasons:
         line += ". The daemon has heard nothing from anyone for a while: every station reads unknown, not offline"
     return line
@@ -273,7 +308,7 @@ def summary(view: TapView, now_ms: int) -> str:
             "truncated": f"truncated ({view.omitted} entries omitted: older live items may be missing)",
             "unsupported": "not offered by this daemon: only items heard after this connection are shown"}[view.snapshot]
     head = [f"canticle tap: run={(view.run or '')[:8]} manifest={(view.hello or {}).get('manifest_sha256', '')[:16]} "
-            f"join snapshot {snap}", _presence_line(view, now_ms), _health_line(view)]
+            f"join snapshot {snap}", _receive_line(view), _presence_line(view, now_ms), _health_line(view)]
     items = view.live(now_ms)
     if not items:
         head.append("nothing live on your tuned streams right now.")
@@ -305,6 +340,9 @@ def json_item(rec: dict, raw: bool = False) -> dict:
 def json_change(kind: str, data: dict, raw: bool = False) -> dict:
     if kind == "item":
         return {"change": kind, "item": json_item(data, raw)}
+    if kind == "records_lost":
+        return {"change": kind, "missing": data["missing"], "total": data["total"],
+                "receive": {"health": "degraded", "reasons": ["records_lost"]}}
     if kind == "withdrawn":
         return {"change": kind, "idem": data["idem"], "reason": data.get("reason"),
                 "station": data["frame"]["station"], "stream": data["frame"].get("stream")}
@@ -313,6 +351,7 @@ def json_change(kind: str, data: dict, raw: bool = False) -> dict:
 
 def summary_json(view: TapView, now_ms: int, raw: bool = False) -> dict:
     return {"run": view.run, "manifest_sha256": (view.hello or {}).get("manifest_sha256"), "snapshot": view.snapshot,
+            "receive": view.receive(),
             "omitted": view.omitted, "health": None if view.health is None else
             {"state": view.health.get("state"), "reasons": view.health.get("reasons")},
             "presence": [p for p in view.presence.values() if view.tuned_station(p["station"].get("name") or "")],
@@ -331,6 +370,9 @@ def render_change(kind: str, data: dict, now_ms: int) -> str:
     if kind == "health":
         reasons = data.get("reasons") or []
         return f"[canticle:health] {data.get('state')}" + (f" ({', '.join(reasons)})" if reasons else "")
+    if kind == "records_lost":
+        return (f"[canticle:records-lost] {data['missing']} record(s) missing on this connection ({data['total']} in "
+                "all): receive health degraded; what is shown as live may be incomplete")
     if kind == "bye":
         return "[canticle:ended] the daemon stopped cleanly (bye); run tap again to rejoin its next run"
     return f"[canticle:ended] the daemon failed ({data.get('reason')}); run tap again once it is back"
