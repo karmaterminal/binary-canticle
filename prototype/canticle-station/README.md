@@ -118,6 +118,12 @@ doctor: every check passed (exit 0). Multicast is reported, not decided (RFC §1
 To run the listener and stations as services, start from the example user units in
 [`docs/systemd/`](docs/systemd/). They are documentation only: nothing installs them.
 
+A LAN pilot host, whose daemon takes datagrams from a station on another host, adds the pilot-host kit in
+[`docs/pilot-host/`](docs/pilot-host/README.md) (#103): an nft table that drops datagrams to the daemon's port
+from anyone but the pilot peers, and a guard that keeps the daemon from starting without it. Pilot round 2b's
+run card, [`proofs/pilot/round-2b-daemon-loss.md`](proofs/pilot/round-2b-daemon-loss.md) (#104), stops and then
+kills the daemon on such a host while a scribe's ear and a prince's `canticle tap` read it.
+
 ### Put something on air
 
 ```sh
@@ -409,7 +415,7 @@ decides who may connect. Exit status: 0 ok; 1 no socket, refused or timed out; 2
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 276 tests, about 65 s
+python -m unittest discover -s tests      # 296 tests, about 80 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -492,6 +498,24 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
     513: closed; nothing live and 512 queued: cut once drained to 513 free, `count` 0, not truncated;
   - one request per connection, first line only: a second request, a junk first line, an over-long first line
     and a wrong `v` are ignored and counted; an error at the cut closes that connection only.
+- `test_tap.py` covers `canticle tap`:
+  - the view: bootstrap, snapshot and live changes, tuning, local expiry, a live `rec_seq` gap after the
+    watermark as `records_lost`, a truncated snapshot, malformed streams refused;
+  - the landing: the banner outside the wrapper, the payload defanged, `sig` from the admission, `--json`
+    defanged and marked untrusted unless `--unsafe-raw`;
+  - against the daemon in-process: live items, a plucked item not shown, two taps beside another binding
+    without disturbing it, a refused uid, no daemon, and `--follow` ending on `bye` with 0 and on `fatal` with 4;
+  - pilot round 2b's two losses, with a `canticle daemon` process and a `canticle tap --follow` process: TERM
+    sends `bye`, removes the socket, and the tap prints its bye line and exits 0; KILL leaves the socket, which
+    refuses a connection, and the tap prints its without-bye line and exits 3. The next daemon takes the socket
+    back with a new `run` and surfaces a still-live item once, as `resurfaced`, with its signed expiry.
+- `test_pilot_host.py` covers the pilot-host kit (#103):
+  - the daemon's start guard under every POSIX shell found, with stub `id`, `sudo` and `nft`: a wildcard or
+    malformed bind and a missing or unreadable table are refused, and so is a table that scopes another address,
+    port or interface, hooks output, or accepts where it should drop;
+  - the shipped table, checked and loaded twice with the real nft in a throwaway network namespace, and the guard
+    reading it back (`NftTest`: it needs nft and root or unprivileged user namespaces, and skips without them);
+  - the units, and the README's worked examples against the tested values.
 - `test_tuner.py` covers the tuner's view and gateway:
   - verified stations with heads, and unnamed streams that can't be tuned;
   - the live ring, then labelled expiry and withdrawal;
