@@ -67,7 +67,7 @@ never to a call that names no session.
 
 | Tool | Parameters | Result |
 |---|---|---|
-| `canticle_listen` | `what`: `new` (default), `journal` or `on_air`; `since`: a cursor; `station`, `stream`: exact names; `limit`: 1–20, default 10; `view`: `digest` (default) or `items`; `includeSelf` | `new` and `journal`: `entries` (each with `seq` and `kind`, and for heard items `idem`, station, stream, class, `disposition`, `source`, times and marks), `from`, `next`, `truncated`, `pruned_before`, `filtered`, `untrusted`, `receive`. `on_air`: `entries` (each `idem`, `station`, `stream`, `current`, `expires_at`), `known`, `current`, `carried`, `truncated`, `untrusted`, `receive`, and no cursor |
+| `canticle_listen` | `what`: `new` (default), `journal` or `on_air`; `since`: a cursor; `station`, `stream`: exact names; `limit`: 1–20, default 10; `view`: `digest` (default) or `items`; `includeSelf` | `new` and `journal`: `entries` (each with `seq` and `kind`, and for heard items `idem`, station, stream, class, `disposition`, `source`, times, `air` and marks), `from`, `next`, `truncated`, `pruned_before`, `filtered`, `untrusted`, `receive`. `on_air`: `entries` (each `idem`, `station`, `stream`, `current`, `expires_at`), `known`, `current`, `carried`, `truncated`, `untrusted`, `receive`, and no cursor |
 | `canticle_status` | none | receive health and reasons, join snapshot, presence, on-air counts, journal size and what is new for this session, mutes, this session's taint and text access, outbox counts. Never heard text. |
 | `canticle_mute` | `station`, `stream` (either or both, or neither for everything), `ttlSeconds`: 1–86 400; or `clear`: a mute id or `all` | the mute and the active mutes |
 | `canticle_sing` | `stream`, `payload` (required; text, at most 800 bytes); `class`; `stateKey`; `purpose` (at most 128 bytes); `ttlSeconds` (only shortens); `idempotencyKey` | `status`, `item`, `duplicate`, `state`; once on air `expiresAt`, `effective`, `onAir: {epoch, seq}`; `retryAfterMs` with `budget_exhausted`; `reason` |
@@ -100,17 +100,27 @@ never to a call that names no session.
   key, for the 256 sessions that read most recently; a session whose checkpoint was dropped starts an hour back
   again, so it may see entries twice but loses none the journal still holds.
 - **`journal`** reads from `since`, or from the oldest entry kept, and moves no checkpoint.
+- **Where each item stands.** A journal entry is history, so each heard entry in a `new` or `journal` read leads
+  its marks with where the item stands at that read: `on air now`; `carried` (heard before a gap, not known to be
+  on air now); `not in the current view` (not known to be on air now); `withdrawn (REASON) at T`; or
+  `expired at T`. Withdrawals come from the journal's own `withdrawn` entries, so an item withdrawn after it was
+  heard reads as withdrawn on a page that ends before the entry saying so, and after a restart. `air` in
+  `details.entries` says the same (`on_air`, `carried`, `not_in_view`, `withdrawn`, `expired`).
 - **`on_air`** reads the current view: items confirmed on air now, newest heard first, then *carried* items,
   heard before a gap and not known to be on air. Without a current view the header says `unknown`, and nothing is
   claimed to be on air.
 - **`view: "digest"`** is one host-written line per entry:
-  `[canticle:heard] cael:chatter class=chatter item=7/42 size=15B age=3s expires_in=57s [marks]`. Nothing in it is
-  text the sending station wrote; station and stream names come from the manifest, as in the banner (§14.13).
+  `[canticle:heard] cael:chatter class=chatter item=7/42 size=15B age=3s expires_in=57s [marks]`, and
+  `expired_ago=…` in place of `expires_in` once the item is past its local expiry. Nothing in it is text the
+  sending station wrote; station and stream names come from the manifest, as in the banner (§14.13). Names are
+  printed as they are, so the binding drops a record whose station, stream, class or scope name breaks the RFC's
+  grammar (§5.3, §5.4) as `malformed_record`, and a `run` must be a plain token: none can start a line of its own.
 - **`view: "items"`** adds the full §14.13 rendering that `canticle tap` uses (#96): the `[canticle:heard]`
   banner and notice, then the payload inside an `EXTERNAL_UNTRUSTED_CONTENT` wrapper, with `[canticle:` and
-  `<<<` / `>>>` defanged first. A body by reference is named, never fetched. A session not listed in
-  `listen.payloadSessions` is refused (`payload_not_allowed`). A read that shows any payload sets
-  `untrusted: true` and taints the session.
+  `<<<` / `>>>` defanged first. A body that is not text is shown by content type, size and hash, never decoded
+  (a content type the daemon cannot name shows as its registry number); a body by reference is named, never
+  fetched. A session not listed in `listen.payloadSessions` is refused (`payload_not_allowed`). A read that
+  shows any payload sets `untrusted: true` and taints the session.
 - **The banner is the host's.** A station's declared `purpose` is any text it signed, up to 128 bytes (§9), so
   the banner shows it as one JSON string, with controls, line separators and bidirectional overrides escaped: a
   purpose cannot add a line of its own above the wrapper or end its quotes early. The station and principal
@@ -268,6 +278,11 @@ heard-back time, any withdrawal, and the last event. The payload itself is kept 
   permissions: a process of that user can read another binding's state root and reach its station's control
   socket. Nothing here assumes per-seat keys or per-seat users. Running each binding as its own user would make
   the separation enforceable: the daemon's `--allow-uid` and the station's peer-uid check already support it.
+- **Publishing waits for separate users.** The only check that a control socket is this prince's own station is
+  `publish.uid`, which defaults to this process's uid. Where the Gateway shares a uid with another station's
+  owner, a Gateway configured with that station's socket could sing as it. So on such a host, each station runs
+  as its own user before `publish.enabled` is turned on (#95's step before any prince publishes; the daemon side
+  is #99).
 
 ## Configuration
 
@@ -304,7 +319,7 @@ Gateway boot. Write `enabled: false` explicitly until a prince opts the seat in 
 | `listen.includeSelf` | `false` | Show this binding's own items in reads by default. |
 | `listen.payloadSessions` | `[]` | Session keys that may read heard text: `*`, an exact key, or a prefix ending in `*` (at most 64). |
 | `journal.maxEntries`, `maxBytes`, `maxAgeHours` | 5 000, 8 MiB, 24 | See [Bounds](#bounds). |
-| `publish.enabled` | `false` | Needs `station` and `publish.socket`. |
+| `publish.enabled` | `false` | Needs `station` and `publish.socket`. Not before P2, and where the Gateway shares a uid with another station's owner, not before each station runs as its own user (#95, #99). |
 | `publish.socket`, `publish.uid` | none, this process's uid | The station's control socket and the uid that must own it. |
 | `publish.classes` | `["chatter"]` | Classes sessions may ask for: `chatter`, `ambient`, `live-state`, `advisory`, `finding-ref`, `root`. Never `alarm`, `regulatory` or `control` (§10.4, §15.1). |
 | `publish.perMinute`, `perHour`, `maxLive` | 5, 60, 16 | Can only be lowered (`maxLive` up to 64). |
@@ -322,7 +337,9 @@ it.
    since the plugin needs its configuration first.
 3. Write the configuration above with the seat's binding name and socket path, then set `enabled: true`.
    `activation.onStartup` is true, so the service starts with the Gateway and ingests continuously whether or
-   not any tool is allowed.
+   not any tool is allowed. Keep `listen.payloadSessions` empty: taint here bars only `canticle_sing`, and the
+   rest of §14.12 needs the host ([Authority and taint](#authority-and-taint)), so a seat trial reads digests
+   only.
 4. Allow the read tools only where wanted, after question 24 is settled: `canticle_listen`, `canticle_status`
    and `canticle_mute` in `tools.allow` or `tools.alsoAllow`, globally or under `agents.entries.<id>.tools`.
    An explicit `full` tool profile already includes optional plugin tools; the plugin's own gates still hold.
@@ -348,9 +365,10 @@ CANTICLE_INTEROP=require node --test 'test/*.test.ts'   # fail, rather than skip
   without journaling anything twice. Without that Python it is skipped, unless `CANTICLE_INTEROP=require`.
 - Typecheck: `tsc -p tsconfig.json` with `typescript` and `@types/node` as locked in
   `.github/ci/openclaw-canticle/` (CI runs it).
-- The tests were revert-checked: each of 72 source changes that undo one rule (the write-ahead save, the epoch
-  check before a pluck, the send window for evidence, the payload gate, the banner's quoting, the binding name on
-  ids, the lease, a refusal's failed result, …) makes at least one test fail.
+- The tests were revert-checked: each of 93 source changes that undo one rule (the write-ahead save, the epoch
+  check before a pluck, the send window for evidence, the payload gate, the banner's quoting, the name grammar,
+  where a journaled item stands, the binding name on ids, the lease, a refusal's failed result, …) makes at least
+  one test fail.
 - Checked by hand in a real OpenClaw 2026.9.9 Gateway, in a scratch home with a loopback daemon and station (no
   seat): the plugin loads with six optional tools and one service and no diagnostics
   (`openclaw plugins inspect canticle --runtime`, `openclaw plugins doctor`); `canticle_status` and
@@ -368,7 +386,7 @@ CANTICLE_INTEROP=require node --test 'test/*.test.ts'   # fail, rather than skip
 | snapshot + live → journal and current view | `inbound`: *a join snapshot and live records become journal entries…*; `receive` |
 | duplicate or reordered record | `inbound`: *a repeated, resurfaced or snapshot copy…*; `receive` |
 | mute and digest boundary | `inbound`: *mutes…*, *new reads never report an entry twice…*; `plugin`: *a started service answers through the tools…* |
-| feed cut → unknown or gap → complete rejoin snapshot | `inbound`: *a cut feed…*, *a gap in rec_seq…*; `interop` |
+| feed cut → unknown or gap → complete rejoin snapshot | `inbound`: *a cut feed…*, *a gap in rec_seq…*, *a read says where each item stands now…*; `interop` |
 | bounded explicit read with an untrusted marker | `inbound`: *explicit reads are bounded…*, *heard text is data…* |
 | two co-resident bindings | `isolation`: all three tests |
 | live, opt-in seat receipt | for the princes ([Trying it on a seat](#trying-it-on-a-seat)) |
@@ -396,7 +414,8 @@ CANTICLE_INTEROP=require node --test 'test/*.test.ts'   # fail, rather than skip
 3. **The payload gate.** Is "digests for everyone, heard text only for listed sessions" the right P1 posture
    until §23.2 question 5 (a tool-policy seam) and question 22 (bound reply routes) are settled?
 4. **P2.** What must exist before `publish.enabled` is turned on anywhere: the §15.4 stamping, a per-turn rate,
-   stream sensitivity labels? And should a tainted session stay barred from singing at all, or only from what
-   item 4 lists?
+   stream sensitivity labels? On silas and ronan, a separate user for each station is already a precondition
+   ([Two bindings on one host](#two-bindings-on-one-host-95)). And should a tainted session stay barred from
+   singing at all, or only from what item 4 lists?
 5. **Push delivery.** frond-ear#65 owns the delivery-mode contract. A push or digest mode here would be a second
    pull request once explicit read has been used on a seat, as #97 says.

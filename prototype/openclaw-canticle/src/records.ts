@@ -14,6 +14,20 @@ const IDEM = /^canticle:[0-9a-f]{16}:\d+:[0-9a-f]{8}:\d+$/;
 const NAME_SEGMENT = "[a-z][a-z0-9-]{0,30}";
 export const STATION_NAME = new RegExp(`^${NAME_SEGMENT}$`);
 export const STREAM_NAME = new RegExp(`^${NAME_SEGMENT}(\\.${NAME_SEGMENT}){0,3}$`);
+/** A class or scope name: one lowercase segment (the prototype's are chatter, live-state, lan, fleet, ...). */
+const TOKEN = STATION_NAME;
+/** A `run` (§14.18.3: random hex chosen at process start), as a token that cannot break a line. */
+export const RUN = /^[0-9A-Za-z_.-]{1,64}$/;
+
+/** A station or stream name as §5.3 and §5.4 define it (a stream name is at most 64 bytes). Names reach
+ * host-written lines unquoted, so a record carrying any other is malformed. */
+export function isStationName(v: unknown): v is string {
+  return typeof v === "string" && STATION_NAME.test(v);
+}
+
+export function isStreamName(v: unknown): v is string {
+  return typeof v === "string" && v.length <= 64 && STREAM_NAME.test(v);
+}
 
 export type Obj = Record<string, unknown>;
 
@@ -68,7 +82,8 @@ function tupleOf(v: unknown): Tuple | null | undefined {
   return { key_id: v.key_id, epoch: v.epoch, stream_id: v.stream_id, seq };
 }
 
-export type Body = { ctype: string; size: number; sha256: string; text?: string; base64?: string };
+/** `ctype` is a media-type string or, for one the daemon cannot name, its registry number (§9 key 7). */
+export type Body = { ctype: string | number; size: number; sha256: string; text?: string; base64?: string };
 export type BodyRef = { url: string; sha256: string; size: number };
 
 /** A deliverable `frame` record (admission `verified`, disposition `surface`), checked field by field. */
@@ -110,10 +125,14 @@ function bodyOf(v: unknown): Body | null | undefined {
   if (v === undefined || v === null) {
     return null;
   }
-  if (!isObj(v) || typeof v.ctype !== "string" || !isInt(v.size) || typeof v.sha256 !== "string") {
+  if (!isObj(v)) {
     return undefined;
   }
-  const out: Body = { ctype: v.ctype, size: v.size, sha256: v.sha256 };
+  const ctype = v.ctype;
+  if ((typeof ctype !== "string" && !(isInt(ctype) && ctype >= 0 && ctype <= 0xffff)) || !isInt(v.size) || typeof v.sha256 !== "string") {
+    return undefined;
+  }
+  const out: Body = { ctype, size: v.size, sha256: v.sha256 };
   if (typeof v.text === "string") {
     out.text = v.text;
   } else if (typeof v.base64 === "string") {
@@ -151,10 +170,13 @@ export function heardFrameOf(rec: Obj): HeardFrame | null {
   const scope = optString(rec.scope);
   const stateKey = optString(rec.state_key);
   const purpose = optString(rec.purpose);
-  if (typeof st.name !== "string" || principal === undefined || typeof rec.stream !== "string") {
+  if (!isStationName(st.name) || principal === undefined || !isStreamName(rec.stream)) {
     return null;
   }
-  if (typeof rec.class !== "string" || !isInt(rec.hop) || scope === undefined || stateKey === undefined) {
+  if (typeof rec.class !== "string" || !TOKEN.test(rec.class) || !isInt(rec.hop) || stateKey === undefined) {
+    return null;
+  }
+  if (scope === undefined || (scope !== null && !TOKEN.test(scope))) {
     return null;
   }
   if (purpose === undefined || (rec.dedup !== "first" && rec.dedup !== "resurfaced")) {
@@ -235,6 +257,10 @@ export function presenceOf(rec: Obj): Presence | null {
   const principal = optString(st.principal);
   const lastBeacon = rec.last_beacon_at;
   if (name === undefined || principal === undefined || (lastBeacon !== null && lastBeacon !== undefined && !isInt(lastBeacon))) {
+    return null;
+  }
+  // A manifest name, or the key id the daemon names a station by when the manifest does not list it (listener.py `_name`).
+  if (name !== null && !isStationName(name) && !HEX16.test(name)) {
     return null;
   }
   return {

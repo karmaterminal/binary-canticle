@@ -95,6 +95,30 @@ test("retention drops whole segments oldest first, keeps the newest, and still s
   k.close();
 });
 
+test("withdrawals are indexed by identity across a reload, and leave the index with their segment", () => {
+  const jdir = join(dir, "journal");
+  const retention = { ...RETENTION, maxEntries: 600 };
+  const j = new Journal(jdir, retention);
+  j.load({}, clock.t);
+  const idem = idemOf(1, clock.t);
+  j.append(heard(1, clock.t), clock.t);
+  j.append({ kind: "withdrawn", run: "run-1", rec_seq: 2, idem, reason: "superseded", by: null, station: "cael", stream: "chatter", self: false }, clock.t + 1);
+  const withdrawal = { seq: 2, at: clock.t + 1, reason: "superseded" };
+  assert.deepEqual(j.withdrawal(idem), withdrawal);
+  j.close();
+  const k = new Journal(jdir, retention);
+  k.load({}, clock.t);
+  assert.deepEqual(k.withdrawal(idem), withdrawal);
+  // Retention takes the segment that holds both entries, and the index forgets the withdrawal with it.
+  for (let i = 2; i <= 1_000; i += 1) {
+    k.append(heard(i, clock.t), clock.t);
+  }
+  assert.equal(k.prune(clock.t), true);
+  assert.equal(k.oldest, 501);
+  assert.equal(k.withdrawal(idem), null);
+  k.close();
+});
+
 test("age retention: a segment goes once its newest entry is older than maxAge, but never the newest segment", () => {
   const j = new Journal(join(dir, "journal"), RETENTION);
   j.load({}, clock.t);

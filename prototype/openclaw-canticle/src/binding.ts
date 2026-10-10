@@ -10,11 +10,11 @@ import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { type BindingConfig, sessionMatches, tuned } from "./config.ts";
 import { DaemonLink } from "./daemon.ts";
-import { type Entry, Journal } from "./journal.ts";
+import { type Entry, type HeardEntry, Journal } from "./journal.ts";
 import { type HushOutcome, Outbox, OutboxClosed, type Row, type SingOutcome, isTerminal, shownState } from "./outbox.ts";
 import { Receiver, type ViewItem } from "./receive.ts";
 import { type HeardFrame, type Obj, STATION_NAME, STREAM_NAME, isObj } from "./records.ts";
-import { heardMarks, iso, presenceText, renderEntry, renderViewItem } from "./render.ts";
+import { type Air, heardMarks, iso, presenceText, renderEntry, renderViewItem } from "./render.ts";
 import { type StationClient, stationClient } from "./station.ts";
 import { Lease, LeaseHeld, ensureDir, readJson, writeJsonAtomic } from "./store.ts";
 
@@ -68,6 +68,8 @@ const CHECKPOINTS_MAX = 256;
 const CLAMP_REASONS = new Set(["none", "class_min", "fair_share", "budget"]);
 const TAINT_MAX = 4_096;
 const MUTES_MAX = 64;
+/** Retract reasons that say the item expired (records.py RETRACT_REASONS). */
+const EXPIRY_REASONS = new Set(["expired", "held_expired"]);
 const CURSOR = /^j:([a-z][a-z0-9-]{0,30}):([0-9a-f]{16}):(\d{1,15})$/;
 const MUTE_ID = /^mute:([a-z][a-z0-9-]{0,30}):(\d{1,9})$/;
 
@@ -509,14 +511,15 @@ export class Binding {
         more = true;
         break;
       }
-      const text = renderEntry(e, now, view);
+      const air = e.kind === "heard" ? this.airOf(e, now) : null;
+      const text = renderEntry(e, now, view, air);
       const size = Buffer.byteLength(text);
       if (ids.length > 0 && bytes + size > READ_BYTES_MAX) {
         more = true;
         break;
       }
       out.push(text);
-      ids.push(entrySummary(e));
+      ids.push(entrySummary(e, air));
       bytes += size;
       last = e.seq;
       if (e.kind === "heard") {
@@ -571,6 +574,23 @@ export class Binding {
         receive: { health: rx.health, reasons: rx.reasons },
       },
     };
+  }
+
+  /** Where a journaled item stands now: withdrawn or expired by what the journal holds, whichever page holds it;
+   * otherwise on air, carried or absent by the current view. Never on air without a current view that holds it. */
+  private airOf(e: HeardEntry, now: number): Air {
+    const w = this.journal.withdrawal(e.frame.idem);
+    if (w !== null && !EXPIRY_REASONS.has(w.reason)) {
+      return { state: "withdrawn", reason: w.reason, at: w.at };
+    }
+    if (e.frame.times.local_expiry_at <= now) {
+      return { state: "expired", at: e.frame.times.local_expiry_at };
+    }
+    const item = this.receiver.items.get(e.frame.idem);
+    if (item === undefined) {
+      return { state: "not_in_view" };
+    }
+    return item.confirmed && this.receiver.current() ? { state: "on_air" } : { state: "carried" };
   }
 
   private firstNewAfter(now: number): number {
@@ -1031,7 +1051,7 @@ export function rowView(r: Row, now: number) {
   };
 }
 
-function entrySummary(e: Entry): Obj {
+function entrySummary(e: Entry, air: Air | null): Obj {
   switch (e.kind) {
     case "heard":
       return {
@@ -1045,7 +1065,9 @@ function entrySummary(e: Entry): Obj {
         source: e.source,
         heard_at: e.frame.times.heard_at,
         expires_at: e.frame.times.local_expiry_at,
-        marks: heardMarks(e),
+        air: air?.state ?? "not_in_view",
+        ...(air?.state === "withdrawn" ? { withdrawn: { reason: air.reason, at: air.at } } : {}),
+        marks: heardMarks(e, air),
       };
     case "withdrawn":
       return { seq: e.seq, kind: e.kind, idem: e.idem, reason: e.reason, station: e.station, stream: e.stream };

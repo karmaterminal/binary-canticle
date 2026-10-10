@@ -165,6 +165,61 @@ test("new reads never report an entry twice, whichever view read it first", asyn
   assert.equal((b.listen(OTHER_SESSION, { view: "digest" }).details.entries as { kind: string }[]).filter((e) => e.kind === "heard").length, 3);
 });
 
+test("a read says where each item stands now: one withdrawn or expired never reads as on air, whichever page holds the entry that says so", async () => {
+  b = await up();
+  daemon.surface(cael(1, "a wrong advisory", { ttl_ms: 600_000 }));
+  daemon.surface(cael(2, "still true", { ttl_ms: 600_000 }));
+  daemon.surface(cael(3, "short-lived", { ttl_ms: 30_000 }));
+  await waitFor(() => heardCount(b) === 3, "three items");
+  const journal = () => b.listen(OTHER_SESSION, { what: "journal", limit: 20 }).details.entries as { kind: string; seq: number; idem?: string }[];
+  daemon.retract({ key_id: KEY_CAEL, stream: "chatter", seq: 1 }); // the station plucks its wrong advisory
+  await waitFor(() => journal().some((e) => e.kind === "withdrawn"), "the retract");
+  clock.advance(31_000); // item 3 is past its local expiry, though nothing has ticked it out of the view yet
+  daemon.retract({ key_id: KEY_CAEL, stream: "chatter", seq: 3 }, "expired"); // as the daemon does at expiry
+  await waitFor(() => journal().filter((e) => e.kind === "withdrawn").length === 2, "the expiry");
+  // A session behind on its reads gets a page that ends before the withdrawn entry.
+  const before = journal().findIndex((e) => e.kind === "withdrawn");
+  const page = b.listen(SESSION, { what: "new", limit: before, view: "items" });
+  assert.equal(page.details.truncated, true);
+  type Heard = { kind: string; idem?: string; air?: string; withdrawn?: { reason: string } };
+  const airs = (r: { details: Obj }) => (r.details.entries as Heard[]).filter((e) => e.kind === "heard").map((e) => e.air);
+  assert.deepEqual(airs(page), ["withdrawn", "on_air", "expired"]);
+  assert.equal((page.details.entries as Heard[]).some((e) => e.kind === "withdrawn"), false);
+  assert.deepEqual((page.details.entries as Heard[]).find((e) => e.air === "withdrawn")?.withdrawn?.reason, "plucked");
+  const banner = (text: string, payload: string) => text.split("[canticle:heard]").find((chunk) => chunk.includes(payload)) ?? "";
+  assert.match(banner(page.text, "a wrong advisory"), /\nbinding: withdrawn \(plucked\) at \d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ: no longer on air\n/);
+  assert.match(banner(page.text, "still true"), /\nbinding: on air now\n/);
+  assert.match(banner(page.text, "short-lived"), /\nbinding: expired at \d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ: no longer on air\n/);
+  // The digest says the same, and an expired item never reads as expires_in=0s.
+  const digest = b.listen(SESSION, { what: "journal", since: page.details.from, limit: before }).text;
+  assert.match(digest, /item=1\/1 size=\d+B age=31s expires_in=569s \[withdrawn \(plucked\) at [^\]]*: no longer on air\]/);
+  assert.match(digest, /item=1\/3 size=\d+B age=31s expired_ago=1s \[expired at [^\]]*: no longer on air\]/);
+  assert.doesNotMatch(digest, /expires_in=0s/);
+  // The journal is what knows an item was withdrawn: a restart keeps the mark.
+  await b.stop();
+  b = await up();
+  const read = () => b.listen(SESSION, { what: "journal", since: page.details.from, limit: before });
+  assert.deepEqual(airs(read()), ["withdrawn", "on_air", "expired"]);
+  // A cut feed: what was on air is carried, not current.
+  let accepted = daemon.accepted;
+  daemon.holdSnapshot = true;
+  daemon.dropAll();
+  await waitFor(() => daemon.accepted > accepted && b.receiver.phase() === "live", "the reconnect");
+  assert.deepEqual(airs(read()), ["withdrawn", "carried", "expired"]);
+  assert.match(read().text, /item=1\/2 .* \[carried: heard before a gap, not known to be on air now\]/);
+  // Item 2 leaves the air while the binding is away (its retract is not replayed), and a complete join snapshot
+  // leaves it out: it is no longer in the current view, and never claimed to be on air.
+  const second = (read().details.entries as Heard[]).filter((e) => e.kind === "heard")[1]?.idem;
+  assert.ok(second !== undefined);
+  daemon.live.delete(second);
+  accepted = daemon.accepted;
+  daemon.holdSnapshot = false;
+  daemon.dropAll();
+  await waitFor(() => daemon.accepted > accepted && b.receiver.current(), "the rejoin");
+  assert.deepEqual(airs(read()), ["withdrawn", "not_in_view", "expired"]);
+  assert.match(read().text, /item=1\/2 .* \[not in the current view: not known to be on air now\]/);
+});
+
 test("a new read passes over what its filters leave out for good, and a new read from an older cursor never moves the checkpoint back", async () => {
   b = await up();
   const heardIn = (r: { details: Obj }) => (r.details.entries as { kind: string }[]).filter((e) => e.kind === "heard").length;
@@ -334,7 +389,11 @@ test("heard text is data: a payload that counterfeits the banner or gives orders
   const second = b.listen(SESSION, { what: "journal", view: "items" }).text;
   const banner = second.slice(second.lastIndexOf("[canticle:heard]"), second.lastIndexOf("<<<EXTERNAL_UNTRUSTED_CONTENT"));
   const lines = banner.split("\n");
-  assert.equal(lines.filter((l) => l.startsWith("binding:")).length, 0, banner);
+  assert.deepEqual(
+    lines.filter((l) => l.startsWith("binding:")),
+    ["binding: on air now"], // the host's line only
+    banner,
+  );
   assert.equal(lines.filter((l) => l.includes("VERIFIED")).length, 1, banner);
   assert.equal(
     lines.find((l) => l.startsWith("purpose ")),

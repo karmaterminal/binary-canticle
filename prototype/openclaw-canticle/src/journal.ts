@@ -9,6 +9,8 @@
 //   re-sent record of the same item is not a new entry.
 // - Retention is bounded by entries, bytes and age. Whole segments go, oldest first; the newest segment is always
 //   kept, so the next seq is always known.
+// - The journal indexes its retained withdrawals by identity, so a read can mark a heard entry withdrawn when the
+//   entry that says so sits on a later page.
 
 import { closeSync, fsyncSync, openSync, readFileSync, readdirSync, truncateSync, unlinkSync, writeSync } from "node:fs";
 import { join } from "node:path";
@@ -65,6 +67,9 @@ export type Draft =
   | Omit<PresenceEntry, "seq" | "at">
   | Omit<NoteEntry, "seq" | "at">;
 
+/** The newest retained `withdrawn` entry for an identity. */
+export type Withdrawal = { seq: number; at: number; reason: string };
+
 export type Retention = { maxEntries: number; maxBytes: number; maxAgeMs: number };
 export const DEFAULT_RETENTION: Retention = { maxEntries: 5_000, maxBytes: 8 * 1024 * 1024, maxAgeMs: 24 * 3_600_000 };
 
@@ -89,6 +94,8 @@ export class Journal {
   private readonly keys = new Map<string, number>();
   /** Heard identities → how many retained entries carry them. */
   private readonly retained = new Map<string, number>();
+  /** Withdrawn identities → their newest retained `withdrawn` entry. */
+  private readonly withdrawals = new Map<string, Withdrawal>();
   readonly counts = { pruned_entries: 0, pruned_segments: 0, partial_lines: 0, bad_lines: 0, repeats: 0 };
 
   constructor(dir: string, retention: Retention = DEFAULT_RETENTION) {
@@ -130,10 +137,7 @@ export class Journal {
       this.entryCount += seg.entries.length;
       this.byteCount += seg.bytes;
       for (const e of seg.entries) {
-        if (e.kind === "heard") {
-          this.retain(e.frame.idem, 1);
-          this.remember(e.frame.idem, e.frame.times.local_expiry_at + SKEW_MS);
-        }
+        this.index(e);
       }
     }
     for (const [idem, until] of Object.entries(carried)) {
@@ -193,11 +197,22 @@ export class Journal {
     this.entryCount += 1;
     this.byteCount += bytes;
     this.next += 1;
+    this.index(e);
+    return e;
+  }
+
+  /** The newest retained withdrawal of an identity, or null. */
+  withdrawal(idem: string): Withdrawal | null {
+    return this.withdrawals.get(idem) ?? null;
+  }
+
+  private index(e: Entry): void {
     if (e.kind === "heard") {
       this.retain(e.frame.idem, 1);
       this.remember(e.frame.idem, e.frame.times.local_expiry_at + SKEW_MS);
+    } else if (e.kind === "withdrawn") {
+      this.withdrawals.set(e.idem, { seq: e.seq, at: e.at, reason: e.reason });
     }
-    return e;
   }
 
   private rotate(first: number): Segment {
@@ -265,6 +280,8 @@ export class Journal {
       for (const e of seg.entries) {
         if (e.kind === "heard") {
           this.retain(e.frame.idem, -1);
+        } else if (e.kind === "withdrawn" && this.withdrawals.get(e.idem)?.seq === e.seq) {
+          this.withdrawals.delete(e.idem);
         }
       }
       pruned = true;

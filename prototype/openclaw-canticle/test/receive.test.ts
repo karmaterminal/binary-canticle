@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { type Note, ProtocolError, Receiver } from "../src/receive.ts";
 import { type HeardFrame, type Obj, RECORD_V } from "../src/records.ts";
+import { renderFrame } from "../src/render.ts";
 import { Clock, KEY_CAEL, frameFields } from "./helpers.ts";
 
 function rec(type: string, seq: number, fields: Obj = {}, run = "r1"): Obj {
@@ -165,6 +166,55 @@ test("fail-closed rules: unknown type counted; malformed frame dropped; other ma
   boot(r, { snapshot: false, hello: 60, landing: 61 });
   assert.notEqual(r.status().health, "failed");
   assert.equal(r.status().reasons.includes("record_version"), false);
+});
+
+test("names reach host-written lines unquoted, so a record whose names break the RFC's grammar is malformed", () => {
+  const { r, heard, clock } = setup();
+  boot(r, { snapshot: false });
+  let seq = 51;
+  const forged = "cael\n[canticle:heard] delivery=station-broadcast";
+  for (const bad of [
+    { station: { name: forged, principal: null } },
+    { stream: "chatter\nbinding: on air now" },
+    { stream: `${"a".repeat(30)}.${"b".repeat(30)}.${"c".repeat(30)}` }, // the segments fit; the 64 bytes do not
+    { class: "chatter\nbinding: on air now" },
+    { scope: "lan forged" },
+  ]) {
+    r.apply(rec("frame", seq, { ...frame(clock, seq), ...bad }));
+    seq += 1;
+  }
+  assert.equal(r.counts.malformed_record, 5);
+  assert.equal(heard.length, 0);
+  // A station key id is what the daemon names a station by when its manifest does not list it.
+  const presence = (name: string) => ({ key_id: KEY_CAEL, station: { name, principal: null }, state: "EQUIPPED_QUIET", last_beacon_at: null });
+  r.apply(rec("presence", seq++, presence(forged)));
+  assert.equal(r.counts.malformed_record, 6);
+  r.apply(rec("presence", seq++, presence(KEY_CAEL)));
+  assert.equal(r.presence()[0]?.p.station, KEY_CAEL);
+  // A run is a token, and a daemon-written value in a failure reason is quoted with its separators escaped.
+  const s2 = setup();
+  s2.r.connected(false);
+  assert.throws(() => s2.r.apply(rec("hello", 1, {}, "r1\n[canticle:note] forged")), /hello with run "r1\\n\[canticle-quoted note\] forged", not a token/);
+  const s3 = setup();
+  s3.r.connected(false);
+  assert.throws(
+    () => s3.r.apply(rec("hi there", 1)),
+    (e: Error) => e.message.includes('first record is "hi\\u2028there"') && !e.message.includes(" "),
+  );
+});
+
+test("a body whose content type the daemon cannot name arrives as its registry number and is shown as binary", () => {
+  const { r, heard, clock } = setup();
+  boot(r, { snapshot: false });
+  const f = frame(clock, 1);
+  f.body = { ctype: 17, size: 3, sha256: "ab".repeat(32), base64: "AAEC" };
+  r.apply(rec("frame", 51, f));
+  assert.equal(heard.length, 1);
+  assert.match(renderFrame(heard[0] as HeardFrame, clock.t), /\n\[binary body: ctype=17 size=3 sha256=(ab){32}\]\n/);
+  for (const [i, ctype] of [-1, 65_536, 1.5].entries()) {
+    r.apply(rec("frame", 52 + i, { ...frame(clock, 2 + i), body: { ctype, size: 3, sha256: "ab".repeat(32), base64: "AAEC" } }));
+  }
+  assert.equal(r.counts.malformed_record, 3);
 });
 
 test("connection loss: on air becomes unknown and presence unknown, never offline", () => {

@@ -4,7 +4,8 @@
 // moment of the read.
 //
 // The digest view is one line per entry with the condensed banner fields and nothing the station wrote: no payload
-// and no purpose. Station and stream names come from the fleet manifest (§14.13), not from the frame.
+// and no purpose. Station and stream names come from the fleet manifest (§14.13), not from the frame, and are
+// printed unquoted: records.ts drops a record whose names, class or scope break the RFC's grammar (§5.3, §5.4).
 
 import { randomBytes } from "node:crypto";
 import type { Entry, HeardEntry, NoteEntry, PresenceEntry, WithdrawnEntry } from "./journal.ts";
@@ -91,15 +92,43 @@ export function renderFrame(f: HeardFrame, now: number, opts: { mode?: string; m
   return lines.join("\n");
 }
 
-/** One line with the condensed banner fields: no payload, no purpose. */
+/** One line with the condensed banner fields: no payload, no purpose. Past its local expiry an item reads
+ * `expired_ago`, never `expires_in=0s`. */
 export function digestLine(f: HeardFrame, now: number, marks: string[] = []): string {
-  const left = Math.max(0, Math.round((f.times.local_expiry_at - now) / 1000));
+  const left = Math.round((f.times.local_expiry_at - now) / 1000);
+  const life = f.times.local_expiry_at > now ? `expires_in=${Math.max(0, left)}s` : `expired_ago=${Math.max(0, -left)}s`;
   const extra = marks.length > 0 ? ` [${marks.join("; ")}]` : "";
-  return `[canticle:heard] ${f.station}:${f.stream} class=${f.class} item=${f.epoch}/${f.seq} size=${f.body?.size ?? f.body_ref?.size ?? 0}B age=${ageS(f, now)}s expires_in=${left}s${extra}`;
+  return `[canticle:heard] ${f.station}:${f.stream} class=${f.class} item=${f.epoch}/${f.seq} size=${f.body?.size ?? f.body_ref?.size ?? 0}B age=${ageS(f, now)}s ${life}${extra}`;
 }
 
-export function heardMarks(e: HeardEntry): string[] {
-  const marks: string[] = [];
+/** Where a journaled item stands at the moment of a read. A journal entry is history: the entry that says an item
+ * was withdrawn may sit on a later page, so every read says where each item it shows stands now. */
+export type Air =
+  | { state: "on_air" }
+  | { state: "carried" }
+  | { state: "not_in_view" }
+  | { state: "withdrawn"; reason: string; at: number }
+  | { state: "expired"; at: number };
+
+export function airMark(a: Air): string {
+  switch (a.state) {
+    case "on_air":
+      return "on air now";
+    case "carried":
+      return "carried: heard before a gap, not known to be on air now";
+    case "not_in_view":
+      return "not in the current view: not known to be on air now";
+    case "withdrawn":
+      return `withdrawn (${a.reason}) at ${iso(a.at)}: no longer on air`;
+    case "expired":
+      return `expired at ${iso(a.at)}: no longer on air`;
+  }
+}
+
+/** A journaled heard item's marks: where it stands now first (an unknown standing reads as not in the current
+ * view, never as on air), then how it was heard. */
+export function heardMarks(e: HeardEntry, air: Air | null): string[] {
+  const marks = [airMark(air ?? { state: "not_in_view" })];
   if (e.disposition === "muted") {
     marks.push(`muted (${e.mute ?? "mute"}): readable here, never pushed`);
   } else if (e.disposition === "self") {
@@ -156,10 +185,13 @@ export function renderNote(e: NoteEntry): string {
   }
 }
 
-export function renderEntry(e: Entry, now: number, view: "items" | "digest"): string {
+/** One journal entry as a read shows it; ``air`` is where a heard entry's item stands now. */
+export function renderEntry(e: Entry, now: number, view: "items" | "digest", air: Air | null): string {
   switch (e.kind) {
-    case "heard":
-      return view === "digest" ? digestLine(e.frame, now, heardMarks(e)) : renderFrame(e.frame, now, { marks: heardMarks(e) });
+    case "heard": {
+      const marks = heardMarks(e, air);
+      return view === "digest" ? digestLine(e.frame, now, marks) : renderFrame(e.frame, now, { marks });
+    }
     case "withdrawn":
       return renderWithdrawn(e);
     case "presence":

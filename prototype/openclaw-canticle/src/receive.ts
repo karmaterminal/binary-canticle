@@ -14,6 +14,7 @@ import {
   type Presence,
   type Retract,
   RECORD_V,
+  RUN,
   healthOf,
   heardFrameOf,
   isDeliverable,
@@ -24,6 +25,7 @@ import {
   retractOf,
   versionOf,
 } from "./records.ts";
+import { quoted } from "./render.ts";
 
 /** A problem that ends the connection (§14.18.3: the binding treats the connection as lost). */
 export class ProtocolError extends Error {
@@ -251,8 +253,11 @@ export class Receiver {
       throw this.fail("malformed_record", "not a record v1 object with a type and an integer rec_seq");
     }
     if (c.phase === "hello") {
-      if (type !== "hello" || typeof raw.run !== "string") {
+      if (type !== "hello") {
         throw this.fail("malformed_record", `first record is ${brief(type)}, not hello`);
+      }
+      if (typeof raw.run !== "string" || !RUN.test(raw.run)) {
+        throw this.fail("malformed_record", `hello with run ${brief(raw.run)}, not a token`);
       }
       c.hello = raw;
       c.run = raw.run;
@@ -603,10 +608,10 @@ export class Receiver {
   }
 }
 
-/** A daemon-supplied value as a short, printable token for a failure reason (status surfaces show it). */
+/** A daemon-supplied value as a short, quoted string for a failure reason (status surfaces show it). */
 function brief(v: unknown): string {
   const text = typeof v === "string" ? v : JSON.stringify(v) ?? String(v);
-  return JSON.stringify(text.length > 40 ? `${text.slice(0, 40)}…` : text);
+  return quoted(text.length > 40 ? `${text.slice(0, 40)}…` : text);
 }
 
 function sortItems(items: ViewItem[]): ViewItem[] {
