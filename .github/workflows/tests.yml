@@ -1,5 +1,6 @@
-# Root-free test suites for prototype/canticle-station and the
-# prototype/protocol-dynamics harness.
+# Root-free test suites for prototype/canticle-station, the
+# prototype/protocol-dynamics harness and the prototype/openclaw-canticle
+# plugin.
 #
 # These jobs do not run run_all.sh, network namespaces or nftables, and they
 # do not rerun or certify the privileged E1-E5 measurements. Those remain a
@@ -8,7 +9,8 @@
 #
 # Boundary: read-only token, no secrets, no pull_request_target or other
 # privileged triggers, actions pinned to reviewed commits, dependencies
-# installed from hash-locked files (.github/ci/), no caching.
+# installed from hash-locked files (.github/ci/; npm verifies the lock's
+# integrity hashes and runs no install scripts), no caching.
 
 name: tests
 
@@ -70,6 +72,49 @@ jobs:
         env:
           PYTHONPATH: prototype/canticle-station
         run: python -m unittest discover -s prototype/protocol-dynamics/tests -v
+      - name: Check the tests left the tree unchanged
+        run: |
+          git diff --exit-code
+          status="$(git status --porcelain)"
+          if [ -n "$status" ]; then echo "untracked files after tests:"; echo "$status"; exit 1; fi
+
+  openclaw-plugin-tests:
+    name: openclaw-plugin-tests (node ${{ matrix.node }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # The Node lines OpenClaw 2026.9.9 runs on (engines: >=24.16 <25 || >=26.1).
+        node: ["24", "26"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Install locked dependencies
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: --no-deps -r .github/ci/requirements-station.txt
+          mkdir -p "$RUNNER_TEMP/tsc"
+          cp .github/ci/openclaw-canticle/package.json .github/ci/openclaw-canticle/package-lock.json "$RUNNER_TEMP/tsc/"
+          npm ci --prefix "$RUNNER_TEMP/tsc" --ignore-scripts --no-audit --no-fund
+      - name: Typecheck
+        run: >-
+          node "$RUNNER_TEMP/tsc/node_modules/typescript/bin/tsc"
+          -p prototype/openclaw-canticle/tsconfig.json
+          --typeRoots "$RUNNER_TEMP/tsc/node_modules/@types"
+      - name: Run plugin tests (the interop test runs the real daemon and stations)
+        working-directory: prototype/openclaw-canticle
+        env:
+          CANTICLE_INTEROP: require
+          CANTICLE_PYTHON: python
+        run: node --test 'test/*.test.ts'
       - name: Check the tests left the tree unchanged
         run: |
           git diff --exit-code
