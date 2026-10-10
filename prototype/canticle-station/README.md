@@ -373,7 +373,7 @@ binding that wants the run's current state sends, as its first line on the socke
 canticle tap                                   # what is live now, every station:stream, then exit
 canticle tap --tune frond-gloss:chatter --tune '*:ops.fleet'
 canticle tap --follow                          # then print each change until interrupted
-canticle tap --json                            # the same as JSON (payload not defanged: for programs)
+canticle tap --json                            # the same as JSON: station text defanged, items marked untrusted
 ```
 
 `canticle tap` is a read-only record v1 client of the host daemon, for a harness that has only an exec tool (an
@@ -390,6 +390,10 @@ stream as a binding must (*Joining a run*), and prints:
   host-authored and outside the wrapper; `[canticle:` prefixes and `<<<` / `>>>` in the payload are defanged
   first, so heard text can counterfeit neither. A body by reference is named, never fetched.
 
+`--json` applies the same landing rules: `body.text`, `purpose` and `body_ref.url` are defanged, and each item
+carries `untrusted: true`, the §14.13 notice and `sig` (from the record's admission). `--unsafe-raw` (with
+`--json` only) prints the daemon's records as received, for debugging; never hand that output to a session.
+
 With `--follow` it then prints new items, `[canticle:withdrawn]` (pluck, supersession, expiry), presence and
 health changes, and `[canticle:ended]` when the daemon says `bye` or `fatal` or the connection closes. A
 daemon restart ends the connection (exit 3); run `tap` again to join the new run with a fresh snapshot, so
@@ -403,7 +407,7 @@ decides who may connect. Exit status: 0 ok; 1 no socket, refused or timed out; 2
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 269 tests, about 65 s
+python -m unittest discover -s tests      # 274 tests, about 65 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 

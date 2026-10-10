@@ -92,7 +92,8 @@ def render_item(rec: dict, now_ms: int, wrapper_id: Optional[str] = None) -> str
     lines = [
         f"[canticle:heard] delivery=station-broadcast mode=silent class={rec.get('class') or 'unavailable'} "
         f"scope={rec.get('scope')}",
-        f'station="{name}" principal="{principal}" key={fr["key_id"]} sig=valid stream={rec.get("stream")}',
+        f'station="{name}" principal="{principal}" key={fr["key_id"]} '
+        f'sig={"valid" if rec.get("admission") == "verified" else "unavailable"} stream={rec.get("stream")}',
         f"item={fr['epoch']}/{fr['seq']} hop={rec.get('hop')} root={_tuple_str(rec.get('lineage', {}).get('root'))}",
         f"issued={_iso(times['issued_at'])} heard={_iso(times.get('heard_at'))} delivered={_iso(now_ms)} "
         f"expires={_iso(times.get('local_expiry_at'))} age={age}s",
@@ -147,7 +148,7 @@ class TapView:
         """Surfaced, tuned, not yet locally expired; newest heard first."""
         out = [r for r in self.frames.values()
                if r["times"]["local_expiry_at"] > now_ms and self.matches(r["station"].get("name") or "", r["stream"] or "")]
-        out.sort(key=lambda r: (-r["times"]["heard_at"], r["idem"]))
+        out.sort(key=lambda r: (-r["times"]["heard_at"], -r["frame"]["epoch"], -int(r["frame"]["seq"]), r["idem"]))
         return out
 
     def _bad(self, detail: str):
@@ -281,12 +282,41 @@ def summary(view: TapView, now_ms: int) -> str:
     return "\n".join(head) + "\n\n" + "\n\n".join(render_item(r, now_ms) for r in items)
 
 
-def summary_json(view: TapView, now_ms: int) -> dict:
+def json_item(rec: dict, raw: bool = False) -> dict:
+    """An item for ``--json``. Unless ``raw``, the station-supplied strings (``body.text``, ``purpose``,
+    ``body_ref.url``) are defanged as in the banner form, and the item carries ``untrusted: true`` and the §14.13
+    notice, so a program that passes it on still passes it on marked. ``raw`` is the explicit unsafe opt-out."""
+    if raw:
+        return rec
+    out = json.loads(json.dumps(rec))
+    body = out.get("body")
+    if body is not None and "text" in body:
+        body["text"] = defang(body["text"])
+    if out.get("purpose") is not None:
+        out["purpose"] = defang(str(out["purpose"]))
+    if out.get("body_ref") is not None and out["body_ref"].get("url") is not None:
+        out["body_ref"]["url"] = defang(str(out["body_ref"]["url"]))
+    out["untrusted"] = True
+    out["notice"] = NOTICE
+    out["sig"] = "valid" if rec.get("admission") == "verified" else "unavailable"
+    return out
+
+
+def json_change(kind: str, data: dict, raw: bool = False) -> dict:
+    if kind == "item":
+        return {"change": kind, "item": json_item(data, raw)}
+    if kind == "withdrawn":
+        return {"change": kind, "idem": data["idem"], "reason": data.get("reason"),
+                "station": data["frame"]["station"], "stream": data["frame"].get("stream")}
+    return {"change": kind, "record": data}
+
+
+def summary_json(view: TapView, now_ms: int, raw: bool = False) -> dict:
     return {"run": view.run, "manifest_sha256": (view.hello or {}).get("manifest_sha256"), "snapshot": view.snapshot,
             "omitted": view.omitted, "health": None if view.health is None else
             {"state": view.health.get("state"), "reasons": view.health.get("reasons")},
             "presence": [p for p in view.presence.values() if view.tuned_station(p["station"].get("name") or "")],
-            "items": view.live(now_ms)}
+            "items": [json_item(r, raw) for r in view.live(now_ms)]}
 
 
 def render_change(kind: str, data: dict, now_ms: int) -> str:
@@ -307,7 +337,7 @@ def render_change(kind: str, data: dict, now_ms: int) -> str:
 
 
 async def tap(socket_path: str, view: TapView, out: TextIO, follow: bool = False, as_json: bool = False,
-              timeout_s: float = 5.0, now_ms: Optional[Callable[[], int]] = None,
+              raw: bool = False, timeout_s: float = 5.0, now_ms: Optional[Callable[[], int]] = None,
               stop: Optional[asyncio.Event] = None) -> int:
     """Connect, ask for the join snapshot, print. Returns the exit status; raises TapError on failure."""
     from . import runner
@@ -356,9 +386,10 @@ async def tap(socket_path: str, view: TapView, out: TextIO, follow: bool = False
                 raise TapError("refused" if view.hello is None else "closed", why)
             view.apply(rec)
         if not follow:
-            print(json.dumps(summary_json(view, clock())) if as_json else summary(view, clock()), file=out, flush=True)
+            print(json.dumps(summary_json(view, clock(), raw)) if as_json else summary(view, clock()), file=out,
+                  flush=True)
             return 0
-        print(json.dumps({"tap": summary_json(view, clock())}) if as_json else summary(view, clock()),
+        print(json.dumps({"tap": summary_json(view, clock(), raw)}) if as_json else summary(view, clock()),
               file=out, flush=True)
         while stop is None or not stop.is_set():
             read = asyncio.ensure_future(next_record(None))
@@ -378,7 +409,7 @@ async def tap(socket_path: str, view: TapView, out: TextIO, follow: bool = False
                 return 0 if view.ended == "bye" else 4
             for kind, data in view.apply(rec):
                 if as_json:
-                    print(json.dumps({"change": kind, "record": data}), file=out, flush=True)
+                    print(json.dumps(json_change(kind, data, raw)), file=out, flush=True)
                 else:
                     print(render_change(kind, data, clock()) + "\n", file=out, flush=True)
         return 0

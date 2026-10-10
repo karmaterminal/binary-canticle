@@ -286,6 +286,9 @@ def cmd_tap(a) -> int:
     if sock is None:
         print("XDG_RUNTIME_DIR is not set: pass --socket (the daemon's socket path)", file=sys.stderr)
         return 1
+    if a.unsafe_raw and not a.json:
+        print("--unsafe-raw applies only with --json", file=sys.stderr)
+        return 1
     try:
         tune = [parse_tune(t) for t in a.tune] if a.tune else None
     except ValueError as e:
@@ -297,7 +300,8 @@ def cmd_tap(a) -> int:
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, stop.set)
-        return await tap(sock, TapView(tune), sys.stdout, follow=a.follow, as_json=a.json, timeout_s=a.timeout,
+        return await tap(sock, TapView(tune), sys.stdout, follow=a.follow, as_json=a.json,
+                         raw=a.unsafe_raw, timeout_s=a.timeout,
                          stop=stop)
 
     try:
@@ -660,7 +664,10 @@ def main(argv=None) -> int:
     tp.add_argument("--socket", help="the daemon's unix socket (default $XDG_RUNTIME_DIR/canticle/daemon.sock)")
     tp.add_argument("--tune", action="append", help="station:stream to show (repeatable; * matches any; default *:*)")
     tp.add_argument("--follow", action="store_true", help="keep reading and print each change until interrupted")
-    tp.add_argument("--json", action="store_true", help="print JSON instead of banners (the payload is not defanged)")
+    tp.add_argument("--json", action="store_true", help="print JSON instead of banners; station text is defanged "
+                    "and each item is marked untrusted with the §14.13 notice")
+    tp.add_argument("--unsafe-raw", action="store_true", help="with --json: the daemon's records as received, "
+                    "nothing defanged or marked (for debugging; never pass this output to a session)")
     tp.add_argument("--timeout", type=float, default=5.0, help="seconds to wait to connect and for the snapshot")
     tp.set_defaults(fn=cmd_tap)
 
