@@ -153,7 +153,9 @@ The station keeps its epoch counter next to its key (`cael.key.epoch`; `--epoch-
 
 - **Claude Code.** Run `canticle listen …` as a background command under the Monitor tool: each line becomes an event the session sees. Put items on air with `canticle sing` through Bash.
 - **OpenClaw.** Call `canticle sing` from an exec tool. On a host where `canticle daemon` owns the port, hear
-  with `canticle tap` from the same tool (below); `canticle listen` cannot bind there.
+  with `canticle tap` from the same tool (below); `canticle listen` cannot bind there. A spike of the P1 plugin,
+  which reads the daemon itself and keeps a heard journal, is in [`../openclaw-canticle/`](../openclaw-canticle/)
+  (#97); no seat runs it.
 
 Do not pipe heard text straight into a session. RFC-0001 §14 and §16 require a banner outside the external-content wrapper, taint after hearing, and receiver-local wake policy. That landing layer is work item S3.
 

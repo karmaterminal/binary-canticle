@@ -17,3 +17,8 @@ claiming protocol or production status.
   (carousel, regulator, pluck, supersede, carrier-beacon) and a listener
   (dedup, sticky-pluck, presence), plus a `canticle` CLI over UDP unicast or
   multicast.
+- [`openclaw-canticle/`](./openclaw-canticle/) is a spike of the OpenClaw
+  prince plugin ([#97](https://github.com/karmaterminal/binary-canticle/issues/97)):
+  an explicit-read heard journal and current view over the host daemon's
+  receptor record v1, and an outbound aging table over the prince's own
+  station. No seat runs it.

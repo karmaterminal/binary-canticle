@@ -5,11 +5,13 @@ Copilot CLI and VS Code load it as well as this file, but Copilot Chat on github
 this file repeats the essentials in brief and adds a checklist for reviews. Keep the two in step.
 
 - RFC-0001 (`rfc/0001-binary-canticle.md`) is the authority. `prototype/canticle-station/` is a Python 3.11
-  spike of it, and its README lists where the code departs from the RFC. `proto/`, `spike/` and `scratch/` are
-  lineage that the RFC supersedes.
+  spike of it, and its README lists where the code departs from the RFC. `prototype/openclaw-canticle/` is a
+  TypeScript spike of the OpenClaw prince plugin (#97), with its own departures table. `proto/`, `spike/` and
+  `scratch/` are lineage that the RFC supersedes.
 - Tests, from the repository root:
   `PYTHONPATH=prototype/canticle-station python -m unittest discover -s prototype/canticle-station/tests`
-  (add `-p 'test_<module>.py'` for one module). Afterwards `git status --porcelain` must print nothing.
+  (add `-p 'test_<module>.py'` for one module). The plugin's, with Node 24 or 26: `node --test 'test/*.test.ts'`
+  in `prototype/openclaw-canticle/`. Afterwards `git status --porcelain` must print nothing.
 - Never run `prototype/protocol-dynamics/run_all.sh` or `prototype/canticle-station/proofs/web-lanes/run.sh`:
   they need root and network namespaces, and their results are attested evidence.
 
@@ -34,4 +36,6 @@ this file repeats the essentials in brief and adds a checklist for reviews. Keep
 - A change under `plugins/binary-canticle/` bumps `version` in its `.claude-plugin/plugin.json`. Flag a
   second marketplace manifest (`marketplace.json`, `.plugin/`, `.github/plugin/`): Copilot CLI would read it
   instead of `.claude-plugin/marketplace.json`.
+- A change under `prototype/openclaw-canticle/` keeps its README (tools, bounds, departures) in step with the
+  code. Flag anything that installs, enables or publishes it, or turns on `publish.enabled` by default.
 - Cite decisions by RFC section, issue, pull request or commit, never by Discord message ID.
