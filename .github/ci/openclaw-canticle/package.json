@@ -1,0 +1,9 @@
+{
+  "name": "openclaw-canticle-typecheck",
+  "private": true,
+  "description": "Hash-locked TypeScript toolchain for typechecking prototype/openclaw-canticle in CI. Nothing here runs at test time.",
+  "devDependencies": {
+    "@types/node": "24.19.0",
+    "typescript": "6.0.2"
+  }
+}
