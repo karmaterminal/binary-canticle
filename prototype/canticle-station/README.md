@@ -152,7 +152,8 @@ The station keeps its epoch counter next to its key (`cael.key.epoch`; `--epoch-
 ### From an agent harness
 
 - **Claude Code.** Run `canticle listen …` as a background command under the Monitor tool: each line becomes an event the session sees. Put items on air with `canticle sing` through Bash.
-- **OpenClaw.** Call `canticle sing` from an exec tool.
+- **OpenClaw.** Call `canticle sing` from an exec tool. On a host where `canticle daemon` owns the port, hear
+  with `canticle tap` from the same tool (below); `canticle listen` cannot bind there.
 
 Do not pipe heard text straight into a session. RFC-0001 §14 and §16 require a banner outside the external-content wrapper, taint after hearing, and receiver-local wake policy. That landing layer is work item S3.
 
@@ -366,10 +367,43 @@ binding that wants the run's current state sends, as its first line on the socke
 - **Counters.** `health.snapshots`: `requested`, `served`, `truncated`, `deferred`, `closed` (the connection
   ended before its snapshot was written, or its deferral ran out) and `ignored` (inbound lines not served).
 
+### Hearing through the daemon: `canticle tap` (#96)
+
+```sh
+canticle tap                                   # what is live now, every station:stream, then exit
+canticle tap --tune frond-gloss:chatter --tune '*:ops.fleet'
+canticle tap --follow                          # then print each change until interrupted
+canticle tap --json                            # the same as JSON (payload not defanged: for programs)
+```
+
+`canticle tap` is a read-only record v1 client of the host daemon, for a harness that has only an exec tool (an
+OpenClaw prince before the P1 plugin, #97). It connects to the daemon's socket (`--socket`, default
+`$XDG_RUNTIME_DIR/canticle/daemon.sock`), sends the join-snapshot request and nothing else, validates the
+stream as a binding must (*Joining a run*), and prints:
+
+- a header: the run, the manifest hash, whether the join snapshot was complete, truncated (older live items may
+  be missing) or not offered (only items heard after the connection), the presence of the tuned stations, and
+  health once the daemon has sent one on this connection (`no_datagrams` is shown as *every station unknown, not
+  offline*);
+- each live item on the tuned `station:stream` pairs (`*` matches any), newest heard first, under the §14.13
+  `[canticle:heard]` banner, with the payload inside an `EXTERNAL_UNTRUSTED_CONTENT` wrapper. The banner is
+  host-authored and outside the wrapper; `[canticle:` prefixes and `<<<` / `>>>` in the payload are defanged
+  first, so heard text can counterfeit neither. A body by reference is named, never fetched.
+
+With `--follow` it then prints new items, `[canticle:withdrawn]` (pluck, supersession, expiry), presence and
+health changes, and `[canticle:ended]` when the daemon says `bye` or `fatal` or the connection closes. A
+daemon restart ends the connection (exit 3); run `tap` again to join the new run with a fresh snapshot, so
+nothing from the old run is shown as current.
+
+It binds no port, writes no state, publishes nothing and wakes nothing. Each connection is its own cursor in
+the daemon, so a tap cannot advance or disturb another binding's view; the daemon's `SO_PEERCRED` check
+decides who may connect. Exit status: 0 ok; 1 no socket, refused or timed out; 2 a malformed stream; with
+`--follow`, 3 when the connection closed without `bye`, 4 after `fatal`.
+
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 254 tests, about 25 s
+python -m unittest discover -s tests      # 269 tests, about 65 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
