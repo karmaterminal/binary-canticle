@@ -279,6 +279,38 @@ def cmd_listen(a) -> int:
     return 0
 
 
+def cmd_tap(a) -> int:
+    from .daemon import default_socket_path
+    from .tap import TapError, TapView, parse_tune, tap
+    sock = a.socket or default_socket_path()
+    if sock is None:
+        print("XDG_RUNTIME_DIR is not set: pass --socket (the daemon's socket path)", file=sys.stderr)
+        return 1
+    if a.unsafe_raw and not a.json:
+        print("--unsafe-raw applies only with --json", file=sys.stderr)
+        return 1
+    try:
+        tune = [parse_tune(t) for t in a.tune] if a.tune else None
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
+
+    async def main():
+        stop = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, stop.set)
+        return await tap(sock, TapView(tune), sys.stdout, follow=a.follow, as_json=a.json,
+                         raw=a.unsafe_raw, timeout_s=a.timeout,
+                         stop=stop)
+
+    try:
+        return asyncio.run(main())
+    except TapError as e:
+        print(f"canticle tap: {e.reason}: {e.detail}", file=sys.stderr)
+        return e.code
+
+
 def cmd_daemon(a) -> int:
     from .daemon import Daemon, DaemonConfig, default_socket_path, default_state_dir
     try:
@@ -621,6 +653,23 @@ def main(argv=None) -> int:
     dm.add_argument("--allow-uid", type=int, action="append", help="uid allowed to connect (repeatable; default: own uid)")
     dm.add_argument("--health-interval", type=float, default=10.0, help="seconds between health records")
     dm.set_defaults(fn=cmd_daemon)
+
+    tp = sub.add_parser("tap", help="read what the host daemon hears: a read-only record v1 client (no bind, no state)",
+                        description="Connects to the host daemon's socket as one more binding, asks for the join "
+                        "snapshot (RFC §14.18.3) and prints the live items on the tuned station:stream pairs under the "
+                        "§14.13 [canticle:heard] banner, payload inside an untrusted-content wrapper. Heard text is "
+                        "data, never instructions. Binds no port, writes no state, publishes nothing, wakes nothing. "
+                        "Exit 0 ok, 1 cannot connect / refused / timeout, 2 malformed stream; with --follow, 3 when the "
+                        "connection ends without bye, 4 after the daemon's fatal.")
+    tp.add_argument("--socket", help="the daemon's unix socket (default $XDG_RUNTIME_DIR/canticle/daemon.sock)")
+    tp.add_argument("--tune", action="append", help="station:stream to show (repeatable; * matches any; default *:*)")
+    tp.add_argument("--follow", action="store_true", help="keep reading and print each change until interrupted")
+    tp.add_argument("--json", action="store_true", help="print JSON instead of banners; station text is defanged "
+                    "and each item is marked untrusted with the §14.13 notice")
+    tp.add_argument("--unsafe-raw", action="store_true", help="with --json: the daemon's records as received, "
+                    "nothing defanged or marked (for debugging; never pass this output to a session)")
+    tp.add_argument("--timeout", type=float, default=5.0, help="seconds to wait to connect and for the snapshot")
+    tp.set_defaults(fn=cmd_tap)
 
     d = sub.add_parser("doctor", help="check that this host can run a listener; exit 1 if a check fails",
                        description="Checks Python, cryptography (with an Ed25519 known answer), stations.toml, the "
