@@ -140,8 +140,8 @@ test("the binding against the real daemon and stations: hear, sing, hear back, p
       return b;
     };
     binding = await up();
-    const reader = { sessionKey: "agent:rune:reader", sessionId: "r-1", subagent: false };
-    const singer = { sessionKey: "agent:rune:main", sessionId: "m-1", subagent: false };
+    const reader = { sessionKey: "agent:rune:reader", sessionId: "r-1", subagent: false, anonymous: false };
+    const singer = { sessionKey: "agent:rune:main", sessionId: "m-1", subagent: false, anonymous: false };
     /** The whole journal, page by page. */
     const journal = (b: Binding, p: Obj = {}): { text: string; entries: { kind: string; station?: string }[] } => {
       const out = { text: "", entries: [] as { kind: string; station?: string }[] };

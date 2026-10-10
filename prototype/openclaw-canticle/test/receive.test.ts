@@ -158,6 +158,13 @@ test("fail-closed rules: unknown type counted; malformed frame dropped; other ma
   assert.equal(heard.length, 0);
   assert.throws(() => r.apply({ ...rec("frame", 54), v: "canticle-receptor-record/2" }), /record_version/);
   assert.equal(r.status().health, "failed");
+  // The failure ends the connection; health stays failed while the binding is away, until a join reads v1 again.
+  r.lost("protocol_error");
+  assert.equal(r.status().health, "failed");
+  assert.deepEqual(r.status().reasons, ["record_version"]);
+  boot(r, { snapshot: false, hello: 60, landing: 61 });
+  assert.notEqual(r.status().health, "failed");
+  assert.equal(r.status().reasons.includes("record_version"), false);
 });
 
 test("connection loss: on air becomes unknown and presence unknown, never offline", () => {

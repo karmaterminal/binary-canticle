@@ -144,15 +144,28 @@ export function isSubagent(sessionKey: string): boolean {
   return k.startsWith("subagent:") || /^agent:[^:]+:subagent:/.test(k);
 }
 
+/** The caller a tool acts for. A context with neither a session key nor an agent id names no session, and such
+ * calls are anonymous rather than one shared identity: no publish tools, no new reads and no heard text. */
+export function callerOf(ctx: ToolContext): Caller {
+  const key = named(ctx.sessionKey) ?? (named(ctx.agentId) !== null ? `agent:${ctx.agentId}` : null);
+  if (key === null) {
+    return { sessionKey: "(no session)", sessionId: null, subagent: false, anonymous: true };
+  }
+  return { sessionKey: key, sessionId: named(ctx.sessionId), subagent: isSubagent(key), anonymous: false };
+}
+
+function named(v: unknown): string | null {
+  return typeof v === "string" && v.trim() !== "" ? v : null;
+}
+
 /** One tool for one session, or null when the tool is not offered there. */
 export function createTool(
   name: ToolName,
   ctx: ToolContext,
   get: () => { binding: Binding | null; failure: string | null; publish: boolean },
 ): Tool | null {
-  const sessionKey = ctx.sessionKey ?? (ctx.agentId !== undefined ? `agent:${ctx.agentId}` : "unknown");
-  const caller: Caller = { sessionKey, sessionId: ctx.sessionId ?? null, subagent: isSubagent(sessionKey) };
-  if ((PUBLISH_TOOLS as readonly string[]).includes(name) && (!get().publish || caller.subagent)) {
+  const caller = callerOf(ctx);
+  if ((PUBLISH_TOOLS as readonly string[]).includes(name) && (!get().publish || caller.subagent || caller.anonymous)) {
     return null;
   }
   const def = DEFS[name];

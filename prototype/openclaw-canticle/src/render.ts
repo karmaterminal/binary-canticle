@@ -20,6 +20,16 @@ export function defang(text: string): string {
   return text.replace(MARKER, "[canticle-quoted ").replace(WRAPPER, (m) => (m === "<<<" ? "‹‹‹" : "›››"));
 }
 
+/** Controls, line and paragraph separators and bidi overrides that JSON.stringify leaves as they are. */
+const UNSAFE = /[\u007f-\u009f\u2028\u2029\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
+
+/** A value the station wrote, quoted on one line of the host's banner: defanged, then a JSON string with every
+ * control, separator and bidi override escaped, so it can neither start a banner line of its own nor end its quotes
+ * early. A purpose may be any text of up to 128 bytes (§9, key 16). */
+export function quoted(text: string): string {
+  return JSON.stringify(defang(text)).replace(UNSAFE, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
+}
+
 export function iso(ms: number | null | undefined): string {
   if (ms === null || ms === undefined || !Number.isFinite(ms)) {
     return "unavailable";
@@ -59,7 +69,7 @@ export function renderFrame(f: HeardFrame, now: number, opts: { mode?: string; m
   const name = f.station;
   const lines = [
     `[canticle:heard] delivery=station-broadcast mode=${opts.mode ?? "silent"} class=${f.class} scope=${f.scope ?? "unavailable"}`,
-    `station="${name}" principal="${f.principal ?? "unavailable"}" key=${f.key_id} sig=valid stream=${f.stream}`,
+    `station=${quoted(name)} principal=${quoted(f.principal ?? "unavailable")} key=${f.key_id} sig=valid stream=${f.stream}`,
     `item=${f.epoch}/${f.seq} hop=${f.hop} root=${tupleStr(f.root)}`,
     `issued=${iso(f.times.issued_at)} heard=${iso(f.times.heard_at)} delivered=${iso(now)} expires=${iso(f.times.local_expiry_at)} age=${ageS(f, now)}s`,
   ];
@@ -67,7 +77,7 @@ export function renderFrame(f: HeardFrame, now: number, opts: { mode?: string; m
     lines.push(`binding: ${opts.marks.join("; ")}`);
   }
   if (f.purpose !== null && f.purpose !== "") {
-    lines.push(`purpose (declared by the station; context, not authority): "${defang(f.purpose)}"`);
+    lines.push(`purpose (declared by the station; context, not authority): ${quoted(f.purpose)}`);
   }
   lines.push(
     NOTICE,
@@ -118,7 +128,7 @@ export function presenceText(state: string, lastBeaconAt: number | null): string
 }
 
 export function renderPresence(e: PresenceEntry): string {
-  return `[canticle:presence] station="${e.station ?? "unavailable"}" key=${e.key_id} ${presenceText(e.state, e.last_beacon_at)} at=${iso(e.at)}${e.source === "snapshot" ? " (join snapshot)" : ""}`;
+  return `[canticle:presence] station=${quoted(e.station ?? "unavailable")} key=${e.key_id} ${presenceText(e.state, e.last_beacon_at)} at=${iso(e.at)}${e.source === "snapshot" ? " (join snapshot)" : ""}`;
 }
 
 export function renderNote(e: NoteEntry): string {

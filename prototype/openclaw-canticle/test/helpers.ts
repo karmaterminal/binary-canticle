@@ -302,7 +302,9 @@ export class FakeDaemon {
 }
 
 type RingItem = { seq: number; kind: "item" | "pluck"; expires_at: number; issued_at: number; state_key: string | null; text: string };
-export type StationFault = "drop_after" | "drop_before" | "refuse";
+/** drop_before/after: close without a reply, before or after acting; refuse: an error reply; hold: no reply until
+ * release(). */
+export type StationFault = "drop_after" | "drop_before" | "refuse" | "hold";
 
 /** A station's control socket: sing, hush and status, with faults to inject. */
 export class FakeStation {
@@ -316,7 +318,10 @@ export class FakeStation {
   readonly faults: { op: string; fault: StationFault }[] = [];
   onSing: ((it: RingItem & { stream: string; epoch: number }) => void) | null = null;
   onHush: ((target: { stream: string; seq: number; epoch: number }) => void) | null = null;
+  /** The loop clamp a sing receipt reports. */
+  singClamp = "none";
   private readonly clock: () => number;
+  private readonly heldReplies: (() => void)[] = [];
 
   constructor(dir: string, name: string, keyId: string, clock: () => number, streams: Record<string, number> = { chatter: 60 }) {
     this.path = join(dir, `${name}.ctl`);
@@ -350,6 +355,10 @@ export class FakeStation {
           sock.end(`${JSON.stringify({ ok: false, error: "refused by test" })}\n`);
           return;
         }
+        if (fault === "hold") {
+          this.heldReplies.push(() => sock.end(`${JSON.stringify(this.dispatch(req))}\n`));
+          return;
+        }
         const reply = this.dispatch(req);
         if (fault === "drop_after") {
           sock.destroy();
@@ -363,6 +372,18 @@ export class FakeStation {
 
   ops(op: string): Obj[] {
     return this.requests.filter((r) => r.op === op);
+  }
+
+  /** How many requests a "hold" fault is keeping without a reply. */
+  get holding(): number {
+    return this.heldReplies.length;
+  }
+
+  /** Answer every held request, as the station would now. */
+  release(): void {
+    for (const reply of this.heldReplies.splice(0)) {
+      reply();
+    }
   }
 
   private dispatch(req: Obj): Obj {
@@ -412,7 +433,7 @@ export class FakeStation {
         expires_at: it.expires_at,
         ttl_s: ttl,
         loop_ms: 10_000,
-        clamp: "none",
+        clamp: this.singClamp,
         size: 200,
         kind: "item",
         ...(superseded !== null ? { superseded_seq: superseded } : {}),
@@ -495,5 +516,5 @@ export function makeBinding(cfg: BindingConfig, clock: Clock, extra: Partial<Bin
   });
 }
 
-export const SESSION: Caller = { sessionKey: "agent:main:main", sessionId: "s-1", subagent: false };
-export const OTHER_SESSION: Caller = { sessionKey: "agent:main:other", sessionId: "s-2", subagent: false };
+export const SESSION: Caller = { sessionKey: "agent:main:main", sessionId: "s-1", subagent: false, anonymous: false };
+export const OTHER_SESSION: Caller = { sessionKey: "agent:main:other", sessionId: "s-2", subagent: false, anonymous: false };

@@ -11,14 +11,16 @@ import { join } from "node:path";
 import { type BindingConfig, sessionMatches, tuned } from "./config.ts";
 import { DaemonLink } from "./daemon.ts";
 import { type Entry, Journal } from "./journal.ts";
-import { Outbox, type Row, isTerminal, shownState } from "./outbox.ts";
+import { type HushOutcome, Outbox, OutboxClosed, type Row, type SingOutcome, isTerminal, shownState } from "./outbox.ts";
 import { Receiver, type ViewItem } from "./receive.ts";
 import { type HeardFrame, type Obj, STATION_NAME, STREAM_NAME, isObj } from "./records.ts";
 import { heardMarks, iso, presenceText, renderEntry, renderViewItem } from "./render.ts";
 import { type StationClient, stationClient } from "./station.ts";
 import { Lease, LeaseHeld, ensureDir, readJson, writeJsonAtomic } from "./store.ts";
 
-export type Caller = { sessionKey: string; sessionId: string | null; subagent: boolean };
+/** Who called a tool. An anonymous call named neither a session nor an agent, so it has no checkpoint, taint mark or
+ * rate limit of its own: it gets status, mutes and digests of the journal and the view, and nothing else. */
+export type Caller = { sessionKey: string; sessionId: string | null; subagent: boolean; anonymous: boolean };
 export type Result = { text: string; details: Obj };
 
 export type Mute = {
@@ -40,6 +42,8 @@ type StateFile = {
   mutes: Mute[];
   checkpoints: Record<string, { seq: number; at: number }>;
   taint: Record<string, { at: number }>;
+  /** When the taint table first overflowed. From then on every session that may read heard text counts as tainted. */
+  taint_overflow: number | null;
   carried_keys: Record<string, number>;
   /** The journal's durable head when this file was saved. A journal found shorter lost entries a cursor may name. */
   journal_head: number;
@@ -60,6 +64,8 @@ const READ_LIMIT_MAX = 20;
 const READ_BYTES_MAX = 12 * 1024;
 const NEW_WINDOW_MS = 3_600_000; // a session's first `new` read starts an hour back
 const CHECKPOINTS_MAX = 256;
+/** The loop clamp reasons of §7.5 and §15.1 a station's receipt may carry through. */
+const CLAMP_REASONS = new Set(["none", "class_min", "fair_share", "budget"]);
 const TAINT_MAX = 4_096;
 const MUTES_MAX = 64;
 const CURSOR = /^j:([a-z][a-z0-9-]{0,30}):([0-9a-f]{16}):(\d{1,15})$/;
@@ -240,6 +246,8 @@ export class Binding {
       this.timer = null;
     }
     this.link.stop();
+    // A reconcile or sing in flight finishes while the lease is still held; nothing of this binding writes after.
+    await this.outbox?.close();
     this.journal.close();
     this.saveState();
     await this.lease.release();
@@ -269,7 +277,9 @@ export class Binding {
     try {
       await this.outbox?.reconcile();
     } catch (e) {
-      this.log(`canticle: outbox reconcile failed: ${(e as Error).message}`);
+      if (!(e instanceof OutboxClosed)) {
+        this.log(`canticle: outbox reconcile failed: ${(e as Error).message}`);
+      }
     }
   }
 
@@ -288,6 +298,7 @@ export class Binding {
         mutes: [],
         checkpoints: {},
         taint: {},
+        taint_overflow: null,
         carried_keys: {},
         journal_head: 0,
       };
@@ -303,6 +314,7 @@ export class Binding {
     }
     const st = raw as unknown as StateFile;
     st.journal_head = typeof st.journal_head === "number" ? st.journal_head : 0;
+    st.taint_overflow = typeof st.taint_overflow === "number" ? st.taint_overflow : null;
     return st;
   }
 
@@ -406,11 +418,14 @@ export class Binding {
 
   /** Whether this session may read heard text: the binding's configuration lists such sessions in listen.payloadSessions. */
   mayReadText(c: Caller): boolean {
-    return sessionMatches(this.cfg.listen.payloadSessions, c.sessionKey);
+    return !c.anonymous && sessionMatches(this.cfg.listen.payloadSessions, c.sessionKey);
   }
 
+  /** Whether this session has read heard text. Once the taint table has overflowed, a forgotten mark cannot be told
+   * from no mark, so every session that may read heard text counts as tainted (§14.12: taint lasts until reset). */
   isTainted(c: Caller): boolean {
-    return this.state !== null && this.taintKeyOf(c) in this.state.taint;
+    const st = this.state;
+    return st !== null && (this.taintKeyOf(c) in st.taint || (st.taint_overflow !== null && this.mayReadText(c)));
   }
 
   // ------------------------------------------------------------------ tools
@@ -428,6 +443,13 @@ export class Binding {
     }
     if (view !== "items" && view !== "digest") {
       return this.refuse("canticle_listen", "bad_param", "view is items or digest");
+    }
+    if (c.anonymous && (what === "new" || view === "items")) {
+      return this.refuse(
+        "canticle_listen",
+        "no_session",
+        "this call names no session, and a new read's checkpoint and heard text's taint (§14.12) belong to one; read what journal or on_air as digests",
+      );
     }
     if (view === "items" && !this.mayReadText(c)) {
       return this.refuse(
@@ -505,7 +527,9 @@ export class Binding {
       }
     }
     if (what === "new") {
-      st.checkpoints[this.sessionKeyOf(c)] = { seq: last, at: now };
+      // A new read from an older cursor reads that span again; the checkpoint itself never moves back.
+      const key = this.sessionKeyOf(c);
+      st.checkpoints[key] = { seq: Math.max(st.checkpoints[key]?.seq ?? 0, last), at: now };
       trimOldest(st.checkpoints, CHECKPOINTS_MAX);
     }
     if (payloadShown > 0) {
@@ -652,7 +676,9 @@ export class Binding {
   private markTainted(c: Caller, now: number): void {
     const st = this.state as StateFile;
     st.taint[this.taintKeyOf(c)] = { at: now };
-    trimOldest(st.taint, TAINT_MAX);
+    if (trimOldest(st.taint, TAINT_MAX)) {
+      st.taint_overflow ??= now;
+    }
   }
 
   status(c: Caller): Result {
@@ -709,12 +735,12 @@ export class Binding {
         counts: this.journal.counts,
       },
       mutes,
-      session: { tainted: this.isTainted(c), may_read_text: this.mayReadText(c) },
+      session: { anonymous: c.anonymous, tainted: this.isTainted(c), may_read_text: this.mayReadText(c) },
       publish:
         out === null
           ? { enabled: false }
           : {
-              enabled: !c.subagent,
+              enabled: !c.subagent && !c.anonymous,
               station: this.cfg.station?.name,
               key_id: this.cfg.station?.keyId,
               rows: out.summary(now),
@@ -731,7 +757,9 @@ export class Binding {
       `presence: ${presence.length === 0 ? "none known" : presence.map((x) => `${x.station ?? x.key_id}: ${presenceText(x.state, x.last_beacon_at)}`).join("; ")}`,
       `journal: ${this.journal.size.entries} entries (seq ${this.journal.oldest}..${this.journal.head}); ${waiting} heard entr${waiting === 1 ? "y" : "ies"} new for this session`,
       `mutes: ${daemonMute ? "daemon MUTE active; " : ""}${mutes.length === 0 ? "none" : mutes.map((m) => `${m.id} ${m.station ?? "*"}:${m.stream ?? "*"}${m.until !== null ? ` until ${iso(m.until)}` : ""}`).join(", ")}`,
-      `this session: ${this.isTainted(c) ? "tainted (has read heard text; cannot sing until reset)" : "not tainted"}; ${this.mayReadText(c) ? "may read heard text (view items)" : "reads digests only (not in listen.payloadSessions)"}`,
+      c.anonymous
+        ? "this call names no session: status, mutes, and digests of the journal and on air only"
+        : `this session: ${this.isTainted(c) ? "tainted (has read heard text; cannot sing until reset)" : "not tainted"}; ${this.mayReadText(c) ? "may read heard text (view items)" : "reads digests only (not in listen.payloadSessions)"}`,
       out === null
         ? "publish: disabled"
         : `publish: ${Object.entries(out.summary(now)).map(([k, v]) => `${k}=${v}`).join(", ") || "no rows"}`,
@@ -806,6 +834,9 @@ export class Binding {
     if (c.subagent) {
       return this.refuse("canticle_sing", "subagent", "sub-agents may not publish (§15.5)");
     }
+    if (c.anonymous) {
+      return this.refuse("canticle_sing", "no_session", "a call that names no session may not publish: taint and rate limits are per session");
+    }
     if (this.isTainted(c)) {
       return this.refuse(
         "canticle_sing",
@@ -830,16 +861,24 @@ export class Binding {
     if (p.ttlSeconds !== undefined && typeof p.ttlSeconds !== "number") {
       return this.refuse("canticle_sing", "bad_param", "ttlSeconds is a number");
     }
-    const o = await out.sing({
-      session: c.sessionKey,
-      stream: p.stream as string,
-      text: p.payload as string,
-      class: (p.class as string | undefined) ?? null,
-      state_key: (p.stateKey as string | undefined) ?? null,
-      purpose: (p.purpose as string | undefined) ?? null,
-      ttl_s: (p.ttlSeconds as number | undefined) ?? null,
-      key: (p.idempotencyKey as string | undefined) ?? null,
-    });
+    let o: SingOutcome;
+    try {
+      o = await out.sing({
+        session: c.sessionKey,
+        stream: p.stream as string,
+        text: p.payload as string,
+        class: (p.class as string | undefined) ?? null,
+        state_key: (p.stateKey as string | undefined) ?? null,
+        purpose: (p.purpose as string | undefined) ?? null,
+        ttl_s: (p.ttlSeconds as number | undefined) ?? null,
+        key: (p.idempotencyKey as string | undefined) ?? null,
+      });
+    } catch (e) {
+      if (e instanceof OutboxClosed) {
+        return this.refuse("canticle_sing", "not_running", "the canticle service stopped before this call reached the station");
+      }
+      throw e;
+    }
     const now = this.clock();
     // The daemon can hear the item before the station's reply arrives (or when the reply is lost): offer what the
     // view already holds from this station, so the row is confirmed or settled by that evidence.
@@ -878,7 +917,10 @@ export class Binding {
       result.effective = {
         ttlMs: Math.round(rc.ttl_s * 1000),
         loopMs: rc.loop_ms,
-        clampReason: row.ttl_s !== null && row.ttl_s > rc.ttl_s ? "stream_max" : (rc.clamp ?? "none"),
+        clampReason: row.ttl_s !== null && row.ttl_s > rc.ttl_s ? "stream_max" : CLAMP_REASONS.has(rc.clamp ?? "") ? rc.clamp : "none",
+        // The prototype station's own `degraded` clamp: the item cannot get the repeats its life needs, so a
+        // sheddable class goes out as a first copy and a burst only. §15.1 has no clamp reason for it.
+        ...(rc.clamp === "degraded" ? { degraded: true } : {}),
         scope: "lan",
         class: row.class ?? "stream default",
         hop: 0,
@@ -907,10 +949,21 @@ export class Binding {
     if (c.subagent) {
       return this.refuse("canticle_hush", "subagent", "sub-agents may not publish (§15.5)");
     }
+    if (c.anonymous) {
+      return this.refuse("canticle_hush", "no_session", "a call that names no session may not publish");
+    }
     if (typeof p.item !== "string") {
       return this.refuse("canticle_hush", "bad_param", "item is an outbox row id (out:BINDING:N)");
     }
-    const o = await out.hush(p.item, c.sessionKey);
+    let o: HushOutcome;
+    try {
+      o = await out.hush(p.item, c.sessionKey);
+    } catch (e) {
+      if (e instanceof OutboxClosed) {
+        return this.refuse("canticle_hush", "not_running", "the canticle service stopped before this call reached the station");
+      }
+      throw e;
+    }
     if (o.status === "refused") {
       return this.refuse("canticle_hush", o.reason ?? "refused", o.reason === "not_this_binding" ? "the row belongs to another binding" : "not an outbox row id");
     }
@@ -1003,13 +1056,15 @@ function entrySummary(e: Entry): Obj {
   }
 }
 
-function trimOldest(m: Record<string, { at: number }>, max: number): void {
+/** Drop the oldest entries past ``max``; true when any was dropped. */
+function trimOldest(m: Record<string, { at: number }>, max: number): boolean {
   const keys = Object.keys(m);
   if (keys.length <= max) {
-    return;
+    return false;
   }
   keys.sort((a, b) => (m[a]?.at ?? 0) - (m[b]?.at ?? 0));
   for (const k of keys.slice(0, keys.length - max)) {
     delete m[k];
   }
+  return true;
 }

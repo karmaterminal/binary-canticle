@@ -94,7 +94,7 @@ afterEach(async () => {
 
 test("cross-binding read, cursor advance, mute and publish are refused, and change neither binding", async () => {
   daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "chatter", seq: 1, issued_at: clock.t, text: "for both" });
-  const scribeSession = { sessionKey: "agent:scribe:main", sessionId: "x-1", subagent: false };
+  const scribeSession = { sessionKey: "agent:scribe:main", sessionId: "x-1", subagent: false, anonymous: false };
   const runeRow = (await a.sing(SESSION, { stream: "chatter", payload: "from rune" })).details.result as Obj;
   const scribeRow = (await b.sing(scribeSession, { stream: "chatter", payload: "from scribe" })).details.result as Obj;
   assert.equal(runeRow.item, "out:rune:1");
@@ -132,7 +132,7 @@ test("cross-binding read, cursor advance, mute and publish are refused, and chan
 });
 
 test("each binding restarts on its own: the other keeps its connection, its journal and its cursors", async () => {
-  const scribeSession = { sessionKey: "agent:scribe:main", sessionId: "x-1", subagent: false };
+  const scribeSession = { sessionKey: "agent:scribe:main", sessionId: "x-1", subagent: false, anonymous: false };
   daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "chatter", seq: 1, issued_at: clock.t });
   await waitFor(() => a.receiver.onAir(clock.t).length === 1 && b.receiver.onAir(clock.t).length === 1, "both to hear it");
   const bConnections = b.receiver.counts.connections;

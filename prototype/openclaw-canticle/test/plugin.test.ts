@@ -82,7 +82,7 @@ test("registers six optional tools and one service, matching the manifest and th
   assert.equal(pkg.private, true); // never published (AGENTS.md: publication is a separate, human-decided gate)
 });
 
-test("publish tools are offered only when publishing is enabled, and never to a sub-agent", () => {
+test("publish tools are offered only when publishing is enabled, never to a sub-agent or a call that names no session", () => {
   const readOnly = load({ binding: "rune", daemon: { socket: daemon.path } });
   for (const name of READ_TOOLS) {
     assert.ok(readOnly.tools.get(name)?.factory({ sessionKey: "agent:main:main" }));
@@ -104,6 +104,16 @@ test("publish tools are offered only when publishing is enabled, and never to a 
   }
   // A sub-agent still reads: what it reads taints it, and it can never sing anyway.
   assert.ok(publishing.tools.get("canticle_listen")?.factory({ sessionKey: "agent:main:subagent:task-1" }));
+  // A call that names no session gets the read tools (digests only) and no publish tool.
+  for (const ctx of [{}, { sessionKey: "" }, { sessionId: "s-1" }]) {
+    for (const name of PUBLISH_TOOLS) {
+      assert.equal(publishing.tools.get(name)?.factory(ctx), null, `${name} for ${JSON.stringify(ctx)}`);
+    }
+    for (const name of READ_TOOLS) {
+      assert.ok(publishing.tools.get(name)?.factory(ctx), `${name} for ${JSON.stringify(ctx)}`);
+    }
+  }
+  assert.ok(publishing.tools.get("canticle_sing")?.factory({ agentId: "main" })); // an agent id names its session
 });
 
 test("only canticle_listen returns network content, and every schema refuses unknown parameters", () => {

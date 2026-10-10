@@ -6,9 +6,10 @@ import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
-import type { Binding } from "../src/binding.ts";
+import { type Binding, BindingStartError } from "../src/binding.ts";
 import type { Obj } from "../src/records.ts";
 import { stationClient } from "../src/station.ts";
+import { callerOf } from "../src/tools.ts";
 import {
   Clock,
   FakeDaemon,
@@ -20,6 +21,7 @@ import {
   configFor,
   makeBinding,
   removeDir,
+  sleep,
   tempDir,
   waitFor,
 } from "./helpers.ts";
@@ -133,6 +135,33 @@ test("withdraw before emission is confirmed: a lost reply leaves the row unknown
   assert.equal(station.ops("sing").length, 1); // never re-sent
 });
 
+test("evidence settles an unknown row only with a frame issued while it was being sent, never an earlier item with the same text", async () => {
+  // The same words, sung earlier by hand (the station's own CLI): on air, and heard by this binding as its own.
+  const hand = await stationClient(station.path)({ op: "sing", stream: "chatter", text: "same words", scope: "lan" });
+  assert.equal(hand.kind, "reply");
+  await waitFor(() => [...b.receiver.items.values()].some((i) => i.frame.key_id === KEY_RUNE), "the hand-sung item");
+  clock.advance(10_000); // past the send window (5 s timeout, 2 s slack)
+  station.faults.push({ op: "sing", fault: "drop_before" }); // the station never gets this one, and no reply comes
+  const s = result(await b.sing(SESSION, { stream: "chatter", payload: "same words" }));
+  assert.equal(s.status, "unknown");
+  await b.tick();
+  const row = b.outbox?.get(s.item as string);
+  assert.equal(row?.state, "unknown");
+  assert.equal(row?.receipt, null);
+  assert.equal(b.outbox?.counts.evidence, 0);
+});
+
+test("a receipt's clamp: a §15.1 reason passes through, and the station's own degraded clamp is flagged, never named a reason", async () => {
+  station.singClamp = "fair_share";
+  const shared = result(await b.sing(SESSION, { stream: "chatter", payload: "shared loop" }));
+  assert.equal((shared.effective as Obj).clampReason, "fair_share");
+  assert.equal("degraded" in (shared.effective as Obj), false);
+  station.singClamp = "degraded";
+  const degraded = result(await b.sing(SESSION, { stream: "chatter", payload: "too little room" }));
+  assert.equal((degraded.effective as Obj).clampReason, "none");
+  assert.equal((degraded.effective as Obj).degraded, true);
+});
+
 test("write-ahead: the row is on disk, marked attempted, before the station acts on it", async () => {
   let seen: Obj | null = null;
   const forward = station.onSing;
@@ -174,6 +203,46 @@ test("withdraw after expiry reports expired and asks the station nothing", async
   clock.advance(6_000);
   const h = result(await b.hush(SESSION, { item }));
   assert.equal(h.status, "expired");
+  assert.equal(station.ops("hush").length, 0);
+});
+
+test("a withdrawal that never reached the station is never reported as a pluck", async () => {
+  const { item } = result(await b.sing(SESSION, { stream: "chatter", payload: "evicted before the pluck" })) as { item: string };
+  station.faults.push({ op: "status", fault: "drop_before" }); // the station cannot be asked
+  const h = result(await b.hush(SESSION, { item }));
+  assert.equal(h.status, "pending");
+  assert.equal(b.outbox?.get(item)?.withdraw?.attempts, 0);
+  station.streams.get("chatter")?.ring.clear(); // the item leaves the station for its own reasons, unheard
+  await b.tick();
+  const row = b.outbox?.get(item);
+  assert.equal(row?.state, "stopped");
+  assert.equal(row?.ended?.reason, "evicted");
+  assert.equal(row?.withdraw?.outcome, "gone_before_pluck");
+  assert.equal(result(await b.hush(SESSION, { item })).status, "not_found");
+  assert.equal(station.ops("hush").length, 0);
+  // A pluck that was sent, whose reply was lost, is what makes a vanished item withdrawn.
+  const { item: second } = result(await b.sing(SESSION, { stream: "chatter", payload: "plucked, reply lost" })) as { item: string };
+  station.onHush = null; // and the daemon's retract never arrives
+  station.faults.push({ op: "hush", fault: "drop_after" });
+  assert.equal(result(await b.hush(SESSION, { item: second })).status, "pending");
+  assert.equal(b.outbox?.get(second)?.withdraw?.attempts, 1);
+  await b.tick();
+  assert.equal(b.outbox?.get(second)?.state, "withdrawn");
+  assert.equal(b.outbox?.get(second)?.ended?.reason, "gone_after_pluck");
+});
+
+test("a hush of an unknown row that has lapsed answers expired and records nothing", async () => {
+  station.faults.push({ op: "sing", fault: "drop_before" }); // no reply, and nothing sung
+  const s = result(await b.sing(SESSION, { stream: "chatter", payload: "never confirmed" }));
+  assert.equal(s.status, "unknown");
+  const item = s.item as string;
+  clock.advance(120_000);
+  await b.tick();
+  assert.equal(b.outbox?.get(item)?.ended?.reason, "lapsed_unconfirmed");
+  const h = result(await b.hush(SESSION, { item }));
+  assert.equal(h.status, "expired");
+  assert.equal(h.reason, "lapsed_unconfirmed");
+  assert.equal(b.outbox?.get(item)?.withdraw, null);
   assert.equal(station.ops("hush").length, 0);
 });
 
@@ -252,14 +321,51 @@ test("a row that was mid-send when the process died comes back unknown, and one 
   assert.equal(station.ops("sing").length, 0);
 });
 
-test("refusals before anything is sent: taint, sub-agents, credentials, size, rate", async () => {
+test("stop waits for a reconcile in flight, refuses what comes after, and never writes over the next binding's rows", async () => {
+  assert.equal(result(await b.sing(SESSION, { stream: "chatter", payload: "first" })).status, "on-air");
+  station.faults.push({ op: "status", fault: "hold" });
+  const ticking = b.tick(); // the reconcile asks the station's status, and waits for it
+  await waitFor(() => station.holding === 1, "the held status request");
+  let stopped = false;
+  const stopping = b.stop().then(() => {
+    stopped = true;
+  });
+  const late = b.sing(SESSION, { stream: "chatter", payload: "too late" }); // queued behind the reconcile
+  await sleep(50);
+  assert.equal(stopped, false); // the stop waits for the reconcile, and holds the lease meanwhile
+  const next = makeBinding(configFor("rune", dir, daemon, { ...PUBLISH, publish: { enabled: true, socket: station.path } }), clock);
+  await assert.rejects(next.start(), (e: unknown) => e instanceof BindingStartError && e.reason === "state_locked");
+  station.release();
+  await ticking;
+  await stopping;
+  const refused = await late;
+  assert.equal(refused.details.refused, "not_running");
+  assert.match(refused.text, /Nothing changed\./);
+  const stale = b.outbox;
+  const first = stale?.get("out:rune:1");
+  assert.ok(stale && first?.receipt);
+  b = await up(); // the next binding on the same root
+  assert.equal(result(await b.sing(SESSION, { stream: "chatter", payload: "second" })).item, "out:rune:2");
+  // An event that still reaches the stopped binding's outbox is not written over the next binding's rows.
+  const target = { key_id: KEY_RUNE, epoch: first.receipt.epoch, stream_id: first.stream_id, seq: first.receipt.seq };
+  stale.retracted({ idem: first.idem as string, reason: "plucked", target, by: null }, clock.t);
+  await sleep(50);
+  const disk = JSON.parse(readFileSync(join(dir, "state-rune", "outbox.json"), "utf8")) as { next_id: number; rows: { id: string }[] };
+  assert.deepEqual(disk.rows.map((r) => r.id), ["out:rune:1", "out:rune:2"]);
+  assert.equal(disk.next_id, 3);
+  assert.equal(station.ops("sing").length, 2); // "too late" never reached the station
+});
+
+test("refusals before anything is sent: taint, sub-agents, no session, credentials, size, rate", async () => {
   daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "chatter", seq: 1, issued_at: clock.t, text: "hello" });
   await waitFor(() => b.listen(SESSION, { what: "journal", view: "items" }).text.includes("hello"), "the heard item");
   const tainted = await b.sing(SESSION, { stream: "chatter", payload: "after hearing" });
   assert.equal(tainted.details.refused, "tainted");
-  const other = { sessionKey: "agent:main:fresh", sessionId: "s-9", subagent: false };
+  const other = { sessionKey: "agent:main:fresh", sessionId: "s-9", subagent: false, anonymous: false };
   const sub = await b.sing({ ...other, subagent: true }, { stream: "chatter", payload: "x" });
   assert.equal(sub.details.refused, "subagent");
+  assert.equal((await b.sing(callerOf({}), { stream: "chatter", payload: "x" })).details.refused, "no_session");
+  assert.equal((await b.hush(callerOf({}), { item: "out:rune:1" })).details.refused, "no_session");
   const byRef = await b.sing(other, { stream: "chatter", payload: { ref: { url: "https://example.invalid/x", sha256: "0".repeat(64), size: 1 } } });
   assert.equal(byRef.details.refused, "bad_param");
   assert.match(byRef.text, /payload is text; a body by reference is not supported here/);

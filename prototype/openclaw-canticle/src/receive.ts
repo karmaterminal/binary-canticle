@@ -565,15 +565,17 @@ export class Receiver {
     const c = this.conn;
     const reasons: string[] = [];
     let health: ReceiveStatus["health"];
-    if (this.connection !== "connected" || c === null || c.phase !== "live" || c.snapshot === "pending") {
+    if (this.versionFailed) {
+      // The daemon speaks a record version this binding does not read: failed until a later join reads v1, whether
+      // or not the connection it ended is back (§14.18.3, *Fail-closed rules*).
+      health = "failed";
+      reasons.push("record_version");
+    } else if (this.connection !== "connected" || c === null || c.phase !== "live" || c.snapshot === "pending") {
       health = "unknown";
       reasons.push(this.connection === "connected" ? "joining" : this.connection);
       if (this.lastFailure !== null && this.connection !== "connected") {
         reasons.push(this.lastFailure);
       }
-    } else if (this.versionFailed) {
-      health = "failed";
-      reasons.push("record_version");
     } else {
       if (c.recordsLost > 0) {
         reasons.push("records_lost");

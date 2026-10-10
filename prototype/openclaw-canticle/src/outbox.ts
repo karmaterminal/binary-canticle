@@ -102,6 +102,9 @@ const STOP_BEFORE_EXPIRY_MS = 100; // the station refuses to pluck closer to exp
 const KEY = /^[A-Za-z0-9._:-]{1,64}$/;
 const STATE_KEY = /^[A-Za-z0-9._:/-]{1,64}$/;
 
+/** An operation reached the outbox after its binding began to stop. Nothing was sent. */
+export class OutboxClosed extends Error {}
+
 export class Outbox {
   private readonly path: string;
   private readonly cfg: OutboxConfig;
@@ -110,6 +113,8 @@ export class Outbox {
   private rowsById = new Map<string, Row>();
   private nextId = 1;
   private chain: Promise<unknown> = Promise.resolve();
+  private closing = false;
+  private closed = false;
   /** What the last status call said about the station (null before any). */
   lastStation: { at: number; ok: boolean; detail: string; epoch: number | null } | null = null;
   readonly counts = { refused: 0, duplicates: 0, rate_limited: 0, evidence: 0, retracts: 0 };
@@ -148,14 +153,33 @@ export class Outbox {
   }
 
   private save(): void {
+    if (this.closed) {
+      return;
+    }
     writeJsonAtomic(this.path, { v: FILE_V, binding: this.cfg.binding, next_id: this.nextId, rows: [...this.rowsById.values()] });
   }
 
-  /** One operation at a time: rows, saves and station requests never interleave. */
+  /** One operation at a time: rows, saves and station requests never interleave. Once the outbox is closing, an
+   * operation that comes up is refused before it can reach the station. */
   private exclusive<T>(fn: () => Promise<T>): Promise<T> {
-    const run = this.chain.then(fn, fn);
+    const go = (): Promise<T> => (this.closing ? Promise.reject(new OutboxClosed("the binding is stopping")) : fn());
+    const run = this.chain.then(go, go);
     this.chain = run.catch(() => undefined);
     return run;
+  }
+
+  /** Let the operation in flight finish and save, refuse the rest, then write nothing more. The binding calls this
+   * before it releases its lease, so a binding that starts on the same root never has its rows overwritten by a
+   * reconcile or a station reply that outlived the stop. */
+  async close(): Promise<void> {
+    this.closing = true;
+    for (let c = this.chain; ; c = this.chain) {
+      await c;
+      if (c === this.chain) {
+        break;
+      }
+    }
+    this.closed = true;
   }
 
   rows(): Row[] {
@@ -409,7 +433,7 @@ export class Outbox {
     }
     const now = this.clock();
     if (row.ended !== null) {
-      return { status: hushStatusOf(row), row };
+      return { status: hushStatusOf(row), reason: row.ended.reason, row };
     }
     row.withdraw ??= { requested_at: now, by, attempts: 0, outcome: null };
     if (row.state === "unknown") {
@@ -499,7 +523,14 @@ export class Outbox {
             if (rc.epoch !== v.epoch) {
               this.end(r, "stopped", "station_restarted", at); // the station's ring is not persisted
             } else if (!(v.onAir.get(r.stream)?.has(rc.seq) ?? false)) {
-              this.end(r, r.withdraw !== null ? "withdrawn" : "stopped", r.withdraw !== null ? "gone_after_pluck" : "evicted", at);
+              // Gone from the station. Only a pluck this binding sent (its reply lost) makes that a withdrawal; a
+              // withdrawal still waiting to be sent did not, so the station evicted or superseded it, or someone
+              // else hushed it.
+              const sent = r.withdraw !== null && r.withdraw.attempts > 0;
+              if (r.withdraw !== null && !sent) {
+                r.withdraw.outcome = "gone_before_pluck";
+              }
+              this.end(r, sent ? "withdrawn" : "stopped", sent ? "gone_after_pluck" : "evicted", at);
             } else if (r.withdraw !== null) {
               await this.pluck(r, at);
             }
@@ -639,7 +670,8 @@ function hushStatusOf(row: Row): HushOutcome["status"] {
     case "on_air":
       return "pending";
     case "unknown":
-      return "unknown";
+      // A lapsed unknown row could no longer be on air: if it ever was, it has expired.
+      return row.ended !== null ? "expired" : "unknown";
     default:
       return "not_found";
   }
