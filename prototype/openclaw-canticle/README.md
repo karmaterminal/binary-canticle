@@ -114,8 +114,8 @@ never to a call that names no session.
 - **The banner is the host's.** A station's declared `purpose` is any text it signed, up to 128 bytes (§9), so
   the banner shows it as one JSON string, with controls, line separators and bidirectional overrides escaped: a
   purpose cannot add a line of its own above the wrapper or end its quotes early. The station and principal
-  names from the manifest are quoted the same way. (`canticle tap` prints the purpose between plain quotes;
-  that is a follow-up for `tap.py`, not this plugin.)
+  names from the manifest are quoted the same way. (`canticle tap` prints the purpose between plain quotes:
+  #102.)
 - **Bounded.** At most `limit` entries and 12 KB of rendered text per call; past either, `truncated` is true and
   `next` pages on.
 - **Gaps are entries, not silence.** `[canticle:gap]` lines mark a lost connection, `records_lost`, a rejoin, a
