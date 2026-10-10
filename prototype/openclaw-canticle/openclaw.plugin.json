@@ -1,0 +1,83 @@
+{
+  "id": "canticle",
+  "name": "Canticle",
+  "description": "Hear the canticle through the host daemon, keep a bounded heard journal, and sing through this prince's own station.",
+  "activation": { "onStartup": true },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["binding", "daemon"],
+    "properties": {
+      "binding": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,30}$" },
+      "daemon": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["socket"],
+        "properties": {
+          "socket": { "type": "string", "minLength": 1 },
+          "uid": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "stateDir": { "type": "string", "minLength": 1 },
+      "station": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "keyId"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,30}$" },
+          "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" }
+        }
+      },
+      "listen": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tune": { "type": "array", "maxItems": 64, "items": { "type": "string", "maxLength": 100 } },
+          "includeSelf": { "type": "boolean" },
+          "payloadSessions": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 201 } }
+        }
+      },
+      "journal": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxEntries": { "type": "integer", "minimum": 100, "maximum": 100000 },
+          "maxBytes": { "type": "integer", "minimum": 65536, "maximum": 268435456 },
+          "maxAgeHours": { "type": "integer", "minimum": 1, "maximum": 720 }
+        }
+      },
+      "publish": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "socket": { "type": "string", "minLength": 1 },
+          "uid": { "type": "integer", "minimum": 0 },
+          "classes": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["chatter", "ambient", "live-state", "advisory", "finding-ref", "root"] }
+          },
+          "perMinute": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "perHour": { "type": "integer", "minimum": 1, "maximum": 60 },
+          "maxLive": { "type": "integer", "minimum": 1, "maximum": 64 }
+        }
+      },
+      "delivery": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": { "mode": { "type": "string", "enum": ["explicit"] } }
+      }
+    }
+  },
+  "contracts": {
+    "tools": ["canticle_listen", "canticle_status", "canticle_mute", "canticle_sing", "canticle_hush", "canticle_outbox"]
+  },
+  "toolMetadata": {
+    "canticle_listen": { "optional": true },
+    "canticle_status": { "optional": true },
+    "canticle_mute": { "optional": true },
+    "canticle_sing": { "optional": true },
+    "canticle_hush": { "optional": true },
+    "canticle_outbox": { "optional": true }
+  }
+}

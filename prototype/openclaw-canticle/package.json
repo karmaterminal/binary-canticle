@@ -1,0 +1,14 @@
+{
+  "name": "openclaw-canticle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Spike: an OpenClaw plugin binding a prince to the canticle host daemon (binary-canticle#97). Not published.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "openclaw": { "extensions": ["./index.ts"] },
+  "scripts": {
+    "test": "node --test 'test/*.test.ts'",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}
