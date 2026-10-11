@@ -95,6 +95,29 @@ class TapViewTest(unittest.TestCase):
         self.assertEqual(summary_json(v, 0)["receive"]["reasons"], ["records_lost"])
         self.assertIn("[canticle:records-lost] 2 record(s) missing", render_change(*changes[0], 0))
         self.assertEqual(json_change(*changes[0])["receive"], {"health": "degraded", "reasons": ["records_lost"]})
+        # bc#107: what was heard before the gap is carried, and no output lists it as live.
+        self.assertEqual([r["idem"] for r in v.live(0)], ["b"])
+        self.assertEqual([r["idem"] for r in v.carried(0)], ["a"])
+        self.assertEqual([r["idem"] for r in summary_json(v, 0)["items"]], ["b"])
+        self.assertEqual([r["idem"] for r in summary_json(v, 0)["carried"]], ["a"])
+        self.assertIn("\n1 carried item: heard before a gap, not known to be live\n1 live item:\n", text)
+        self.assertEqual(text.count("[canticle:heard]"), 1)
+        self.assertIn("what was heard before is carried, not known to be live", render_change(*changes[0], 0))
+
+    def test_presence_held_before_a_gap_reads_unknown_until_a_presence_record(self):
+        """bc#107: presence records are droppable (§14.18.2), so a gap can hide a presence change. Text and JSON read
+        the presence held before it as unknown until a presence record after the gap."""
+        v = TapView()
+        bootstrap(v)
+        v.apply(rec("snapshot_end", 3, watermark=3, count=0, truncated=False, omitted=0))
+        cael = {"station": {"name": "cael", "principal": None}, "key_id": "00" * 8, "last_beacon_at": None}
+        v.apply(rec("presence", 4, state="EQUIPPED_QUIET", **cael))
+        v.apply(rec("health", 7, state="ok", reasons=[]))   # 5 and 6 never arrived
+        self.assertIn("\non air: cael=unknown\n", summary(v, 0))
+        self.assertEqual([p["state"] for p in summary_json(v, 0)["presence"]], ["unknown"])
+        v.apply(rec("presence", 8, state="EQUIPPED_QUIET", **cael))
+        self.assertIn("\non air: cael=EQUIPPED_QUIET\n", summary(v, 0))
+        self.assertEqual([p["state"] for p in summary_json(v, 0)["presence"]], ["EQUIPPED_QUIET"])
 
     def test_without_a_snapshot_only_the_first_live_skip_is_exempt(self):
         v = TapView()
@@ -184,7 +207,45 @@ class RenderTest(unittest.TestCase):
         self.assertIs(json_item(r, raw=True), r)
 
     def test_defang(self):
-        self.assertEqual(defang("[CANTICLE:x] <<<a>>>"), "[canticle-quoted x] ‹‹‹a›››")
+        self.assertEqual(defang("[CANTICLE:x] <<<a>>>"), "[canticle-quoted x] &lt;&lt;&lt;a&gt;&gt;&gt;")
+
+
+class SharedFixtureTest(unittest.TestCase):
+    """The fixtures in tests/fixtures also drive the OpenClaw plugin's tests (prototype/openclaw-canticle/test), so tap
+    and the plugin cannot drift apart."""
+
+    @staticmethod
+    def fixture(name):
+        with open(os.path.join(os.path.dirname(__file__), "fixtures", name), encoding="utf-8") as f:
+            return json.load(f)
+
+    def test_defang_cases(self):
+        """bc#106: look-alike, fullwidth and zero-width forms of the wrapper markers and the banner prefix."""
+        fx = self.fixture("defang.json")
+        self.assertEqual(len(fx["cases"]), 57)
+        for case in fx["cases"]:
+            self.assertEqual(defang(case["in"]), case["out"], case["why"])
+            if case["in"]:
+                shown = render_item(fields(frame("a", 3, text=case["in"])), 0, wrapper_id="w1")
+                self.assertEqual(shown.count("<<<"), 2, case["why"])   # the wrapper's own two markers, and no others
+                self.assertIn(f"\n---\n{case['out']}\n<<<END_EXTERNAL_UNTRUSTED_CONTENT", shown, case["why"])
+
+    def test_view_after_gap(self):
+        """bc#107: after a live rec_seq gap, what the view held is carried until a record after the gap confirms it."""
+        fx = self.fixture("view-after-gap.json")
+        label = {idem: name for name, idem in fx["items"].items()}
+        v, checked = TapView(), 0
+        for step in fx["steps"]:
+            if "record" in step:
+                v.apply(step["record"])
+                continue
+            got = {"on_air": [label[r["idem"]] for r in v.live(fx["now"])],
+                   "carried": [label[r["idem"]] for r in v.carried(fx["now"])],
+                   "presence": {p["station"]["name"] or p["key_id"]: v.presence_state(p) for p in v.presence.values()},
+                   "records_lost": v.records_lost}
+            self.assertEqual(got, step["expect"], step["why"])
+            checked += 1
+        self.assertEqual(checked, 7)
 
 
 class TapDaemonTest(SnapshotCase):
