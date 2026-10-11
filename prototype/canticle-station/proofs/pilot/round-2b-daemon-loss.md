@@ -146,12 +146,14 @@ address `ADDR:9999`, with `pid=PID0`. The hello line's `"run"` is R0, and its `"
 `receiveHealth: "ok"`, `reasons: []`, `joinSnapshot: "complete"`, and `run` equal to R0 (`ear_status.canticle.run`
 is the whole run id; the journal's hello has the same). Write down `lastFailure` and `counts` as they are.
 
-**P4, the tap (observer B).** Start a follow tap in the background. It writes to a file, runs until the daemon
-goes away, and then appends its exit status. The command returns at once.
+**P4, the tap (observer B).** Start a follow tap in the background. It writes its output to a file and its pid
+to the same name plus `.pid`, runs until the daemon goes away, and then appends its exit status to the file. The
+command returns at once.
 
 ```sh
-mkdir -p ~/canticle-2b && setsid -f sh -c '~/.venvs/canticle/bin/canticle tap --follow --tune "$0" >"$1" 2>&1
-  echo "exit=$?" >>"$1"' frond-scribe:chatter ~/canticle-2b/tap-a1.txt     # ronan: frond-gloss:chatter
+mkdir -p ~/canticle-2b && setsid -f sh -c '~/.venvs/canticle/bin/canticle tap --follow --tune "$0" >"$1" 2>&1 &
+  echo $! >"$1.pid"; wait $!; echo "exit=$?" >>"$1"' \
+  frond-scribe:chatter ~/canticle-2b/tap-a1.txt     # ronan: frond-gloss:chatter
 ```
 
 Read it with `cat ~/canticle-2b/tap-a1.txt`. Expect `canticle tap: run=R0 (first 8) ... join snapshot complete`,
@@ -289,11 +291,11 @@ Each live item shows `expires_at` equal to the singer's `expires_at`, to the mil
 
 ```sh
 pid=$(systemctl --user show -p MainPID --value canticle-daemon)
-if [ "${pid:-0}" -gt 0 ]; then date -u '+%F %T UTC' && kill -9 "$pid"; else echo "MainPID=$pid: no daemon to kill"; fi
+case $pid in ''|*[!0-9]*|0) echo "MainPID=$pid: no daemon to kill" ;; *) date -u '+%F %T UTC' && kill -9 "$pid" ;; esac
 ```
 
 Post the time (T_KILL). Don't start it: systemd does, after `RestartSec` (5 s). `MainPID` is 0 when the unit has
-no running process, and `kill -9 0` would kill your own shell's process group, so the `if` kills only a real
+no running process, and `kill -9 0` would kill your own shell's process group, so the `case` kills only a real
 pid. If it prints `no daemon to kill`, nothing was killed: run P2 again.
 
 **B2, during the outage.** It lasts about 5 s, so these may be missed; B4's `lastFailure` and `counts` keep the
@@ -374,8 +376,17 @@ sudo nft list table inet canticle
 - **The daemon is down:** `systemctl --user start canticle-daemon` with the kit, or, on round 1's transient
   unit, its command line from [Before the day](#before-the-day). Then P2: one socket on `ADDR:9999`, a hello.
 - **The ear:** nothing to do. It reconnects by itself.
-- **The tap:** stop observer B's follow tap if it still runs (`pkill -f '[c]anticle tap --follow'`). After
-  posting, `rm -r ~/canticle-2b`.
+- **The tap:** if observer B's open tap still runs (its file has no `exit=` line), stop it by the pid P4
+  recorded. Never by a pattern (`pkill -f`): the host's seats share one uid, and a pattern can match another
+  seat's tap.
+
+  ```sh
+  f=~/canticle-2b/tap-a2.txt                              # the open one: tap-a1, tap-a2 or tap-b2
+  pid=$(cat "$f.pid")
+  if ! grep -q '^exit=' "$f" && ps -o args= -p "$pid" | grep -q 'canticle tap --follow'; then kill "$pid"; fi
+  ```
+
+  After posting, `rm -r ~/canticle-2b`.
 - **The singer:** if the stream's default TTL was raised for the run, set `CANTICLE_STATION_ARGS` back and
   restart the station.
 - The table stays. Never remove it under a running daemon.
