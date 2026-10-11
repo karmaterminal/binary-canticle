@@ -383,8 +383,8 @@ CANTICLE_INTEROP=require node --test 'test/*.test.ts'   # fail, rather than skip
 - Two fixtures in `prototype/canticle-station/tests/fixtures/` are written for both this plugin and
   `canticle tap`, so the two cannot drift: `defang.json` (#106), every look-alike of the wrapper markers and the
   banner prefix and what `defang` returns for each, and `view-after-gap.json` (#107), records across a live gap
-  and what the view holds after each. `render.test.ts` and `receive.test.ts` run them here; tap's tests do not
-  run them yet (tap is 🌿's).
+  and what the view holds after each. `render.test.ts` and `receive.test.ts` run them here, and
+  `prototype/canticle-station/tests/test_tap.py` runs them against `canticle tap`.
 - The tests were revert-checked: each of 116 source changes that undo one rule (the write-ahead save, the epoch
   check before a pluck, the send window for evidence, the payload gate, the banner's quoting, the name grammar,
   where a journaled item stands, the look-alike folds, an outbox row's expiry between reconciles, what a gap

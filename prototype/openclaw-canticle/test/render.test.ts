@@ -76,7 +76,7 @@ test("text that counterfeits nothing is returned as it is, and replacements keep
 });
 
 test("the shared defang fixture (bc#106): every case defangs as listed, and its rendered frame holds only the binding's two markers", () => {
-  // Written for canticle tap's defang too (prototype/canticle-station/canticle/tap.py), so the two cannot drift.
+  // The same cases drive canticle tap's defang (prototype/canticle-station/tests/test_tap.py).
   const path = join(import.meta.dirname, "..", "..", "canticle-station", "tests", "fixtures", "defang.json");
   const fx = JSON.parse(readFileSync(path, "utf8")) as { cases: { in: string; out: string; why: string }[] };
   assert.equal(fx.cases.length, 57);

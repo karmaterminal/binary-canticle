@@ -91,7 +91,7 @@ test("a rec_seq gap after the point of continuity reports records_lost; a regres
 });
 
 test("the shared gap fixture (bc#107): what was held before a live gap is carried until a record after it confirms it", () => {
-  // Written for canticle tap's TapView too (prototype/canticle-station/canticle/tap.py), so the two cannot drift.
+  // The same records and expectations drive canticle tap's TapView (prototype/canticle-station/tests/test_tap.py).
   type Step = { record: Obj } | { expect: Obj; why: string };
   const path = join(import.meta.dirname, "..", "..", "canticle-station", "tests", "fixtures", "view-after-gap.json");
   const fx = JSON.parse(readFileSync(path, "utf8")) as { now: number; items: Record<string, string>; steps: Step[] };
