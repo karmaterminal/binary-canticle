@@ -577,14 +577,17 @@ export class Binding {
   }
 
   /** Where a journaled item stands now: withdrawn or expired by what the journal holds, whichever page holds it;
-   * otherwise on air, carried or absent by the current view. Never on air without a current view that holds it. */
+   * otherwise on air, carried or absent by the current view. Never on air without a current view that holds it.
+   * A retract for expiry is the daemon's word that the item expired, even when it comes before the item's local
+   * expiry, as the receiver already takes it: the item expired at whichever came first (#108). */
   private airOf(e: HeardEntry, now: number): Air {
     const w = this.journal.withdrawal(e.frame.idem);
-    if (w !== null && !EXPIRY_REASONS.has(w.reason)) {
-      return { state: "withdrawn", reason: w.reason, at: w.at };
+    const expiry = e.frame.times.local_expiry_at;
+    if (w !== null) {
+      return EXPIRY_REASONS.has(w.reason) ? { state: "expired", at: Math.min(w.at, expiry) } : { state: "withdrawn", reason: w.reason, at: w.at };
     }
-    if (e.frame.times.local_expiry_at <= now) {
-      return { state: "expired", at: e.frame.times.local_expiry_at };
+    if (expiry <= now) {
+      return { state: "expired", at: expiry };
     }
     const item = this.receiver.items.get(e.frame.idem);
     if (item === undefined) {
@@ -1068,6 +1071,7 @@ function entrySummary(e: Entry, air: Air | null): Obj {
         expires_at: e.frame.times.local_expiry_at,
         air: air?.state ?? "not_in_view",
         ...(air?.state === "withdrawn" ? { withdrawn: { reason: air.reason, at: air.at } } : {}),
+        ...(air?.state === "expired" ? { expired_at: air.at } : {}),
         marks: heardMarks(e, air),
       };
     case "withdrawn":

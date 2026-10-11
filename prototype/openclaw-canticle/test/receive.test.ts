@@ -2,6 +2,8 @@
 // retracts, expiry, and the current view versus carried items.
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import { type Note, ProtocolError, Receiver } from "../src/receive.ts";
 import { type HeardFrame, type Obj, RECORD_V } from "../src/records.ts";
@@ -86,6 +88,32 @@ test("a rec_seq gap after the point of continuity reports records_lost; a regres
   assert.deepEqual(lost, [{ kind: "records_lost", missing: 2, total: 2, why: "gap" }]);
   assert.deepEqual(r.status().reasons, ["records_lost"]);
   assert.throws(() => r.apply(rec("frame", 53, frame(clock, 3))), /rec_seq 53 after 54/);
+});
+
+test("the shared gap fixture (bc#107): what was held before a live gap is carried until a record after it confirms it", () => {
+  // Written for canticle tap's TapView too (prototype/canticle-station/canticle/tap.py), so the two cannot drift.
+  type Step = { record: Obj } | { expect: Obj; why: string };
+  const path = join(import.meta.dirname, "..", "..", "canticle-station", "tests", "fixtures", "view-after-gap.json");
+  const fx = JSON.parse(readFileSync(path, "utf8")) as { now: number; items: Record<string, string>; steps: Step[] };
+  const label = new Map(Object.entries(fx.items).map(([name, idem]) => [idem, name]));
+  const { r } = setup(new Clock(fx.now));
+  r.connected(true);
+  let checked = 0;
+  for (const step of fx.steps) {
+    if ("record" in step) {
+      r.apply(step.record);
+      continue;
+    }
+    const got = {
+      on_air: r.onAir(fx.now).map((i) => label.get(i.frame.idem)),
+      carried: r.carried(fx.now).map((i) => label.get(i.frame.idem)),
+      presence: Object.fromEntries(r.presence().map(({ p, state }) => [p.station ?? p.key_id, state])),
+      records_lost: r.status().records_lost,
+    };
+    assert.deepEqual(got, step.expect, step.why);
+    checked += 1;
+  }
+  assert.equal(checked, 7);
 });
 
 test("a complete snapshot replaces the view; a truncated one merges and reports joined_late", () => {

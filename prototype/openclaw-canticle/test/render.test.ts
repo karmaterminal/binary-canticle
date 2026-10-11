@@ -3,15 +3,19 @@
 // src/security/external-content.ts at openclaw 2026.9.9, must find no marker in what defang returns.
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
-import { defang } from "../src/render.ts";
+import { type HeardFrame, heardFrameOf } from "../src/records.ts";
+import { defang, renderFrame } from "../src/render.ts";
+import { KEY_CAEL, frameFields } from "./helpers.ts";
 
 const LEFT = [0x3c, 0xff1c, 0x2329, 0x3008, 0x2039, 0x27e8, 0xfe64, 0x00ab, 0x300a, 0x27ea, 0x27ec, 0x27ee, 0x276c, 0x276e, 0x02c2];
 const RIGHT = [0x3e, 0xff1e, 0x232a, 0x3009, 0x203a, 0x27e9, 0xfe65, 0x00bb, 0x300b, 0x27eb, 0x27ed, 0x27ef, 0x276d, 0x276f, 0x02c3];
 const ZERO_WIDTH = [0x200b, 0x200c, 0x200d, 0x2060, 0xfeff, 0x00ad];
 
-/** OpenClaw's MARKER_CHAR_FOLDS and replaceMarkers patterns: whether OpenClaw would see a marker in ``text``. */
-function openclawSeesMarker(text: string): boolean {
+/** OpenClaw's MARKER_CHAR_FOLDS and replaceMarkers patterns: the markers OpenClaw would see in ``text``. */
+function openclawMarkers(text: string): string[] {
   const folds = new Map<number, string>();
   LEFT.slice(1).forEach((c) => folds.set(c, "<"));
   RIGHT.slice(1).forEach((c) => folds.set(c, ">"));
@@ -23,10 +27,12 @@ function openclawSeesMarker(text: string): boolean {
   }
   const folded = [...text].map((u) => (u.charCodeAt(0) < 0x80 ? u : (folds.get(u.charCodeAt(0)) ?? u))).join("");
   return [
-    /<<<\s*EXTERNAL[\s_]+UNTRUSTED[\s_]+CONTENT(?:\s+id=\\*"[^"]*")?\s*>>>/i,
-    /<<<\s*END[\s_]+EXTERNAL[\s_]+UNTRUSTED[\s_]+CONTENT(?:\s+id=\\*"[^"]*")?\s*>>>/i,
-  ].some((p) => p.test(folded));
+    /<<<\s*EXTERNAL[\s_]+UNTRUSTED[\s_]+CONTENT(?:\s+id=\\*"[^"]*")?\s*>>>/gi,
+    /<<<\s*END[\s_]+EXTERNAL[\s_]+UNTRUSTED[\s_]+CONTENT(?:\s+id=\\*"[^"]*")?\s*>>>/gi,
+  ].flatMap((p) => folded.match(p) ?? []);
 }
+
+const openclawSeesMarker = (text: string): boolean => openclawMarkers(text).length > 0;
 
 const ch = String.fromCharCode;
 
@@ -67,4 +73,23 @@ test("text that counterfeits nothing is returned as it is, and replacements keep
   assert.equal(defang("🌿<<<🌿>>>🌿"), "🌿&lt;&lt;&lt;🌿&gt;&gt;&gt;🌿");
   assert.equal(defang(">>> print(1)\n<<<<"), "&gt;&gt;&gt; print(1)\n&lt;&lt;&lt;<");
   assert.equal(defang(defang("<<<x>>> [canticle:y")), defang("<<<x>>> [canticle:y")); // nothing left to replace
+});
+
+test("the shared defang fixture (bc#106): every case defangs as listed, and its rendered frame holds only the binding's two markers", () => {
+  // Written for canticle tap's defang too (prototype/canticle-station/canticle/tap.py), so the two cannot drift.
+  const path = join(import.meta.dirname, "..", "..", "canticle-station", "tests", "fixtures", "defang.json");
+  const fx = JSON.parse(readFileSync(path, "utf8")) as { cases: { in: string; out: string; why: string }[] };
+  assert.equal(fx.cases.length, 57);
+  for (const c of fx.cases) {
+    assert.equal(defang(c.in), c.out, c.why);
+    assert.equal(openclawSeesMarker(c.out), false, c.why);
+    if (c.in === "") {
+      continue; // a frame needs a body
+    }
+    const f = heardFrameOf(frameFields({ station: "cael", key_id: KEY_CAEL, stream: "chatter", seq: 1, issued_at: 0, text: c.in })) as HeardFrame;
+    const shown = renderFrame(f, 1, { wrapperId: "w1" });
+    const seen = openclawMarkers(shown);
+    assert.deepEqual(seen, ['<<<EXTERNAL_UNTRUSTED_CONTENT id="w1">>>', '<<<END_EXTERNAL_UNTRUSTED_CONTENT id="w1">>>'], c.why);
+    assert.ok(shown.includes(`\n---\n${c.out}\n<<<END_EXTERNAL_UNTRUSTED_CONTENT id="w1">>>`), c.why); // kept, as data
+  }
 });

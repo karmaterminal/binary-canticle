@@ -104,14 +104,16 @@ never to a call that names no session.
   its marks with where the item stands at that read: `on air now`; `carried` (heard before a gap, not known to be
   on air now); `not in the current view` (not known to be on air now); `withdrawn (REASON) at T`; or
   `expired at T`. Withdrawals come from the journal's own `withdrawn` entries, so an item withdrawn after it was
-  heard reads as withdrawn on a page that ends before the entry saying so, and after a restart. `air` in
-  `details.entries` says the same (`on_air`, `carried`, `not_in_view`, `withdrawn`, `expired`).
+  heard reads as withdrawn on a page that ends before the entry saying so, and after a restart. A retract for
+  expiry is the daemon's word that the item expired, as the current view already takes it: T is the retract or
+  the item's local expiry, whichever came first (#108). `air` in `details.entries` says the same (`on_air`,
+  `carried`, `not_in_view`, `withdrawn`, `expired`), with `withdrawn` or `expired_at` beside it.
 - **`on_air`** reads the current view: items confirmed on air now, newest heard first, then *carried* items,
   heard before a gap and not known to be on air. Without a current view the header says `unknown`, and nothing is
   claimed to be on air.
 - **`view: "digest"`** is one host-written line per entry:
   `[canticle:heard] cael:chatter class=chatter item=7/42 size=15B age=3s expires_in=57s [marks]`, and
-  `expired_ago=…` in place of `expires_in` once the item is past its local expiry. Nothing in it is text the
+  `expired_ago=…` in place of `expires_in` once the item has expired. Nothing in it is text the
   sending station wrote; station and stream names come from the manifest, as in the banner (§14.13). Names are
   printed as they are, so the binding drops a record whose station, stream, class or scope name breaks the RFC's
   grammar (§5.3, §5.4) as `malformed_record`, and a `run` must be a plain token: none can start a line of its own.
@@ -171,9 +173,11 @@ never to a call that names no session.
   resurfaced record (§14.18.3) is not a new entry. Identities are remembered until the item's local expiry plus
   5 s (§14.18.5), across pruning and restarts.
 - **The current view** answers "what is on air now?". It is built from the join snapshot and live records, and
-  drops items at their local expiry or on a retract. After a connection loss every item in it is *carried* until
-  a complete join snapshot or a live record confirms it, and with no connection the answer is `unknown`. A
-  restart into the run it last held is a rejoin (§14.18.3).
+  drops items at their local expiry or on a retract. After a connection loss or a `rec_seq` gap every item in it
+  is *carried*, and presence reads unknown, until a complete join snapshot or a later live record about it
+  confirms it again (#107): presence records are droppable (§14.18.2), so a gap can hide a presence change, and
+  from a daemon that broke §14.18.2 even a retract. With no connection the answer is `unknown`. A restart into the
+  run it last held is a rejoin (§14.18.3).
 - **Receive health** is `ok`, `degraded` (`records_lost`, `joined_late`), `failed` (a record version this binding
   does not read; it stays `failed`, connected or not, until a join reads v1 again) or `unknown` (not connected,
   joining, or the daemon refused or closed the connection before `hello`: `closed_before_hello`). Transport
@@ -376,10 +380,16 @@ CANTICLE_INTEROP=require node --test 'test/*.test.ts'   # fail, rather than skip
   without journaling anything twice. Without that Python it is skipped, unless `CANTICLE_INTEROP=require`.
 - Typecheck: `tsc -p tsconfig.json` with `typescript` and `@types/node` as locked in
   `.github/ci/openclaw-canticle/` (CI runs it).
-- The tests were revert-checked: each of 107 source changes that undo one rule (the write-ahead save, the epoch
+- Two fixtures in `prototype/canticle-station/tests/fixtures/` are written for both this plugin and
+  `canticle tap`, so the two cannot drift: `defang.json` (#106), every look-alike of the wrapper markers and the
+  banner prefix and what `defang` returns for each, and `view-after-gap.json` (#107), records across a live gap
+  and what the view holds after each. `render.test.ts` and `receive.test.ts` run them here; tap's tests do not
+  run them yet (tap is 🌿's).
+- The tests were revert-checked: each of 116 source changes that undo one rule (the write-ahead save, the epoch
   check before a pluck, the send window for evidence, the payload gate, the banner's quoting, the name grammar,
-  where a journaled item stands, the look-alike folds, an outbox row's expiry between reconciles, the binding name
-  on ids, the lease, a refusal's failed result, …) makes at least one test fail.
+  where a journaled item stands, the look-alike folds, an outbox row's expiry between reconciles, what a gap
+  leaves carried, an early retract for expiry, the binding name on ids, the lease, a refusal's failed result, …)
+  makes at least one test fail.
 - Checked by hand in a real OpenClaw 2026.9.9 Gateway, in a scratch home with a loopback daemon and station (no
   seat): the plugin loads with six optional tools and one service and no diagnostics
   (`openclaw plugins inspect canticle --runtime`, `openclaw plugins doctor`); `canticle_status` and
@@ -397,7 +407,7 @@ CANTICLE_INTEROP=require node --test 'test/*.test.ts'   # fail, rather than skip
 | snapshot + live → journal and current view | `inbound`: *a join snapshot and live records become journal entries…*; `receive` |
 | duplicate or reordered record | `inbound`: *a repeated, resurfaced or snapshot copy…*; `receive` |
 | mute and digest boundary | `inbound`: *mutes…*, *new reads never report an entry twice…*; `plugin`: *a started service answers through the tools…* |
-| feed cut → unknown or gap → complete rejoin snapshot | `inbound`: *a cut feed…*, *a gap in rec_seq…*, *a read says where each item stands now…*; `interop` |
+| feed cut → unknown or gap → complete rejoin snapshot | `inbound`: *a cut feed…*, *a gap in rec_seq…*, *a read says where each item stands now…*, *a retract for expiry before the item's local expiry…*; `receive`: *the shared gap fixture…*; `interop` |
 | bounded explicit read with an untrusted marker | `inbound`: *explicit reads are bounded…*, *heard text is data…* |
 | two co-resident bindings | `isolation`: all three tests |
 | live, opt-in seat receipt | for the princes ([Trying it on a seat](#trying-it-on-a-seat)) |

@@ -125,10 +125,11 @@ export function renderFrame(f: HeardFrame, now: number, opts: { mode?: string; m
 }
 
 /** One line with the condensed banner fields: no payload, no purpose. Past its local expiry an item reads
- * `expired_ago`, never `expires_in=0s`. */
-export function digestLine(f: HeardFrame, now: number, marks: string[] = []): string {
-  const left = Math.round((f.times.local_expiry_at - now) / 1000);
-  const life = f.times.local_expiry_at > now ? `expires_in=${Math.max(0, left)}s` : `expired_ago=${Math.max(0, -left)}s`;
+ * `expired_ago`, never `expires_in=0s`; so does one the daemon retracted for expiry before that (``expiredAt``, #108). */
+export function digestLine(f: HeardFrame, now: number, marks: string[] = [], expiredAt: number | null = null): string {
+  const end = expiredAt !== null && expiredAt < f.times.local_expiry_at ? expiredAt : f.times.local_expiry_at;
+  const left = Math.round((end - now) / 1000);
+  const life = end > now ? `expires_in=${Math.max(0, left)}s` : `expired_ago=${Math.max(0, -left)}s`;
   const extra = marks.length > 0 ? ` [${marks.join("; ")}]` : "";
   return `[canticle:heard] ${f.station}:${f.stream} class=${f.class} item=${f.epoch}/${f.seq} size=${f.body?.size ?? f.body_ref?.size ?? 0}B age=${ageS(f, now)}s ${life}${extra}`;
 }
@@ -203,7 +204,7 @@ export function renderNote(e: NoteEntry): string {
     case "records_lost":
       return n.why === "rejoin"
         ? `[canticle:gap] rejoined at ${at}: records emitted while away were not replayed (records_lost)`
-        : `[canticle:gap] ${n.missing ?? "some"} record(s) missing on this connection at ${at} (records_lost)`;
+        : `[canticle:gap] ${n.missing ?? "some"} record(s) missing on this connection at ${at} (records_lost): what was heard before is carried, not current`;
     case "snapshot":
       return n.result === "complete"
         ? `[canticle:note] join snapshot complete at ${at}: ${n.entries} entries`
@@ -222,7 +223,7 @@ export function renderEntry(e: Entry, now: number, view: "items" | "digest", air
   switch (e.kind) {
     case "heard": {
       const marks = heardMarks(e, air);
-      return view === "digest" ? digestLine(e.frame, now, marks) : renderFrame(e.frame, now, { marks });
+      return view === "digest" ? digestLine(e.frame, now, marks, air?.state === "expired" ? air.at : null) : renderFrame(e.frame, now, { marks });
     }
     case "withdrawn":
       return renderWithdrawn(e);
