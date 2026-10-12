@@ -200,10 +200,72 @@ test("an item plucked outside the plugin (the station's own CLI) is withdrawn wh
 
 test("withdraw after expiry reports expired and asks the station nothing", async () => {
   const { item } = result(await b.sing(SESSION, { stream: "chatter", payload: "short", ttlSeconds: 5 })) as { item: string };
-  clock.advance(6_000);
+  clock.advance(6_000); // no reconcile has run since
+  const asked = station.requests.length;
   const h = result(await b.hush(SESSION, { item }));
   assert.equal(h.status, "expired");
-  assert.equal(station.ops("hush").length, 0);
+  assert.equal(h.reason, "expired");
+  assert.equal(station.requests.length, asked); // not even its status: the clock had already ended the row
+});
+
+test("between reconciles a row past its expiry reads expired, never expiring with 0s left, and is no longer live", async () => {
+  const { item } = result(await b.sing(SESSION, { stream: "chatter", payload: "the well is dry", ttlSeconds: 30 })) as { item: string };
+  await waitFor(() => b.outbox?.get(item)?.heard_at !== null, "the daemon to hear the item back");
+  clock.advance(30_001); // past its expiry; no reconcile has run since
+  const live = b.outboxView(SESSION, {});
+  assert.equal(live.text, "[canticle:outbox] 0 live row(s); expired=1");
+  assert.deepEqual(live.details.rows, []);
+  const all = b.outboxView(SESSION, { rows: "all" });
+  assert.match(all.text, new RegExp(`^${item} expired chatter body=15B sha256=[0-9a-f]{12}… epoch 1 seq 1 heard$`, "m"));
+  assert.equal(((all.details.rows as Obj[])[0] as Obj).state, "expired");
+  // A call acts on the same standing. The same payload is sung anew, since its row is no longer live...
+  const again = result(await b.sing(SESSION, { stream: "chatter", payload: "the well is dry", ttlSeconds: 30 }));
+  assert.equal(again.status, "on-air");
+  assert.equal(again.duplicate, false);
+  assert.notEqual(again.item, item);
+  assert.equal(b.outbox?.get(item)?.ended?.reason, "expired");
+  // ...and a repeat under the caller's key gets its ended row back, not "on-air", and nothing is sung.
+  const keyed = result(await b.sing(SESSION, { stream: "chatter", payload: "keyed", ttlSeconds: 30, idempotencyKey: "k-1" }));
+  clock.advance(30_001);
+  const repeat = result(await b.sing(SESSION, { stream: "chatter", payload: "keyed", ttlSeconds: 30, idempotencyKey: "k-1" }));
+  assert.equal(repeat.item, keyed.item);
+  assert.equal(repeat.duplicate, true);
+  assert.equal(repeat.status, "ended");
+  assert.equal(repeat.state, "expired");
+  assert.equal(station.ops("sing").length, 3);
+  // An unknown row past the latest expiry it could have leaves the live list too.
+  station.faults.push({ op: "sing", fault: "drop_before" });
+  const lost = result(await b.sing(SESSION, { stream: "chatter", payload: "never confirmed" }));
+  assert.equal(lost.status, "unknown");
+  assert.match(b.outboxView(SESSION, {}).text, new RegExp(`^${String(lost.item)} unknown chatter`, "m"));
+  clock.advance(120_000);
+  assert.equal(b.outboxView(SESSION, {}).text, "[canticle:outbox] 0 live row(s); expired=3, unknown=1");
+});
+
+test("a row that ends while reconcile waits on the station keeps its real ending", async () => {
+  // Its life runs out while the station is asked: expired, not evicted.
+  const { item } = result(await b.sing(SESSION, { stream: "chatter", payload: "runs out", ttlSeconds: 30 })) as { item: string };
+  station.faults.push({ op: "status", fault: "hold" });
+  const first = b.tick();
+  await waitFor(() => station.holding === 1, "reconcile to ask the station");
+  clock.advance(30_001);
+  station.release();
+  await first;
+  assert.equal(b.outbox?.get(item)?.state, "expired");
+  assert.equal(b.outbox?.get(item)?.ended?.reason, "expired");
+  // The daemon's retract arrives while the station is asked: the retract's answer stands.
+  const { item: second } = result(await b.sing(SESSION, { stream: "chatter", payload: "plucked by hand meanwhile" })) as { item: string };
+  station.faults.push({ op: "status", fault: "hold" });
+  const next = b.tick();
+  await waitFor(() => station.holding === 1, "reconcile to ask the station again");
+  const seq = b.outbox?.get(second)?.receipt?.seq;
+  const a = await stationClient(station.path)({ op: "hush", stream: "chatter", seq, reason: 0 }); // the station's own CLI
+  assert.equal(a.kind === "reply" && a.reply.ok, true);
+  await waitFor(() => b.outbox?.get(second)?.state === "withdrawn", "the daemon's retract");
+  station.release();
+  await next;
+  assert.equal(b.outbox?.get(second)?.state, "withdrawn");
+  assert.equal(b.outbox?.get(second)?.ended?.reason, "retract:plucked");
 });
 
 test("a withdrawal that never reached the station is never reported as a pluck", async () => {

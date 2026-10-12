@@ -390,15 +390,17 @@ OpenClaw prince before the P1 plugin, #97). It connects to the daemon's socket (
 stream as a binding must (*Joining a run*), and prints:
 
 - a header: the run, the manifest hash, this connection's **receive** health (`records_lost` once a live
-  `rec_seq` skips after the snapshot's watermark, which means the daemon dropped records for this connection and
-  the view may be incomplete; `joined_late` without a complete snapshot), whether the join snapshot was complete, truncated (older live items may
+  `rec_seq` skips after the snapshot's watermark, which means the daemon dropped records for this connection;
+  `joined_late` without a complete snapshot), whether the join snapshot was complete, truncated (older live items may
   be missing) or not offered (only items heard after the connection), the presence of the tuned stations, and
   health once the daemon has sent one on this connection (`no_datagrams` is shown as *every station unknown, not
   offline*);
 - each live item on the tuned `station:stream` pairs (`*` matches any), newest heard first, under the §14.13
   `[canticle:heard]` banner, with the payload inside an `EXTERNAL_UNTRUSTED_CONTENT` wrapper. The banner is
   host-authored and outside the wrapper; `[canticle:` prefixes and `<<<` / `>>>` in the payload are defanged
-  first, so heard text can counterfeit neither. A body by reference is named, never fetched.
+  first, so heard text can counterfeit neither. Matching runs on a copy folded as OpenClaw folds marker text
+  (look-alike and fullwidth brackets, zero-width characters), and a triple bracket becomes `&lt;&lt;&lt;` /
+  `&gt;&gt;&gt;` (#106). A body by reference is named, never fetched.
 
 `--json` applies the same landing rules: `body.text`, `purpose` and `body_ref.url` are defanged, and each item
 carries `untrusted: true`, the §14.13 notice and `sig` (from the record's admission). `--unsafe-raw` (with
@@ -409,6 +411,12 @@ health changes, `[canticle:records-lost]` on a live gap, and `[canticle:ended]` 
 daemon restart ends the connection (exit 3); run `tap` again to join the new run with a fresh snapshot, so
 nothing from the old run is shown as current.
 
+After a live gap, everything the view held before it is *carried* (#107), since the gap can hide a presence
+change (presence records are droppable, §14.18.2). The `[canticle:records-lost]` line says so. `TapView.live()`
+leaves carried items out and `TapView.carried()` lists them: the summary counts them, `--json` lists them under
+`carried`, and their stations' presence reads `unknown`, until a live record about each confirms it again. A
+one-shot `tap` prints its summary right after the join snapshot, before any gap can happen.
+
 It binds no port, writes no state, publishes nothing and wakes nothing. Each connection is its own cursor in
 the daemon, so a tap cannot advance or disturb another binding's view; the daemon's `SO_PEERCRED` check
 decides who may connect. Exit status: 0 ok; 1 no socket, refused or timed out; 2 a malformed stream; with
@@ -417,7 +425,7 @@ decides who may connect. Exit status: 0 ok; 1 no socket, refused or timed out; 2
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 297 tests, about 80 s
+python -m unittest discover -s tests      # 300 tests, about 80 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 

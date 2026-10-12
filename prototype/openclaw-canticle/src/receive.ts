@@ -2,9 +2,10 @@
 // snapshot, live records, gaps and run boundaries, and the current view built from them. One Receiver lives as
 // long as the binding; each daemon connection is a sequence of connected() ... lost() calls on it.
 //
-// The current view answers "what is on air now?". It is not the journal: after a connection loss every item in
-// it is *carried* (heard before the gap, not known to be current) until a complete join snapshot or a live record
-// confirms it, and with no connection there is no current answer at all, only "unknown" (never "offline").
+// The current view answers "what is on air now?". It is not the journal: after a connection loss or a rec_seq gap
+// every item in it is *carried* (heard before the gap, not known to be current) until a complete join snapshot or a
+// live record confirms it, and with no connection there is no current answer at all, only "unknown" (never
+// "offline").
 
 import {
   type DaemonHealth,
@@ -212,13 +213,19 @@ export class Receiver {
       return;
     }
     this.since = this.clock();
+    this.unconfirm();
+    this.events.note({ kind: "disconnected", why: how });
+  }
+
+  /** Everything the view holds becomes carried: heard before a loss, not known to be current, until a complete join
+   * snapshot or a later live record confirms it again. Presence reads unknown until then. */
+  private unconfirm(): void {
     for (const item of this.items.values()) {
       item.confirmed = false;
     }
     for (const row of this.presenceRows.values()) {
       row.confirmed = false;
     }
-    this.events.note({ kind: "disconnected", why: how });
   }
 
   /** Where the open connection is: waiting for `hello`, for the bootstrap `landing_state`, or live. */
@@ -294,7 +301,11 @@ export class Receiver {
       c.continuous = true; // without a snapshot, continuity starts at the first live record
     }
     if (missing > 0) {
+      // The gap can hold a presence change (presence records are droppable, §14.18.2) and, from a daemon that broke
+      // §14.18.2, even a retract. What the view held is carried from here, as at a connection loss, until a complete
+      // join snapshot or a record after the gap confirms it again (#107).
       c.recordsLost += missing;
+      this.unconfirm();
       this.events.note({ kind: "records_lost", missing, total: c.recordsLost, why: "gap" });
     }
     this.live(c, raw, type, seq);
