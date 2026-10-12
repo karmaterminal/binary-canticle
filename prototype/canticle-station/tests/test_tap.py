@@ -1,21 +1,29 @@
 """``canticle tap`` (#96): a read-only record v1 client of the host daemon.
 
 The daemon runs in-process (``DaemonCase``); ``tap`` connects to its real unix socket. Items are heard through
-``Daemon._call`` with real station frames, as in the join-snapshot tests.
+``Daemon._call`` with real station frames, as in the join-snapshot tests. ``DaemonLossTest`` runs the daemon and
+the tap as processes instead, for the two losses of pilot round 2b (proofs/pilot/round-2b-daemon-loss.md).
 """
 
 import asyncio
 import io
 import json
 import os
+import signal
+import socket
+import stat
+import subprocess
+import sys
+import time
 import unittest
+from unittest import mock
 
-from canticle import runner
+from canticle import runner, wire
 from canticle.records import RECORD_V
 from canticle.tap import (NOTICE, REQUEST, TapError, TapView, defang, json_change, json_item, parse_tune, render_change,
                           render_item, summary, summary_json, tap)
 
-from test_daemon import until
+from test_daemon import ROOT, until
 from test_join_snapshot import SnapshotCase
 
 
@@ -346,6 +354,22 @@ class TapDaemonTest(SnapshotCase):
         self.assertIn("reason=plucked", out.getvalue())
         self.assertIn("[canticle:ended] the daemon stopped cleanly (bye)", out.getvalue())
 
+    def test_follow_ends_with_4_after_fatal(self):
+        """A failed state save ends the run with `fatal` and no `bye`: the follow tap says so and exits 4."""
+        async def scenario(d, port):
+            out = io.StringIO()
+            task = asyncio.create_task(tap(d.cfg.socket_path, TapView(), out, follow=True, timeout_s=3))
+            await until(lambda: "join snapshot" in out.getvalue(), what="tap header")
+            with mock.patch("canticle.listener.atomic_write_json", side_effect=OSError(28, "No space left on device")):
+                self.sing(d, self.station(), text="never shown")
+            return await asyncio.wait_for(task, 5), out.getvalue()
+
+        (code, out), daemon_code = self.run_with(scenario)
+        self.assertEqual((code, daemon_code), (4, 1))
+        self.assertTrue(out.rstrip().endswith(
+            "[canticle:ended] the daemon failed (state_not_durable); run tap again once it is back"), out)
+        self.assertNotIn("never shown", out)
+
     def test_json_modes_against_the_daemon(self):
         async def scenario(d, port):
             self.sing(d, self.station(), text=EVIL)
@@ -379,6 +403,145 @@ class TapDaemonTest(SnapshotCase):
     def test_request_line_is_the_documented_join_snapshot_op(self):
         self.assertEqual(json.loads(REQUEST), {"op": "join_snapshot", "v": RECORD_V})
         self.assertTrue(REQUEST.endswith(b"\n"))
+
+
+def wait_until(pred, timeout_s=10.0, what="condition"):
+    deadline = time.monotonic() + timeout_s
+    while not pred():
+        if time.monotonic() > deadline:
+            raise AssertionError(f"timed out waiting for {what}")
+        time.sleep(0.02)
+
+
+class DaemonLossTest(SnapshotCase):
+    """Pilot round 2b's two losses (proofs/pilot/round-2b-daemon-loss.md), with a `canticle daemon` process stopped
+    by TERM (case a) and killed by KILL (case b), and a `canticle tap --follow` process reading it. The lines and
+    exit statuses the card tells observer B to expect are asserted here as written."""
+
+    def setUp(self):
+        super().setUp()
+        self.sock = os.path.join(self.dir, "run", "daemon.sock")
+        self.env = {**os.environ, "PYTHONPATH": str(ROOT)}
+        self.procs: list = []
+        self.addCleanup(self._reap)
+
+    def _reap(self):
+        for proc, out in self.procs:
+            if proc.poll() is None:
+                proc.kill()
+            proc.wait(timeout=10)
+            out.close()
+
+    def start(self, name: str, *argv) -> tuple:
+        """Run ``python -m canticle ARGV`` with stdout and stderr in one file; returns (process, its file)."""
+        path = os.path.join(self.dir, f"{name}.txt")
+        out = open(path, "w")
+        proc = subprocess.Popen([sys.executable, "-m", "canticle", *argv], env=self.env, stdout=out,
+                                stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+        self.procs.append((proc, out))
+        return proc, path
+
+    @staticmethod
+    def read(path: str) -> str:
+        with open(path) as fh:
+            return fh.read()
+
+    def daemon(self, name: str) -> tuple:
+        """Start a daemon on this test's socket and state, and wait until that socket answers (a stale one left by a
+        killed daemon refuses); returns (process, output file, its hello record)."""
+        proc, path = self.start(name, "daemon", "--manifest", self.manifest, "--bind", "127.0.0.1:0", "--no-multicast",
+                                "--socket", self.sock, "--state-dir", os.path.join(self.dir, "state"))
+
+        def answers() -> bool:
+            if proc.poll() is not None:
+                raise AssertionError(f"{name} exited with {proc.returncode}: {self.read(path)}")
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
+                try:
+                    probe.connect(self.sock)
+                except (FileNotFoundError, ConnectionRefusedError):
+                    return False
+            return True
+
+        wait_until(answers, what=f"{name}'s socket")
+        hello = [json.loads(x) for x in self.read(path).splitlines() if '"type":"hello"' in x]
+        self.assertEqual(len(hello), 1, self.read(path))
+        return proc, path, hello[0]
+
+    def follow(self, name: str) -> tuple:
+        proc, path = self.start(name, "tap", "--socket", self.sock, "--follow")
+        wait_until(lambda: "join snapshot complete" in self.read(path) or proc.poll() is not None,
+                   what=f"{name} header")
+        self.assertIn("join snapshot complete", self.read(path))
+        return proc, path
+
+    def tap_once(self, *argv) -> tuple:
+        r = subprocess.run([sys.executable, "-m", "canticle", "tap", "--socket", self.sock, *argv], env=self.env,
+                           capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
+        return r.returncode, r.stdout, r.stderr
+
+    @staticmethod
+    def send(frames, bind: str) -> None:
+        host, port = runner.parse_addr(bind)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as tx:
+            for f in frames:
+                tx.sendto(f, (host, port))
+
+    def test_case_a_term_sends_bye_and_the_follow_tap_exits_0(self):
+        d, d_out, _ = self.daemon("daemon")
+        t, t_out = self.follow("tap")
+        d.send_signal(signal.SIGTERM)
+        self.assertEqual(d.wait(timeout=10), 0, self.read(d_out))
+        self.assertEqual(t.wait(timeout=10), 0, self.read(t_out))
+        self.assertTrue(self.read(t_out).rstrip().endswith(
+            "[canticle:ended] the daemon stopped cleanly (bye); run tap again to rejoin its next run"))
+        self.assertIn('"type":"bye"', self.read(d_out))
+        self.assertFalse(os.path.lexists(self.sock), "a clean stop removes the socket")
+        # A tap during the outage finds no socket.
+        code, _, err = self.tap_once()
+        self.assertEqual((code, err.strip()), (1, f"canticle tap: no_daemon: no daemon socket at {self.sock} "
+                                                   "(is `canticle daemon` running?)"))
+
+    def test_case_b_kill_ends_without_bye_and_the_next_run_resurfaces_the_item_once(self):
+        st = self.station()
+        now = runner.now_ms()
+        res = st.sing(now, "chatter", text="still on air", ttl_s=60)
+        frames = [f for f in st.poll(now) if f[3] == wire.KIND_ITEM]
+        d1, d1_out, hello1 = self.daemon("daemon-1")
+        t, t_out = self.follow("tap")
+        self.send(frames, hello1["bind"])
+        wait_until(lambda: f"item=1/{res.seq} " in self.read(t_out), what="the followed item")
+
+        os.kill(d1.pid, signal.SIGKILL)
+        self.assertEqual(d1.wait(timeout=10), -signal.SIGKILL)
+        self.assertEqual(t.wait(timeout=10), 3, self.read(t_out))
+        self.assertTrue(self.read(t_out).rstrip().endswith(
+            "[canticle:ended] the connection closed without bye (daemon restart?); run tap again to rejoin with a "
+            "fresh snapshot"))
+        self.assertNotIn('"type":"bye"', self.read(d1_out))
+        # The killed daemon leaves its socket file, and nothing answers there.
+        self.assertTrue(stat.S_ISSOCK(os.lstat(self.sock).st_mode))
+        code, _, err = self.tap_once()
+        self.assertEqual(code, 1)
+        self.assertIn(f"canticle tap: connect_failed: {self.sock}: ConnectionRefusedError", err)
+
+        # The next daemon removes the stale socket and starts a new run. The station's next repeat brings the
+        # item back once, from the old run's state: resurfaced, with its signed expiry.
+        d2, d2_out, hello2 = self.daemon("daemon-2")
+        self.assertNotEqual(hello2["run"], hello1["run"])
+        self.send(frames, hello2["bind"])
+
+        def items():
+            code, out, err = self.tap_once("--json")
+            self.assertEqual(code, 0, err)
+            snap = json.loads(out)
+            self.assertEqual((snap["run"], snap["snapshot"]), (hello2["run"], "complete"))
+            return snap["items"]
+        wait_until(lambda: items(), what="the item on the new run")
+        [item] = items()
+        self.assertEqual((item["frame"]["epoch"], item["frame"]["seq"], item["dedup"], item["times"]["expires_at"]),
+                         (1, res.seq, "resurfaced", res.expires_at))
+        d2.send_signal(signal.SIGTERM)
+        self.assertEqual(d2.wait(timeout=10), 0, self.read(d2_out))
 
 
 if __name__ == "__main__":

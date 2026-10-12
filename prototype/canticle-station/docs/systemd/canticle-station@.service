@@ -5,6 +5,11 @@
 #
 #   CANTICLE_STATION_ARGS=--stream chatter --stream lens.threat:live-state
 #
+# It sends to CANTICLE_STATION_TO, this host's listener (127.0.0.1:9999) unless the env file names another
+# host:port. A LAN pilot station sends to its peer instead (docs/pilot-host/README.md):
+#
+#   CANTICLE_STATION_TO=10.0.0.246:9999
+#
 #   cp docs/systemd/canticle-station@.service ~/.config/systemd/user/
 #   systemctl --user daemon-reload && systemctl --user enable --now canticle-station@cael
 #   canticle sing --control "$XDG_RUNTIME_DIR/canticle-cael.sock" --stream chatter --text hello --ttl 30
@@ -17,11 +22,13 @@ Description=canticle station %i (binary-canticle spike)
 
 [Service]
 Type=exec
+# The env file's CANTICLE_STATION_TO, when it sets one, overrides this default.
+Environment=CANTICLE_STATION_TO=127.0.0.1:9999
 EnvironmentFile=%h/.binary-canticle/station-%i.env
 UMask=0077
-# Unicast to this host's listener. Add --multicast only after an RFC §11.2 doctor has passed:
-# this spike's `canticle doctor` reports multicast but does not decide it.
-ExecStart=%h/.venvs/canticle/bin/canticle station --key %h/.binary-canticle/keys/%i.key --manifest %h/.binary-canticle/fleet.json --control %t/canticle-%i.sock --to 127.0.0.1:9999 $CANTICLE_STATION_ARGS
+# Unicast to CANTICLE_STATION_TO; a further --to in CANTICLE_STATION_ARGS adds a destination. Add --multicast
+# only after an RFC §11.2 doctor has passed: this spike's `canticle doctor` reports multicast but does not decide it.
+ExecStart=%h/.venvs/canticle/bin/canticle station --key %h/.binary-canticle/keys/%i.key --manifest %h/.binary-canticle/fleet.json --control %t/canticle-%i.sock --to ${CANTICLE_STATION_TO} $CANTICLE_STATION_ARGS
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=yes

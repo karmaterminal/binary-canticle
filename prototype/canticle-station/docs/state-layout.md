@@ -9,7 +9,10 @@ line, so another layout works as long as each process is given the same paths ev
 ~/.binary-canticle/                      configuration (RFC §13.6 names this directory)
 ├── stations.toml                        locators: manifest, listener bind, multicast (stations-toml.md)
 ├── fleet.json                           the fleet manifest, UNSIGNED in this spike (canticle manifest verify)
-├── station-cael.env                     the example station unit's streams: CANTICLE_STATION_ARGS=--stream ...
+├── station-cael.env                     the example station unit's streams: CANTICLE_STATION_ARGS=--stream ...,
+│                                        and on a LAN pilot host its peer: CANTICLE_STATION_TO=ADDR:PORT
+├── pilot.env                            LAN pilot host only (below): the daemon's CANTICLE_BIND
+├── canticle-pilot-guard.sh              LAN pilot host only: the daemon's start guard
 └── keys/                                mode 0700
     ├── cael.key                         Ed25519 seed, hex; mode 0600, written by canticle keygen, never overwritten
     ├── cael.key.epoch                   the station's epoch counter (§5.2)
@@ -84,6 +87,22 @@ $XDG_RUNTIME_DIR/canticle/daemon.sock    the host daemon's record socket (§11.1
   edit it.
 - `canticle doctor` recognises the daemon holding the address through its default lease. A daemon run with
   `--state-dir` is reported as "in use, and not by this listener".
+
+## LAN pilot host
+
+A host whose daemon hears a station on another host adds the pilot-host kit ([`pilot-host/`](pilot-host/README.md),
+#103). Its files, all written by the host owner:
+
+- `~/.binary-canticle/pilot.env` holds `CANTICLE_BIND`, the one LAN address and port the daemon binds. The kit's
+  drop-in for the daemon unit reads it.
+- `~/.binary-canticle/canticle-pilot-guard.sh` runs before every daemon start. It refuses a wildcard or malformed
+  `CANTICLE_BIND`, and refuses unless `table inet canticle` drops datagrams to exactly that address and port
+  from other interfaces and other sources.
+- `~/.binary-canticle/station-NAME.env` adds `CANTICLE_STATION_TO`, the peer host's daemon, so the station sends
+  there instead of to this host's listener.
+- `/etc/canticle/canticle-pilot.nft` is the table and `/etc/systemd/system/canticle-nft.service` loads it at
+  boot; `/etc/sudoers.d/canticle-pilot`, when the kit's step 3 needs it, lets the seat read the table back. Root
+  owns all three.
 
 ## Logs
 
