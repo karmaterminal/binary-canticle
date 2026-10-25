@@ -54,10 +54,12 @@ not do · the prototype · choices for review.
 
 - Both streams carry the finding and its receipt's doorbell. The names are conventions: a receiver knows a
   finding by its content type, class and key, never by its stream (§6.7).
-- Each stream's configuration raises the keep-on-air ceiling for `advisory` from one TTL (§7.9) to at least
-  1800 s, the watch window the examples use; a watcher that watches longer needs a stream configured for its
-  window. Without that, a conforming station keeps a finding on air for one TTL only, and receivers then read it
-  as lapsed.
+- Each stream's configuration raises the keep-on-air ceiling for `advisory` from one TTL (§7.9) to the longest
+  keep-on-air its singers ask for. The Thornfield probe asks for its window plus 35 minutes (its 30-minute hold
+  cap and 5 more), so `alerts` needs at least 5700 s for its 60-minute maximum window
+  (temporal-thornfield-frond#28). `distress` needs at least 1800 s, the watch window the examples use, or more for
+  a watcher that watches longer. Without that, a conforming station keeps a finding on air for one TTL only, and
+  receivers then read it as lapsed.
 - An incident key is the item's `state_key`: 1-32 bytes of UTF-8, one line. Lowercase ASCII is easiest to match.
   `SIGNAL` comes from the probe's own list (scribe-prince-shared#78 keeps the fleet probes' list). Leave room for
   the seat: beside the 17-byte `heartbeat-crowded`, `SEAT` has 14 bytes.
@@ -157,9 +159,9 @@ conversational presence ends. A frame lives one TTL, at most the stream's `max_t
 Keep-on-air is a series of re-issued frames, which the station keeps up after the probe has exited. If the
 station stops, the item lapses within one TTL, and receivers read that as lapsed, never as resolved.
 
-Keep-on-air past one TTL needs the stream's configuration to allow it (§7.9), which is why both streams raise it
-to at least 1800 s. The spike does not model per-stream ceilings: it caps any keyed item at the 24 h station hard
-cap (D3).
+Keep-on-air past one TTL needs the stream's configuration to allow it (§7.9), which is why each stream raises its
+ceiling (Streams and incident keys). The spike does not model per-stream ceilings: it caps any keyed item at the
+24 h station hard cap (D3).
 
 ## Classes
 
