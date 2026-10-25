@@ -434,7 +434,8 @@ class PerKeyBoundsTest(unittest.TestCase):
     def test_mark_cap_holds_per_key_under_multi_key_saturation(self):
         # Three keys granted finding-ref, each saturating its marks: each holds its own quota × 8 and none
         # locks another out. With equal shares of the store (no per-key override, capacity ≥ keys) that sums
-        # to 8 × the dedup capacity (main: 98 ×); see the next test for when it does not.
+        # to at most 8 × the dedup capacity, here exactly since 30 / 3 leaves no remainder (main: 98 ×); see the
+        # next test for when it does not hold.
         sks = [Ed25519PrivateKey.from_private_bytes(bytes.fromhex(s)) for s in (vectors.TEST1, vectors.TEST2,
                                                                                   vectors.TEST3)]
         lst = self.fr_listener(keys=sks, dedup_capacity=30)
@@ -450,7 +451,7 @@ class PerKeyBoundsTest(unittest.TestCase):
 
     def test_the_8x_capacity_sum_holds_only_for_equal_shares(self):
         # 🌻's review of #117: the cap is per key. The sum over keys is 8 × the sum of the per-key dedup
-        # quotas, which is 8 × the store only for equal shares. An explicit per-key quota, or the floor of 1
+        # quotas, which is at most 8 × the store only for equal shares (less when they leave a remainder). An explicit per-key quota, or the floor of 1
         # with more keys than capacity, takes the sum past 8 × capacity.
         sks = [Ed25519PrivateKey.from_private_bytes(bytes.fromhex(s)) for s in (vectors.TEST1, vectors.TEST2,
                                                                                   vectors.TEST3)]
