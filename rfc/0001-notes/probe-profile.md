@@ -200,8 +200,8 @@ canticle sing --control ./watch.sock --stream distress --scope fleet --class fin
 - `--body-ref URL SHA256 SIZE` sends `"body_ref": {"url", "sha256", "size"}`: a one-line URL of 1-200 bytes, 64
   hex digits and a byte count. Alone it makes a doorbell, and `sing` reads nothing from stdin. Beside a body, the
   body is its summary (§9.6).
-- A refusal comes back as `{"ok": false, "error": ...}`, naming the field, before a `seq` is used. An empty
-  `SHA256`, after a failed `sha256sum`, is refused, and nothing goes on air.
+- A refusal comes back as `{"ok": false, "error": ...}`, naming the field, before a `seq` is used; so does one
+  for a frame over 1 100 bytes. An empty `SHA256`, after a failed `sha256sum`, is refused, and nothing goes on air.
 - The key needs classes `advisory,finding-ref`, the streams, and `fleet` scope in the manifest
   (`canticle keygen --classes advisory,finding-ref --streams alerts,distress --scopes lan,fleet`), and its station
   runs them as `--stream distress:advisory --stream alerts:advisory`. Creating keys and running stations on a host

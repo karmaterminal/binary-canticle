@@ -88,6 +88,14 @@ class CarouselTest(unittest.TestCase):
         later = Station(SK, [StreamConfig("chatter")], epoch=2, rng=random.Random(2), now_ms=T0 + 4)
         later.sing(T0 + 4, "chatter", text="e", cls="chatter", state_key="k")     # a new epoch may change it
 
+    def test_an_oversize_item_is_refused_before_a_seq_is_used(self):
+        st = station()
+        s = st.streams["chatter"]
+        with self.assertRaisesRegex(ValueError, "canonical limit"):
+            st.sing(T0, "chatter", text="x" * 1100)
+        self.assertEqual((s.head_seq, dict(s.ring)), (0, {}))
+        self.assertEqual(st.sing(T0, "chatter", text="fits").seq, 1)              # no gap where it would have been
+
     def test_key_classes_are_forgotten_once_no_mark_can_hold_them(self):
         # The q21 review: the table must not grow with every key of the epoch. A key is forgotten once its
         # last item's expiry + TTL + class max TTL + margin has passed; then a class change is allowed.

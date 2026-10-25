@@ -180,7 +180,7 @@ canticle sing --control ./watch.sock --stream distress --scope fleet --keep-on-a
 - `--body-ref URL SHA256 SIZE` gives content by reference (§9.6). Alone it makes a doorbell, such as the
   receipt's `finding-ref`; beside a body, the body is its summary. Nothing fetches it.
 - The control socket takes the same as `"finding": {...}` and `"body_ref": {"url", "sha256", "size"}`. A
-  refusal names the field and comes before a `seq` is used.
+  refusal names the field and comes before a `seq` is used, as does one for a frame over 1 100 bytes.
 - `canticle tap` shows a finding field by field inside the wrapper, under one host-authored line with its
   status, severity and voice as attributed to the signer: `voice=self` only when the subject names the signer.
   `--json` adds `finding` (its text fields defanged) and `finding_voice`, or `finding_error`.
@@ -456,7 +456,7 @@ decides who may connect. Exit status: 0 ok; 1 no socket, refused or timed out; 2
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 320 tests, about 80 s
+python -m unittest discover -s tests      # 321 tests, about 80 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -470,6 +470,7 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
   - a 20 000-case fuzz run (random bytes and mutations of valid frames) in which nothing but a `Reject` ever escapes.
 - `test_station.py` drives the carousel on a virtual clock:
   - burst timing, byte-identical repeats, jitter bounds and stopping before expiry;
+  - an item too large for a frame refused before a seq is used (#112);
   - the regulator's fair share, class floor and degraded shedding;
   - supersede, pluck (including a late pluck that must never be shed, a PLUCK that depth never evicts, and a refused hush that must change nothing) and refresh re-issue (which keeps provenance flags), and one class per state_key within an epoch (a change is refused before a seq is used, and a key is forgotten once no receiver can hold its mark, so the table stays bounded);
   - depth, stream-id collisions and beacon pages (including the #71 shrink repro, a growth repro, and a property test that every window of `count` beacons carries every stream, under growth and shrinkage, with every paged beacon the actual-size run from the cursor);
