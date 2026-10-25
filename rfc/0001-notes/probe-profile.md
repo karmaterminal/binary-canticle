@@ -85,7 +85,9 @@ Content type 11, `application/vnd.canticle.finding+cbor` (§9.9): a deterministi
 
 - Every text field is one line: no Unicode Cc character, and no U+2028 or U+2029. Lengths count UTF-8 bytes.
 - A publisher refuses names it does not know. Receivers ignore unsigned integer keys other than 1-7; a change that
-  old receivers must not misread takes a new content type.
+  old receivers must not misread takes a new content type. Keep a new key's value within frame v2's CBOR subset
+  (no floats, tags or `undefined`; integer or text map keys): the spike reads a body outside it as opaque
+  (prototype README).
 - In record v1 (§14.18.3), `body.ctype` is the media type's name, or 11 from a daemon that predates the
   registration. Accept both.
 - No word means "fine", and a missing severity is not a value (I-9). A probe that finds nothing to report sings

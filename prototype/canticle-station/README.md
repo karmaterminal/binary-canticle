@@ -38,7 +38,7 @@ Not implemented here, and still open work (see RFC-0001 §23.3):
 - the receiver side of `trail_seq` (§7.10: waiting up to one `loop_max_ms` for a gap at or above it, and relay repair). The station emits it and the listener holds it (amendment A1, #70); nothing acts on it yet.
 - IPv6 groups, and the multicast decision of §11.2's doctor (MTU, peer beacons, the 270 s querier check, Wi-Fi and container detection, broadcast fallback, recording the binding, and its exit codes). `canticle doctor` checks the host and only reports multicast.
 
-The decoder is stricter than the RFC in two places: it rejects floats and tags under every key, not only core keys 1-31; and it accepts only integer and text-string map keys at every depth, including extension values (#66), where the RFC says only that the frame map has integer keys.
+The decoder is stricter than the RFC in two places: it rejects floats, tags and simple values other than false, true and null under every key, where the RFC forbids only floats and tags, and only under core keys 1-31; and it accepts only integer and text-string map keys at every depth, including extension values (#66), where the RFC says only that the frame map has integer keys. Finding bodies (§6.7) go through the same decoder, so both rules hold inside them at every depth, with §9.4's deterministic encoding and bounds (depth 4, 32 entries). A finding body that breaks any of them, even under a key receivers ignore, is opaque, where §6.7's CDDL admits any value under those keys.
 
 Keep-on-air is looser than the RFC: the station lets any keyed item be kept on air up to its 24 h hard cap (D3), where §7.9 holds classes other than root and aspect items to one TTL unless the stream configuration raises it. Streams have no such setting here.
 
