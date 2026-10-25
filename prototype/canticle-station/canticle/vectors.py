@@ -219,6 +219,15 @@ def sequence_cases() -> list[dict]:
     ]
     out += [{"name": n, "datagrams_hex": [d.hex() for d in ds], "now_ms": NOW, "at_ms": at,
              "per_key_quota": q, "per_key_mark_quota": mq, "expect": e} for n, ds, at, q, mq, e in timed]
+    # #67: with no fixed mark limit, the derived one is the dedup quota × the largest granted class factor,
+    # capped at the keyed classes' largest (8). test1 is granted finding-ref (factor 98), so at a dedup
+    # quota of 1 it holds 8 marks. Each item lives 1 s, so its dedup entry is gone before the next.
+    fr = [wire.sign_frame(wire.KIND_ITEM, s1, _item({2: threat, 3: i + 1, 4: NOW + i * 10_000,
+                                                     5: NOW + i * 10_000 + 1_000, 6: 5, 10: f"f{i}"}))
+          for i in range(9)]
+    out.append({"name": "supersession-mark-limit-factor-capped", "datagrams_hex": [d.hex() for d in fr],
+                "now_ms": NOW, "at_ms": [NOW + i * 10_000 for i in range(9)], "per_key_quota": 1,
+                "expect": ["item"] * 8 + ["evidence:over-quota"]})
     return out
 
 
