@@ -38,6 +38,18 @@ LIVE_STATE = CLASS_BY_NAME["live-state"].code
 STATE_VERSION = 3  # 2: dedup rows carry (expires_at, scope) for the §9.7 PLUCK check (#60); 3: marks carry their class (§23.2 q21)
 
 
+def _mark_factor(c) -> int:
+    """How many dedup entries' lifetimes a mark of class c lasts: ⌈(default TTL + max TTL + skew) / default TTL⌉ (§7.4)."""
+    return -(-((c.default_ttl_s + c.max_ttl_s) * 1000 + SKEW_MS) // (c.default_ttl_s * 1000))
+
+
+# The mark limit's factor never exceeds the largest among the classes that must carry a state_key (§6.2):
+# 8, for regulatory and control. ambient (14) and finding-ref (98) may carry one but need not, and
+# uncapped they let one key hold 98 times its dedup share in marks, every one of them in each saved
+# snapshot (#67).
+MARK_FACTOR_CAP = max(_mark_factor(c) for c in CLASSES.values() if c.keyed)
+
+
 @dataclass
 class Event:
     kind: str       # item | withdrawn | superseded | expired | presence | evidence
@@ -500,13 +512,13 @@ class Listener:
         """Per-key limit on supersession marks, counted apart from dedup entries (§7.4). A dedup entry
         lasts about one TTL; a mark lasts that TTL + skew + the class max TTL (§7.8). So the limit is the
         dedup share scaled by the largest ⌈(default TTL + max TTL + skew) / default TTL⌉ among the key's
-        granted classes: a key churning state_keys at its class default TTLs within its share fits."""
+        granted classes, capped at MARK_FACTOR_CAP (#67): a key churning state_keys at its class default
+        TTLs within its share fits, for every class whose factor is at most the cap."""
         if self.per_key_mark_quota is not None:
             return max(1, self.per_key_mark_quota)
         entry = self.manifest.entry(kid)
         specs = [CLASSES[c] for c in (entry.classes if entry else ()) if c in CLASSES] or list(CLASSES.values())
-        factor = max(-(-((c.default_ttl_s + c.max_ttl_s) * 1000 + SKEW_MS) // (c.default_ttl_s * 1000)) for c in specs)
-        return self._quota() * factor
+        return self._quota() * min(MARK_FACTOR_CAP, max(_mark_factor(c) for c in specs))
 
     def _hwm_room(self, kid: bytes, now_ms: int) -> bool:
         """Marks outlive dedup entries, so they have their own per-key limit, checked at admission and
