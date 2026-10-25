@@ -400,8 +400,9 @@ class PerKeyBoundsTest(unittest.TestCase):
     def test_mark_limit_factor_is_capped_at_the_keyed_classes(self):
         # #67: the factor was the largest over every granted class, 98 for finding-ref, which any key may
         # use with a state_key. It is now capped at the largest factor among keyed classes (8); classes at
-        # or under the cap keep their factor.
-        for classes, factor in (({5}, 8), ({2}, 8), ({1, 5}, 8), ({6}, 8), ({8}, 8), ({1, 3, 9}, 7),
+        # or under the cap keep their factor. `keyed` only sets the cap's value: the factor is still taken over
+        # every granted class, keyed or not, so advisory (unkeyed, 6) beside finding-ref gets 8, not 0 or 6.
+        for classes, factor in (({5}, 8), ({2}, 8), ({1, 5}, 8), ({4, 5}, 8), ({6}, 8), ({8}, 8), ({1, 3, 9}, 7),
                                 ({4}, 6), ({7}, 6), ({9}, 3)):
             entry = StationEntry("cael", wire.public_key_bytes(SK), frozenset(classes), ("chatter",))
             lst = Listener(Manifest([entry]), ephemeral=True, per_key_quota=256)
@@ -431,8 +432,9 @@ class PerKeyBoundsTest(unittest.TestCase):
         self.assertEqual([e.kind for e in evs], ["item"])
 
     def test_mark_cap_holds_per_key_under_multi_key_saturation(self):
-        # Three keys granted finding-ref, each saturating its marks: each holds its own quota × 8, none
-        # locks another out, and together they hold 8 × the dedup capacity (main: 98 ×).
+        # Three keys granted finding-ref, each saturating its marks: each holds its own quota × 8 and none
+        # locks another out. With equal shares of the store (no per-key override, capacity ≥ keys) that sums
+        # to 8 × the dedup capacity (main: 98 ×); see the next test for when it does not.
         sks = [Ed25519PrivateKey.from_private_bytes(bytes.fromhex(s)) for s in (vectors.TEST1, vectors.TEST2,
                                                                                   vectors.TEST3)]
         lst = self.fr_listener(keys=sks, dedup_capacity=30)
@@ -445,6 +447,44 @@ class PerKeyBoundsTest(unittest.TestCase):
         kids = [wire.key_id(wire.public_key_bytes(sk)) for sk in sks]
         self.assertEqual([lst.hwm_per_key[k] for k in kids], [80, 80, 80])
         self.assertEqual(len(lst.hwm), 8 * 30)
+
+    def test_the_8x_capacity_sum_holds_only_for_equal_shares(self):
+        # 🌻's review of #117: the cap is per key. The sum over keys is 8 × the sum of the per-key dedup
+        # quotas, which is 8 × the store only for equal shares. An explicit per-key quota, or the floor of 1
+        # with more keys than capacity, takes the sum past 8 × capacity.
+        sks = [Ed25519PrivateKey.from_private_bytes(bytes.fromhex(s)) for s in (vectors.TEST1, vectors.TEST2,
+                                                                                  vectors.TEST3)]
+        kids = [wire.key_id(wire.public_key_bytes(sk)) for sk in sks]
+        lst = self.fr_listener(keys=sks, dedup_capacity=30, per_key_quota=256)
+        self.assertEqual(sum(lst._mark_quota(k) for k in kids), 3 * 2_048)          # not 8 × 30 = 240
+        lst = self.fr_listener(keys=sks, dedup_capacity=2)
+        self.assertEqual(lst._quota(), 1)
+        self.assertEqual(sum(lst._mark_quota(k) for k in kids), 3 * 8)              # not 8 × 2 = 16
+
+    def test_a_full_mark_limit_refuses_an_open_never_a_close(self):
+        # The #115 profile grants advisory (unkeyed, state_key optional) and finding-ref. Its keyed
+        # advisories make the marks and count against the key's limit. Once the limit is full a new
+        # incident's open is refused, but a resolve for an incident already marked needs no new mark
+        # (_needs_hwm_slot), so it lands.
+        entry = StationEntry("cael", wire.public_key_bytes(SK), frozenset({4, 5}), ("chatter",))
+        lst = Listener(Manifest([entry]), ephemeral=True, warmup=False, per_key_quota=1)
+        self.assertEqual(lst._mark_quota(SK_ID), 8)
+        adv = lambda seq, t, key, text: self.item(seq, t, cls=4, ttl=1_000, extra={10: key, 8: text})
+        for i in range(8):
+            t = T0 + i * 7_000
+            lst.tick(t)
+            self.assertIn("item", [e.kind for e in lst.hear(adv(i + 1, t, f"inc-{i}", b"open"), t)])
+        self.assertEqual((lst.hwm_per_key[SK_ID], {v[4] for v in lst.hwm.values()}), (8, {4}))
+        t = T0 + 8 * 7_000
+        lst.tick(t)
+        evs = lst.hear(adv(9, t, "inc-8", b"open"), t)                               # a new incident: no room
+        self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["over-quota"])
+        t += 7_000
+        lst.tick(t)
+        evs = lst.hear(adv(10, t, "inc-3", b"resolved"), t)                          # an open incident's close
+        self.assertEqual([e.kind for e in evs], ["item"])
+        self.assertEqual(lst.hwm[(SK_ID, self.CHAT, "inc-3")][2], 10)                # the mark moved; none added
+        self.assertEqual(len(lst.hwm), 8)
 
     def test_marks_round_trip_at_the_cap_and_older_state_over_it_loads_whole(self):
         with tempfile.TemporaryDirectory() as d:
