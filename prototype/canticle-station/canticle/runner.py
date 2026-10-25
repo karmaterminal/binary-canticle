@@ -19,6 +19,7 @@ import struct
 import time
 from typing import Callable, Optional
 
+from . import finding
 from .listener import Event, Listener
 from .ids import CLASSES
 from .station import Station
@@ -51,6 +52,33 @@ def _peer_uid(writer: asyncio.StreamWriter) -> Optional[int]:
     return struct.unpack("3i", creds)[1]
 
 
+def body_ref(ref) -> tuple:
+    """A request's ``body_ref``, ``{url, sha256, size}``, as ITEM key 9 (§9.6): a one-line url of 1-200 bytes,
+    the referenced content's SHA-256 in hex, and its size in bytes. Receivers never fetch it on landing."""
+    if not isinstance(ref, dict) or set(ref) != {"url", "sha256", "size"}:
+        raise ValueError("body_ref is {url, sha256, size} (§9.6)")
+    url, digest, size = ref["url"], ref["sha256"], ref["size"]
+    if not isinstance(url, str) or not 1 <= len(url.encode("utf-8")) <= 200 or not finding.one_line(url):
+        raise ValueError("body_ref url is one line of 1-200 bytes (§9.6)")
+    if not isinstance(digest, str) or len(digest) != 64 or set(digest) - set("0123456789abcdefABCDEF"):
+        raise ValueError("body_ref sha256 is 64 hex digits")
+    if isinstance(size, bool) or not isinstance(size, int) or not 0 <= size < 2**64:
+        raise ValueError("body_ref size is a byte count")
+    return url, bytes.fromhex(digest), size
+
+
+def _finding_body(req: dict, cls: Optional[str], kwargs: dict) -> None:
+    """Turn a request's ``finding`` into the item's body: content type 11, keyed by its incident (§6.7)."""
+    if cls != finding.CLASS:
+        raise ValueError(f"a finding is sung as class {finding.CLASS}, not {cls} (§6.7)")
+    if "text" in req or "body_hex" in req or req.get("ctype", finding.CTYPE) != finding.CTYPE:
+        raise ValueError("a finding is the whole body, content type 11: no text, body_hex or other ctype (§6.7)")
+    f = finding.check(req["finding"])
+    if kwargs.setdefault("state_key", f["incident"]) != f["incident"]:
+        raise ValueError("a finding's state_key is its incident (§6.7)")
+    kwargs["body"], kwargs["ctype"] = finding.encode(f), finding.CTYPE
+
+
 def _dispatch(station: Station, req: dict, socket_classes: frozenset) -> dict:
     op = req.get("op")
     now = now_ms()
@@ -70,6 +98,10 @@ def _dispatch(station: Station, req: dict, socket_classes: frozenset) -> dict:
             kwargs["body"] = bytes.fromhex(req["body_hex"])
         if "ctype" in req:
             kwargs["ctype"] = req["ctype"]
+        if "body_ref" in req:
+            kwargs["body_ref"] = body_ref(req["body_ref"])
+        if "finding" in req:
+            _finding_body(req, cls, kwargs)
         if isinstance(kwargs.get("loop"), str) and kwargs["loop"].isdigit():
             kwargs["loop"] = int(kwargs["loop"])
         return {"ok": True, **station.sing(now, req["stream"], **kwargs).to_json()}

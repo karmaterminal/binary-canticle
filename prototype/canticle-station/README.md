@@ -17,6 +17,7 @@ them loop until they expire.
 | §10.4 Publisher grants | The station signs only the classes, scopes and streams its manifest entry grants, checked before a `seq` is allocated. The control socket has its own grant, narrower than the key's (`--socket-class`), and never accepts `regulatory`, `alarm` or `control`, because their op-level and typed-body checks (§10.4, §15.4) are not implemented here; `host` scope is refused because this station only speaks UDP; one station per key (an exclusive lease on the key file); epochs from a locked, fsynced counter. |
 | §11.1-§11.2 Bindings | Host-local submission over a unix socket (mode 0600, peer uid checked); UDP unicast and LAN multicast (`239.255.13.13:9999`, provisional per D22, IP TTL 1, don't-fragment). |
 | §11.2, §13.6, §15.7 Onboarding (#73) | `canticle doctor` checks Python, `cryptography` (with an RFC 8032 known answer), `stations.toml`, the manifest and the listener's UDP address, and only reports multicast. `stations.toml` locates the manifest and the listener's address. `canticle manifest verify` and `show` read the unsigned spike-0 manifest; manifests refuse small-order keys (§9.3) and key-ids that do not match their keys (§10.3). |
+| §6.7 Findings (FP-1, #112) | `canticle/finding.py`: the finding body (content type 11) and its strict reader. `canticle sing --finding` and `--body-ref`, and the control socket's `finding` and `body_ref` fields, put a keyed `advisory` finding and a `finding-ref` doorbell on air. `canticle tap` shows a finding field by field, with a host-authored line that attributes it to its signer. See [Findings](#findings-fp-1-112). |
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
 | §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only gateway over one listener, and a read-only page to pick a station:stream and watch its live ring, with expiry and gaps shown honestly. |
 | §14.18.3 Record v1 (BC-2, #77) | `canticle/records.py`: the listener's outcomes as receptor record v1 (`hello`, `landing_state`, `frame`, `retract`, `presence`, `health`, `fatal`, `bye`) under the disposition mapping, with fixed health counters and a bounded table of unverified key ids (D34). See [Record v1 and the host daemon](#record-v1-and-the-host-daemon-bc-2-d35-77). |
@@ -27,7 +28,7 @@ Not implemented here, and still open work (see RFC-0001 §23.3):
 - relay leases for internet listeners (§11.3)
 - signed fleet manifests and the genesis pin; the manifest here is plain JSON (§10.3), so `stations.toml` refuses a `[trust]` table
 - the daemon's key store (§15.7); keys are files
-- typed-body schemas, content policy and taint checks before signing (§15)
+- typed-body schemas other than the finding body (§6.7), and content policy and taint checks before signing (§15)
 - accord (§10.7) and control frames (§10.6)
 - the receptor's landing into agent sessions, banners and taint (§14)
 - DNS-SD (§13)
@@ -38,6 +39,8 @@ Not implemented here, and still open work (see RFC-0001 §23.3):
 - IPv6 groups, and the multicast decision of §11.2's doctor (MTU, peer beacons, the 270 s querier check, Wi-Fi and container detection, broadcast fallback, recording the binding, and its exit codes). `canticle doctor` checks the host and only reports multicast.
 
 The decoder is stricter than the RFC in two places: it rejects floats and tags under every key, not only core keys 1-31; and it accepts only integer and text-string map keys at every depth, including extension values (#66), where the RFC says only that the frame map has integer keys.
+
+Keep-on-air is looser than the RFC: the station lets any keyed item be kept on air up to its 24 h hard cap (D3), where §7.9 holds classes other than root and aspect items to one TTL unless the stream configuration raises it. Streams have no such setting here.
 
 ## Install and onboard
 
@@ -154,6 +157,33 @@ On 2026-09-27 an earlier form of these commands ran as separate processes over m
 Each item was heard once, although the station sent it many times. The last line is the goodbye beacon the station sends on shutdown.
 
 The station keeps its epoch counter next to its key (`cael.key.epoch`; `--epoch-file` overrides the path). Each start takes `max(previous + 1, unix seconds)` and writes it before the first frame, so a restart never reuses a `seq` (RFC §5.2).
+
+### Findings (FP-1, #112)
+
+A fleet probe or a distress watcher sings a finding: a keyed `advisory` with content type 11 (RFC §6.7). The
+streams, incident keys and lifecycle are in the probe profile,
+[`rfc/0001-notes/probe-profile.md`](../../rfc/0001-notes/probe-profile.md), with a full open, close and doorbell
+example.
+
+```sh
+SHA256=$(sha256sum receipt-1.json | cut -d' ' -f1); SIZE=$(stat -c %s receipt-1.json)
+canticle sing --control ./watch.sock --stream distress --scope fleet --keep-on-air 1800 \
+  --finding '{"incident": "seat-a:distress", "subject": "seat-a", "voice": "observer", "status": "open",
+    "severity": "moderate", "summary": "gateway not ready for 6 min; 3 claimed turns waiting",
+    "not_proved": "that any turn was lost"}' \
+  --body-ref https://ledger.example/receipts/seat-a-distress-1.json "$SHA256" "$SIZE"
+```
+
+- `--finding` sends the named fields. The station checks them (`canticle/finding.py`), builds the body, keys the
+  item by its incident, and refuses any class but `advisory`. A newer finding on the same key supersedes the
+  old one and stops its loop at once; only one that says `resolved` resolves it.
+- `--body-ref URL SHA256 SIZE` gives content by reference (§9.6). Alone it makes a doorbell, such as the
+  receipt's `finding-ref`; beside a body, the body is its summary. Nothing fetches it.
+- The control socket takes the same as `"finding": {...}` and `"body_ref": {"url", "sha256", "size"}`. A
+  refusal names the field and comes before a `seq` is used.
+- `canticle tap` shows a finding field by field inside the wrapper, under one host-authored line with its
+  status, severity and voice as attributed to the signer: `voice=self` only when the subject names the signer.
+  `--json` adds `finding` (its text fields defanged) and `finding_voice`, or `finding_error`.
 
 ### From an agent harness
 
@@ -400,7 +430,8 @@ stream as a binding must (*Joining a run*), and prints:
   host-authored and outside the wrapper; `[canticle:` prefixes and `<<<` / `>>>` in the payload are defanged
   first, so heard text can counterfeit neither. Matching runs on a copy folded as OpenClaw folds marker text
   (look-alike and fullwidth brackets, zero-width characters), and a triple bracket becomes `&lt;&lt;&lt;` /
-  `&gt;&gt;&gt;` (#106). A body by reference is named, never fetched.
+  `&gt;&gt;&gt;` (#106). A body by reference is named, never fetched. A finding gets one more banner line
+  ([Findings](#findings-fp-1-112)).
 
 `--json` applies the same landing rules: `body.text`, `purpose` and `body_ref.url` are defanged, and each item
 carries `untrusted: true`, the §14.13 notice and `sig` (from the record's admission). `--unsafe-raw` (with
@@ -425,7 +456,7 @@ decides who may connect. Exit status: 0 ok; 1 no socket, refused or timed out; 2
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 300 tests, about 80 s
+python -m unittest discover -s tests      # 320 tests, about 80 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
@@ -519,6 +550,21 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
     sends `bye`, removes the socket, and the tap prints its bye line and exits 0; KILL leaves the socket, which
     refuses a connection, and the tap prints its without-bye line and exits 3. The next daemon takes the socket
     back with a new `run` and surfaces a still-live item once, as `resurfaced`, with its signed expiry.
+- `test_finding.py` covers findings sung live (§6.7, #112):
+  - the finding body: the probe profile's worked examples byte for byte, severity words given only while
+    open, bounded one-line text, strict decoding that ignores only unknown integer keys, and a finding
+    carried only by a keyed `advisory`;
+  - `sing`: a finding keyed by its incident, a `body_ref` beside it, the receipt's doorbell (an unkeyed
+    `finding-ref` with only a `body_ref`), refusals before a `seq` is used, the largest finding fitting a frame,
+    and the requests the CLI builds;
+  - resolution: a `resolved` finding stops the open one's loop at once, and another station's resolution
+    resolves nothing of this one's;
+  - late joiners: one that joins after the resolution hears it once within about one loop and never the open
+    finding, and one that joined while open hears the open finding superseded;
+  - voice, through the receptor and `canticle tap`: a watcher's finding lands as the watcher's, never in the
+    subject's voice; `self` only when the subject names the signer; a body that is not a finding stays opaque;
+    station text inside a finding is defanged;
+  - the background emitter still refusing `advisory` and `finding-ref` (§15.8).
 - `test_pilot_host.py` covers the pilot-host kit (#103):
   - the daemon's start guard under every POSIX shell found, with stub `id`, `sudo` and `nft`: a wildcard or
     malformed bind and a missing or unreadable table are refused, and so is a table that scopes another address,
