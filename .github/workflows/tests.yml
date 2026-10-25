@@ -121,6 +121,13 @@ jobs:
           node "$RUNNER_TEMP/tsc/node_modules/typescript/bin/tsc"
           -p prototype/openclaw-canticle/tsconfig.json
           --typeRoots "$RUNNER_TEMP/tsc/node_modules/@types"
+      - name: Build installable plugin entry
+        run: |
+          node "$RUNNER_TEMP/tsc/node_modules/typescript/bin/tsc" \
+            -p prototype/openclaw-canticle/tsconfig.build.json \
+            --typeRoots "$RUNNER_TEMP/tsc/node_modules/@types"
+          test -f prototype/openclaw-canticle/dist/index.js
+          node -e 'import("./prototype/openclaw-canticle/dist/index.js").then(m => { if (m.default?.id !== "canticle") process.exit(1) })'
       - name: Run plugin tests (the interop test runs the real daemon and stations)
         working-directory: prototype/openclaw-canticle
         env:
