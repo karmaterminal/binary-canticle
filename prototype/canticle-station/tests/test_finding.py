@@ -254,16 +254,22 @@ class SingTest(unittest.TestCase):
 
 class ResolveTest(unittest.TestCase):
     def test_a_resolved_finding_stops_the_open_loop_at_once(self):
+        """The profile's lifecycle: the open is kept on air past a refresh, then resolved. The refreshed item is
+        the one superseded, and no open finding goes out afterwards, by loop or by refresh (§7.8, §7.9)."""
         st = station(WATCH_SK)
-        a = sing(st, T0, stream="distress", finding=OPEN)
-        self.assertTrue(items(run(st, T0, T0 + 30_000), seq=a["seq"]))
-        b = sing(st, T0 + 30_000, stream="distress", finding=RESOLVED)
-        self.assertEqual(b["superseded_seq"], a["seq"])
-        later = run(st, T0 + 30_000, T0 + 120_000)
-        self.assertFalse(items(later, seq=a["seq"]), "the open finding looped after its resolution")
-        resolved = items(later, seq=b["seq"])
-        self.assertEqual(resolved[0][0], T0 + 30_000)          # the resolution goes out at once, with a burst
-        self.assertEqual(finding.decode(parsed(resolved[0][1], resolved[0][0]).body.body)["status"], "resolved")
+        a = sing(st, T0, stream="distress", finding=OPEN, keep_on_air=1_800)
+        ttl_ms = int(a["ttl_s"] * 1000)
+        opened = run(st, T0, T0 + ttl_ms)                      # past the re-issue at 2/3 of the TTL (§7.9)
+        refreshed = {parsed(f, t).body.seq for t, f in items(opened)} - {a["seq"]}
+        self.assertEqual(len(refreshed), 1, "the open finding was not kept on air by one refresh")
+        t = T0 + ttl_ms
+        b = sing(st, t, stream="distress", finding=RESOLVED, keep_on_air=900)
+        self.assertEqual(b.get("superseded_seq"), refreshed.pop(), "the resolution left the refreshed item on air")
+        later = run(st, t, t + 2 * ttl_ms)                     # past where the open one's next refreshes fell
+        statuses = [finding.decode(parsed(f, u).body.body)["status"] for u, f in items(later)]
+        self.assertNotIn("open", statuses, "the open finding looped or was re-issued after its resolution")
+        self.assertEqual(items(later, seq=b["seq"])[0][0], t)  # the resolution goes out at once, with a burst
+        self.assertEqual(statuses[0], "resolved")
 
     def test_another_stations_resolution_does_not_resolve_this_one(self):
         """§6.5: supersession stays within one key. The watcher's open finding stays current when the seat itself

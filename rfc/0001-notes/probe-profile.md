@@ -25,10 +25,11 @@ not do · the prototype · choices for review.
    did run show them, and the summary names what was not read.
 5. Close explicitly, with a newer item on the same key and stream: `resolved` when you saw it clear, `ended` when
    you stopped watching without seeing it clear. Never leave it to silence or expiry.
-6. On `alerts`, announce changes, not scans (Silas, #111): a material change, the close, and at most one
-   rate-limited reminder.
-7. Never sing `alarm`, never give severity as a number, and never put a credential, a pre-signed URL or a local
-   path in a `body_ref` or a text field.
+6. Announce changes, not scans (Silas, #111): the open, a new view when the finding changes materially, the
+   close, and at most one reminder, an hour or more after the last change (Lifecycle). New counts alone are not
+   a change.
+7. Never sing `alarm` or hold a key granted it, never give severity as a number, and never put a credential, a
+   pre-signed URL or a local path in a `body_ref` or a text field.
 
 **Receiver**
 
@@ -53,6 +54,10 @@ not do · the prototype · choices for review.
 
 - Both streams carry the finding and its receipt's doorbell. The names are conventions: a receiver knows a
   finding by its content type, class and key, never by its stream (§6.7).
+- Each stream's configuration raises the keep-on-air ceiling for `advisory` from one TTL (§7.9) to at least
+  1800 s, the watch window the examples use; a watcher that watches longer needs a stream configured for its
+  window. Without that, a conforming station keeps a finding on air for one TTL only, and receivers then read it
+  as lapsed.
 - An incident key is the item's `state_key`: 1-32 bytes of UTF-8, one line. Lowercase ASCII is easiest to match.
   `SIGNAL` comes from the probe's own list (scribe-prince-shared#78 keeps the fleet probes' list). Leave room for
   the seat: beside the 17-byte `heartbeat-crowded`, `SEAT` has 14 bytes.
@@ -127,14 +132,21 @@ a6016f736561742d613a64697374726573730266736561742d6103686f6273657276657204687265
 2. **Open.** Sing the advisory with `status: open`, a severity, the receipt as `body_ref`, and `--keep-on-air` for
    the watch window. The station re-issues it before each expiry with the same body (§7.9), so a summary states
    what the check saw, not a running count.
-3. **A new view.** When the severity or what the summary says changes, sing a new item on the same key. It
-   supersedes the old one at once (§7.8), and a late joiner hears only the newest within about one loop (§7.10).
-4. **Close.** Sing `resolved` or `ended`, with no severity, the final receipt as `body_ref`, and about 15 minutes
+3. **A new view.** When the finding changes materially, sing a new item on the same key: a new severity, or a
+   change in what it asserts (for a watcher, which of its checks fail). New counts alone are not a change: every
+   scan re-counts, and a sing per scan is the chatter rule 6 keeps off the air, so the item keeps the counts it
+   was sung with. A new view supersedes the old item at once (§7.8), and a late joiner hears only the newest
+   within about one loop (§7.10).
+4. **Reminder.** At most one per incident, an hour or more after the open or the last new view, while it is
+   still open: the current body sung again, with the same `canticle sing --finding`. It is a new item, so every
+   receiver hears it as new. A keep-on-air re-issue is not a reminder: it carries `refresh = 1` and an equal
+   digest, and receivers take it as the same lineage, never as new (§7.9).
+5. **Close.** Sing `resolved` or `ended`, with no severity, the final receipt as `body_ref`, and about 15 minutes
    of keep-on-air (`--keep-on-air 900`), so late joiners hear the close. A probe's conversational presence ends
    with its close, so no listener sees an apparent responder silently swallowing questions (Silas, #111).
-5. **Doorbell.** Ring the final receipt once: a `finding-ref` with only a `body_ref` (content type 8) and no
+6. **Doorbell.** Ring the final receipt once: a `finding-ref` with only a `body_ref` (content type 8) and no
    `state_key`. An unkeyed item cannot be kept on air (§7.9), so it lives one stream TTL.
-6. **Sung in error.** Correct it with a newer item on the same key: `ended`, with a summary that says what was
+7. **Sung in error.** Correct it with a newer item on the same key: `ended`, with a summary that says what was
    wrong. Pluck it (`canticle hush`) only when the item itself must stop being shown; a pluck withdraws a
    statement and never resolves one (§7.7).
 
@@ -143,8 +155,9 @@ conversational presence ends. A frame lives one TTL, at most the stream's `max_t
 Keep-on-air is a series of re-issued frames, which the station keeps up after the probe has exited. If the
 station stops, the item lapses within one TTL, and receivers read that as lapsed, never as resolved.
 
-Keep-on-air past one TTL needs the stream's configuration to allow it (§7.9). The spike does not model that per
-stream: it caps any keyed item at the 24 h station hard cap (D3).
+Keep-on-air past one TTL needs the stream's configuration to allow it (§7.9), which is why both streams raise it
+to at least 1800 s. The spike does not model per-stream ceilings: it caps any keyed item at the 24 h station hard
+cap (D3).
 
 ## Classes
 
@@ -231,3 +244,5 @@ Each choice, with the alternative it turned down. The open questions are RFC §2
 5. CAP's severity words, present only while open. Not `critical`, `warning` and `info`.
 6. `self` shown only when `subject` names the signer's manifest station name.
 7. A malformed body fails quiet as opaque. Nothing is shown half-parsed.
+8. A new view only on a material change, and one reminder, sung as a new item. Not a sing per scan, and not a
+   reminder sent as a refresh, which no receiver shows as new.

@@ -426,7 +426,8 @@ finding-body = {
   ? 5 => "extreme" / "severe" / "moderate" / "minor" / "unknown",
                                         ; severity, in CAP's words: present exactly when status is "open"
   6 => tstr .size (1..280),             ; summary: what was checked and seen, in plain operational language
-  7 => tstr .size (1..160)              ; not_proved: what this finding does not establish
+  7 => tstr .size (1..160),             ; not_proved: what this finding does not establish
+  * (0 / uint .gt 7) => any             ; any other unsigned key: ignored (fail quiet, below)
 }
 ```
 
@@ -437,7 +438,7 @@ finding-body = {
 - **Resolution is explicit.** For one signer, an incident is resolved only by a newer item from the same key, on the same stream and with the same `state_key`, whose body says `resolved`. It supersedes the open item and stops its loop at once (§7.8). `ended` says that the signer stopped watching without seeing the condition clear. Silence, expiry, a pluck, a lapsed refresh, a gap and another station's item MUST NOT be read as resolved (§6.3 rule 5, §6.5, §14.7.2). An open finding that reaches its local expiry loses current-state authority (§6.3 rule 1), and reads as lapsed, not resolved.
 - **Many observers, one incident.** Stations that see the same incident use the same `incident`. Each station's item is its own observation, superseded only by that station (§6.5, §7.8). A receiver MAY group them by incident; it counts signers, never items or repeats (§10.7 R-ACC-1).
 - **The receipt's doorbell.** A `finding-ref` on the same stream announces the durable receipt: `body_ref` only, content type 8 (§9.12), and no `state_key`. A doorbell keyed by the incident would change that key's class within the epoch (§7.8).
-- **Never an alarm.** A probe or a watcher never sings `alarm`. Alarms need a human-held key (D14), and a single automated keeper raising fleet alarms is not v1 (§19.6).
+- **Never an alarm.** A probe or a watcher MUST NOT sing `alarm`, and its key MUST NOT be granted `alarm` in the manifest (§10.4); an alarm from such a key then fails the capability check at every receiver. Alarms need a human-held key (D14), and a single automated keeper raising fleet alarms is not v1 (§19.6).
 
 The stream names, incident keys and lifecycle that fleet probes and distress watchers follow are the probe profile, `rfc/0001-notes/probe-profile.md`. That note is non-normative and defers to this section.
 

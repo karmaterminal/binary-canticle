@@ -558,8 +558,8 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
   - `sing`: a finding keyed by its incident, a `body_ref` beside it, the receipt's doorbell (an unkeyed
     `finding-ref` with only a `body_ref`), refusals before a `seq` is used, the largest finding fitting a frame,
     and the requests the CLI builds;
-  - resolution: a `resolved` finding stops the open one's loop at once, and another station's resolution
-    resolves nothing of this one's;
+  - resolution: a `resolved` finding stops the open one's loop at once, after keep-on-air has refreshed it, and
+    no refresh brings it back; another station's resolution resolves nothing of this one's;
   - late joiners: one that joins after the resolution hears it once within about one loop and never the open
     finding, and one that joined while open hears the open finding superseded;
   - voice, through the receptor and `canticle tap`: a watcher's finding lands as the watcher's, never in the
