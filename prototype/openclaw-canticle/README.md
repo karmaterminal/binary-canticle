@@ -16,7 +16,7 @@ acceptance list is for the princes ([Trying it on a seat](#trying-it-on-a-seat))
 | Heard text | Only for sessions listed in `listen.payloadSessions`, under the §14.13 banner and inside the untrusted-content wrapper. Every other session reads host-written digests. Reading heard text taints the session. |
 | Publishing | Off by default. When enabled, it sings through this prince's own station's control socket, as that station's pinned key. It exercises the outbox, and it is not P2 ([Phases](#phases)). |
 | Two bindings | Separate state roots, ids that name their binding, and refusals that change nothing (#95). |
-| Runtime | OpenClaw loads `index.ts` as written: no build step, no runtime dependencies. |
+| Runtime | No runtime dependencies. `build.sh` emits installable JavaScript from the locked TypeScript toolchain; the source checkout still runs directly in tests. |
 
 Contents: [Phases](#phases) · [How it fits](#how-it-fits) · [Tools](#tools) · [Inbound](#inbound-journal-current-view-mutes) ·
 [Outbound](#outbound-the-aging-table) · [Bounds](#bounds) · [Authority and taint](#authority-and-taint) ·
@@ -346,10 +346,13 @@ For the princes, one seat at a time, when they choose to (#95's admission gate).
 it.
 
 1. A host daemon must already run on the seat's host (`canticle daemon`, see the station README).
-2. `openclaw plugins install --link /path/to/binary-canticle/prototype/openclaw-canticle`. Without a prompt,
-   add `--force` (a local path) and `--accept-capabilities` (the capability consent). Linking grants no extra
-   trust. The install adds the path to `plugins.load.paths` and writes `plugins.entries.canticle.enabled: false`,
-   since the plugin needs its configuration first.
+2. Run `prototype/openclaw-canticle/build.sh` from a checkout pinned to the commit you reviewed, then
+   `openclaw plugins install /path/to/binary-canticle/prototype/openclaw-canticle`. The build uses the same
+   hash-locked TypeScript toolchain as CI and emits `dist/index.js`; package installation refuses a TypeScript-only
+   entry. Without a prompt, add `--force` (a local path) and `--accept-capabilities` (the capability consent).
+   The install copies the built plugin into OpenClaw's extensions and writes
+   `plugins.entries.canticle.enabled: false`, since the plugin needs its configuration first. A `--link`
+   development install is possible, but points the Gateway at a mutable checkout and is not the seat path.
 3. Write the configuration above with the seat's binding name and socket path, then set `enabled: true`.
    `activation.onStartup` is true, so the service starts with the Gateway and ingests continuously whether or
    not any tool is allowed. Keep `listen.payloadSessions` empty: taint here bars only `canticle_sing`, and the
