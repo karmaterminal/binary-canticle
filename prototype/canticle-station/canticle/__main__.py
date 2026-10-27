@@ -30,7 +30,7 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from . import runner, stations, wire
+from . import finding, runner, stations, wire
 from .ids import CLASS_BY_NAME, SCOPES, STATION_NAME_RE
 from .listener import Listener
 from .manifest import FORMAT, Manifest, StationEntry, verify_json
@@ -178,20 +178,46 @@ def _control(a) -> str:
     raise SystemExit(2)
 
 
-def cmd_sing(a) -> int:
+def sing_request(a) -> dict:
+    """The control request ``canticle sing`` sends (§11.1). A ValueError names a usage mistake."""
+    given = [f"--{n.replace('_', '-')}" for n in ("text", "body_hex", "finding") if getattr(a, n) is not None]
+    if len(given) > 1:
+        raise ValueError(f"give one body: {' or '.join(given)}")
     req = {"op": "sing", "stream": a.stream, "loop": a.loop, "scope": a.scope}
-    if a.text is not None:
+    if a.finding is not None:
+        try:
+            req["finding"] = json.loads(a.finding)
+        except ValueError:
+            raise ValueError("--finding takes one JSON object of named fields (rfc/0001-notes/probe-profile.md)")
+        if a.ctype not in (None, finding.CTYPE):
+            raise ValueError(f"--finding is content type {finding.CTYPE}; drop --ctype {a.ctype}")
+        req["class"] = a.cls or "advisory"
+    elif a.text is not None:
         req["text"] = a.text
     elif a.body_hex is not None:
-        req["body_hex"], req["ctype"] = a.body_hex, a.ctype
-    else:
+        req["body_hex"], req["ctype"] = a.body_hex, 2 if a.ctype is None else a.ctype
+    elif a.body_ref is None:
         req["text"] = sys.stdin.read()
+    if a.body_ref is not None:
+        url, digest, size = a.body_ref
+        if not size.isdigit():
+            raise ValueError(f"--body-ref SIZE must be a byte count, not {size!r}")
+        req["body_ref"] = {"url": url, "sha256": digest, "size": int(size)}
     for k in ("ttl", "state_key", "purpose", "intensity", "keep_on_air"):
         v = getattr(a, k)
         if v is not None:
             req[k] = v
     if a.cls:
         req["class"] = a.cls
+    return req
+
+
+def cmd_sing(a) -> int:
+    try:
+        req = sing_request(a)
+    except ValueError as e:
+        print(f"canticle sing: {e}", file=sys.stderr)
+        return 2
     resp = runner.control_request(_control(a), req)
     print(json.dumps(resp))
     return 0 if resp.get("ok") else 1
@@ -584,7 +610,7 @@ def main(argv=None) -> int:
     g.add_argument("--stream", required=True)
     g.add_argument("--text")
     g.add_argument("--body-hex")
-    g.add_argument("--ctype", type=int, default=2)
+    g.add_argument("--ctype", type=int, help="content type of a --body-hex body (§9.9; default 2)")
     g.add_argument("--class", dest="cls")
     g.add_argument("--ttl", type=float)
     g.add_argument("--loop", default="normal", help="fast | normal | slow | milliseconds")
@@ -593,6 +619,11 @@ def main(argv=None) -> int:
     g.add_argument("--scope", default="lan", choices=["host", "lan", "fleet", "public"])
     g.add_argument("--purpose")
     g.add_argument("--intensity", type=int)
+    g.add_argument("--finding", metavar="JSON", help="a finding (RFC §6.7) as one JSON object: incident, subject, "
+                   "voice, status, severity, summary, not_proved. Sung as an advisory keyed by its incident")
+    g.add_argument("--body-ref", nargs=3, metavar=("URL", "SHA256", "SIZE"),
+                   help="content by reference (§9.6): alone, a doorbell such as a finding-ref; beside a body, "
+                   "the body is its summary")
     g.set_defaults(fn=cmd_sing)
 
     h = sub.add_parser("hush", help="pluck a live item")

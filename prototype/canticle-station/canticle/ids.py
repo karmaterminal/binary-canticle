@@ -131,4 +131,5 @@ CTYPES = {
     "application/vnd.canticle.digest-ref+cbor": 8,
     "application/vnd.canticle.disposition+cbor": 9,
     "application/vnd.canticle.control+cbor": 10,
+    "application/vnd.canticle.finding+cbor": 11,
 }

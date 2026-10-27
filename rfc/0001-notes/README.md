@@ -15,6 +15,16 @@ the trail.
 not in this repository. The one exception is the ringserver proofs, which
 landed as [`prototype/ringserver-proofs/`](../../prototype/ringserver-proofs/).
 
+## Profiles (maintained)
+
+A profile says how one use of the protocol sings and hears, within what the RFC
+already allows. Unlike the review notes, a profile is kept in step with the RFC
+section it serves, and that section stays the authority.
+
+| Note | Covers |
+|---|---|
+| [`probe-profile.md`](probe-profile.md) | Findings from fleet probes and distress watchers (#111, #112; RFC §6.7, amendment FP-1): the `alerts` and `distress` streams, incident keys, the finding body with worked examples, resolution by a signed `resolved` item, the receipt's doorbell, and `canticle sing --finding`. |
+
 ## Readers (what exists)
 
 | Note | Covers |

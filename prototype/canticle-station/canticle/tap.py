@@ -12,6 +12,10 @@ daemon's per-connection queue), so a tap cannot disturb another binding's view.
 
 Heard text is data (RFC I-6). The banner is host-authored and sits outside the wrapper; the payload is
 defanged first (``[canticle:`` prefixes and wrapper markers removed, §14.13), so it cannot counterfeit either.
+
+A finding (§6.7, content type 11) is shown field by field inside the wrapper. The banner gains one line with its
+status, severity and voice as attributed to the signer, all words from the profile's closed sets; a content type
+11 body that is not a finding is named as unreadable and stays opaque.
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ import re
 import secrets
 from typing import Callable, Optional, TextIO
 
+from . import finding
 from .records import MAX_LINE, RECORD_V
 
 REQUEST = json.dumps({"op": "join_snapshot", "v": RECORD_V}, separators=(",", ":")).encode() + b"\n"
@@ -84,10 +89,39 @@ def defang(text: str) -> str:
     return "".join(out)
 
 
+def _finding(rec: dict) -> tuple:
+    """(finding, None) for a frame that carries one (§6.7), (None, reason) for a content type 11 body that is not a
+    finding, (None, None) otherwise."""
+    try:
+        return finding.from_record(rec), None
+    except finding.FindingError as e:
+        return None, e.reason
+
+
+_ATTRIBUTION = {
+    "observer": "the station's own observation of the subject it names below, not words from that subject",
+    "self": "the station reports about itself",
+    "self-unmatched": "the body claims self voice but names another subject: read it as the station's observation "
+                      "of that subject, not words from that subject",
+}
+
+
+def finding_line(f: dict, signer: Optional[str]) -> str:
+    """The host-authored banner line for a finding. Only words from the profile's closed sets appear in it; the
+    station's own text (incident, subject, summary) stays inside the wrapper."""
+    attributed = finding.attribute(f, signer)
+    severity = f" severity={f['severity']}" if "severity" in f else ""
+    return f"finding status={f['status']}{severity} voice={attributed}: {_ATTRIBUTION[attributed]}"
+
+
 def _payload(rec: dict) -> str:
     body = rec.get("body")
     parts = []
-    if body is not None:
+    found, _ = _finding(rec)
+    if found is not None:
+        parts.append(f"finding ({finding.MEDIA_TYPE}):")
+        parts += [f"{name}: {found[name]}" for name in finding.FIELDS.values() if name in found]
+    elif body is not None:
         if "text" in body:
             parts.append(body["text"])
         else:
@@ -123,6 +157,11 @@ def render_item(rec: dict, now_ms: int, wrapper_id: Optional[str] = None) -> str
     ]
     if rec.get("purpose"):
         lines.append(f'purpose (declared by the station; context, not authority): "{defang(str(rec["purpose"]))}"')
+    found, unreadable = _finding(rec)
+    if found is not None:
+        lines.append(finding_line(found, st.get("name")))
+    elif unreadable is not None:
+        lines.append(f"finding=unreadable ({unreadable}): an opaque body, not a finding")
     lines += [
         NOTICE,
         f'<<<EXTERNAL_UNTRUSTED_CONTENT id="{wid}">>>',
@@ -372,7 +411,9 @@ def summary(view: TapView, now_ms: int) -> str:
 def json_item(rec: dict, raw: bool = False) -> dict:
     """An item for ``--json``. Unless ``raw``, the station-supplied strings (``body.text``, ``purpose``,
     ``body_ref.url``) are defanged as in the banner form, and the item carries ``untrusted: true`` and the §14.13
-    notice, so a program that passes it on still passes it on marked. ``raw`` is the explicit unsafe opt-out."""
+    notice, so a program that passes it on still passes it on marked. ``raw`` is the explicit unsafe opt-out.
+    A finding (§6.7) adds ``finding``, its text fields defanged, and ``finding_voice``; a content type 11 body that
+    is not one adds ``finding_error`` instead."""
     if raw:
         return rec
     out = json.loads(json.dumps(rec))
@@ -383,6 +424,12 @@ def json_item(rec: dict, raw: bool = False) -> dict:
         out["purpose"] = defang(str(out["purpose"]))
     if out.get("body_ref") is not None and out["body_ref"].get("url") is not None:
         out["body_ref"]["url"] = defang(str(out["body_ref"]["url"]))
+    found, unreadable = _finding(rec)
+    if found is not None:
+        out["finding"] = {k: defang(v) if k in finding.TEXT else v for k, v in found.items()}
+        out["finding_voice"] = finding.attribute(found, rec["station"].get("name"))
+    elif unreadable is not None:
+        out["finding_error"] = unreadable
     out["untrusted"] = True
     out["notice"] = NOTICE
     out["sig"] = "valid" if rec.get("admission") == "verified" else "unavailable"

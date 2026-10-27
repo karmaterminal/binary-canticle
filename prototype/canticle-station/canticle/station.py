@@ -296,12 +296,13 @@ class Station:
         ttl_ms = int(min(ttl_s if ttl_s is not None else st.cfg.default_ttl_s, st.cfg.default_ttl_s) * 1000)
         if ttl_ms <= STOP_BEFORE_EXPIRY_MS:
             raise ValueError("ttl too short")
-        st.head_seq += 1
-        it = wire.Item(epoch=self.epoch, stream=st.sid, seq=st.head_seq, issued_at=now_ms,
+        # Build and sign the ITEM before taking its seq, so a frame refused for its size leaves no gap.
+        it = wire.Item(epoch=self.epoch, stream=st.sid, seq=st.head_seq + 1, issued_at=now_ms,
                        expires_at=now_ms + ttl_ms, cls=spec.code, ctype=ctype,
                        body=body, body_ref=body_ref, state_key=state_key, hop=hop, scope=SCOPES[scope],
                        intensity=intensity, flags=flags, purpose=purpose, lens=st.cfg.lens)
         frame = wire.encode_item(self.sk, it)
+        st.head_seq = it.seq
         superseded = None
         if state_key is not None:
             for seq, other in list(st.ring.items()):
