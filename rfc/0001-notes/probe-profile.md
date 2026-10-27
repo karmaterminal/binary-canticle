@@ -1,6 +1,6 @@
 # Probe profile: findings sung live
 
-> Non-normative. RFC-0001 §6.7 (amendment FP-1, #112; D37, proposed) is the authority, and this note defers to
+> Non-normative. RFC-0001 §6.7 (amendment FP-1, #112; D37, decided) is the authority, and this note defers to
 > it. Code: `prototype/canticle-station/canticle/finding.py`. Tests: `prototype/canticle-station/tests/test_finding.py`.
 
 How a fleet probe or a distress watcher (#111) says what it checked and saw, with classes that already exist.
