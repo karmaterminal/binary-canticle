@@ -456,7 +456,7 @@ decides who may connect. Exit status: 0 ok; 1 no socket, refused or timed out; 2
 ## Tests
 
 ```sh
-python -m unittest discover -s tests      # 321 tests, about 80 s
+python -m unittest discover -s tests      # 327 tests, about 80 s
 python -m canticle vectors                # regenerate vectors/frame-v2-candidates.json
 ```
 
