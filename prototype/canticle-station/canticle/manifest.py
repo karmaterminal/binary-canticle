@@ -30,7 +30,7 @@ from .wire import Reject
 FORMAT = "canticle-fleet/spike-0"
 DEFAULT_SCOPES = frozenset({SCOPES["host"], SCOPES["lan"]})
 FIELDS = ("manifest", "signed", "stations")
-ENTRY_FIELDS = ("name", "public_key", "key_id", "classes", "streams", "scopes", "revoked")
+ENTRY_FIELDS = ("name", "public_key", "key_id", "classes", "streams", "public_streams", "scopes", "revoked")
 _HEX = {64: re.compile(r"[0-9a-f]{64}"), 16: re.compile(r"[0-9a-f]{16}")}
 
 
@@ -42,6 +42,7 @@ class StationEntry:
     streams: tuple = ()         # stream names, so listeners can map ids to names (§5.4)
     revoked: bool = False
     scopes: frozenset = DEFAULT_SCOPES  # scope codes this key may sign (§4.3, §10.3 `scopes`)
+    public_streams: tuple = ()  # explicitly safe to enumerate via §13 DNS; absent means none
     key_id: bytes = field(init=False)
     stream_names: dict = field(init=False)
 
@@ -52,6 +53,12 @@ class StationEntry:
             )
         object.__setattr__(self, "key_id", key_id(self.public_key))
         object.__setattr__(self, "stream_names", stream_ids(self.streams))
+        for name in self.public_streams:
+            if not isinstance(name, str):
+                raise ValueError("public_streams must contain stream names")
+            check_stream_name(name)
+        if len(set(self.public_streams)) != len(self.public_streams) or not set(self.public_streams).issubset(self.streams):
+            raise ValueError("public_streams must be distinct names in streams")
 
     def to_json(self) -> dict:
         names = {c.code: c.name for c in CLASS_BY_NAME.values()}
@@ -60,6 +67,8 @@ class StationEntry:
                "scopes": [s for s, c in sorted(SCOPES.items(), key=lambda kv: kv[1]) if c in self.scopes]}
         if self.revoked:
             out["revoked"] = True
+        if self.public_streams:
+            out["public_streams"] = list(self.public_streams)
         return out
 
 
@@ -105,6 +114,7 @@ class Manifest:
                 name=s["name"], public_key=bytes.fromhex(s["public_key"]),
                 classes=frozenset(CLASS_BY_NAME[c].code for c in s.get("classes", [])),
                 streams=tuple(s.get("streams", [])), revoked=bool(s.get("revoked", False)),
+                public_streams=tuple(s.get("public_streams", [])),
                 scopes=frozenset(SCOPES[x] for x in s["scopes"]) if "scopes" in s else DEFAULT_SCOPES)
             # key_id is optional (manifests written before it was added carry none), but one that is
             # present must be SHA-256(public_key)[0:8] (§10.3).
@@ -226,6 +236,17 @@ def _entry_problems(s: dict, at: str, seen: dict) -> list[str]:
             out.append(f"{at}: {e}")
     if "revoked" in s and not isinstance(s["revoked"], bool):
         out.append(f"{at}: revoked must be true or false")
+    public = s.get("public_streams", [])
+    if not isinstance(public, list) or not all(isinstance(x, str) for x in public):
+        out.append(f"{at}: public_streams must be a list of stream names")
+    else:
+        try:
+            for x in public:
+                check_stream_name(x)
+            if len(set(public)) != len(public) or not isinstance(streams, list) or not set(public).issubset(streams):
+                out.append(f"{at}: public_streams must be distinct names in streams")
+        except ValueError as e:
+            out.append(f"{at}: {e}")
     return out
 
 
