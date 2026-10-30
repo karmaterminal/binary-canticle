@@ -87,6 +87,20 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual(verify_json(data), [])
         self.assertEqual(len(list(Manifest.from_json(data))), 3)
 
+    def test_public_streams_are_explicit_and_subset_checked(self):
+        data = good()
+        self.assertNotIn("public_streams", data["stations"][0])
+        self.assertEqual(Manifest.from_json(data).to_json(), data)
+        data["stations"][0]["public_streams"] = ["chatter"]
+        self.assertEqual(verify_json(data), [])
+        self.assertEqual(Manifest.from_json(data).to_json(), data)
+        for bad in (["secret"], ["chatter", "chatter"], ["Chatter"], "chatter", [3]):
+            with self.subTest(bad=bad):
+                data["stations"][0]["public_streams"] = bad
+                self.assertTrue(verify_json(data))
+                with self.assertRaises((ValueError, TypeError)):
+                    Manifest.from_json(data)
+
     def test_a_mismatched_key_id_is_refused_by_verify_and_by_the_listener(self):
         data = good()
         data["stations"][1]["key_id"] = data["stations"][0]["key_id"]  # test2 claims test1's key-id

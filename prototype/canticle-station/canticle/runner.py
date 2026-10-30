@@ -109,6 +109,12 @@ def _dispatch(station: Station, req: dict, socket_classes: frozenset) -> dict:
         return {"ok": True, **station.hush(now, req["stream"], int(req["seq"]), int(req.get("reason", 0))).to_json()}
     if op == "status":
         return {"ok": True, **station.status(now)}
+    if op == "public_catalog":
+        grant = station.grant
+        if grant is None or grant.revoked:
+            return {"ok": False, "error": "no active manifest grant"}
+        return {"ok": True, "station": grant.name, "key_id": grant.key_id.hex(),
+                "public_key": grant.public_key.hex(), "public_streams": list(grant.public_streams)}
     return {"ok": False, "error": f"unknown op {op!r}"}
 
 
