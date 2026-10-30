@@ -39,6 +39,56 @@ class Publication:
     records: tuple[Record, ...]
 
 
+class MemoryLeaseBackend:
+    """Deterministic fake SRP-like lease store for tests; performs no DNS I/O.
+
+    Handles are scoped to one backend instance. Expired leases cannot be renewed or
+    withdrawn, and a stale handle cannot alter a successor's publication.
+    """
+
+    def __init__(self, clock=time.monotonic):
+        self.clock = clock
+        self._next_handle = 0
+        self._leases = {}
+        self._owners = {}
+
+    def _live(self, handle):
+        lease = self._leases.get(handle)
+        return lease if lease is not None and self.clock() < lease[2] else None
+
+    def publish(self, publication: Publication, lease_seconds: int):
+        name = (publication.zone, publication.station)
+        prior = self._owners.get(name)
+        if prior is not None and self._live(prior) is not None:
+            raise RuntimeError("DNS name already has a live lease")
+        self._next_handle += 1
+        handle = self._next_handle
+        self._leases[handle] = (name, publication, self.clock() + lease_seconds)
+        self._owners[name] = handle
+        return handle
+
+    def renew(self, handle, publication: Publication, lease_seconds: int):
+        lease = self._live(handle)
+        if lease is None or lease[1] != publication or self._owners.get(lease[0]) != handle:
+            raise RuntimeError("lease handle does not own this publication")
+        self._leases[handle] = (lease[0], publication, self.clock() + lease_seconds)
+
+    def withdraw(self, handle):
+        lease = self._live(handle)
+        if lease is None or self._owners.get(lease[0]) != handle:
+            raise RuntimeError("lease handle does not own a live publication")
+        del self._owners[lease[0]]
+        del self._leases[handle]
+
+    def active(self):
+        """Snapshot of live fake publications, ordered for deterministic assertions."""
+        return tuple(sorted(
+            ((name, lease[1]) for name, handle in self._owners.items()
+             if (lease := self._live(handle)) is not None),
+            key=lambda row: row[0],
+        ))
+
+
 class Registration:
     """One station's DNS lease. Methods are explicit; no background or session refresh.
 
@@ -72,6 +122,8 @@ class Registration:
             raise ValueError("public stream list exceeds DNS publication bound")
         if not set(grant.public_streams).issubset(station.streams):
             raise ValueError("public streams must be configured on this station")
+        if not _NAME.fullmatch(grant.name):
+            raise ValueError("station name must be one DNS instance label")
         instance = f"{grant.name}._canticle._udp.{zone}"
         service = f"_canticle._udp.{zone}"
         txt = ("txtvers=1", f"sid={grant.key_id.hex()}",

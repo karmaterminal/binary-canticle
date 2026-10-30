@@ -3,7 +3,7 @@ from dataclasses import replace
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from canticle.dns_registration import Registration
+from canticle.dns_registration import MemoryLeaseBackend, Registration
 from canticle.manifest import Manifest, StationEntry
 from canticle.station import Station, StreamConfig
 from canticle.wire import public_key_bytes
@@ -118,6 +118,30 @@ class RegistrationTests(unittest.TestCase):
         self.manifest.add(StationEntry('cael', public_key_bytes(Ed25519PrivateKey.generate()), frozenset()))
         with self.assertRaisesRegex(ValueError, 'one active'):
             self.registration()
+
+    def test_fake_backend_exclusive_lease_and_stale_handle(self):
+        backend = MemoryLeaseBackend(lambda: self.now)
+        first = Registration(
+            self.station, self.manifest, backend, enabled=True,
+            zone='example.org', target='relay.example.org', port=47113, clock=lambda: self.now)
+        second = Registration(
+            self.station, self.manifest, backend, enabled=True,
+            zone='example.org', target='relay.example.org', port=47113, clock=lambda: self.now)
+        first.publish()
+        self.assertEqual(len(backend.active()), 1)
+        with self.assertRaisesRegex(RuntimeError, 'live lease'):
+            second.publish()
+        self.assertIsNone(second.expires_at)
+        self.now = 3600
+        self.assertEqual(backend.active(), ())
+        second.publish()
+        with self.assertRaisesRegex(RuntimeError, 'does not own'):
+            backend.withdraw(1)
+        with self.assertRaisesRegex(RuntimeError, 'does not own'):
+            backend.renew(1, first.publication, 3600)
+        self.assertEqual(len(backend.active()), 1)
+        second.withdraw()
+        self.assertEqual(backend.active(), ())
 
 
 if __name__ == '__main__':

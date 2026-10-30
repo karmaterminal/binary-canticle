@@ -56,8 +56,9 @@ targets, ambiguous or revoked grants, absent public scope, and leases outside
 3600–7200 s are refused. A monotonic clock bounds renewals; expired ownership
 handles are not reused for renewal or withdrawal. The provider protocol is
 `publish(publication, lease_seconds) -> handle`, `renew(handle, publication,
-lease_seconds)`, `withdraw(handle)`; fake-provider tests cover its state machine.
-There is **no real provider, CLI, credential handling, DNS UPDATE, SRP, automatic
+lease_seconds)`, `withdraw(handle)`; `MemoryLeaseBackend` is a deterministic
+in-process fake that enforces exclusive live name ownership and rejects stale handles.
+There is **no real DNS provider, CLI, credential handling, DNS UPDATE, SRP, automatic
 refresh, or live-zone mutation**. A future provider must authenticate updates,
 enforce handle ownership, and make failed calls leave the prior lease unchanged.
 The unsigned local manifest remains the only trust input in this spike; DNS
