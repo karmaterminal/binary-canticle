@@ -4,7 +4,9 @@ import { Resolver } from "node:dns/promises";
 import type { BindingConfig } from "./config.ts";
 
 type RecordHint = { type: string; ttl?: number; value?: string; target?: string; name?: string; port?: number; priority?: number; weight?: number; entries?: string[] };
-export type DnsReader = (name: string) => Promise<RecordHint[]>;
+type RecordKind = "PTR" | "SRV" | "TXT";
+type TypedResolver = Pick<Resolver, "resolvePtr" | "resolveSrv" | "resolveTxt" | "cancel">;
+export type DnsReader = (name: string, kind: RecordKind) => Promise<RecordHint[]>;
 const MAX_INSTANCES = 32;
 const MAX_RESULTS = 8;
 const MAX_RECORDS = 8;
@@ -12,21 +14,30 @@ const MAX_CACHE = 128;
 const MAX_TTL = 300;
 const NEGATIVE_TTL = 60;
 
-export async function systemDns(name: string): Promise<RecordHint[]> {
-  const resolver = new Resolver();
-  let timer: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      resolver.resolveAny(name) as Promise<RecordHint[]>,
-      new Promise<never>((_, reject) => { timer = setTimeout(() => { resolver.cancel(); reject(new Error("DNS timeout")); }, 2000); }),
-    ]);
-  } catch (e) {
-    if (["ENOTFOUND", "ENODATA"].includes((e as NodeJS.ErrnoException).code ?? "")) return [];
-    throw e;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+export function createSystemDns(makeResolver: () => TypedResolver = () => new Resolver()): DnsReader {
+  return async (name, kind) => {
+    const resolver = makeResolver();
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      const lookup = kind === "PTR"
+        ? resolver.resolvePtr(name).then((rows) => rows.slice(0, MAX_INSTANCES + 1).map((value) => ({ type: kind, value })))
+        : kind === "SRV"
+          ? resolver.resolveSrv(name).then((rows) => rows.slice(0, MAX_RECORDS).map((row) => ({ type: kind, ...row })))
+          : resolver.resolveTxt(name).then((rows) => rows.slice(0, MAX_RECORDS).map((entries) => ({ type: kind, entries })));
+      return await Promise.race([
+        lookup,
+        new Promise<never>((_, reject) => { timer = setTimeout(() => { resolver.cancel(); reject(new Error("DNS timeout")); }, 2000); }),
+      ]);
+    } catch (e) {
+      if (["ENOTFOUND", "ENODATA"].includes((e as NodeJS.ErrnoException).code ?? "")) return [];
+      throw e;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
 }
+
+export const systemDns: DnsReader = createSystemDns();
 
 export class Discoverer {
   private cache = new Map<string, { until: number; records: RecordHint[] }>();
@@ -37,11 +48,11 @@ export class Discoverer {
     this.cfg = cfg; this.dns = dns; this.now = now;
   }
 
-  private async query(name: string, kind: string): Promise<RecordHint[]> {
+  private async query(name: string, kind: RecordKind): Promise<RecordHint[]> {
     const key = `${kind}:${name}`;
     const cached = this.cache.get(key);
     if (cached && cached.until > this.now()) return cached.records;
-    const response = await this.dns(name);
+    const response = await this.dns(name, kind);
     const records = response.filter((r) => r?.type === kind).slice(0, kind === "PTR" ? MAX_INSTANCES + 1 : MAX_RECORDS);
     const ttl = Math.max(1, Math.min(records.length ? MAX_TTL : NEGATIVE_TTL,
       ...records.map((r) => Number.isSafeInteger(r.ttl) && (r.ttl as number) > 0 ? r.ttl as number : NEGATIVE_TTL),
