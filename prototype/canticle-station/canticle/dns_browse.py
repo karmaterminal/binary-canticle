@@ -13,6 +13,8 @@ from dataclasses import dataclass
 MAX_INSTANCES = 32
 MAX_PUBLIC_STREAMS = 32
 MAX_RECORDS = 8
+MAX_TXT_STRINGS = 32
+MAX_TXT_BYTES = 4096
 MAX_CACHE = 128
 MAX_TTL = 300
 NEGATIVE_TTL = 60
@@ -53,7 +55,8 @@ class DnsPythonResolver:
         elif kind == "SRV":
             rows = tuple((int(r.priority), int(r.weight), int(r.port), str(r.target)) for r in reply)
         else:
-            rows = tuple(tuple(bytes(s).decode("utf-8", "replace") for s in r.strings) for r in reply)
+            rows = tuple(tuple(bytes(s).decode("utf-8", "replace") for s in r.strings)
+                         for r in reply[:MAX_RECORDS])
         return Answer(rows, int(reply.rrset.ttl))
 
 
@@ -105,13 +108,21 @@ class Browser:
             srv = self._query(instance, "SRV")
             txt = self._query(instance, "TXT")
             hints = {}
+            txt_invalid = False
             for strings in txt.records:
+                if (not isinstance(strings, tuple) or len(strings) > MAX_TXT_STRINGS
+                        or sum(len(item.encode("utf-8")) for item in strings if isinstance(item, str)) > MAX_TXT_BYTES
+                        or any(not isinstance(item, str) or "\ufffd" in item for item in strings)):
+                    txt_invalid = True
+                    continue
                 for item in strings:
                     if "=" in item:
                         k, v = item.split("=", 1)
                         if k not in hints:
                             hints[k] = v
             mismatches = []
+            if txt_invalid:
+                mismatches.append("txt-invalid")
             if "sid" in hints and hints["sid"].lower() != grant.key_id.hex():
                 mismatches.append("sid")
             if "k" in hints:

@@ -55,6 +55,12 @@ class BrowseTests(unittest.TestCase):
         self.assertEqual(row['mismatches'], ['k', 'sid', 'streams'])
         self.assertEqual(row['public_streams'], ['hymn'])
 
+    def test_oversized_txt_is_ignored_and_reported(self):
+        self.answers[(INSTANCE, 'TXT')] = Answer(((('streams=' + 'x' * 5000),),), 120)
+        row = Browser(FakeResolver(self.answers), self.manifest, 'example.org').browse()['stations'][0]
+        self.assertEqual(row['public_streams'], ['hymn'])
+        self.assertEqual(row['mismatches'], ['txt-invalid'])
+
     def test_ttl_and_negative_cache(self):
         resolver = FakeResolver(self.answers)
         browser = Browser(resolver, self.manifest, 'example.org', lambda: self.now)
