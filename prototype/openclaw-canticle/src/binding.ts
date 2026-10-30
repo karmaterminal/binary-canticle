@@ -423,6 +423,12 @@ export class Binding {
     return !c.anonymous && sessionMatches(this.cfg.listen.payloadSessions, c.sessionKey);
   }
 
+  private subscribed(c: Caller, station: string, stream: string): boolean {
+    if (c.anonymous) return false;
+    const sub = this.cfg.listen.subscriptions.find((x) => x.sessionKey === c.sessionKey.toLowerCase());
+    return sub !== undefined && tuned(sub.tune, station, stream);
+  }
+
   /** Whether this session has read heard text. Once the taint table has overflowed, a forgotten mark cannot be told
    * from no mark, so every session that may read heard text counts as tainted (§14.12: taint lasts until reset). */
   isTainted(c: Caller): boolean {
@@ -502,6 +508,10 @@ export class Binding {
     let heardShown = 0;
     let payloadShown = 0;
     for (const e of this.journal.scan(after)) {
+      if (!this.visible(c, e)) {
+        last = e.seq;
+        continue;
+      }
       if (!this.matches(e, station, stream, includeSelf)) {
         filtered += 1;
         last = e.seq;
@@ -618,9 +628,19 @@ export class Binding {
     }
   }
 
+  private visible(c: Caller, e: Entry): boolean {
+    switch (e.kind) {
+      case "heard": return this.subscribed(c, e.frame.station, e.frame.stream);
+      case "withdrawn": return e.station !== null && e.stream !== null && this.subscribed(c, e.station, e.stream);
+      case "presence": return this.cfg.listen.subscriptions.some((x) => x.sessionKey === c.sessionKey.toLowerCase() && x.tune.some((t) => t.station === "*" || t.station === e.station));
+      case "note": return true;
+    }
+  }
+
   private onAirResult(c: Caller, now: number, view: "items" | "digest", station: string | null, stream: string | null, limit: number, includeSelf: boolean): Result {
     const rx = this.receiver.status();
     const keep = (i: ViewItem): boolean =>
+      this.subscribed(c, i.frame.station, i.frame.stream) &&
       (includeSelf || this.cfg.station === null || i.frame.key_id !== this.cfg.station.keyId) &&
       (station === null || i.frame.station === station) &&
       (stream === null || i.frame.stream === stream);
@@ -711,19 +731,21 @@ export class Binding {
     }
     const now = this.clock();
     const rx = this.receiver.status();
-    const current = this.receiver.onAir(now).length;
-    const carried = this.receiver.carried(now).length;
+    const current = this.receiver.onAir(now).filter((i) => this.subscribed(c, i.frame.station, i.frame.stream)).length;
+    const carried = this.receiver.carried(now).filter((i) => this.subscribed(c, i.frame.station, i.frame.stream)).length;
     const presence = this.receiver
       .presence()
+      .filter(({ p }) => this.cfg.listen.subscriptions.some((x) => x.sessionKey === c.sessionKey.toLowerCase() && x.tune.some((t) => t.station === "*" || t.station === p.station)))
       .map(({ p, state, current: cur }) => ({ station: p.station, key_id: p.key_id, state, last_beacon_at: p.last_beacon_at, current: cur }));
     const checkpoint = st.checkpoints[this.sessionKeyOf(c)]?.seq ?? null;
     let waiting = 0;
     for (const e of this.journal.scan(checkpoint ?? this.firstNewAfter(now))) {
-      if (e.kind === "heard" && e.disposition !== "self") {
+      if (e.kind === "heard" && e.disposition !== "self" && this.visible(c, e)) {
         waiting += 1;
       }
     }
     const mutes = st.mutes.filter((m) => m.until === null || m.until > now);
+    const visibleEntries = [...this.journal.scan(this.journal.oldest - 1)].filter((e) => this.visible(c, e)).length;
     const landing = rx.landing;
     const daemonMute = landing !== null && isObj(landing.mute);
     const out = this.outbox;
@@ -749,13 +771,10 @@ export class Binding {
       on_air: { known: this.receiver.current(), current, carried },
       presence,
       journal: {
-        head: this.journal.head,
-        oldest: this.journal.oldest,
-        ...this.journal.size,
+        entries: visibleEntries,
         retention: this.cfg.journal,
         new_for_this_session: waiting,
         checkpoint: checkpoint === null ? null : this.cursor(checkpoint),
-        counts: this.journal.counts,
       },
       mutes,
       session: { anonymous: c.anonymous, tainted: this.isTainted(c), may_read_text: this.mayReadText(c) },
@@ -778,7 +797,7 @@ export class Binding {
         ? `on air: ${current} item(s)${carried > 0 ? `, ${carried} carried from before a gap` : ""}`
         : `on air: unknown (no current view)${carried > 0 ? `; ${carried} carried item(s) from before the gap` : ""}`,
       `presence: ${presence.length === 0 ? "none known" : presence.map((x) => `${x.station ?? x.key_id}: ${presenceText(x.state, x.last_beacon_at)}`).join("; ")}`,
-      `journal: ${this.journal.size.entries} entries (seq ${this.journal.oldest}..${this.journal.head}); ${waiting} heard entr${waiting === 1 ? "y" : "ies"} new for this session`,
+      `journal: ${visibleEntries} visible entries; ${waiting} heard entr${waiting === 1 ? "y" : "ies"} new for this session`,
       `mutes: ${daemonMute ? "daemon MUTE active; " : ""}${mutes.length === 0 ? "none" : mutes.map((m) => `${m.id} ${m.station ?? "*"}:${m.stream ?? "*"}${m.until !== null ? ` until ${iso(m.until)}` : ""}`).join(", ")}`,
       c.anonymous
         ? "this call names no session: status, mutes, and digests of the journal and on air only"

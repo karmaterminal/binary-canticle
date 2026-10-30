@@ -155,7 +155,7 @@ test("the tools say the service is not running until it starts, and a bad config
 
 test("a started service answers through the tools, and a refusal is a failed result that changes nothing", async () => {
   const clock = new Clock(Date.now());
-  const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: ["agent:main:*"] } };
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: ["agent:main:*"], subscriptions: [{ sessionKey: "agent:main:main", tune: ["*:*"] }] } };
   const { tools, service } = load(cfg);
   const logs: string[] = [];
   const ctx = {
@@ -188,13 +188,13 @@ test("a started service answers through the tools, and a refusal is a failed res
     await refused(listen.execute("c5", { what: "everything" }), "bad_param", /what/);
     const st = await status.execute("c6", {});
     assert.equal(st.content[0]?.text.includes("hello from cael"), false); // status never carries heard text
-    // A session the configuration does not list reads digests: no sender text, and no taint.
+    // A session without a subscription sees no item, even in digests; no sender text or taint.
     const outsider = tool(tools, "canticle_listen", { sessionKey: "agent:discord-bound:main", sessionId: "d-1" });
     await refused(outsider.execute("c8", { what: "journal", view: "items" }), "payload_not_allowed", /payload_not_allowed/);
     const digest = await outsider.execute("c9", { what: "journal" });
-    assert.match(digest.content[0]?.text ?? "", /\[canticle:heard\] cael:chatter class=chatter/);
+    assert.doesNotMatch(digest.content[0]?.text ?? "", /\[canticle:heard\] cael:chatter/);
     assert.equal(digest.content[0]?.text.includes("hello from cael"), false);
-    assert.match(digest.content[0]?.text ?? "", /heard text is not shown to this session/);
+    assert.doesNotMatch(digest.content[0]?.text ?? "", /heard text is not shown to this session/);
     assert.equal((digest.details.canticle as Obj).untrusted, false);
   } finally {
     await service.stop?.(ctx);
@@ -294,7 +294,7 @@ const FULL = {
   daemon: { socket: "/run/user/1000/canticle/daemon.sock", uid: 1000 },
   stateDir: "/home/rune/.openclaw/canticle/rune",
   station: { name: "rune", keyId: KEY_RUNE },
-  listen: { tune: ["*:chatter", "cael:*", "*:alerts.*"], includeSelf: false, payloadSessions: ["agent:reader:*"] },
+  listen: { tune: ["*:chatter", "cael:*", "*:alerts.*"], includeSelf: false, payloadSessions: ["agent:reader:*"], subscriptions: [{ sessionKey: "agent:reader:main", tune: ["cael:chatter"] }] },
   journal: { maxEntries: 5000, maxBytes: 8388608, maxAgeHours: 24 },
   publish: {
     enabled: true,

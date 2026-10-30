@@ -502,7 +502,7 @@ export function bridge(station: FakeStation, daemon: FakeDaemon): void {
 
 export function configFor(name: string, dir: string, daemon: FakeDaemon, extra: Obj = {}): BindingConfig {
   // Tests read heard text from any session unless they set listen themselves.
-  return parseConfig({ binding: name, daemon: { socket: daemon.path }, stateDir: join(dir, `state-${name}`), listen: { payloadSessions: ["*"] }, ...extra });
+  return parseConfig({ binding: name, daemon: { socket: daemon.path }, stateDir: join(dir, `state-${name}`), listen: { payloadSessions: ["*"], subscriptions: [{ sessionKey: SESSION.sessionKey, tune: ["*:*"] }, { sessionKey: OTHER_SESSION.sessionKey, tune: ["*:*"] }, { sessionKey: "agent:scribe:main", tune: ["*:*"] }] }, ...extra });
 }
 
 export function makeBinding(cfg: BindingConfig, clock: Clock, extra: Partial<BindingOptions> = {}): Binding {
