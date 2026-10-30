@@ -560,6 +560,21 @@ def _manifest_show(a, path: str, data, problems: list) -> int:
     return 1 if problems else 0
 
 
+def cmd_dns_browse(a) -> int:
+    from .dns_browse import Browser, DnsPythonResolver
+    try:
+        data = json.loads(Path(a.manifest).read_text(encoding="utf-8"))
+        problems = verify_json(data)
+        if problems:
+            raise ValueError("invalid manifest: " + "; ".join(problems[:3]))
+        result = Browser(DnsPythonResolver(), Manifest.from_json(data), a.domain).browse()
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"dns-browse: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(result, indent=2))
+    return 0
+
+
 def cmd_vectors(a) -> int:
     from .vectors import build
     Path(a.out).write_text(json.dumps(build(), indent=1) + "\n")
@@ -728,6 +743,11 @@ def main(argv=None) -> int:
         x.add_argument("--stations", help=f"stations.toml to read when no path is given (default {stations.DEFAULT_PATH})")
         x.add_argument("--json", action="store_true")
         x.set_defaults(fn=cmd_manifest)
+
+    db = sub.add_parser("dns-browse", help="read-only DNS-SD locator browse; public catalog from local manifest")
+    db.add_argument("--domain", required=True, help="one explicit unicast DNS domain")
+    db.add_argument("--manifest", required=True, help="local manifest with explicit public_streams")
+    db.set_defaults(fn=cmd_dns_browse)
 
     v = sub.add_parser("vectors", help="regenerate the candidate conformance vectors")
     v.add_argument("--out", default="vectors/frame-v2-candidates.json")

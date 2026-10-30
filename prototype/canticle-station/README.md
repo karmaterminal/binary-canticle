@@ -28,8 +28,25 @@ answers `{"op":"public_catalog"}` with its manifest station name, key-id, public
 only that explicit `public_streams` list. A revoked grant is refused. This operation is read-only
 and returns no live status or private stream names. It is the **station** control socket, not the
 host receptor-record daemon socket; the latter has no single local station identity. DNS remains
-a locator and cross-check hint, never an identity or trust source. This spike does not publish or
-resolve DNS records, and its manifest remains unsigned.
+a locator and cross-check hint, never an identity or trust source. This spike does not publish DNS records, and its manifest remains unsigned.
+### Read-only DNS-SD browse slice (§13)
+
+`canticle dns-browse --domain example.org --manifest fleet.json` queries one explicit **unicast**
+zone (`PTR _canticle._udp.<domain>` then instance `SRV`/`TXT`) and prints bounded JSON.
+It requires separately installed `dnspython`; the station runtime dependency and host daemon
+protocol are unchanged. The command never connects to an advertised endpoint, writes DNS,
+or alters listener/static fallback state. It ignores out-of-zone instances and SRV targets;
+limits instances to 32, records/endpoints to 8 each, public names to 32 per station, and
+cache entries to 128; TTLs are clamped to 1–300 s, with empty answers cached for at most
+60 s. The cache lives for the `Browser` object's lifetime (the one-shot CLI exits after one
+browse). `sid`, `k`, and `streams` discrepancies are reported as mismatches, not trusted.
+Only an unrevoked, uniquely named local manifest entry with explicit `public_streams` is
+included; TXT never adds a stream. `.local`/mDNS, DNSSEC validation, SRP registration, subtype
+browse, multi-zone routing and daemon integration remain unimplemented. The host daemon's
+receptor-record socket has no local station identity, so the existing station-side
+`public_catalog` read operation is the safe local identity surface for future publication.
+The spike manifest is unsigned; operators must secure its local file themselves.
+
 | §6.7 Findings (FP-1, #112) | `canticle/finding.py`: the finding body (content type 11) and its strict reader. `canticle sing --finding` and `--body-ref`, and the control socket's `finding` and `body_ref` fields, put a keyed `advisory` finding and a `finding-ref` doorbell on air. `canticle tap` shows a finding field by field, with a host-authored line that attributes it to its signer. See [Findings](#findings-fp-1-112). |
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
 | §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only gateway over one listener, and a read-only page to pick a station:stream and watch its live ring, with expiry and gaps shown honestly. |
@@ -44,7 +61,7 @@ Not implemented here, and still open work (see RFC-0001 §23.3):
 - typed-body schemas other than the finding body (§6.7), and content policy and taint checks before signing (§15)
 - accord (§10.7) and control frames (§10.6)
 - the receptor's landing into agent sessions, banners and taint (§14)
-- DNS-SD (§13)
+- DNS-SD publication, mDNS and daemon integration (§13)
 - the ringserver bridge (§18; see [`../ringserver-proofs/`](../ringserver-proofs/))
 - the capsid (§8.7)
 - work-conserving budget redistribution and burst budget accounting (§7.5-§7.6)
