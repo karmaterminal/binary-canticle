@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("beacon", Path(__file__).with_name("beacon.py"))
 beacon = importlib.util.module_from_spec(spec)
@@ -80,6 +81,20 @@ class BeaconTest(unittest.TestCase):
                         actor="alice", socket_path="fake", now=100,
                         sink=lambda *_: (_ for _ in ()).throw(RuntimeError("refused")))
         self.assertEqual(json.loads(self.state.read_text())["offset"], 1)
+
+    def test_accepted_publish_then_checkpoint_failure_retries_same_batch(self):
+        self.add(raw_body="private log body")
+        with patch.object(beacon, "_save", side_effect=OSError("checkpoint failed")):
+            with self.assertRaises(OSError):
+                self.tick()
+        self.assertEqual(len(self.sent), 1)  # acceptance occurred; local state did not advance
+        self.assertFalse(self.state.exists())
+        self.assertEqual(self.tick(now=101), "published")
+        self.assertEqual(len(self.sent), 2)
+        self.assertEqual(self.sent[0], self.sent[1])  # state_key is audit identity, not station dedupe
+        self.assertNotIn("private log body", self.sent[1]["text"])
+        self.assertEqual(self.tick(now=102), "idle")
+        self.assertEqual(len(self.sent), 2)  # checkpointed restart is deduped
 
 
 if __name__ == "__main__":
