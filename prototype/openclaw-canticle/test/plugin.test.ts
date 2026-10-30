@@ -66,7 +66,7 @@ afterEach(async () => {
   removeDir(dir);
 });
 
-test("registers six optional tools and one service, matching the manifest and the package", () => {
+test("registers seven optional tools and one service, matching the manifest and the package", () => {
   const { tools, service } = load();
   assert.deepEqual([...tools.keys()], [...TOOL_NAMES]);
   assert.deepEqual(manifest.contracts, { tools: [...TOOL_NAMES] });
@@ -116,7 +116,7 @@ test("publish tools are offered only when publishing is enabled, never to a sub-
   assert.ok(publishing.tools.get("canticle_sing")?.factory({ agentId: "main" })); // an agent id names its session
 });
 
-test("only canticle_listen returns network content, and every schema refuses unknown parameters", () => {
+test("only network-facing read tools return network content, and every schema refuses unknown parameters", () => {
   const { tools } = load({
     binding: "rune",
     daemon: { socket: daemon.path },
@@ -125,7 +125,7 @@ test("only canticle_listen returns network content, and every schema refuses unk
   });
   for (const name of TOOL_NAMES) {
     const t = tool(tools, name);
-    assert.equal(t.resultContentSource, name === "canticle_listen" ? "network" : undefined, name);
+    assert.equal(t.resultContentSource, name === "canticle_listen" || name === "canticle_discover" ? "network" : undefined, name);
     assert.equal(t.parameters.additionalProperties, false, name);
     assert.equal(t.parameters.type, "object", name);
     for (const [k, v] of Object.entries(t.parameters.properties as Obj)) {
@@ -306,6 +306,7 @@ const FULL = {
     maxLive: 16,
   },
   delivery: { mode: "explicit" },
+  discovery: { domains: ["example.org"], catalog: [] },
 };
 
 test("the manifest schema accepts every key the plugin reads, and nothing it does not", () => {
