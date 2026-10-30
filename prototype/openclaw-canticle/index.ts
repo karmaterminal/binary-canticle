@@ -14,9 +14,9 @@ type Logger = { info?: (msg: string) => void; warn?: (msg: string) => void; erro
 type ServiceContext = { config?: unknown; stateDir: string; logger?: Logger };
 type PluginApi = {
   pluginConfig?: unknown;
-  session?: { state?: { resolveLocalSessionRoute?: (sessionKey: string) => {
+  session?: { state?: { resolveLocalSessionRoute?: (sessionKey: string) => Promise<{
     sessionKey: string; exists: boolean; onHost: boolean;
-  } } };
+  }> } };
   registerTool: (factory: (ctx: ToolContext) => unknown, opts: { name: string; optional: boolean }) => void;
   registerService: (service: {
     id: string;
@@ -64,12 +64,11 @@ export default {
             config: cfg,
             root: stateRootOf(cfg, ctx.stateDir),
             routeProof: (sessionKey) => {
-              try {
-                const proof = api.session?.state?.resolveLocalSessionRoute?.(sessionKey);
-                return proof?.exists ? { canonicalKey: proof.sessionKey, offHost: !proof.onHost } : null;
-              } catch {
-                return null;
-              }
+              // The landed host route proof is async. Candidates currently require a synchronous
+              // proof, so ambient admission stays closed until that call path is made async.
+              // Never treat a Promise or a configured target as a route proof.
+              void sessionKey;
+              return null;
             },
             log: (msg) => ctx.logger?.info?.(msg),
           });
