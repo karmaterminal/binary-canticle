@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { Binding } from "../src/binding.ts";
@@ -97,6 +97,92 @@ function keygen(dir: string, name: string): string {
   assert.equal(r.status, 0, r.stderr);
   return (JSON.parse(r.stdout) as { key_id: string }).key_id;
 }
+
+test("Mirari fixture -> station -> daemon -> binding: mute, manual read, source opt-out and untuned receiver", { skip: missing ?? false, timeout: 60_000 }, async () => {
+  const dir = tempDir();
+  const run = join(dir, "run");
+  mkdirSync(run, { mode: 0o700 });
+  const procs: Proc[] = [];
+  let binding: Binding | null = null;
+  try {
+    const key = spawnSync(PY, ["-m", "canticle", "keygen", "--out", join(dir, "mirari.key"),
+      "--manifest", join(dir, "fleet.json"), "--name", "mirari", "--classes", "chatter",
+      "--streams", "wake", "--scopes", "host,lan"], { env: ENV, encoding: "utf8" });
+    assert.equal(key.status, 0, key.stderr);
+    const daemon = new Proc(["daemon", "--manifest", join(dir, "fleet.json"), "--bind", "127.0.0.1:0",
+      "--socket", join(run, "daemon.sock"), "--state-dir", join(dir, "daemon-state"), "--health-interval", "1"]);
+    procs.push(daemon);
+    const hello = await daemon.line((o) => o.type === "hello", "Mirari daemon hello");
+    const station = new Proc(["station", "--key", join(dir, "mirari.key"), "--manifest", join(dir, "fleet.json"),
+      "--stream", "wake", "--to", String(hello.bind), "--control", join(run, "mirari.ctl"), "--beacon-ms", "500"]);
+    procs.push(station);
+    await station.line((o) => typeof o.station === "string", "Mirari station ready");
+    await waitFor(() => existsSync(join(run, "mirari.ctl")), "Mirari control socket", 15_000);
+
+    const reader = { sessionKey: "agent:mirari:reader", sessionId: "mirari-test", subagent: false, anonymous: false };
+    const make = (tune: string[]) => new Binding({
+      config: parseConfig({ binding: "mirari-test", daemon: { socket: join(run, "daemon.sock") },
+        stateDir: join(dir, "binding"), listen: { tune, payloadSessions: [reader.sessionKey] } }),
+      root: join(dir, "binding"), tickMs: 200,
+      link: { backoff: { firstMs: 100, maxMs: 500, jitter: 0 } },
+    });
+    binding = make(["mirari:wake"]);
+    await binding.start();
+    await waitFor(() => binding?.receiver.current() === true, "Mirari binding join", 15_000);
+    const source = join(dir, "source.jsonl");
+    const auth = join(dir, "auth.json");
+    const state = join(dir, "beacon-state.json");
+    writeFileSync(source, JSON.stringify({ actor: "alice", origin: "actor", shareable: true, lineage: "local",
+      kind: "tool", id: "step1", topic: "checked tests", raw_body: "PRIVATE BODY NOT FOR WIRE" }) + "\n");
+    const authorization = { enabled: true, actor: "alice", station: "mirari", source,
+      audience: "lan", stream: "wake", ttl_s: 30, cadence_s: 30, inactive_s: 60 };
+    writeFileSync(auth, JSON.stringify(authorization));
+    const emit = () => spawnSync(PY, ["-c", "import runpy,sys; b=runpy.run_path(sys.argv[1]); print(b['tick'](auth=b['Path'](sys.argv[2]), source=b['Path'](sys.argv[3]), state=b['Path'](sys.argv[4]), actor='alice', socket_path=sys.argv[5]))",
+      join(import.meta.dirname, "..", "..", "mirari-wake", "beacon.py"), auth, source, state, join(run, "mirari.ctl")],
+      { env: ENV, encoding: "utf8" });
+    const mute = binding.mute(reader, { station: "mirari", stream: "wake" });
+    assert.equal(mute.details.ok, true);
+    const first = emit();
+    assert.equal(first.status, 0, first.stderr);
+    assert.equal(first.stdout.trim(), "published");
+    const heard = () => binding!.listen(reader, { what: "journal", view: "items", stream: "wake" });
+    await waitFor(() => heard().text.includes("checked tests"), "Mirari item at binding", 15_000);
+    const observed = heard();
+    const entries = observed.details.entries as { kind: string; disposition?: string; station?: string }[];
+    assert.equal(entries.filter((e) => e.kind === "heard" && e.station === "mirari" && e.disposition === "muted").length, 1);
+    assert.match(observed.text, /muted \(mute:mirari-test:1\): readable here, never pushed/);
+    assert.doesNotMatch(observed.text, /PRIVATE BODY NOT FOR WIRE/);
+    assert.equal(observed.details.untrusted, true); // manual payload read remains possible, and taints this session
+    assert.equal(binding.isTainted(reader), true);
+    assert.equal(binding.mute(reader, { clear: "all" }).details.ok, true);
+    assert.equal((heard().details.entries as typeof entries).filter((e) => e.kind === "heard" && e.disposition === "muted").length, 1);
+
+    // Actor revocation is checked before a new station submission, even with a new source row.
+    writeFileSync(source, JSON.stringify({ actor: "alice", origin: "actor", shareable: true, lineage: "local",
+      kind: "event", id: "step2", topic: "reviewed notes" }) + "\n", { flag: "a" });
+    writeFileSync(auth, JSON.stringify({ ...authorization, enabled: false }));
+    const revoked = emit();
+    assert.notEqual(revoked.status, 0);
+    assert.match(revoked.stderr, /authorization disabled/);
+    assert.equal(heard().text.includes("reviewed notes"), false);
+
+    // Receiver opt-out is a separate local choice: no wake tuning means no new journal entry.
+    await binding.stop();
+    binding = make([]);
+    await binding.start();
+    await waitFor(() => binding?.receiver.current() === true, "untuned binding join", 15_000);
+    writeFileSync(auth, JSON.stringify(authorization));
+    const second = emit();
+    assert.equal(second.status, 0, second.stderr);
+    assert.equal(second.stdout.trim(), "published");
+    await sleep(1200); // station loops; untuned binding must still ignore it
+    assert.equal(binding.listen(reader, { what: "journal", view: "items" }).text.includes("reviewed notes"), false);
+  } finally {
+    await binding?.stop();
+    for (const p of procs.reverse()) await p.stop();
+    removeDir(dir);
+  }
+});
 
 test("the binding against the real daemon and stations: hear, sing, hear back, pluck, rejoin, daemon restart", { skip: missing ?? false, timeout: 90_000 }, async () => {
   const dir = tempDir();
