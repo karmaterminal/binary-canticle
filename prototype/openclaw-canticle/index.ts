@@ -14,6 +14,9 @@ type Logger = { info?: (msg: string) => void; warn?: (msg: string) => void; erro
 type ServiceContext = { config?: unknown; stateDir: string; logger?: Logger };
 type PluginApi = {
   pluginConfig?: unknown;
+  session?: { state?: { resolveLocalSessionRoute?: (sessionKey: string) => {
+    sessionKey: string; exists: boolean; onHost: boolean;
+  } } };
   registerTool: (factory: (ctx: ToolContext) => unknown, opts: { name: string; optional: boolean }) => void;
   registerService: (service: {
     id: string;
@@ -60,6 +63,14 @@ export default {
           b = new Binding({
             config: cfg,
             root: stateRootOf(cfg, ctx.stateDir),
+            routeProof: (sessionKey) => {
+              try {
+                const proof = api.session?.state?.resolveLocalSessionRoute?.(sessionKey);
+                return proof?.exists ? { canonicalKey: proof.sessionKey, offHost: !proof.onHost } : null;
+              } catch {
+                return null;
+              }
+            },
             log: (msg) => ctx.logger?.info?.(msg),
           });
           await b.start();
