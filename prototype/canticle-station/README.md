@@ -47,6 +47,25 @@ receptor-record socket has no local station identity, so the existing station-si
 `public_catalog` read operation is the safe local identity surface for future publication.
 The spike manifest is unsigned; operators must secure its local file themselves.
 
+### DNS-SD registration planning slice (§13)
+
+`canticle.dns_registration.Registration` is a station-owned, explicitly enabled lease
+planner for one unicast zone. It constructs PTR (300 s), instance SRV/TXT (120 s),
+and only the station's manifest-listed `public_streams`; `.local`, out-of-zone
+targets, ambiguous or revoked grants, absent public scope, and leases outside
+3600–7200 s are refused. A monotonic clock bounds renewals; expired ownership
+handles are not reused for renewal or withdrawal. The provider protocol is
+`publish(publication, lease_seconds) -> handle`, `renew(handle, publication,
+lease_seconds)`, `withdraw(handle)`; fake-provider tests cover its state machine.
+There is **no real provider, CLI, credential handling, DNS UPDATE, SRP, automatic
+refresh, or live-zone mutation**. A future provider must authenticate updates,
+enforce handle ownership, and make failed calls leave the prior lease unchanged.
+The unsigned local manifest remains the only trust input in this spike; DNS
+records are locator and cross-check hints, not authority or liveness.
+Key-rotation overlap (§13.5) and subtype PTRs are intentionally not planned:
+two active keys with one station name are refused until a rotation policy and
+multi-key TXT representation are specified.
+
 | §6.7 Findings (FP-1, #112) | `canticle/finding.py`: the finding body (content type 11) and its strict reader. `canticle sing --finding` and `--body-ref`, and the control socket's `finding` and `body_ref` fields, put a keyed `advisory` finding and a `finding-ref` doorbell on air. `canticle tap` shows a finding field by field, with a host-authored line that attributes it to its signer. See [Findings](#findings-fp-1-112). |
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
 | §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only gateway over one listener, and a read-only page to pick a station:stream and watch its live ring, with expiry and gaps shown honestly. |
@@ -61,7 +80,7 @@ Not implemented here, and still open work (see RFC-0001 §23.3):
 - typed-body schemas other than the finding body (§6.7), and content policy and taint checks before signing (§15)
 - accord (§10.7) and control frames (§10.6)
 - the receptor's landing into agent sessions, banners and taint (§14)
-- DNS-SD publication, mDNS and daemon integration (§13)
+- live DNS-SD publication, mDNS and daemon integration (§13)
 - the ringserver bridge (§18; see [`../ringserver-proofs/`](../ringserver-proofs/))
 - the capsid (§8.7)
 - work-conserving budget redistribution and burst budget accounting (§7.5-§7.6)
