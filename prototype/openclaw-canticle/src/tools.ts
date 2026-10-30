@@ -5,8 +5,9 @@
 
 import type { Binding, Caller, Result } from "./binding.ts";
 import type { Obj } from "./records.ts";
+import type { Discoverer } from "./discover.ts";
 
-export const READ_TOOLS = ["canticle_listen", "canticle_status", "canticle_mute"] as const;
+export const READ_TOOLS = ["canticle_listen", "canticle_status", "canticle_mute", "canticle_discover"] as const;
 export const PUBLISH_TOOLS = ["canticle_sing", "canticle_hush", "canticle_outbox"] as const;
 export const TOOL_NAMES = [...READ_TOOLS, ...PUBLISH_TOOLS] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -29,6 +30,14 @@ export type ToolResult = { content: { type: "text"; text: string }[]; details: {
 const STRING = { type: "string" } as const;
 
 const DEFS: Record<ToolName, { label: string; description: string; parameters: Obj; network?: true }> = {
+  canticle_discover: {
+    label: "Canticle discover",
+    network: true,
+    description: "Browse an explicitly configured unicast DNS domain for locator hints of operator-cataloged stations with public streams. DNS never grants identity, trust, liveness, or permission to connect. Read only; at most 32 instances per call.",
+    parameters: { type: "object", additionalProperties: false, required: ["domain"], properties: {
+      domain: STRING, stream: { ...STRING, description: "Exact public stream name; no wildcard." },
+    } },
+  },
   canticle_listen: {
     label: "Canticle listen",
     network: true,
@@ -162,7 +171,7 @@ function named(v: unknown): string | null {
 export function createTool(
   name: ToolName,
   ctx: ToolContext,
-  get: () => { binding: Binding | null; failure: string | null; publish: boolean },
+  get: () => { binding: Binding | null; failure: string | null; publish: boolean; discovery?: Discoverer | null },
 ): Tool | null {
   const caller = callerOf(ctx);
   if ((PUBLISH_TOOLS as readonly string[]).includes(name) && (!get().publish || caller.subagent || caller.anonymous)) {
@@ -177,6 +186,19 @@ export function createTool(
     ...(def.network === true ? { resultContentSource: "network" as const } : {}),
     async execute(_toolCallId, params) {
       const { binding, failure } = get();
+      if (name === "canticle_discover") {
+        const discover = get().discovery;
+        const p = (typeof params === "object" && params !== null ? params : {}) as Obj;
+        if (!discover || typeof p.domain !== "string" || (p.stream !== undefined && (typeof p.stream !== "string" || !/^[a-z][a-z0-9.-]{0,99}$/.test(p.stream)))) {
+          return resultOf({ text: "[canticle:refused] canticle_discover: invalid_config: discovery is unavailable or parameters are invalid. Nothing changed.", details: { ok: false, refused: "invalid_config" } });
+        }
+        try {
+          const data = await discover.browse(p.domain, p.stream as string | undefined);
+          return resultOf({ text: JSON.stringify(data), details: { ok: true, ...data as Obj } });
+        } catch (e) {
+          return resultOf({ text: `[canticle:refused] canticle_discover: browse_failed: ${(e as Error).message}. Nothing changed.`, details: { ok: false, refused: "browse_failed" } });
+        }
+      }
       if (binding === null) {
         const detail = `the canticle service is not running (${failure ?? "not started"})`;
         return resultOf({ text: `[canticle:refused] ${name}: not_running: ${detail}. Nothing changed.`, details: { ok: false, refused: "not_running", detail } });
