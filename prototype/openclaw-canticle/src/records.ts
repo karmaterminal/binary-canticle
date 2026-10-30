@@ -98,6 +98,7 @@ export type HeardFrame = {
   stream: string;
   class: string;
   scope: string | null;
+  lens: number | null;
   hop: number;
   state_key: string | null;
   purpose: string | null;
@@ -168,6 +169,7 @@ export function heardFrameOf(rec: Obj): HeardFrame | null {
   }
   const principal = optString(st.principal);
   const scope = optString(rec.scope);
+  const lens = rec.lens === undefined || rec.lens === null ? null : rec.lens;
   const stateKey = optString(rec.state_key);
   const purpose = optString(rec.purpose);
   if (!isStationName(st.name) || principal === undefined || !isStreamName(rec.stream)) {
@@ -176,7 +178,7 @@ export function heardFrameOf(rec: Obj): HeardFrame | null {
   if (typeof rec.class !== "string" || !TOKEN.test(rec.class) || !isInt(rec.hop) || stateKey === undefined) {
     return null;
   }
-  if (scope === undefined || (scope !== null && !TOKEN.test(scope))) {
+  if (scope === undefined || (scope !== null && !TOKEN.test(scope)) || (lens !== null && (!isInt(lens) || lens < 0 || lens > 65535))) {
     return null;
   }
   if (purpose === undefined || (rec.dedup !== "first" && rec.dedup !== "resurfaced")) {
@@ -210,6 +212,7 @@ export function heardFrameOf(rec: Obj): HeardFrame | null {
     stream: rec.stream,
     class: rec.class,
     scope,
+    lens,
     hop: rec.hop,
     state_key: stateKey,
     purpose,

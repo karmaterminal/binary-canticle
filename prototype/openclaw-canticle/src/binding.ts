@@ -7,6 +7,7 @@
 // session cannot sing (stricter than §15.4 item 4; see the README).
 
 import { randomBytes } from "node:crypto";
+import { Candidates, type RouteProof } from "./candidates.ts";
 import { join } from "node:path";
 import { type BindingConfig, sessionMatches, tuned } from "./config.ts";
 import { DaemonLink } from "./daemon.ts";
@@ -57,6 +58,8 @@ export type BindingOptions = {
   station?: StationClient;
   link?: { silenceMs?: number; snapshotMs?: number; backoff?: { firstMs: number; maxMs: number; jitter: number } };
   tickMs?: number;
+  /** Host-authoritative canonical key and reply-route check. Without one, ambient candidates fail closed. */
+  routeProof?: RouteProof;
 };
 
 const STATE_V = "openclaw-canticle-state/1";
@@ -92,6 +95,7 @@ export class Binding {
   readonly receiver: Receiver;
   private readonly link: DaemonLink;
   readonly outbox: Outbox | null;
+  readonly candidates: Candidates;
   private state: StateFile | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly tickMs: number;
@@ -107,11 +111,13 @@ export class Binding {
     this.lease = new Lease(o.root);
     this.lease.onError = (e) => this.log(`canticle: state lease error: ${e.message}`);
     this.journal = new Journal(join(o.root, "journal"), o.config.journal);
+    this.candidates = new Candidates(o.root, o.config.binding, o.config.subscriptions, o.routeProof ?? (() => null));
     const self = o.config.station?.keyId ?? null;
     this.receiver = new Receiver(
       {
         heard: (f, ctx) => this.onHeard(f, ctx.run, ctx.rec_seq, ctx.source),
         withdrawn: (r, ctx, held) => {
+          this.candidates.retract(r.idem, this.clock());
           if (self !== null && r.target.key_id === self) {
             this.outbox?.retracted(r, this.clock());
           }
@@ -146,6 +152,8 @@ export class Binding {
             last_beacon_at: p.last_beacon_at,
           }),
         note: (n) => {
+          if (n.kind === "joined" && n.join === "rejoin") this.candidates.rejoin(n.run, this.clock());
+          if (n.kind === "disconnected" || n.kind === "records_lost") this.candidates.rejoin(this.state?.last_run ?? "", this.clock());
           this.append({ kind: "note", note: n });
           if (n.kind === "joined" && this.state !== null && this.state.last_run !== n.run) {
             this.state.last_run = n.run;
@@ -155,7 +163,7 @@ export class Binding {
       },
       {
         clock: this.clock,
-        accepts: (f) => (self !== null && f.key_id === self) || tuned(o.config.listen.tune, f.station, f.stream),
+        accepts: (f) => (self !== null && f.key_id === self) || tuned(o.config.listen.tune, f.station, f.stream) || o.config.subscriptions.some((s) => s.stations.length === 0 || s.stations.includes(f.station)),
         lastRun: null,
       },
     );
@@ -211,6 +219,8 @@ export class Binding {
       const now = this.clock();
       this.state = this.loadState(now);
       this.journal.load(this.state.carried_keys, now);
+      this.candidates.load(now);
+      if (this.state.last_run !== null) this.candidates.rejoin(this.state.last_run, now);
       if (this.journal.head < this.state.journal_head) {
         // Journal files are gone that held seqs a reader may have a cursor for. Rather than hand those seqs out
         // again, every earlier cursor and checkpoint becomes stale: a read with one is refused, never misread.
@@ -262,6 +272,7 @@ export class Binding {
     }
     const now = this.clock();
     this.receiver.tick(now);
+    this.candidates.tick(now);
     const st = this.state as StateFile;
     let dirty = false;
     if (this.journal.prune(now)) {
@@ -348,7 +359,7 @@ export class Binding {
       return;
     }
     const mute = self ? null : this.muteFor(f.station, f.stream, now);
-    this.append({
+    const entry = this.append({
       kind: "heard",
       run,
       rec_seq: recSeq,
@@ -357,6 +368,7 @@ export class Binding {
       mute,
       frame: f,
     });
+    if (entry !== null) this.candidates.accept(f, run, now, self, mute !== null);
   }
 
   /** The mute that covers a station:stream now: the daemon's MUTE first, then this binding's most specific. */

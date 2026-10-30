@@ -1,5 +1,11 @@
 # openclaw-canticle: the OpenClaw prince plugin (spike, #97)
 
+## Ambient candidate slice (not delivery)
+
+`subscriptions` are operator-configured, explicit IDs with exact `targets[].sessionKey`, optional station/stream/class/scope/lens filters, `delivery: "ringbuffer_only" | "ambient"`, and a per-target rolling-hour `perHour` cap. A missing filter means any value; lens IDs are decimal strings. `wake` is rejected. The default remains no subscriptions and explicit-read-only tools. The ambient ledger persists in `candidates.json` under this binding's state root; it keeps at most 4,096 candidates and exposes at most two **logical** slots per session, with five items and 1,536 bytes per digest. It stores no payload text in those lines. Retractions, expiry and rejoin remove pending candidates and leave tombstones through local expiry plus skew. Chatter, ambient and advisory candidates retain a per-session desynchronization draw across restart.
+
+The ledger accepts an ambient target only after a host-authoritative `routeProof` returns the **same canonical key** with `offHost: false`. The current plugin API does not supply that proof, so its service uses the fail-closed default: configured ambient subscriptions collect no candidates in a running Gateway. This slice does not enqueue, inject, wake, or alter `canticle_listen` behavior. Wiring the host route proof, OC-0 slot handshake/settlement and actual delivery remains future work.
+
 An OpenClaw plugin that binds one prince to the canticle host daemon and keeps two durable projections #97 asks
 for: an **inbound heard journal** with a separate **current view** of what is on air, and an **outbound aging
 table** of what the prince asked its own station to sing. Sessions read and act through six small tools; nothing
