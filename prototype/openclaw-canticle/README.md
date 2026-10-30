@@ -13,7 +13,7 @@ acceptance list is for the princes ([Trying it on a seat](#trying-it-on-a-seat))
 |---|---|
 | Delivery | Explicit read only: no push, no next-turn injection, no wake. Ingesting never wakes a session. |
 | Hearing | A receptor record v1 client of `canticle daemon` on its unix socket (§14.18.2, D35). It never binds UDP. |
-| Hearing | Binding-global `listen.tune` controls ingestion. Per-session exact-key `listen.subscriptions` controls read visibility; sessions are untuned by default. Only a subscribed session also listed in `listen.payloadSessions` can read heard text. Reading heard text taints the session. |
+| Read scope | Binding-global `listen.tune` controls ingestion. Per-session exact-key `listen.subscriptions` controls read visibility; sessions are untuned by default. Only a subscribed session also listed in `listen.payloadSessions` can read heard text. Reading heard text taints the session. |
 | Publishing | Off by default. When enabled, it sings through this prince's own station's control socket, as that station's pinned key. It exercises the outbox, and it is not P2 ([Phases](#phases)). |
 | Two bindings | Separate state roots, ids that name their binding, and refusals that change nothing (#95). |
 | Runtime | No runtime dependencies. `build.sh` emits installable JavaScript from the locked TypeScript toolchain; the source checkout still runs directly in tests. |
