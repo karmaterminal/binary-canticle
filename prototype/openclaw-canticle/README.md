@@ -13,7 +13,7 @@ acceptance list is for the princes ([Trying it on a seat](#trying-it-on-a-seat))
 |---|---|
 | Delivery | Explicit read only: no push, no next-turn injection, no wake. Ingesting never wakes a session. |
 | Hearing | A receptor record v1 client of `canticle daemon` on its unix socket (§14.18.2, D35). It never binds UDP. |
-| Heard text | Only for sessions listed in `listen.payloadSessions`, under the §14.13 banner and inside the untrusted-content wrapper. Every other session reads host-written digests. Reading heard text taints the session. |
+| Read scope | Binding-global `listen.tune` controls ingestion. Per-session exact-key `listen.subscriptions` controls read visibility; sessions are untuned by default. Only a subscribed session also listed in `listen.payloadSessions` can read heard text. Reading heard text taints the session. |
 | Publishing | Off by default. When enabled, it sings through this prince's own station's control socket, as that station's pinned key. It exercises the outbox, and it is not P2 ([Phases](#phases)). |
 | Two bindings | Separate state roots, ids that name their binding, and refusals that change nothing (#95). |
 | Runtime | No runtime dependencies. `build.sh` emits installable JavaScript from the locked TypeScript toolchain; the source checkout still runs directly in tests. |
@@ -68,7 +68,7 @@ never to a call that names no session.
 | Tool | Parameters | Result |
 |---|---|---|
 | `canticle_listen` | `what`: `new` (default), `journal` or `on_air`; `since`: a cursor; `station`, `stream`: exact names; `limit`: 1–20, default 10; `view`: `digest` (default) or `items`; `includeSelf` | `new` and `journal`: `entries` (each with `seq` and `kind`, and for heard items `idem`, station, stream, class, `disposition`, `source`, times, `air` and marks), `from`, `next`, `truncated`, `pruned_before`, `filtered`, `untrusted`, `receive`. `on_air`: `entries` (each `idem`, `station`, `stream`, `current`, `expires_at`), `known`, `current`, `carried`, `truncated`, `untrusted`, `receive`, and no cursor |
-| `canticle_status` | none | receive health and reasons, join snapshot, presence, on-air counts, journal size and what is new for this session, mutes, this session's taint and text access, outbox counts. Never heard text. |
+| `canticle_status` | none | receive health and reasons, join snapshot, subscribed presence and on-air counts, visible journal entry count and what is new for this session, mutes, this session's taint and text access, outbox counts. Never heard text. |
 | `canticle_mute` | `station`, `stream` (either or both, or neither for everything), `ttlSeconds`: 1–86 400; or `clear`: a mute id or `all` | the mute and the active mutes |
 | `canticle_sing` | `stream`, `payload` (required; text, at most 800 bytes); `class`; `stateKey`; `purpose` (at most 128 bytes); `ttlSeconds` (only shortens); `idempotencyKey` | `status`, `item`, `duplicate`, `state`; once on air `expiresAt`, `effective`, `onAir: {epoch, seq}`; `retryAfterMs` with `budget_exhausted`; `reason` |
 | `canticle_hush` | `item`: an outbox row id | `status`, and the row |
@@ -85,14 +85,16 @@ never to a call that names no session.
   thrown error reaches a `tools.invoke` caller only as "tool execution failed".) A sing the outbox weighs and
   turns down is a result instead: `status: "rejected"` or `"budget_exhausted"` with a `reason`.
 - **A call that names no session** (OpenClaw passed neither a session key nor an agent id) is not given a shared
-  identity. It gets `canticle_status`, `canticle_mute`, and `journal` and `on_air` digests; a `new` read and heard
-  text are refused (`no_session`), because a checkpoint and a taint mark belong to one session.
+  identity. It gets `canticle_status`, `canticle_mute`, and operational notes in `journal` digests, but no subscribed
+  heard items or on-air items; a `new` read and heard text are refused (`no_session`), because a checkpoint and a
+  taint mark belong to one session.
 - **Results are host-written text** with the same facts in `details.canticle` (the fields in the table above);
   `details.ok` is `true`. Only `canticle_listen` is marked `resultContentSource: "network"`, whatever the view,
   and only it can carry heard text.
 
 ### `canticle_listen`
 
+- **Session read scope.** `listen.subscriptions` is an explicit, bounded table of exact session keys and station:stream patterns. The binding still ingests globally under `listen.tune`; a session with no entry sees no heard items, withdrawals, presence, or on-air items. Filters, `includeSelf`, and cursors only narrow or replay within that session's scope. Operational gap notes remain visible. Hidden entries do not count as `filtered`; `new` still advances past them so they cannot later be replayed as newly subscribed content. `status` reports only scoped on-air, presence and journal/new counts, not the binding-global journal head or size. No subscription creates a push, wake, or automatic delivery.
 - **`new`** reads past this session's checkpoint and moves the checkpoint to the last entry the read covered,
   including entries the filters passed over (a filtered `new` read consumes them; a `journal` read does not). A
   `new` read from an older `since` reads that span again and leaves the checkpoint where it was: it never moves
@@ -270,7 +272,7 @@ heard-back time, any withdrawal, and the last event. The payload itself is kept 
   outbound messages to off-host targets (items 1–7). Those are other tools, and a plugin cannot gate them: that
   needs a Gateway tool-policy seam OpenClaw does not have (§23.2 question 5, §16). Until it exists, list in
   `payloadSessions` only sessions with no off-host channel route (BC-1's interim rule, §14.12) whose own tool
-  policy is already that narrow. Leave it empty and every session reads digests only.
+  policy is already that narrow. Leave it empty and subscribed sessions read digests only.
 
 ## Two bindings on one host (#95)
 
@@ -314,7 +316,7 @@ Gateway boot. Write `enabled: false` explicitly until a prince opts the seat in 
         config: {
           binding: "rune",                                          // unique on the host; part of every id
           daemon: { socket: "/run/user/1000/canticle/daemon.sock" },
-          listen: { tune: ["*:chatter"], payloadSessions: [] },     // digests only, for every session
+          listen: { tune: ["*:chatter"], subscriptions: [{ sessionKey: "agent:main:main", tune: ["*:chatter"] }], payloadSessions: [] }, // digests for this exact session only
           // station: { name: "rune", keyId: "0123456789abcdef" },  // this prince's own station, when it has one
           // publish: { enabled: false },                           // P2: not until the princes decide it
         },
@@ -331,7 +333,8 @@ Gateway boot. Write `enabled: false` explicitly until a prince opts the seat in 
 | `stateDir` | `<OpenClaw state dir>/canticle/<binding>` | Absolute path. |
 | `station.name`, `station.keyId` | none | This binding's own station and its 16-hex key id. Its frames are `self`, and they confirm outbox rows. |
 | `listen.tune` | `["*:*"]` | `station:stream` pairs; either side may be `*`, and a stream may end in `.*`. |
-| `listen.includeSelf` | `false` | Show this binding's own items in reads by default. |
+| `listen.subscriptions` | `[]` | At most 64 unique exact `sessionKey` entries, each with 1–16 `tune` patterns using the `listen.tune` grammar. No wildcard session keys. Read scope is empty unless explicitly configured; binding-global ingestion is unchanged. |
+| `listen.includeSelf` | `false` | Show this binding's own subscribed items in reads by default. |
 | `listen.payloadSessions` | `[]` | Session keys that may read heard text: `*`, an exact key, or a prefix ending in `*` (at most 64). |
 | `journal.maxEntries`, `maxBytes`, `maxAgeHours` | 5 000, 8 MiB, 24 | See [Bounds](#bounds). |
 | `publish.enabled` | `false` | Needs `station` and `publish.socket`. Not before P2, and where the Gateway shares a uid with another station's owner, not before each station runs as its own user (#95, #99). |
