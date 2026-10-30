@@ -38,16 +38,45 @@ export class Candidates {
       const d = raw as unknown as Ledger;
       if (Object.keys(d.pending).length > MAX_PENDING || Object.keys(d.settled).length > MAX_SETTLED || Object.keys(d.spend).length > 2048) throw new Error("candidate ledger exceeds bounds");
       for (const [key, c] of Object.entries(d.pending)) {
-        if (!isObj(c) || c.key !== key || typeof c.sessionKey !== "string" || typeof c.expiresAt !== "number" || !Number.isSafeInteger(c.expiresAt) || typeof c.line !== "string" || Buffer.byteLength(c.line) > MAX_BYTES) throw new Error("candidate ledger has an invalid row");
+        if (!isObj(c) || c.key !== key || typeof c.sessionKey !== "string" ||
+          !Array.isArray(c.subscriptionIds) || c.subscriptionIds.length > 64 || c.subscriptionIds.some((id: unknown) => typeof id !== "string") ||
+          typeof c.station !== "string" || typeof c.stream !== "string" || typeof c.class !== "string" ||
+          (c.scope !== null && typeof c.scope !== "string") || (c.lens !== null && !Number.isSafeInteger(c.lens)) ||
+          typeof c.expiresAt !== "number" || !Number.isSafeInteger(c.expiresAt) ||
+          typeof c.line !== "string" || Buffer.byteLength(c.line) > MAX_BYTES) throw new Error("candidate ledger has an invalid row");
       }
       this.data = d;
     }
     this.prune(now);
   }
   private save(): void { writeJsonAtomic(this.path, this.data); }
+  private matchingSubscriptions(c: Pick<Candidate, "subscriptionIds" | "sessionKey" | "station" | "stream" | "class" | "scope" | "lens">): string[] {
+    return c.subscriptionIds.filter((id) => this.subscriptions.some((s) =>
+      s.id === id && s.delivery === "ambient" && s.targets.some((t) => t.sessionKey === c.sessionKey) &&
+      match(s.stations, c.station) && match(s.streams, c.stream) && match(s.classes, c.class) &&
+      match(s.scopes, c.scope) && match(s.lenses, c.lens)));
+  }
+  private validRoute(sessionKey: string): boolean {
+    const proof = this.route(sessionKey);
+    return proof !== null && !proof.offHost && proof.canonicalKey === sessionKey;
+  }
+  /** A subscription can broaden receiver acceptance only with a proven local target. */
+  acceptsAmbient(frame: HeardFrame): boolean {
+    return this.subscriptions.some((s) => s.delivery === "ambient" &&
+      match(s.stations, frame.station) && match(s.streams, frame.stream) &&
+      match(s.classes, frame.class) && match(s.scopes, frame.scope) && match(s.lenses, frame.lens) &&
+      s.targets.some((t) => this.validRoute(t.sessionKey)));
+  }
   private prune(now: number): void {
     let dirty = false;
-    for (const [key, c] of Object.entries(this.data.pending)) if (c.expiresAt <= now) { delete this.data.pending[key]; this.data.settled[key] = now + 5000; dirty = true; }
+    for (const [key, c] of Object.entries(this.data.pending)) {
+      const validIds = this.matchingSubscriptions(c);
+      if (c.expiresAt <= now || validIds.length === 0) {
+        delete this.data.pending[key]; this.data.settled[key] = Math.max(now, c.expiresAt) + 5000; dirty = true;
+      } else if (validIds.length !== c.subscriptionIds.length) {
+        c.subscriptionIds = validIds; dirty = true;
+      }
+    }
     for (const [key, until] of Object.entries(this.data.settled)) if (until <= now) { delete this.data.settled[key]; dirty = true; }
     for (const [id, times] of Object.entries(this.data.spend)) {
       const recent = times.filter((t) => t > now - 3_600_000);
@@ -64,14 +93,17 @@ export class Candidates {
     for (const sub of this.subscriptions) {
       if (sub.delivery !== "ambient" || (self && !sub.stations.includes(frame.station)) || !match(sub.stations, frame.station) || !match(sub.streams, frame.stream) || !match(sub.classes, frame.class) || !match(sub.scopes, frame.scope) || !match(sub.lenses, frame.lens)) continue;
       for (const target of sub.targets) {
-        const proof = this.route(target.sessionKey);
-        if (proof === null || proof.offHost || proof.canonicalKey !== target.sessionKey) continue;
+        if (!this.validRoute(target.sessionKey)) continue;
         const spendKey = `${sub.id}:${target.sessionKey}`;
         const spent = this.data.spend[spendKey] ?? [];
-        if (frame.dedup === "first" && spent.length >= sub.perHour) continue;
         const key = `${frame.idem}:${target.sessionKey}`;
         const existing = this.data.pending[key];
-        if (existing) { if (!existing.subscriptionIds.includes(sub.id)) { existing.subscriptionIds.push(sub.id); this.save(); } continue; }
+        if (existing?.subscriptionIds.includes(sub.id) || spent.length >= sub.perHour) continue;
+        if (existing) {
+          existing.subscriptionIds.push(sub.id);
+          spent.push(now); this.data.spend[spendKey] = spent; this.save();
+          continue;
+        }
         if (this.data.settled[key] !== undefined || Object.keys(this.data.pending).length >= MAX_PENDING) continue;
         const line = `${frame.station}:${frame.stream} ${frame.class} scope=${frame.scope ?? "unavailable"} lens=${frame.lens ?? "unavailable"} item=${frame.epoch}/${frame.seq} expires=${new Date(frame.times.local_expiry_at).toISOString()}`;
         if (Buffer.byteLength(line) > MAX_BYTES) continue;
@@ -80,7 +112,7 @@ export class Candidates {
         if (delayed && window <= 0) continue;
         const eligibleAt = delayed ? now + randomInt(window + 1) : now;
         this.data.pending[key] = { key, sessionKey: target.sessionKey, subscriptionIds: [sub.id], run, station: frame.station, stream: frame.stream, class: frame.class, scope: frame.scope, lens: frame.lens, heardAt: frame.times.heard_at, expiresAt: frame.times.local_expiry_at, eligibleAt, line };
-        if (frame.dedup === "first") spent.push(now);
+        spent.push(now);
         this.data.spend[spendKey] = spent;
         added++;
         this.save();
@@ -98,8 +130,8 @@ export class Candidates {
   }
   /** Read-only logical slots for a later OC-0 adapter; never enqueued or shown to a model. */
   slots(sessionKey: string, now: number): LogicalSlot[] {
-    const proof = this.route(sessionKey);
-    if (proof === null || proof.offHost || proof.canonicalKey !== sessionKey) return [];
+    this.prune(now);
+    if (!this.validRoute(sessionKey)) return [];
     const rows = Object.values(this.data.pending).filter((c) => c.sessionKey === sessionKey && c.expiresAt > now && c.eligibleAt <= now);
     return (["canticle:digest", "canticle:alarm"] as const).flatMap((slot) => {
       const chosen: Candidate[] = []; let bytes = 0;

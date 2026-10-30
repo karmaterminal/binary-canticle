@@ -100,6 +100,8 @@ export class Binding {
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly tickMs: number;
   private running = false;
+  private joinedThisStart = false;
+  private preserveInitialRejoin = false;
   readonly counts = { repeats: 0, withdrawn_unheard: 0, refused: 0, append_errors: 0 };
 
   constructor(o: BindingOptions) {
@@ -152,9 +154,19 @@ export class Binding {
             last_beacon_at: p.last_beacon_at,
           }),
         note: (n) => {
-          if (n.kind === "joined" && n.join === "rejoin") this.candidates.rejoin(n.run, this.clock());
-          if (n.kind === "disconnected" || n.kind === "records_lost") this.candidates.rejoin(this.state?.last_run ?? "", this.clock());
+          // A restored run is not a live rejoin: retain its candidates across Gateway restart.
+          if (n.kind === "joined" && n.join === "rejoin") {
+            if (this.joinedThisStart) this.candidates.rejoin(n.run, this.clock());
+            else this.preserveInitialRejoin = true;
+          }
+          if (n.kind === "records_lost" && !(n.why === "rejoin" && this.preserveInitialRejoin) && this.joinedThisStart) this.candidates.rejoin(this.state?.last_run ?? "", this.clock());
+          if (n.kind === "records_lost") this.preserveInitialRejoin = false;
+          if (n.kind === "disconnected") {
+            if (this.joinedThisStart && n.why !== "stopped") this.candidates.rejoin(this.state?.last_run ?? "", this.clock());
+            this.preserveInitialRejoin = false;
+          }
           this.append({ kind: "note", note: n });
+          if (n.kind === "joined") this.joinedThisStart = true;
           if (n.kind === "joined" && this.state !== null && this.state.last_run !== n.run) {
             this.state.last_run = n.run;
             this.saveState();
@@ -163,7 +175,7 @@ export class Binding {
       },
       {
         clock: this.clock,
-        accepts: (f) => (self !== null && f.key_id === self) || tuned(o.config.listen.tune, f.station, f.stream) || o.config.subscriptions.some((s) => s.stations.length === 0 || s.stations.includes(f.station)),
+        accepts: (f) => (self !== null && f.key_id === self) || tuned(o.config.listen.tune, f.station, f.stream) || this.candidates.acceptsAmbient(f),
         lastRun: null,
       },
     );
@@ -220,7 +232,6 @@ export class Binding {
       this.state = this.loadState(now);
       this.journal.load(this.state.carried_keys, now);
       this.candidates.load(now);
-      if (this.state.last_run !== null) this.candidates.rejoin(this.state.last_run, now);
       if (this.journal.head < this.state.journal_head) {
         // Journal files are gone that held seqs a reader may have a cursor for. Rather than hand those seqs out
         // again, every earlier cursor and checkpoint becomes stale: a read with one is refused, never misread.
@@ -241,6 +252,8 @@ export class Binding {
       throw new BindingStartError("state_unreadable", (e as Error).message);
     }
     this.running = true;
+    this.joinedThisStart = false;
+    this.preserveInitialRejoin = false;
     this.link.start();
     this.timer = setInterval(() => {
       this.tick().catch((e: unknown) => this.log(`canticle: tick failed: ${(e as Error).message}`));
