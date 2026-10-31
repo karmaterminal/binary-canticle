@@ -306,6 +306,7 @@ const FULL = {
     maxLive: 16,
   },
   delivery: { mode: "explicit" },
+  subscriptions: [],
   discovery: { domains: ["example.org"], catalog: [] },
 };
 

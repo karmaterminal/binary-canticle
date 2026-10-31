@@ -6,6 +6,11 @@ import { isAbsolute, join } from "node:path";
 import { type Obj, STATION_NAME, isObj } from "./records.ts";
 
 export type Tune = { station: string; stream: string };
+export type Subscription = {
+  id: string; stations: string[]; streams: string[]; classes: string[]; scopes: string[]; lenses: string[];
+  targets: { sessionKey: string }[]; delivery: "ringbuffer_only" | "ambient"; perHour: number;
+};
+export const TARGET_SESSION_KEY = /^agent:[a-z][a-z0-9_-]*:(?:main|[a-z][a-z0-9_-]*(?::[a-z0-9_-]+){1,5})$/;
 
 export type BindingConfig = {
   /** This binding's name: unique among the bindings on one host, and part of every id it issues. */
@@ -28,6 +33,7 @@ export type BindingConfig = {
     maxLive: number;
   };
   delivery: { mode: "explicit" };
+  subscriptions: Subscription[];
   discovery: { domains: string[]; catalog: { name: string; publicKey: string; publicStreams: string[] }[] };
 };
 
@@ -79,6 +85,32 @@ export function parseConfig(raw: unknown): BindingConfig {
   if (delivery.mode !== undefined && delivery.mode !== "explicit") {
     throw new ConfigError("delivery.mode: only \"explicit\" exists in this version; push and wake delivery are a separate opt-in");
   }
+  const subscriptionsRaw = c.subscriptions === undefined ? [] : c.subscriptions;
+  if (!Array.isArray(subscriptionsRaw) || subscriptionsRaw.length > 64) throw new ConfigError("subscriptions: at most 64 entries");
+  const subscriptions: Subscription[] = subscriptionsRaw.map((value, i) => {
+    const s = obj(value, `subscriptions[${i}]`);
+    const id = str(s.id, `subscriptions[${i}].id`);
+    if (!STATION_NAME.test(id)) throw new ConfigError(`subscriptions[${i}].id: invalid id`);
+    if (!Array.isArray(s.targets) || s.targets.length < 1 || s.targets.length > 32) throw new ConfigError(`subscriptions[${i}].targets: 1 to 32 exact targets`);
+    const targets = s.targets.map((value: unknown, j: number) => {
+      const t = obj(value, `subscriptions[${i}].targets[${j}]`);
+      const sessionKey = str(t.sessionKey, `subscriptions[${i}].targets[${j}].sessionKey`);
+      if (!TARGET_SESSION_KEY.test(sessionKey) || sessionKey !== sessionKey.toLowerCase() || sessionKey === "agent:main:main") {
+        throw new ConfigError(`subscriptions[${i}].targets[${j}]: canonical, exact, non-shared session key required`);
+      }
+      return { sessionKey };
+    });
+    if (new Set(targets.map((t: {sessionKey: string}) => t.sessionKey)).size !== targets.length) throw new ConfigError(`subscriptions[${i}]: duplicate targets`);
+    const names = (field: string, pattern: RegExp) => {
+      const list = s[field] === undefined ? [] : strList(s[field], `subscriptions[${i}].${field}`);
+      if (list.length > 64 || list.some((v) => !pattern.test(v)) || new Set(list).size !== list.length) throw new ConfigError(`subscriptions[${i}].${field}: invalid filter`);
+      return list;
+    };
+    const posture = s.delivery === undefined ? "ringbuffer_only" : s.delivery;
+    if (posture !== "ringbuffer_only" && posture !== "ambient") throw new ConfigError(`subscriptions[${i}].delivery: P1 allows ringbuffer_only or ambient, never wake`);
+    return { id, targets, delivery: posture, stations: names("stations", STATION_NAME), streams: names("streams", STREAM_PATTERN), classes: names("classes", STATION_NAME), scopes: names("scopes", STATION_NAME), lenses: names("lenses", /^(?:0|[1-9]\d{0,4})$/), perHour: s.perHour === undefined ? 60 : int(s.perHour, `subscriptions[${i}].perHour`, 1, 600) };
+  });
+  if (new Set(subscriptions.map((s) => s.id)).size !== subscriptions.length) throw new ConfigError("subscriptions: duplicate id");
   const discover = c.discovery === undefined ? {} : obj(c.discovery, "discovery");
   const domains = discover.domains === undefined ? [] : strList(discover.domains, "discovery.domains");
   if (domains.length > 8 || domains.some((x) => !DOMAIN.test(x) || x.endsWith(".local"))) {
@@ -126,6 +158,7 @@ export function parseConfig(raw: unknown): BindingConfig {
       maxLive: p.maxLive === undefined ? 16 : int(p.maxLive, "publish.maxLive", 1, 64),
     },
     delivery: { mode: "explicit" },
+    subscriptions,
     discovery: { domains, catalog },
   };
 }

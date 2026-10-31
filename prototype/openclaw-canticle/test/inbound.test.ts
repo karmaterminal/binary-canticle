@@ -92,6 +92,16 @@ test("a join snapshot and live records become journal entries and the current vi
   assert.doesNotMatch(`${journal}\n${b.status(SESSION).text}`, /offline|absent|dead|\bdown\b|unwell/);
 });
 
+test("a subscription cannot widen receiver acceptance without a local route; explicit tune still reads", async () => {
+  daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", seq: 1, issued_at: clock.t, class: "advisory" });
+  const subscription = { id: "fleet", delivery: "ambient", targets: [{ sessionKey: "agent:main:local:task" }], stations: ["cael"], streams: ["lens.threat"], classes: ["advisory"] };
+  b = await up({ listen: { tune: [], payloadSessions: ["*"] }, subscriptions: [subscription] });
+  assert.equal(heardCount(b), 0);
+  await b.stop();
+  b = await up({ listen: { tune: ["cael:lens.threat"], payloadSessions: ["*"] }, subscriptions: [subscription] });
+  assert.equal(heardCount(b), 1);
+});
+
 test("a repeated, resurfaced or snapshot copy of one item is journaled once; a reordered record ends the connection", async () => {
   b = await up();
   daemon.surface(cael(1));
@@ -325,6 +335,12 @@ test("a taint table that overflows fails closed: every session that may read hea
   await b.stop();
   b = await up(cfg);
   assert.equal(b.isTainted(early), true); // and it holds across a restart
+  await b.resetSession(early.sessionKey, early.sessionId);
+  assert.equal(b.isTainted(early), false, "explicit reset clears even an overflow-implied taint");
+  assert.equal(b.isTainted(OTHER_SESSION), true, "reset does not clear another session's taint");
+  await b.stop();
+  b = await up(cfg);
+  assert.equal(b.isTainted(early), false, "the reset mark survives restart");
 });
 
 test("a cut feed: on air reads unknown with carried items, until a complete join snapshot makes it current", async () => {
