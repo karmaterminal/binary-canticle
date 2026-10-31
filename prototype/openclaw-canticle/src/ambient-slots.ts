@@ -15,7 +15,8 @@ export type Oc0Host = {
   withdraw(sessionKey: string, idempotencyKey: string): Promise<EntryOutcome>;
 };
 type Entry = { id: string; sessionKey: string; slot: SlotKey; frames: SlotFrame[]; deadline: number; retention: number; status: "enqueuing" | "pending" | "settled"; outcome?: EntryOutcome; previous?: string };
-type Ledger = { v: 1; binding: string; entries: Entry[]; settled: Record<string, number> };
+type Note = { key: string; expiresAt: number; line: string };
+type Ledger = { v: 1; binding: string; entries: Entry[]; settled: Record<string, number>; tainted?: Record<string, number>; notes?: Record<string, Note> };
 const SLOTS: SlotKey[] = ["canticle:digest", "canticle:alarm"];
 
 export class AmbientSlots {
@@ -25,7 +26,7 @@ export class AmbientSlots {
   private data: Ledger;
   constructor(root: string, binding: string, host: Oc0Host) {
     this.path = join(root, "ambient-slots.json"); this.binding = binding; this.host = host;
-    this.data = { v: 1, binding, entries: [], settled: {} };
+    this.data = { v: 1, binding, entries: [], settled: {}, tainted: {}, notes: {} };
   }
   private save(): void { writeJsonAtomic(this.path, this.data); }
   load(): void {
@@ -38,6 +39,9 @@ export class AmbientSlots {
       typeof e.sessionKey !== "string" || !Array.isArray(e.frames) || e.frames.length > 5 ||
       e.frames.some((f) => typeof f.key !== "string" || !Number.isSafeInteger(f.expiresAt) || typeof f.line !== "string") ||
       !["enqueuing", "pending", "settled"].includes(e.status))) throw new Error("invalid ambient slot entries");
+    if (d.tainted !== undefined && (!d.tainted || typeof d.tainted !== "object" || Object.values(d.tainted).some((n) => !Number.isSafeInteger(n)))) throw new Error("invalid ambient taint");
+    if (d.notes !== undefined && (!d.notes || typeof d.notes !== "object" || Object.values(d.notes).some((n) => !n || typeof n.key !== "string" || !Number.isSafeInteger(n.expiresAt) || typeof n.line !== "string"))) throw new Error("invalid ambient notes");
+    d.tainted ??= {}; d.notes ??= {};
     this.data = d;
   }
   private prune(now: number): void {
@@ -47,6 +51,9 @@ export class AmbientSlots {
     for (const [key, until] of Object.entries(this.data.settled)) if (until <= now) {
       delete this.data.settled[key]; dirty = true;
     }
+    for (const [key, note] of Object.entries(this.data.notes ?? {})) if (note.expiresAt + 5000 <= now) {
+      delete this.data.notes![key]; dirty = true;
+    }
     if (dirty) this.save();
   }
   private active(session: string, slot: SlotKey): Entry | undefined {
@@ -54,6 +61,7 @@ export class AmbientSlots {
   }
   private settle(e: Entry, outcome: EntryOutcome, now: number): void {
     e.status = "settled"; e.outcome = outcome;
+    if (outcome === "consumed") (this.data.tainted ??= {})[e.sessionKey] ??= now;
     if (outcome === "consumed" || outcome === "discarded") for (const f of e.frames) this.data.settled[f.key] = f.expiresAt + 5000;
     if (outcome === "expired") for (const f of e.frames) if (f.expiresAt <= now) this.data.settled[f.key] = f.expiresAt + 5000;
     this.save();
@@ -111,7 +119,16 @@ export class AmbientSlots {
     await this.reconcile(session, now);
     for (const e of this.data.entries.filter((x) => x.sessionKey === session && x.status === "pending" && x.frames.some((f) => f.key === key))) await this.withdraw(e, now);
     const expiry = this.data.entries.flatMap((e) => e.frames).find((f) => f.key === key)?.expiresAt;
+    if (this.data.entries.some((e) => e.sessionKey === session && e.outcome === "consumed" && e.frames.some((f) => f.key === key)) && expiry !== undefined) {
+      const noteKey = `canticle-note:${key}`;
+      (this.data.notes ??= {})[noteKey] ??= { key: noteKey, expiresAt: Math.max(expiry, now + 60_000), line: `[canticle:withdrawn/expired] ${key} withdrawn/expired` };
+      this.save();
+    }
     if (expiry !== undefined) { this.data.settled[key] = expiry + 5000; this.save(); }
+  }
+  isTainted(session: string): boolean { return this.data.tainted?.[session] !== undefined; }
+  notes(session: string, now: number): SlotFrame[] {
+    return Object.values(this.data.notes ?? {}).filter((n) => n.expiresAt > now && n.key.endsWith(`:${session}`) && !this.outcome(n.key));
   }
   pending(session: string): Entry[] { return this.data.entries.filter((e) => e.sessionKey === session && e.status === "pending"); }
   sessions(): string[] { return [...new Set(this.data.entries.map((e) => e.sessionKey))]; }

@@ -425,7 +425,10 @@ export class Binding {
       const slots = await this.candidates.slots(session, now, (key) => this.ambient!.outcome(key));
       for (const slot of ["canticle:digest", "canticle:alarm"] as const) {
         await this.ambient.sync({ sessionKey: session, slot,
-          frames: (slots.find((s) => s.key === slot)?.items ?? []).map((c) => ({ key: c.key, expiresAt: c.expiresAt, line: c.line })) }, now);
+          frames: [
+            ...(slot === "canticle:digest" ? this.ambient.notes(session, now) : []),
+            ...(slots.find((s) => s.key === slot)?.items ?? []).map((c) => ({ key: c.key, expiresAt: c.expiresAt, line: c.line })),
+          ].slice(0, 5) }, now);
       }
     }
   }
@@ -498,7 +501,7 @@ export class Binding {
    * from no mark, so every session that may read heard text counts as tainted (§14.12: taint lasts until reset). */
   isTainted(c: Caller): boolean {
     const st = this.state;
-    return st !== null && (this.taintKeyOf(c) in st.taint || (st.taint_overflow !== null && this.mayReadText(c)));
+    return st !== null && (this.ambient?.isTainted(c.sessionKey) === true || this.taintKeyOf(c) in st.taint || (st.taint_overflow !== null && this.mayReadText(c)));
   }
 
   // ------------------------------------------------------------------ tools
@@ -931,11 +934,19 @@ export class Binding {
     if (c.anonymous) {
       return this.refuse("canticle_sing", "no_session", "a call that names no session may not publish: taint and rate limits are per session");
     }
+    if (this.ambient) {
+      try {
+        await this.ambientFlight;
+        await this.ambient.reconcile(c.sessionKey, this.clock());
+      } catch {
+        return this.refuse("canticle_sing", "taint_unknown", "OC-0 outcome could not be checked; publishing is denied");
+      }
+    }
     if (this.isTainted(c)) {
       return this.refuse(
         "canticle_sing",
         "tainted",
-        "this session has read heard text; a session that heard canticle content cannot sing until it is reset",
+        "this session has heard canticle content; a tainted session cannot sing",
       );
     }
     for (const k of ["stream", "payload"] as const) {

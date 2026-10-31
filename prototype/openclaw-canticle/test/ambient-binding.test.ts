@@ -53,8 +53,33 @@ test("binding wires OC-0 only with both seams; restart reconciles lost reply and
     host.drain(); await b.tick(); await b.stop(); b = null;
     b = make(host); await b.start();
     assert.equal(host.records.length, 1, "consumed key remains tombstoned across restart");
+    assert.equal(b.isTainted({ sessionKey: session, sessionId: "fresh-session-id", subagent: false, anonymous: false }), true,
+      "OC-0 consumed outcome taints the canonical target after restart");
+    assert.equal(b.isTainted({ sessionKey: "agent:main:local:other", sessionId: null, subagent: false, anonymous: false }), false);
     await b.stop(); b = null;
   } finally { await b?.stop(); await daemon.stop(); removeDir(root); }
+});
+
+test("drained frame retracted while binding runs queues one metadata-only digest note", async () => {
+  const root = tempDir(), daemon = new FakeDaemon(root), host = new Host(), now = Date.now();
+  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, subscriptions: [{
+    id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
+    streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
+  }] });
+  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true }), oc0Host: host });
+  try {
+    await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 7, issued_at: now, ttl_ms: 120_000 });
+    await waitFor(() => host.records.length === 1);
+    host.drain(); await b.tick();
+    await waitFor(() => b.isTainted({ sessionKey: session, sessionId: null, subagent: false, anonymous: false }));
+    daemon.retract({ key_id: KEY_CAEL, stream: "lens.threat", seq: 7 });
+    await waitFor(() => host.records.some((r) => r.text.includes("[canticle:withdrawn/expired]")));
+    const note = host.records.at(-1)!;
+    assert.equal(note.supersedeKey, "canticle:digest");
+    assert.equal(note.text.split("\n").length, 1);
+    assert.doesNotMatch(note.text, /item=1\/7/, "note does not re-expose the consumed payload");
+  } finally { await b.stop(); await daemon.stop(); removeDir(root); }
 });
 
 test("retract withdraws a pending slot before rebuilding the surviving frame", async () => {

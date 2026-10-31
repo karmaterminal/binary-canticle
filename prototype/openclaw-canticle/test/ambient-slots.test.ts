@@ -69,3 +69,40 @@ test("retract withdraws first, then settles retracted key and rebuilds survivor"
     assert.equal(a.pending(sessionKey)[0]?.frames.map((f) => f.key).join(), "b");
   } finally { removeDir(root); }
 });
+
+test("consumed outcome durably taints only its session and retract note lands once after restart", async () => {
+  const root = tempDir(), host = new Host();
+  try {
+    const a = new AmbientSlots(root, "rune", host); a.load();
+    await a.sync(req("canticle:digest", "item:agent:main:local:task"), now);
+    host.drain("canticle:digest"); // binding is down at the drain boundary
+    const b = new AmbientSlots(root, "rune", host); b.load();
+    await b.reconcile(sessionKey, now);
+    assert.equal(b.isTainted(sessionKey), true);
+    assert.equal(b.isTainted("agent:main:local:other"), false);
+    await b.retract(sessionKey, "item:agent:main:local:task", now);
+    const notes = b.notes(sessionKey, now);
+    assert.equal(notes.length, 1);
+    assert.match(notes[0]!.line, /withdrawn\/expired/);
+    const c = new AmbientSlots(root, "rune", host); c.load();
+    await c.retract(sessionKey, "item:agent:main:local:task", now);
+    assert.deepEqual(c.notes(sessionKey, now), notes, "duplicate retract cannot queue a second note");
+    await c.sync({ sessionKey, slot: "canticle:digest", frames: notes }, now);
+    host.drain("canticle:digest");
+    const d = new AmbientSlots(root, "rune", host); d.load(); await d.reconcile(sessionKey, now);
+    assert.equal(d.notes(sessionKey, now).length, 0, "consumed note cannot be delivered twice");
+    assert.equal(d.isTainted(sessionKey), true);
+  } finally { removeDir(root); }
+});
+
+test("withdrawn before drain creates no post-consumption note or taint", async () => {
+  const root = tempDir(), host = new Host();
+  try {
+    const a = new AmbientSlots(root, "rune", host); a.load();
+    await a.sync(req("canticle:digest", "item:agent:main:local:task"), now);
+    await a.retract(sessionKey, "item:agent:main:local:task", now);
+    const b = new AmbientSlots(root, "rune", host); b.load();
+    assert.equal(b.isTainted(sessionKey), false);
+    assert.deepEqual(b.notes(sessionKey, now), []);
+  } finally { removeDir(root); }
+});
