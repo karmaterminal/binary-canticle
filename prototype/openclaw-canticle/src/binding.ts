@@ -46,6 +46,8 @@ type StateFile = {
   taint: Record<string, { at: number }>;
   /** When the taint table first overflowed. From then on every session that may read heard text counts as tainted. */
   taint_overflow: number | null;
+  /** Explicit resets after overflow remain untainted; bounded, with overflow failing closed. */
+  taint_cleared?: Record<string, number>;
   carried_keys: Record<string, number>;
   /** The journal's durable head when this file was saved. A journal found shorter lost entries a cursor may name. */
   journal_head: number;
@@ -247,6 +249,7 @@ export class Binding {
       await this.candidates.preflightRoutes();
       if (this.ambient) {
         this.ambient.load();
+        this.ambient.expire(now);
         for (const session of this.ambient.sessions()) await this.ambient.reconcile(session, now);
         await this.syncAmbient();
       }
@@ -304,6 +307,7 @@ export class Binding {
       return;
     }
     const now = this.clock();
+    this.ambient?.expire(now);
     this.receiver.tick(now);
     this.candidates.tick(now);
     this.queueAmbient(() => this.syncAmbient());
@@ -362,6 +366,9 @@ export class Binding {
     const st = raw as unknown as StateFile;
     st.journal_head = typeof st.journal_head === "number" ? st.journal_head : 0;
     st.taint_overflow = typeof st.taint_overflow === "number" ? st.taint_overflow : null;
+    if (st.taint_cleared !== undefined && (!isObj(st.taint_cleared) || Object.keys(st.taint_cleared).length > TAINT_MAX ||
+      Object.values(st.taint_cleared).some((v) => !Number.isSafeInteger(v))))
+      throw new BindingStartError("state_unreadable", "invalid taint reset marks");
     return st;
   }
 
@@ -421,6 +428,7 @@ export class Binding {
   private async syncAmbient(): Promise<void> {
     if (!this.ambient) return;
     const now = this.clock();
+    this.ambient.expire(now);
     for (const session of new Set([...this.candidates.targetSessions(), ...this.ambient.sessions()])) {
       const slots = await this.candidates.slots(session, now, (key) => this.ambient!.outcome(key));
       for (const slot of ["canticle:digest", "canticle:alarm"] as const) {
@@ -501,7 +509,35 @@ export class Binding {
    * from no mark, so every session that may read heard text counts as tainted (§14.12: taint lasts until reset). */
   isTainted(c: Caller): boolean {
     const st = this.state;
-    return st !== null && (this.ambient?.isTainted(c.sessionKey) === true || this.taintKeyOf(c) in st.taint || (st.taint_overflow !== null && this.mayReadText(c)));
+    const key = this.taintKeyOf(c);
+    return st !== null && (this.ambient?.isTainted(c.sessionKey) === true || key in st.taint ||
+      (st.taint_overflow !== null && this.mayReadText(c) && (st.taint_cleared?.[key] ?? -1) < st.taint_overflow));
+  }
+  /** Called only after the host has cleared this session's pending injections on /new. */
+  async resetSession(sessionKey: string, sessionId: string | null): Promise<void> {
+    await this.ambientFlight;
+    const st = this.state;
+    if (!st) throw new Error("canticle binding is not running");
+    const now = this.clock();
+    this.ambient?.reset(sessionKey, now);
+    this.candidates.resetSession(sessionKey, now);
+    for (const key of [sessionId, `key:${sessionKey}`]) {
+      if (key === null) continue;
+      delete st.taint[key];
+      delete st.checkpoints[key];
+      if (st.taint_overflow !== null && Object.keys(st.taint_cleared ?? {}).length < TAINT_MAX)
+        (st.taint_cleared ??= {})[key] = now;
+    }
+    this.saveState();
+  }
+  /** Called after host session deletion; no slot outcome or taint history survives. */
+  async deleteSession(sessionKey: string, sessionId: string | null): Promise<void> {
+    await this.resetSession(sessionKey, sessionId);
+    this.ambient?.deleteSession(sessionKey);
+    this.candidates.deleteSession(sessionKey);
+    const st = this.state!;
+    for (const key of [sessionId, `key:${sessionKey}`]) if (key !== null) delete st.taint_cleared?.[key];
+    this.saveState();
   }
 
   // ------------------------------------------------------------------ tools

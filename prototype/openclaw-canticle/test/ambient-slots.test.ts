@@ -106,3 +106,42 @@ test("withdrawn before drain creates no post-consumption note or taint", async (
     assert.deepEqual(b.notes(sessionKey, now), []);
   } finally { removeDir(root); }
 });
+
+test("reset clears taint and pending slots but retains frame tombstones; delete clears history", async () => {
+  const root = tempDir(), host = new Host(), key = `frame:${sessionKey}`;
+  try {
+    const a = new AmbientSlots(root, "rune", host); a.load();
+    await a.sync(req("canticle:digest", key), now);
+    host.drain("canticle:digest"); await a.reconcile(sessionKey, now);
+    assert.equal(a.isTainted(sessionKey), true);
+    a.reset(sessionKey, now);
+    const b = new AmbientSlots(root, "rune", host); b.load();
+    assert.equal(b.isTainted(sessionKey), false);
+    assert.equal(b.outcome(key), true);
+    await b.sync(req("canticle:digest", key), now);
+    assert.equal(host.entries.size, 1, "reset cannot re-admit consumed frame");
+    b.deleteSession(sessionKey);
+    const c = new AmbientSlots(root, "rune", host); c.load();
+    assert.equal(c.outcome(key), false);
+    assert.equal(c.sessions().includes(sessionKey), false);
+  } finally { removeDir(root); }
+});
+
+test("local expiry creates one metadata-only note without a retract record", async () => {
+  const root = tempDir(), host = new Host(), key = `frame:${sessionKey}`;
+  try {
+    const a = new AmbientSlots(root, "rune", host); a.load();
+    await a.sync(req("canticle:digest", key), now);
+    host.drain("canticle:digest"); await a.reconcile(sessionKey, now);
+    a.expire(now + 120_000);
+    const b = new AmbientSlots(root, "rune", host); b.load();
+    assert.equal(b.notes(sessionKey, now + 120_000).length, 1);
+    assert.match(b.notes(sessionKey, now + 120_000)[0]!.line, /withdrawn\/expired/);
+    b.expire(now + 120_000);
+    assert.equal(b.notes(sessionKey, now + 120_000).length, 1);
+    await b.sync({ sessionKey, slot: "canticle:digest", frames: b.notes(sessionKey, now + 120_000) }, now + 120_000);
+    host.drain("canticle:digest"); await b.reconcile(sessionKey, now + 120_000);
+    b.expire(now + 120_000);
+    assert.equal(b.notes(sessionKey, now + 120_000).length, 0);
+  } finally { removeDir(root); }
+});

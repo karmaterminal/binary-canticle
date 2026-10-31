@@ -150,6 +150,18 @@ export class Candidates {
     for (const [key, c] of Object.entries(this.data.pending)) if (c.run === run) { delete this.data.pending[key]; this.data.settled[key] = c.expiresAt + 5000; }
     this.prune(now); this.save();
   }
+  resetSession(session: string, now: number): void {
+    for (const [key, c] of Object.entries(this.data.pending)) if (c.sessionKey === session) {
+      delete this.data.pending[key]; this.data.settled[key] = c.expiresAt + 5000;
+    }
+    this.prune(now); this.save();
+  }
+  deleteSession(session: string): void {
+    for (const [key, c] of Object.entries(this.data.pending)) if (c.sessionKey === session) delete this.data.pending[key];
+    for (const key of Object.keys(this.data.settled)) if (key.endsWith(`:${session}`)) delete this.data.settled[key];
+    for (const key of Object.keys(this.data.spend)) if (key.endsWith(`:${session}`)) delete this.data.spend[key];
+    this.proven.delete(session); this.save();
+  }
   targetSessions(): string[] {
     return [...new Set(this.subscriptions.flatMap((s) => s.delivery === "ambient" ? s.targets.map((t) => t.sessionKey) : []))];
   }

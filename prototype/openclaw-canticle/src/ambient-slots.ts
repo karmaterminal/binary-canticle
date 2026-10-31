@@ -127,6 +127,41 @@ export class AmbientSlots {
     if (expiry !== undefined) { this.data.settled[key] = expiry + 5000; this.save(); }
   }
   isTainted(session: string): boolean { return this.data.tainted?.[session] !== undefined; }
+  /** The host has cleared pending entries on reset/disable. Keep admitted frame keys settled. */
+  reset(session: string, now: number): void {
+    this.prune(now);
+    for (const e of this.data.entries.filter((entry) => entry.sessionKey === session)) {
+      if (e.status !== "settled") for (const f of e.frames) this.data.settled[f.key] = f.expiresAt + 5000;
+      e.status = "settled"; e.outcome = "withdrawn";
+    }
+    delete this.data.tainted?.[session];
+    for (const key of Object.keys(this.data.notes ?? {})) if (key.endsWith(`:${session}`)) delete this.data.notes![key];
+    this.save();
+  }
+  /** Deleting a session removes its own admission history as well as its taint. */
+  deleteSession(session: string): void {
+    const removed = this.data.entries.filter((e) => e.sessionKey === session);
+    this.data.entries = this.data.entries.filter((e) => e.sessionKey !== session);
+    for (const e of removed) for (const f of e.frames) delete this.data.settled[f.key];
+    delete this.data.tainted?.[session];
+    for (const key of Object.keys(this.data.notes ?? {})) if (key.endsWith(`:${session}`)) delete this.data.notes![key];
+    this.save();
+  }
+  /** Expiry of an already consumed item is a local event, not a daemon retract. */
+  expire(now: number): void {
+    let dirty = false;
+    for (const e of this.data.entries) {
+      if (e.outcome !== "consumed") continue;
+      for (const f of e.frames) {
+        if (f.expiresAt > now) continue;
+        const key = `canticle-note:${f.key}`;
+        if (this.data.notes?.[key] || this.data.settled[f.key] === undefined || this.data.settled[key] !== undefined) continue;
+        (this.data.notes ??= {})[key] = { key, expiresAt: now + 60_000, line: `[canticle:withdrawn/expired] ${f.key} withdrawn/expired` };
+        dirty = true;
+      }
+    }
+    if (dirty) this.save();
+  }
   notes(session: string, now: number): SlotFrame[] {
     return Object.values(this.data.notes ?? {}).filter((n) => n.expiresAt > now && n.key.endsWith(`:${session}`) && !this.outcome(n.key));
   }

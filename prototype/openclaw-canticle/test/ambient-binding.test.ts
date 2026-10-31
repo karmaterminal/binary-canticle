@@ -56,6 +56,12 @@ test("binding wires OC-0 only with both seams; restart reconciles lost reply and
     assert.equal(b.isTainted({ sessionKey: session, sessionId: "fresh-session-id", subagent: false, anonymous: false }), true,
       "OC-0 consumed outcome taints the canonical target after restart");
     assert.equal(b.isTainted({ sessionKey: "agent:main:local:other", sessionId: null, subagent: false, anonymous: false }), false);
+    await b.resetSession(session, "fresh-session-id");
+    assert.equal(b.isTainted({ sessionKey: session, sessionId: "fresh-session-id", subagent: false, anonymous: false }), false);
+    await b.tick();
+    assert.equal(host.records.length, 1, "reset keeps the consumed frame tombstone");
+    await b.deleteSession(session, "fresh-session-id");
+    assert.equal(b.ambient?.sessions().includes(session), false);
     await b.stop(); b = null;
   } finally { await b?.stop(); await daemon.stop(); removeDir(root); }
 });
