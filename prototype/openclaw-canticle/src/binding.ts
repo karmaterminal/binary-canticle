@@ -96,6 +96,7 @@ export class Binding {
   private readonly link: DaemonLink;
   readonly outbox: Outbox | null;
   readonly candidates: Candidates;
+  private readonly candidateFlights = new Set<Promise<void>>();
   private state: StateFile | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly tickMs: number;
@@ -113,7 +114,7 @@ export class Binding {
     this.lease = new Lease(o.root);
     this.lease.onError = (e) => this.log(`canticle: state lease error: ${e.message}`);
     this.journal = new Journal(join(o.root, "journal"), o.config.journal);
-    this.candidates = new Candidates(o.root, o.config.binding, o.config.subscriptions, o.routeProof ?? (() => null));
+    this.candidates = new Candidates(o.root, o.config.binding, o.config.subscriptions, o.routeProof ?? (async (sessionKey) => ({ sessionKey, exists: false, onHost: false })));
     const self = o.config.station?.keyId ?? null;
     this.receiver = new Receiver(
       {
@@ -175,7 +176,7 @@ export class Binding {
       },
       {
         clock: this.clock,
-        accepts: (f) => (self !== null && f.key_id === self) || tuned(o.config.listen.tune, f.station, f.stream) || this.candidates.acceptsAmbient(f),
+        accepts: (f) => (self !== null && f.key_id === self) || tuned(o.config.listen.tune, f.station, f.stream) || this.candidates.matchesAmbient(f),
         lastRun: null,
       },
     );
@@ -232,6 +233,7 @@ export class Binding {
       this.state = this.loadState(now);
       this.journal.load(this.state.carried_keys, now);
       this.candidates.load(now);
+      await this.candidates.preflightRoutes();
       if (this.journal.head < this.state.journal_head) {
         // Journal files are gone that held seqs a reader may have a cursor for. Rather than hand those seqs out
         // again, every earlier cursor and checkpoint becomes stale: a read with one is refused, never misread.
@@ -272,6 +274,7 @@ export class Binding {
     }
     this.link.stop();
     // A reconcile or sing in flight finishes while the lease is still held; nothing of this binding writes after.
+    await Promise.allSettled(this.candidateFlights);
     await this.outbox?.close();
     this.journal.close();
     this.saveState();
@@ -381,7 +384,12 @@ export class Binding {
       mute,
       frame: f,
     });
-    if (entry !== null) this.candidates.accept(f, run, now, self, mute !== null);
+    if (entry !== null) {
+      const flight = this.candidates.accept(f, run, now, self, mute !== null)
+        .then(() => undefined, (e: unknown) => this.log(`canticle: candidate admission failed: ${(e as Error).message}`));
+      this.candidateFlights.add(flight);
+      void flight.finally(() => this.candidateFlights.delete(flight));
+    }
   }
 
   /** The mute that covers a station:stream now: the daemon's MUTE first, then this binding's most specific. */

@@ -63,12 +63,10 @@ export default {
           b = new Binding({
             config: cfg,
             root: stateRootOf(cfg, ctx.stateDir),
-            routeProof: (sessionKey) => {
-              // The landed host route proof is async. Candidates currently require a synchronous
-              // proof, so ambient admission stays closed until that call path is made async.
-              // Never treat a Promise or a configured target as a route proof.
-              void sessionKey;
-              return null;
+            routeProof: async (sessionKey) => {
+              const resolve = api.session?.state?.resolveLocalSessionRoute;
+              if (!resolve) return { sessionKey, exists: false, onHost: false };
+              return resolve(sessionKey);
             },
             log: (msg) => ctx.logger?.info?.(msg),
           });

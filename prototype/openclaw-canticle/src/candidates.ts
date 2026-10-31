@@ -5,7 +5,7 @@ import { type Subscription } from "./config.ts";
 import { type HeardFrame, isObj } from "./records.ts";
 import { readJson, writeJsonAtomic } from "./store.ts";
 
-export type RouteProof = (sessionKey: string) => { canonicalKey: string; offHost: boolean } | null;
+export type RouteProof = (sessionKey: string) => Promise<{ sessionKey: string; exists: boolean; onHost: boolean }>;
 export type Candidate = { key: string; sessionKey: string; subscriptionIds: string[]; run: string; station: string; stream: string; class: string; scope: string | null; lens: number | null; heardAt: number; expiresAt: number; eligibleAt: number; line: string };
 type Ledger = { v: 1; binding: string; pending: Record<string, Candidate>; settled: Record<string, number>; spend: Record<string, number[]> };
 export type LogicalSlot = { key: "canticle:digest" | "canticle:alarm"; items: Candidate[]; text: string; expiresAt: number };
@@ -24,6 +24,9 @@ export class Candidates {
   private readonly subscriptions: Subscription[];
   private readonly route: RouteProof;
   private data: Ledger;
+  private readonly proven = new Set<string>();
+  private readonly retractedInFlight = new Set<string>();
+  private readonly cancelledRuns = new Set<string>();
   constructor(root: string, binding: string, subscriptions: Subscription[], route: RouteProof) {
     this.path = join(root, "candidates.json");
     this.binding = binding;
@@ -56,16 +59,32 @@ export class Candidates {
       match(s.stations, c.station) && match(s.streams, c.stream) && match(s.classes, c.class) &&
       match(s.scopes, c.scope) && match(s.lenses, c.lens)));
   }
-  private validRoute(sessionKey: string): boolean {
-    const proof = this.route(sessionKey);
-    return proof !== null && !proof.offHost && proof.canonicalKey === sessionKey;
+  private async validRoute(sessionKey: string): Promise<boolean> {
+    try {
+      const proof = await this.route(sessionKey);
+      const valid = proof !== null && proof.sessionKey === sessionKey && proof.exists === true && proof.onHost === true;
+      if (valid) this.proven.add(sessionKey); else this.proven.delete(sessionKey);
+      return valid;
+    } catch { this.proven.delete(sessionKey); return false; }
   }
   /** A subscription can broaden receiver acceptance only with a proven local target. */
-  acceptsAmbient(frame: HeardFrame): boolean {
+  async acceptsAmbient(frame: HeardFrame): Promise<boolean> {
+    for (const s of this.subscriptions) {
+      if (s.delivery !== "ambient" || !match(s.stations, frame.station) || !match(s.streams, frame.stream) ||
+        !match(s.classes, frame.class) || !match(s.scopes, frame.scope) || !match(s.lenses, frame.lens)) continue;
+      for (const t of s.targets) if (await this.validRoute(t.sessionKey)) return true;
+    }
+    return false;
+  }
+  async preflightRoutes(): Promise<void> {
+    for (const key of new Set(this.subscriptions.flatMap((s) => s.delivery === "ambient" ? s.targets.map((t) => t.sessionKey) : []))) await this.validRoute(key);
+  }
+  /** Cached preflight gates receiver acceptance; admission refreshes the proof before persistence. */
+  matchesAmbient(frame: HeardFrame): boolean {
     return this.subscriptions.some((s) => s.delivery === "ambient" &&
       match(s.stations, frame.station) && match(s.streams, frame.stream) &&
       match(s.classes, frame.class) && match(s.scopes, frame.scope) && match(s.lenses, frame.lens) &&
-      s.targets.some((t) => this.validRoute(t.sessionKey)));
+      s.targets.some((t) => this.proven.has(t.sessionKey)));
   }
   private prune(now: number): void {
     let dirty = false;
@@ -86,14 +105,15 @@ export class Candidates {
   }
   tick(now: number): void { this.prune(now); }
   /** A route proof must come from the host, never from the frame or the subscription itself. */
-  accept(frame: HeardFrame, run: string, now: number, self: boolean, muted: boolean): number {
+  async accept(frame: HeardFrame, run: string, now: number, self: boolean, muted: boolean): Promise<number> {
     this.prune(now);
     if (muted || frame.times.local_expiry_at <= now || Object.keys(this.data.pending).length >= MAX_PENDING || Object.keys(this.data.settled).length >= MAX_SETTLED) return 0;
     let added = 0;
     for (const sub of this.subscriptions) {
       if (sub.delivery !== "ambient" || (self && !sub.stations.includes(frame.station)) || !match(sub.stations, frame.station) || !match(sub.streams, frame.stream) || !match(sub.classes, frame.class) || !match(sub.scopes, frame.scope) || !match(sub.lenses, frame.lens)) continue;
       for (const target of sub.targets) {
-        if (!this.validRoute(target.sessionKey)) continue;
+        if (!await this.validRoute(target.sessionKey)) continue;
+        if (this.retractedInFlight.has(frame.idem) || this.cancelledRuns.has(run)) continue;
         const spendKey = `${sub.id}:${target.sessionKey}`;
         const spent = this.data.spend[spendKey] ?? [];
         const key = `${frame.idem}:${target.sessionKey}`;
@@ -121,17 +141,19 @@ export class Candidates {
     return added;
   }
   retract(idem: string, now: number): void {
+    this.retractedInFlight.add(idem);
     for (const [key, c] of Object.entries(this.data.pending)) if (key.startsWith(`${idem}:`)) { delete this.data.pending[key]; this.data.settled[key] = c.expiresAt + 5000; }
     this.prune(now); this.save();
   }
   rejoin(run: string, now: number): void {
+    this.cancelledRuns.add(run);
     for (const [key, c] of Object.entries(this.data.pending)) if (c.run === run) { delete this.data.pending[key]; this.data.settled[key] = c.expiresAt + 5000; }
     this.prune(now); this.save();
   }
   /** Read-only logical slots for a later OC-0 adapter; never enqueued or shown to a model. */
-  slots(sessionKey: string, now: number): LogicalSlot[] {
+  async slots(sessionKey: string, now: number): Promise<LogicalSlot[]> {
     this.prune(now);
-    if (!this.validRoute(sessionKey)) return [];
+    if (!await this.validRoute(sessionKey)) return [];
     const rows = Object.values(this.data.pending).filter((c) => c.sessionKey === sessionKey && c.expiresAt > now && c.eligibleAt <= now);
     return (["canticle:digest", "canticle:alarm"] as const).flatMap((slot) => {
       const chosen: Candidate[] = []; let bytes = 0;
