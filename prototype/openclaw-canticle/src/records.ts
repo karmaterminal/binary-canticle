@@ -311,12 +311,13 @@ export function healthOf(rec: Obj): DaemonHealth | null {
   return { state: reasonCode(rec.state), reasons: rec.reasons.slice(0, 8).map(reasonCode), beacon_age_ms: ages };
 }
 
-export type Landing = { mute: unknown; breaker: string | null; until: number | null };
+export type Landing = { mute: unknown; breaker: string | null; until: number | null; modulation: unknown };
 
 export function landingOf(rec: Obj): Landing {
   return {
     mute: rec.mute ?? null,
     breaker: typeof rec.breaker === "string" ? rec.breaker : null,
     until: isInt(rec.until) ? rec.until : null,
+    modulation: rec.modulation,
   };
 }

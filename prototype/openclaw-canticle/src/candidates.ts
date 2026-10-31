@@ -105,15 +105,15 @@ export class Candidates {
   }
   tick(now: number): void { this.prune(now); }
   /** A route proof must come from the host, never from the frame or the subscription itself. */
-  async accept(frame: HeardFrame, run: string, now: number, self: boolean, muted: boolean): Promise<number> {
+  async accept(frame: HeardFrame, run: string, now: number, self: boolean, muted: boolean, mayAdmit: () => boolean = () => true): Promise<number> {
     this.prune(now);
-    if (muted || frame.times.local_expiry_at <= now || Object.keys(this.data.pending).length >= MAX_PENDING || Object.keys(this.data.settled).length >= MAX_SETTLED) return 0;
+    if (muted || !mayAdmit() || frame.times.local_expiry_at <= now || Object.keys(this.data.pending).length >= MAX_PENDING || Object.keys(this.data.settled).length >= MAX_SETTLED) return 0;
     let added = 0;
     for (const sub of this.subscriptions) {
       if (sub.delivery !== "ambient" || (self && !sub.stations.includes(frame.station)) || !match(sub.stations, frame.station) || !match(sub.streams, frame.stream) || !match(sub.classes, frame.class) || !match(sub.scopes, frame.scope) || !match(sub.lenses, frame.lens)) continue;
       for (const target of sub.targets) {
         if (!await this.validRoute(target.sessionKey)) continue;
-        if (this.retractedInFlight.has(frame.idem) || this.cancelledRuns.has(run)) continue;
+        if (!mayAdmit() || this.retractedInFlight.has(frame.idem) || this.cancelledRuns.has(run)) continue;
         const spendKey = `${sub.id}:${target.sessionKey}`;
         const spent = this.data.spend[spendKey] ?? [];
         const key = `${frame.idem}:${target.sessionKey}`;
@@ -148,6 +148,13 @@ export class Candidates {
   rejoin(run: string, now: number): void {
     this.cancelledRuns.add(run);
     for (const [key, c] of Object.entries(this.data.pending)) if (c.run === run) { delete this.data.pending[key]; this.data.settled[key] = c.expiresAt + 5000; }
+    this.prune(now); this.save();
+  }
+  /** A receiver-wide suppression revokes queued admissions, including delayed A11 candidates. */
+  suppress(now: number): void {
+    for (const [key, c] of Object.entries(this.data.pending)) {
+      delete this.data.pending[key]; this.data.settled[key] = c.expiresAt + 5000;
+    }
     this.prune(now); this.save();
   }
   resetSession(session: string, now: number): void {

@@ -27,7 +27,7 @@ class Host implements Oc0Host {
   pending(): number { return [...this.entries.values()].filter((v) => v === "pending").length; }
 }
 
-test("binding wires OC-0 only with both seams; restart reconciles lost reply and consumed tombstone", async () => {
+test("binding wires OC-0 only with both seams; restart does not admit stale candidate before landing", async () => {
   const root = tempDir(), daemon = new FakeDaemon(root), host = new Host();
   const now = Date.now();
   const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, subscriptions: [{
@@ -44,24 +44,9 @@ test("binding wires OC-0 only with both seams; restart reconciles lost reply and
     await waitFor(() => b!.candidates.pendingCount === 1); await b.stop(); b = null;
     assert.equal(host.records.length, 0, "route proof alone never enqueues");
 
-    host.loseReply = true;
-    b = make(host); await assert.rejects(b.start(), /lost reply/); b = null;
-    assert.equal(host.records.length, 1, "restart rebuilds stored candidate");
-    assert.equal(host.pending(), 1);
     b = make(host); await b.start();
-    assert.equal(host.records.length, 1, "lost enqueue reply reconciles without duplicate");
-    host.drain(); await b.tick(); await b.stop(); b = null;
-    b = make(host); await b.start();
-    assert.equal(host.records.length, 1, "consumed key remains tombstoned across restart");
-    assert.equal(b.isTainted({ sessionKey: session, sessionId: "fresh-session-id", subagent: false, anonymous: false }), true,
-      "OC-0 consumed outcome taints the canonical target after restart");
-    assert.equal(b.isTainted({ sessionKey: "agent:main:local:other", sessionId: null, subagent: false, anonymous: false }), false);
-    await b.resetSession(session, "fresh-session-id");
-    assert.equal(b.isTainted({ sessionKey: session, sessionId: "fresh-session-id", subagent: false, anonymous: false }), false);
-    await b.tick();
-    assert.equal(host.records.length, 1, "reset keeps the consumed frame tombstone");
-    await b.deleteSession(session, "fresh-session-id");
-    assert.equal(b.ambient?.sessions().includes(session), false);
+    await waitFor(() => b!.receiver.current());
+    assert.equal(host.records.length, 0, "a rejoined run cancels old candidates before rebuilding");
     await b.stop(); b = null;
   } finally { await b?.stop(); await daemon.stop(); removeDir(root); }
 });
@@ -103,4 +88,90 @@ test("retract withdraws a pending slot before rebuilding the surviving frame", a
     await waitFor(() => host.records.at(-1)?.text.includes("item=1/2") === true && host.records.at(-1)?.text.includes("item=1/1") === false);
     assert.equal(host.pending(), 1);
   } finally { await b.stop(); await daemon.stop(); removeDir(root); }
+});
+
+test("landing MUTE and regulatory change withdraw pending host entry; clear state only admits new frames", async () => {
+  const root = tempDir(), daemon = new FakeDaemon(root), host = new Host(), now = Date.now();
+  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, subscriptions: [{
+    id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
+    streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
+  }] });
+  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true }), oc0Host: host });
+  try {
+    await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 21, issued_at: now, ttl_ms: 120_000 });
+    await waitFor(() => host.pending() === 1);
+    daemon.emit("landing_state", { mute: { until: null, by: "test" }, breaker: "closed", until: null, modulation: [] });
+    await waitFor(() => host.pending() === 0);
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 22, issued_at: now, ttl_ms: 120_000 });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(b.candidates.pendingCount, 0);
+    assert.equal(host.pending(), 0);
+    daemon.emit("landing_state", { mute: null, breaker: "closed", until: null, modulation: [{ stream: "lens.threat", op: "tighten", delta_theta: 0.5 }] });
+    await b.tick();
+    assert.equal(host.pending(), 0, "unknown modulation must fail closed, not use stale baseline");
+    daemon.emit("landing_state", { mute: null, breaker: "closed", until: null, modulation: [] });
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 23, issued_at: now, ttl_ms: 120_000 });
+    await waitFor(() => host.pending() === 1);
+    assert.equal(host.records.at(-1)?.text.includes("item=1/21"), false);
+  } finally { await b.stop(); await daemon.stop(); removeDir(root); }
+});
+
+test("landing MUTE racing an in-flight host enqueue withdraws its accepted entry", async () => {
+  const root = tempDir(), daemon = new FakeDaemon(root), now = Date.now();
+  let release: (() => void) | undefined;
+  let entered: (() => void) | undefined;
+  const began = new Promise<void>((resolve) => { entered = resolve; });
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  class SlowHost extends Host {
+    override async enqueue(e: HostEntry): Promise<{ accepted: true }> {
+      entered?.(); await gate;
+      return await super.enqueue(e) as { accepted: true };
+    }
+  }
+  const host = new SlowHost();
+  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, subscriptions: [{
+    id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
+    streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
+  }] });
+  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true }), oc0Host: host });
+  try {
+    await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 31, issued_at: now, ttl_ms: 120_000 });
+    await began;
+    daemon.emit("landing_state", { mute: { until: null, by: "test" }, breaker: "closed", until: null, modulation: [] });
+    await waitFor(() => typeof b.receiver.status().landing?.mute === "object" && b.receiver.status().landing?.mute !== null);
+    release?.();
+    await waitFor(() => host.records.length === 1 && host.pending() === 0);
+  } finally { release?.(); await b.stop(); await daemon.stop(); removeDir(root); }
+});
+
+test("breaker change racing an in-flight enqueue withdraws the old entry before rebuilding", async () => {
+  const root = tempDir(), daemon = new FakeDaemon(root), now = Date.now();
+  let release: (() => void) | undefined;
+  let entered: (() => void) | undefined;
+  const began = new Promise<void>((resolve) => { entered = resolve; });
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  class SlowHost extends Host {
+    override async enqueue(e: HostEntry): Promise<{ accepted: true }> {
+      if (this.records.length === 0) { entered?.(); await gate; }
+      return await super.enqueue(e) as { accepted: true };
+    }
+  }
+  const host = new SlowHost();
+  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, subscriptions: [{
+    id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
+    streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
+  }] });
+  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true }), oc0Host: host });
+  try {
+    await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 41, issued_at: now, ttl_ms: 120_000 });
+    await began;
+    daemon.emit("landing_state", { mute: null, breaker: "open", until: now + 60_000, modulation: [] });
+    await waitFor(() => b.receiver.status().landing?.breaker === "open");
+    release?.();
+    await waitFor(() => host.records.length >= 2 && host.pending() === 1);
+    assert.equal(host.entries.get(host.records[0]!.idempotencyKey), "withdrawn");
+  } finally { release?.(); await b.stop(); await daemon.stop(); removeDir(root); }
 });

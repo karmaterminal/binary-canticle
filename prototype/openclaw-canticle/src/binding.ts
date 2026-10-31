@@ -102,6 +102,7 @@ export class Binding {
   readonly candidates: Candidates;
   readonly ambient: AmbientSlots | null;
   private ambientFlight: Promise<void> = Promise.resolve();
+  private landingRevision = 0;
   private readonly candidateFlights = new Set<Promise<void>>();
   private state: StateFile | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -167,6 +168,10 @@ export class Binding {
             last_beacon_at: p.last_beacon_at,
           }),
         note: (n) => {
+          if (n.kind === "landing_changed") {
+            this.landingRevision++;
+            if (!this.ambientLanding(this.clock(), false).allowed) this.candidates.suppress(this.clock());
+          }
           // A restored run is not a live rejoin: retain its candidates across Gateway restart.
           if (n.kind === "joined" && n.join === "rejoin") {
             if (this.joinedThisStart) this.candidates.rejoin(n.run, this.clock());
@@ -178,8 +183,8 @@ export class Binding {
             if (this.joinedThisStart && n.why !== "stopped") this.candidates.rejoin(this.state?.last_run ?? "", this.clock());
             this.preserveInitialRejoin = false;
           }
-          if (n.kind === "joined" || n.kind === "records_lost" || n.kind === "disconnected") this.queueAmbient(() => this.syncAmbient());
-          this.append({ kind: "note", note: n });
+          if (n.kind === "joined" || n.kind === "landing_changed" || n.kind === "records_lost" || n.kind === "disconnected") this.queueAmbient(() => this.syncAmbient());
+          if (n.kind !== "landing_changed") this.append({ kind: "note", note: n });
           if (n.kind === "joined") this.joinedThisStart = true;
           if (n.kind === "joined" && this.state !== null && this.state.last_run !== n.run) {
             this.state.last_run = n.run;
@@ -410,7 +415,7 @@ export class Binding {
       frame: f,
     });
     if (entry !== null) {
-      const flight = this.candidates.accept(f, run, now, self, mute !== null)
+      const flight = this.candidates.accept(f, run, now, self, mute !== null, () => this.ambientLanding(this.clock()).allowed)
         .then(() => { this.queueAmbient(() => this.syncAmbient()); }, (e: unknown) => this.log(`canticle: candidate admission failed: ${(e as Error).message}`));
       this.candidateFlights.add(flight);
       void flight.finally(() => this.candidateFlights.delete(flight));
@@ -432,13 +437,34 @@ export class Binding {
     for (const session of new Set([...this.candidates.targetSessions(), ...this.ambient.sessions()])) {
       const slots = await this.candidates.slots(session, now, (key) => this.ambient!.outcome(key));
       for (const slot of ["canticle:digest", "canticle:alarm"] as const) {
+        const revision = this.landingRevision;
+        const landing = this.ambientLanding(this.clock());
+        const items = slots.find((s) => s.key === slot)?.items ?? [];
+        // The host record is authoritative at the moment of each host operation. An absent or
+        // unimplemented regulatory state closes admission, including during startup/rejoin.
+        const admitted = !landing.allowed ? [] : landing.breaker === "open"
+          ? slot === "canticle:digest" ? [...new Map(items.map((c) => [c.stream, c] as const)).values()] : []
+          : landing.breaker === "half_open" ? items.slice(0, Math.floor(items.length / 4)) : items;
         await this.ambient.sync({ sessionKey: session, slot,
           frames: [
-            ...(slot === "canticle:digest" ? this.ambient.notes(session, now) : []),
-            ...(slots.find((s) => s.key === slot)?.items ?? []).map((c) => ({ key: c.key, expiresAt: c.expiresAt, line: c.line })),
+            ...(landing.allowed && slot === "canticle:digest" ? this.ambient.notes(session, now) : []),
+            ...admitted.map((c) => ({ key: c.key, expiresAt: c.expiresAt, line: c.line })),
           ].slice(0, 5) }, now);
+        // A landing update may arrive while OC-0 is awaiting an enqueue response. Withdraw
+        // before this flight completes; the queued update will then rebuild from current state.
+        if (revision !== this.landingRevision || !this.ambientLanding(this.clock()).allowed)
+          await this.ambient.sync({ sessionKey: session, slot, frames: [] }, this.clock());
       }
     }
+  }
+
+  private ambientLanding(now: number, requireCurrent = true): { allowed: boolean; breaker: "closed" | "open" | "half_open" } {
+    const landing = this.receiver.status().landing;
+    if ((requireCurrent && !this.receiver.current()) || landing === null ||
+      (isObj(landing.mute) && (typeof landing.mute.until !== "number" || landing.mute.until > now)) ||
+      !Array.isArray(landing.modulation) || landing.modulation.length !== 0 ||
+      !["closed", "open", "half_open"].includes(landing.breaker ?? "")) return { allowed: false, breaker: "closed" };
+    return { allowed: true, breaker: landing.breaker as "closed" | "open" | "half_open" };
   }
 
   /** The mute that covers a station:stream now: the daemon's MUTE first, then this binding's most specific. */
