@@ -1,4 +1,4 @@
-// OC-0 adapter core. Deliberately not wired to the service until the host exposes the complete seam.
+// OC-0 adapter core. The service wires this only when both host seams exist.
 // The binding owns frame keys; OC-0 owns entry outcomes. Every intent is durable before a host call.
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -114,5 +114,9 @@ export class AmbientSlots {
     if (expiry !== undefined) { this.data.settled[key] = expiry + 5000; this.save(); }
   }
   pending(session: string): Entry[] { return this.data.entries.filter((e) => e.sessionKey === session && e.status === "pending"); }
+  sessions(): string[] { return [...new Set(this.data.entries.map((e) => e.sessionKey))]; }
+  keysForIdem(idem: string): { session: string; key: string }[] {
+    return [...new Map(this.data.entries.flatMap((e) => e.frames.filter((f) => f.key.startsWith(`${idem}:`)).map((f) => [`${e.sessionKey}\0${f.key}`, { session: e.sessionKey, key: f.key }] as const))).values()];
+  }
   outcome(key: string): boolean { return this.data.settled[key] !== undefined; }
 }

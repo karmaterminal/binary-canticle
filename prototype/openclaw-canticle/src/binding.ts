@@ -8,6 +8,7 @@
 
 import { randomBytes } from "node:crypto";
 import { Candidates, type RouteProof } from "./candidates.ts";
+import { AmbientSlots, type Oc0Host } from "./ambient-slots.ts";
 import { join } from "node:path";
 import { type BindingConfig, sessionMatches, tuned } from "./config.ts";
 import { DaemonLink } from "./daemon.ts";
@@ -60,6 +61,7 @@ export type BindingOptions = {
   tickMs?: number;
   /** Host-authoritative canonical key and reply-route check. Without one, ambient candidates fail closed. */
   routeProof?: RouteProof;
+  oc0Host?: Oc0Host;
 };
 
 const STATE_V = "openclaw-canticle-state/1";
@@ -96,6 +98,8 @@ export class Binding {
   private readonly link: DaemonLink;
   readonly outbox: Outbox | null;
   readonly candidates: Candidates;
+  readonly ambient: AmbientSlots | null;
+  private ambientFlight: Promise<void> = Promise.resolve();
   private readonly candidateFlights = new Set<Promise<void>>();
   private state: StateFile | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -115,12 +119,18 @@ export class Binding {
     this.lease.onError = (e) => this.log(`canticle: state lease error: ${e.message}`);
     this.journal = new Journal(join(o.root, "journal"), o.config.journal);
     this.candidates = new Candidates(o.root, o.config.binding, o.config.subscriptions, o.routeProof ?? (async (sessionKey) => ({ sessionKey, exists: false, onHost: false })));
+    this.ambient = o.routeProof && o.oc0Host ? new AmbientSlots(o.root, o.config.binding, o.oc0Host) : null;
     const self = o.config.station?.keyId ?? null;
     this.receiver = new Receiver(
       {
         heard: (f, ctx) => this.onHeard(f, ctx.run, ctx.rec_seq, ctx.source),
         withdrawn: (r, ctx, held) => {
+          const keys = this.ambient?.keysForIdem(r.idem) ?? [];
           this.candidates.retract(r.idem, this.clock());
+          this.queueAmbient(async () => {
+            for (const { session, key } of keys) await this.ambient?.retract(session, key, this.clock());
+            await this.syncAmbient();
+          });
           if (self !== null && r.target.key_id === self) {
             this.outbox?.retracted(r, this.clock());
           }
@@ -166,6 +176,7 @@ export class Binding {
             if (this.joinedThisStart && n.why !== "stopped") this.candidates.rejoin(this.state?.last_run ?? "", this.clock());
             this.preserveInitialRejoin = false;
           }
+          if (n.kind === "joined" || n.kind === "records_lost" || n.kind === "disconnected") this.queueAmbient(() => this.syncAmbient());
           this.append({ kind: "note", note: n });
           if (n.kind === "joined") this.joinedThisStart = true;
           if (n.kind === "joined" && this.state !== null && this.state.last_run !== n.run) {
@@ -234,6 +245,11 @@ export class Binding {
       this.journal.load(this.state.carried_keys, now);
       this.candidates.load(now);
       await this.candidates.preflightRoutes();
+      if (this.ambient) {
+        this.ambient.load();
+        for (const session of this.ambient.sessions()) await this.ambient.reconcile(session, now);
+        await this.syncAmbient();
+      }
       if (this.journal.head < this.state.journal_head) {
         // Journal files are gone that held seqs a reader may have a cursor for. Rather than hand those seqs out
         // again, every earlier cursor and checkpoint becomes stale: a read with one is refused, never misread.
@@ -275,6 +291,7 @@ export class Binding {
     this.link.stop();
     // A reconcile or sing in flight finishes while the lease is still held; nothing of this binding writes after.
     await Promise.allSettled(this.candidateFlights);
+    await this.ambientFlight;
     await this.outbox?.close();
     this.journal.close();
     this.saveState();
@@ -289,6 +306,7 @@ export class Binding {
     const now = this.clock();
     this.receiver.tick(now);
     this.candidates.tick(now);
+    this.queueAmbient(() => this.syncAmbient());
     const st = this.state as StateFile;
     let dirty = false;
     if (this.journal.prune(now)) {
@@ -386,9 +404,29 @@ export class Binding {
     });
     if (entry !== null) {
       const flight = this.candidates.accept(f, run, now, self, mute !== null)
-        .then(() => undefined, (e: unknown) => this.log(`canticle: candidate admission failed: ${(e as Error).message}`));
+        .then(() => { this.queueAmbient(() => this.syncAmbient()); }, (e: unknown) => this.log(`canticle: candidate admission failed: ${(e as Error).message}`));
       this.candidateFlights.add(flight);
       void flight.finally(() => this.candidateFlights.delete(flight));
+    }
+  }
+
+  /** Serial host operations; the next sync reconciles an ambiguous prior call. */
+  private queueAmbient(work: () => Promise<void>): void {
+    if (!this.ambient) return;
+    this.ambientFlight = this.ambientFlight.then(work, work).catch((e: unknown) => {
+      this.log(`canticle: OC-0 ambient sync failed closed: ${(e as Error).message}`);
+    });
+  }
+
+  private async syncAmbient(): Promise<void> {
+    if (!this.ambient) return;
+    const now = this.clock();
+    for (const session of new Set([...this.candidates.targetSessions(), ...this.ambient.sessions()])) {
+      const slots = await this.candidates.slots(session, now, (key) => this.ambient!.outcome(key));
+      for (const slot of ["canticle:digest", "canticle:alarm"] as const) {
+        await this.ambient.sync({ sessionKey: session, slot,
+          frames: (slots.find((s) => s.key === slot)?.items ?? []).map((c) => ({ key: c.key, expiresAt: c.expiresAt, line: c.line })) }, now);
+      }
     }
   }
 

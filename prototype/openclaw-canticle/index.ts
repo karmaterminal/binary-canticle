@@ -7,6 +7,7 @@ import { Binding } from "./src/binding.ts";
 import { parseConfig, stateRootOf } from "./src/config.ts";
 import { TOOL_NAMES, type ToolContext, createTool } from "./src/tools.ts";
 import { Discoverer } from "./src/discover.ts";
+import { oc0HostFromWorkflow, type Oc0Workflow } from "./src/oc0-host.ts";
 
 const PLUGIN_ID = "canticle";
 
@@ -17,6 +18,7 @@ type PluginApi = {
   session?: { state?: { resolveLocalSessionRoute?: (sessionKey: string) => Promise<{
     sessionKey: string; exists: boolean; onHost: boolean;
   }> } };
+  workflow?: Partial<Oc0Workflow>;
   registerTool: (factory: (ctx: ToolContext) => unknown, opts: { name: string; optional: boolean }) => void;
   registerService: (service: {
     id: string;
@@ -68,6 +70,10 @@ export default {
               if (!resolve) return { sessionKey, exists: false, onHost: false };
               return resolve(sessionKey);
             },
+            ...(api.session?.state?.resolveLocalSessionRoute &&
+              api.workflow?.enqueueNextTurnInjection && api.workflow?.getNextTurnInjectionState &&
+              api.workflow?.withdrawNextTurnInjection
+              ? { oc0Host: oc0HostFromWorkflow(api.workflow as Oc0Workflow) } : {}),
             log: (msg) => ctx.logger?.info?.(msg),
           });
           await b.start();

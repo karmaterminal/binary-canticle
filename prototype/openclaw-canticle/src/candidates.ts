@@ -1,4 +1,4 @@
-// Durable, non-delivering ambient candidate ledger. No host queue, prompt hook, or wake call exists here.
+// Durable ambient candidate ledger. The binding alone may hand bounded slots to OC-0.
 import { join } from "node:path";
 import { randomInt } from "node:crypto";
 import { type Subscription } from "./config.ts";
@@ -150,11 +150,14 @@ export class Candidates {
     for (const [key, c] of Object.entries(this.data.pending)) if (c.run === run) { delete this.data.pending[key]; this.data.settled[key] = c.expiresAt + 5000; }
     this.prune(now); this.save();
   }
-  /** Read-only logical slots for a later OC-0 adapter; never enqueued or shown to a model. */
-  async slots(sessionKey: string, now: number): Promise<LogicalSlot[]> {
+  targetSessions(): string[] {
+    return [...new Set(this.subscriptions.flatMap((s) => s.delivery === "ambient" ? s.targets.map((t) => t.sessionKey) : []))];
+  }
+  /** Route-checked, bounded logical slots; exclude keys already settled by OC-0. */
+  async slots(sessionKey: string, now: number, settled: (key: string) => boolean = () => false): Promise<LogicalSlot[]> {
     this.prune(now);
     if (!await this.validRoute(sessionKey)) return [];
-    const rows = Object.values(this.data.pending).filter((c) => c.sessionKey === sessionKey && c.expiresAt > now && c.eligibleAt <= now);
+    const rows = Object.values(this.data.pending).filter((c) => c.sessionKey === sessionKey && c.expiresAt > now && c.eligibleAt <= now && !settled(c.key));
     return (["canticle:digest", "canticle:alarm"] as const).flatMap((slot) => {
       const chosen: Candidate[] = []; let bytes = 0;
       for (const c of rows.filter((r) => (r.class === "alarm") === (slot === "canticle:alarm")).sort((a, b) => a.expiresAt - b.expiresAt || b.heardAt - a.heardAt)) {
