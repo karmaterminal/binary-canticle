@@ -14,7 +14,7 @@ Status: implementation plan, not an RFC amendment or a claim of deployed deliver
 |---|---|---|---|
 | Receive | binding config | `listen.tune: ["station:stream", ...]`; ingests once per host binding | Operator only; DNS does not tune automatically |
 | Read | binding config | `listen.subscriptions: [{ sessionKey, tune }]`; empty by default | Exact session key only; filter and cursor cannot widen it |
-| Delivery | binding config, after host proof | Named subscription ID, exact targets, station/stream/class/scope/lens filters, disposition, budget | Never from a frame, model tool call, DNS record or `canticle_mute` |
+| Delivery | exact listening session, within binding config ceiling and after host proof | Named subscription ID, exact target, station/stream/class/scope/lens filters, runtime attention and budget | Runtime may narrow or quiet, never widen the configured audience, routes or wake ceiling; never from a frame or DNS record |
 
 PR #121 supplies the read plane. PR #127 currently introduces a second top-level `subscriptions` object with different fields and no read-plane relationship. Before #127 merges, consolidate under `listen.subscriptions` **or** name the delivery plane distinctly (for example `delivery.subscriptions`) with a documented, fail-closed migration. Do not silently interpret an existing read subscription as ambient consent. Reject ambiguous dual configuration, retain an untuned default, and test one session that reads several streams but receives no ambient delivery. `agentId` alone is not a session identity (#121 review fix).
 
@@ -22,7 +22,7 @@ PR #121 supplies the read plane. PR #127 currently introduces a second top-level
 
 These are desired outcomes, not a deployable configuration until the delivery schema is reconciled:
 
-- **Focus / mention-only:** locally hold all tuned material for explicit reads, while a narrow metadata-derived stream or trusted sender identity can enter a bounded digest. A human can switch the local disposition at runtime without changing station or fleet trust. A payload keyword or glyph match is *not* a trust signal; if offered, it is an opt-in local text filter after verification and wrapping, cannot grant a new target, and cannot trigger wake by itself. Resolve its privacy and taint implications before implementation.
+- **Focus / quiet:** the listening session controls its own runtime attention, with binding configuration as the ceiling. Quiet can hold tuned material for explicit reads without wake. A bounded digest may be admitted only under the configured filters. `canticle_mute` is currently binding-wide and therefore also quiets sibling sessions; a session-scoped control must not be represented by that tool until implemented. A payload keyword or glyph match is *not* a trust signal; if offered, it is an opt-in local text filter after verification and wrapping, cannot grant a new target, and cannot trigger wake by itself. Resolve its privacy and taint implications before implementation.
 - **Gentle ambient:** digest only; bounded per session, delayed for chatter, no wake. The host's OC-0 settled-state receipt proves consumption. Muting withdraws pending slots; resuming cannot replay muted items as new. A session with an off-host route is excluded until RFC §23.2 question 22 is decided.
 - **Alarm:** separate P3, never a synonym for “keyword popped.” Only verified alarm frames under §14.10, with a concrete operator alarm producer and a single host wake-budget owner.
 - **Expression:** `canticle_sing` uses only the binding's own pinned station/stream grant, idempotency key, class and absolute expiry; `canticle_hush` withdraws one known row. Never relay heard text back. A lost reply leaves an unknown row, not a retry. The existing outbox and station receipt are the starting point, not a guarantee of live peer consumption.
@@ -41,7 +41,7 @@ PRs #122–#124 are public catalog and bounded, read-only DNS-SD discovery. Keep
 
 | Gate | Observable pass condition | Current status |
 |---|---|---|
-| R1 exact read | Two exact local sessions, distinct subscriptions and cursors; absent session key fails closed; same heard record cannot leak across filters or after reset | #121 open; 80 plugin tests with missing-key fix pushed; live two-binding receipt still owed |
+| R1 exact read | Two exact local sessions, distinct subscriptions and cursors; absent session key fails closed; the same record is digest-only for one and text-eligible for the other under `payloadSessions`; no leak across filters or after reset | #121 merged at `bc5654f`; live two-binding receipt still owed |
 | R2 read discovery | Public-only catalog, bounded DNS browse/cache, mismatches reported; injected DNS cannot change trust or private stream visibility | #122–#124 open; live locator proof owed |
 | R3 expression | Own station emits with one row/one send; expiry, lost reply, hush, restart; another peer proves it heard the frame | Baseline plugin tests exist; live peer receipt owed |
 | R4 registration | Station lease published, renewed while active, withdrawn on clean stop and allowed to expire on crash; grants alter advertised stream set | #125 planner only; live DNS transport absent |
@@ -52,9 +52,9 @@ Do not call R5 complete from a candidate-ledger test or R4 complete from a regis
 
 ## Immediate execution order
 
-1. Resolve #121's exact-session-key review and land its read contract.
+1. #121's exact-session-key read contract is merged. Prove two-session digest-vs-items isolation on a live binding and document the migration.
 2. Review/land #122 → #123 → #124 with a public-only live discovery receipt. Write a one-page quickstart with the three questions above and exact config/tool examples.
 3. Rebase #127 on #121 and #124; settle the single configuration model and migration. Keep `ringbuffer_only` as default and reject ambient startup without the complete host seam.
 4. Complete OC-0 route and lifecycle callbacks in OpenClaw, then do the crash/retract/mute/consume matrix and a live two-session receipt before enabling ambient.
 5. Implement and prove live station-owned DNS lease transport from #125 separately; do not use registration as a blocker for static-manifest P1.
-6. Add runtime disposition controls only with bounded, persisted local semantics and no unreviewed wake; decide keyword/glyph matching and off-host taint route in the RFC first.
+6. Add session-owned runtime attention within config ceilings, including quiet and digest before any wake; make binding-wide versus session-local mutes explicit. Define spawn-time named read presets for exact new lane keys (fed by #119/#126) so a beacon can become visible to already-tuned lanes. Decide keyword/glyph matching and off-host taint route in the RFC first.
