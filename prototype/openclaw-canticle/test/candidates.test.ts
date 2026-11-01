@@ -32,7 +32,7 @@ test("binding mutes revoke queued candidates and block matching in-flight admiss
   const root = tempDir(); const now = 1_790_000_000_000;
   try {
     const cfg = config({ perHour: 10 });
-    const ledger = new Candidates(root, "rune", cfg.delivery.subscriptions, async (key) => ({ sessionKey: key, exists: true, onHost: true }));
+    const ledger = new Candidates(root, "rune", cfg.delivery.subscriptions, async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" }));
     ledger.load(now);
     assert.equal(await ledger.accept(frame(now, 1), "run", now, false, false), 1);
     ledger.setMutes([{ station: "cael", stream: null }], now);
@@ -45,7 +45,7 @@ test("binding mutes revoke queued candidates and block matching in-flight admiss
 
 test("mute revocation and its tombstone survive restart when pruning has nothing to save", async () => {
   const root = tempDir(); const now = 1_790_000_000_000;
-  const proof = async (key: string) => ({ sessionKey: key, exists: true, onHost: true });
+  const proof = async (key: string) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" });
   try {
     const subs = config({ perHour: 10 }).delivery.subscriptions;
     const ledger = new Candidates(root, "rune", subs, proof);
@@ -66,16 +66,16 @@ test("mute revocation and its tombstone survive restart when pruning has nothing
 
 test("mute arriving during awaited route proof fences admission, then unmute permits a fresh frame", async () => {
   const root = tempDir(); const now = 1_790_000_000_000;
-  let release: ((value: { sessionKey: string; exists: boolean; onHost: boolean }) => void) | undefined;
+  let release: ((value: { sessionKey: string; exists: boolean; onHost: boolean; sessionId?: string }) => void) | undefined;
   let delayed = true;
   try {
     const ledger = new Candidates(root, "rune", config({ perHour: 10 }).delivery.subscriptions,
-      (key) => delayed ? new Promise((resolve) => { release = resolve; }) : Promise.resolve({ sessionKey: key, exists: true, onHost: true }));
+      (key) => delayed ? new Promise((resolve) => { release = resolve; }) : Promise.resolve({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" }));
     ledger.load(now);
     const admission = ledger.accept(frame(now, 1), "run", now, false, false);
     assert.ok(release, "route proof is in flight");
     ledger.setMutes([{ station: "cael", stream: null }], now);
-    release({ sessionKey: session, exists: true, onHost: true });
+    release({ sessionKey: session, exists: true, onHost: true, sessionId: "s-1" });
     assert.equal(await admission, 0);
     assert.equal(ledger.pendingCount, 0);
     ledger.setMutes([], now);
@@ -91,7 +91,7 @@ test("candidate ledger fails closed without host route proof, filters and budget
     const denied = new Candidates(root, "rune", cfg.delivery.subscriptions, async () => ({ sessionKey: session, exists: true, onHost: false }));
     denied.load(now);
     assert.equal(await denied.accept(frame(now, 1), "run", now, false, false), 0);
-    const ledger = new Candidates(root, "rune", cfg.delivery.subscriptions, async (key) => ({ sessionKey: key, exists: true, onHost: true }));
+    const ledger = new Candidates(root, "rune", cfg.delivery.subscriptions, async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" }));
     ledger.load(now);
     const f = frame(now, 1);
     assert.equal(await ledger.accept(f, "run", now, false, false), 1);
@@ -100,7 +100,7 @@ test("candidate ledger fails closed without host route proof, filters and budget
     assert.equal(await ledger.accept({ ...frame(now, 3), dedup: "resurfaced" }, "run", now, false, false), 0); // resurfacing cannot bypass budget
     assert.equal((await ledger.slots(session, now + 60_001)).length, 1);
     assert.equal((await ledger.slots(session, now + 60_001))[0]?.key, "canticle:digest");
-    const restored = new Candidates(root, "rune", cfg.delivery.subscriptions, async (key) => ({ sessionKey: key, exists: true, onHost: true }));
+    const restored = new Candidates(root, "rune", cfg.delivery.subscriptions, async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" }));
     restored.load(now);
     assert.equal(restored.pendingCount, 1);
     restored.retract(f.idem, now);
@@ -113,7 +113,7 @@ test("logical slots stay bounded by five items and 1536 bytes; rejoin settles ca
   const root = tempDir(); const now = 1_790_000_000_000;
   try {
     const cfg = config({ perHour: 600 });
-    const ledger = new Candidates(root, "rune", cfg.delivery.subscriptions, async (key) => ({ sessionKey: key, exists: true, onHost: true }));
+    const ledger = new Candidates(root, "rune", cfg.delivery.subscriptions, async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" }));
     ledger.load(now);
     for (let i = 1; i <= 50; i++) await ledger.accept(frame(now, i), "run", now, false, false);
     const slots = await ledger.slots(session, now + 60_001);
@@ -129,7 +129,7 @@ test("logical slots stay bounded by five items and 1536 bytes; rejoin settles ca
 test("restart retains candidates, while untune, target and filter changes revoke old slots", async () => {
   const root = tempDir(); const now = 1_790_000_000_000;
   const daemon = new FakeDaemon(root);
-  const proof = async (key: string) => ({ sessionKey: key, exists: true, onHost: true });
+  const proof = async (key: string) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" });
   const cfg = parseConfig({ ...base, daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: config({ perHour: 10 }).delivery.subscriptions } });
   let binding: Binding | null = null;
   try {
@@ -167,14 +167,14 @@ test("ambient receiver acceptance requires a local route and matching stream", a
     const subs = config({ perHour: 10 }).delivery.subscriptions;
     assert.equal(await new Candidates(root, "rune", subs, async () => ({ sessionKey: session, exists: false, onHost: false })).acceptsAmbient(f), false);
     assert.equal(await new Candidates(root, "rune", subs, async () => ({ sessionKey: session, exists: true, onHost: false })).acceptsAmbient(f), false);
-    assert.equal(await new Candidates(root, "rune", subs, async (key) => ({ sessionKey: key, exists: true, onHost: true })).acceptsAmbient(f), true);
-    assert.equal(await new Candidates(root, "rune", config({ streams: ["other"] }).delivery.subscriptions, async (key) => ({ sessionKey: key, exists: true, onHost: true })).acceptsAmbient(f), false);
+    assert.equal(await new Candidates(root, "rune", subs, async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" })).acceptsAmbient(f), true);
+    assert.equal(await new Candidates(root, "rune", config({ streams: ["other"] }).delivery.subscriptions, async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" })).acceptsAmbient(f), false);
   } finally { removeDir(root); }
 });
 
 test("async proof cannot admit a retracted frame or a cancelled run", async () => {
   const root = tempDir(); const now = 1_790_000_000_000;
-  let release: ((value: { sessionKey: string; exists: boolean; onHost: boolean }) => void) | undefined;
+  let release: ((value: { sessionKey: string; exists: boolean; onHost: boolean; sessionId?: string }) => void) | undefined;
   try {
     const ledger = new Candidates(root, "rune", config({ perHour: 10 }).delivery.subscriptions,
       () => new Promise((resolve) => { release = resolve; }));
@@ -182,12 +182,12 @@ test("async proof cannot admit a retracted frame or a cancelled run", async () =
     const f = frame(now, 1);
     const admission = ledger.accept(f, "run", now, false, false);
     ledger.retract(f.idem, now);
-    release?.({ sessionKey: session, exists: true, onHost: true });
+    release?.({ sessionKey: session, exists: true, onHost: true, sessionId: "s-1" });
     assert.equal(await admission, 0);
     assert.equal(ledger.pendingCount, 0);
     const second = ledger.accept(frame(now, 2), "run", now, false, false);
     ledger.rejoin("run", now);
-    release?.({ sessionKey: session, exists: true, onHost: true });
+    release?.({ sessionKey: session, exists: true, onHost: true, sessionId: "s-1" });
     assert.equal(await second, 0);
   } finally { removeDir(root); }
 });
@@ -195,7 +195,7 @@ test("async proof cannot admit a retracted frame or a cancelled run", async () =
 test("a Promise-shaped, rejected, or mismatched host proof grants no candidate", async () => {
   const now = 1_790_000_000_000;
   for (const proof of [
-    async () => ({ sessionKey: "agent:main:local:other", exists: true, onHost: true }),
+    async () => ({ sessionKey: "agent:main:local:other", exists: true, onHost: true, sessionId: "s-1" }),
     async () => { throw new Error("unavailable"); },
     async () => ({ sessionKey: session, exists: true, onHost: false }),
   ]) {
@@ -211,18 +211,38 @@ test("a Promise-shaped, rejected, or mismatched host proof grants no candidate",
 
 test("reset fences an in-flight route proof, but permits a fresh generation", async () => {
   const root = tempDir(); const now = 1_790_000_000_000;
-  let release: ((value: { sessionKey: string; exists: boolean; onHost: boolean }) => void) | undefined;
+  let release: ((value: { sessionKey: string; exists: boolean; onHost: boolean; sessionId?: string }) => void) | undefined;
   let delayed = true;
   try {
     const ledger = new Candidates(root, "rune", config({ perHour: 10 }).delivery.subscriptions,
-      (key) => delayed ? new Promise((resolve) => { release = resolve; }) : Promise.resolve({ sessionKey: key, exists: true, onHost: true }));
+      (key) => delayed ? new Promise((resolve) => { release = resolve; }) : Promise.resolve({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" }));
     ledger.load(now);
     const admission = ledger.accept(frame(now, 10), "run", now, false, false);
     ledger.resetSession(session, now);
-    release?.({ sessionKey: session, exists: true, onHost: true });
+    release?.({ sessionKey: session, exists: true, onHost: true, sessionId: "s-1" });
     assert.equal(await admission, 0);
     assert.equal(ledger.pendingCount, 0);
     delayed = false;
     assert.equal(await ledger.accept(frame(now, 11), "run", now, false, false), 1);
+  } finally { removeDir(root); }
+});
+
+test("ambient admission requires host generation; old callback preserves successor candidate", async () => {
+  const root = tempDir(), now = 1_790_000_000_000;
+  let generation: string | undefined;
+  try {
+    const ledger = new Candidates(root, "rune", config({ perHour: 10 }).delivery.subscriptions,
+      async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: generation }));
+    ledger.load(now);
+    assert.equal(await ledger.accept(frame(now, 1), "run", now, false, false), 0);
+    generation = "old";
+    assert.equal(await ledger.accept(frame(now, 1), "run", now, false, false), 1);
+    generation = "new";
+    assert.deepEqual(await ledger.slots(session, now + 60_001), []);
+    assert.equal(await ledger.accept(frame(now, 2), "run", now, false, false), 1);
+    ledger.resetSession(session, now, "old");
+    ledger.deleteSession(session, "old");
+    assert.equal(ledger.pendingCount, 1);
+    assert.equal((await ledger.slots(session, now + 60_001))[0]?.items[0]?.sessionId, "new");
   } finally { removeDir(root); }
 });

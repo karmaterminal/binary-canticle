@@ -609,7 +609,7 @@ export class Binding {
   isTainted(c: Caller): boolean {
     const st = this.state;
     const key = this.taintKeyOf(c);
-    return st !== null && (this.ambient?.isTainted(c.sessionKey) === true || key in st.taint ||
+    return st !== null && (this.ambient?.isTainted(c.sessionKey, c.sessionId) === true || key in st.taint ||
       (st.taint_overflow !== null && this.mayReadText(c) && (st.taint_cleared?.[key] ?? -1) < st.taint_overflow));
   }
   /** Called only after the host has cleared this session's pending injections on /new. */
@@ -618,22 +618,28 @@ export class Binding {
     const st = this.state;
     if (!st) throw new Error("canticle binding is not running");
     const now = this.clock();
-    this.ambient?.reset(sessionKey, now, false);
-    this.candidates.resetSession(sessionKey, now);
+    this.ambient?.reset(sessionKey, now, sessionId !== null, sessionId ?? undefined);
+    this.candidates.resetSession(sessionKey, now, sessionId ?? undefined);
     for (const key of [sessionId, `key:${sessionKey}`]) {
       if (key === null) continue;
       delete st.taint[key];
       if (st.taint_overflow !== null && Object.keys(st.taint_cleared ?? {}).length < TAINT_MAX)
         (st.taint_cleared ??= {})[key] = now;
     }
-    delete st.checkpoints[sessionKey];
+    // A delayed callback for the old generation must not clear a successor's cursor.
+    let currentIsEnded = false;
+    try {
+      const proof = await this.routeProof(sessionKey);
+      currentIsEnded = proof.sessionKey === sessionKey && proof.sessionId === sessionId;
+    } catch { /* Unknown generation: preserve shared state. */ }
+    if (currentIsEnded) delete st.checkpoints[sessionKey];
     this.saveState();
   }
   /** Called after host session deletion; no slot outcome or taint history survives. */
   async deleteSession(sessionKey: string, sessionId: string | null): Promise<void> {
     await this.resetSession(sessionKey, sessionId);
-    this.ambient?.deleteSession(sessionKey, false);
-    this.candidates.deleteSession(sessionKey);
+    this.ambient?.deleteSession(sessionKey, sessionId !== null, sessionId ?? undefined);
+    this.candidates.deleteSession(sessionKey, sessionId ?? undefined);
     const st = this.state!;
     for (const key of [sessionId, `key:${sessionKey}`]) if (key !== null) delete st.taint_cleared?.[key];
     this.saveState();

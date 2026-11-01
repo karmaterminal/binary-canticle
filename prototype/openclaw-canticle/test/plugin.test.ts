@@ -400,10 +400,11 @@ test("ambient service fails closed without both lifecycle callbacks; ringbuffer-
 
 test("typed reset and delete callbacks clear only the ended exact session", async () => {
   const key = "agent:main:reader";
+  let currentSessionId = "old";
   const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: [key], subscriptions: [{ sessionKey: key, tune: ["*:*"] }] } };
   const hooks = new Map<string, LifecycleHandler>();
   const { tools, service } = load(cfg, { on: (name: string, handler: LifecycleHandler) => hooks.set(name, handler),
-    session: { state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true }) } } });
+    session: { state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: currentSessionId }) } } });
   assert.deepEqual([...hooks.keys()], ["session_reset", "session_delete"]);
   const ctx = { stateDir: dir, logger: { info: () => undefined } };
   await service.start(ctx);
@@ -427,6 +428,12 @@ test("typed reset and delete callbacks clear only the ended exact session", asyn
     await hooks.get("session_reset")!({ ...event, nextSessionId: "new" }, context);
     assert.equal(state().taint.old, undefined);
     assert.equal(state().checkpoints[key], undefined);
+    currentSessionId = "new";
+    const successor = tool(tools, "canticle_listen", { sessionKey: key, sessionId: "new" });
+    await successor.execute("new-checkpoint", { what: "new" });
+    assert.ok(state().checkpoints[key]);
+    await hooks.get("session_reset")!({ ...event, nextSessionId: "new" }, context);
+    assert.ok(state().checkpoints[key], "late old-generation reset cannot erase successor checkpoint");
     await reader.execute("read2", { what: "journal", view: "items" });
     assert.ok(state().taint.old);
     await hooks.get("session_delete")!(event, context);

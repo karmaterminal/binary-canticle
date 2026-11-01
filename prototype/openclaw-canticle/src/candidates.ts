@@ -5,8 +5,8 @@ import { TARGET_SESSION_KEY, type Subscription } from "./config.ts";
 import { type HeardFrame, isObj } from "./records.ts";
 import { readJson, writeJsonAtomic } from "./store.ts";
 
-export type RouteProof = (sessionKey: string) => Promise<{ sessionKey: string; exists: boolean; onHost: boolean }>;
-export type Candidate = { key: string; sessionKey: string; subscriptionIds: string[]; run: string; station: string; stream: string; class: string; scope: string | null; lens: number | null; heardAt: number; expiresAt: number; eligibleAt: number; line: string };
+export type RouteProof = (sessionKey: string) => Promise<{ sessionKey: string; exists: boolean; onHost: boolean; sessionId?: string | undefined }>;
+export type Candidate = { key: string; sessionKey: string; sessionId: string; subscriptionIds: string[]; run: string; station: string; stream: string; class: string; scope: string | null; lens: number | null; heardAt: number; expiresAt: number; eligibleAt: number; line: string };
 type Ledger = { v: 1; binding: string; pending: Record<string, Candidate>; settled: Record<string, number>; spend: Record<string, number[]> };
 export type LogicalSlot = { key: "canticle:digest" | "canticle:alarm"; items: Candidate[]; text: string; expiresAt: number };
 const MAX_PENDING = 4096;
@@ -25,7 +25,7 @@ export class Candidates {
   private readonly route: RouteProof;
   private readonly ambientEnabled: boolean;
   private data: Ledger;
-  private readonly proven = new Set<string>();
+  private readonly proven = new Map<string, string>();
   private muteScopes: { station: string | null; stream: string | null }[] = [];
   private readonly retractedInFlight = new Set<string>();
   private readonly cancelledRuns = new Set<string>();
@@ -48,7 +48,7 @@ export class Candidates {
         if (!isObj(c) || c.key !== key || typeof c.sessionKey !== "string" ||
           c.sessionKey !== c.sessionKey.toLowerCase() || !TARGET_SESSION_KEY.test(c.sessionKey) || c.sessionKey === "agent:main:main" ||
           !Array.isArray(c.subscriptionIds) || c.subscriptionIds.length > 64 || c.subscriptionIds.some((id: unknown) => typeof id !== "string") ||
-          typeof c.station !== "string" || typeof c.stream !== "string" || typeof c.class !== "string" ||
+          typeof c.sessionId !== "string" || !c.sessionId || typeof c.station !== "string" || typeof c.stream !== "string" || typeof c.class !== "string" ||
           (c.scope !== null && typeof c.scope !== "string") || (c.lens !== null && !Number.isSafeInteger(c.lens)) ||
           typeof c.expiresAt !== "number" || !Number.isSafeInteger(c.expiresAt) ||
           typeof c.line !== "string" || Buffer.byteLength(c.line) > MAX_BYTES) throw new Error("candidate ledger has an invalid row");
@@ -64,14 +64,14 @@ export class Candidates {
       match(s.stations, c.station) && match(s.streams, c.stream) && match(s.classes, c.class) &&
       match(s.scopes, c.scope) && match(s.lenses, c.lens)));
   }
-  private async validRoute(sessionKey: string): Promise<boolean> {
-    if (sessionKey !== sessionKey.toLowerCase() || !TARGET_SESSION_KEY.test(sessionKey) || sessionKey === "agent:main:main") return false;
+  private async validRoute(sessionKey: string): Promise<string | null> {
+    if (sessionKey !== sessionKey.toLowerCase() || !TARGET_SESSION_KEY.test(sessionKey) || sessionKey === "agent:main:main") return null;
     try {
       const proof = await this.route(sessionKey);
-      const valid = proof !== null && proof.sessionKey === sessionKey && proof.exists === true && proof.onHost === true;
-      if (valid) this.proven.add(sessionKey); else this.proven.delete(sessionKey);
-      return valid;
-    } catch { this.proven.delete(sessionKey); return false; }
+      const valid = proof !== null && proof.sessionKey === sessionKey && proof.exists === true && proof.onHost === true && typeof proof.sessionId === "string" && proof.sessionId.length > 0;
+      if (valid) this.proven.set(sessionKey, proof.sessionId!); else this.proven.delete(sessionKey);
+      return valid ? proof.sessionId! : null;
+    } catch { this.proven.delete(sessionKey); return null; }
   }
   /** A subscription can broaden receiver acceptance only with a proven local target. */
   async acceptsAmbient(frame: HeardFrame): Promise<boolean> {
@@ -141,7 +141,8 @@ export class Candidates {
       if (sub.delivery !== "ambient" || (self && !sub.stations.includes(frame.station)) || !match(sub.stations, frame.station) || !match(sub.streams, frame.stream) || !match(sub.classes, frame.class) || !match(sub.scopes, frame.scope) || !match(sub.lenses, frame.lens)) continue;
       for (const target of sub.targets) {
         const epoch = this.resetEpoch.get(target.sessionKey) ?? 0;
-        if (!await this.validRoute(target.sessionKey)) continue;
+        const sessionId = await this.validRoute(target.sessionKey);
+        if (!sessionId) continue;
         if (this.mutedByScope(frame.station, frame.stream) || !mayAdmit() ||
           this.retractedInFlight.has(frame.idem) || this.cancelledRuns.has(run) ||
           (this.resetEpoch.get(target.sessionKey) ?? 0) !== epoch) continue;
@@ -149,6 +150,7 @@ export class Candidates {
         const spent = this.data.spend[spendKey] ?? [];
         const key = `${frame.idem}:${target.sessionKey}`;
         const existing = this.data.pending[key];
+        if (existing && existing.sessionId !== sessionId) continue;
         if (existing?.subscriptionIds.includes(sub.id) || spent.length >= sub.perHour) continue;
         if (existing) {
           existing.subscriptionIds.push(sub.id);
@@ -162,7 +164,7 @@ export class Candidates {
         const window = Math.min(60_000, frame.times.local_expiry_at - now - 1000);
         if (delayed && window <= 0) continue;
         const eligibleAt = delayed ? now + randomInt(window + 1) : now;
-        this.data.pending[key] = { key, sessionKey: target.sessionKey, subscriptionIds: [sub.id], run, station: frame.station, stream: frame.stream, class: frame.class, scope: frame.scope, lens: frame.lens, heardAt: frame.times.heard_at, expiresAt: frame.times.local_expiry_at, eligibleAt, line };
+        this.data.pending[key] = { key, sessionKey: target.sessionKey, sessionId, subscriptionIds: [sub.id], run, station: frame.station, stream: frame.stream, class: frame.class, scope: frame.scope, lens: frame.lens, heardAt: frame.times.heard_at, expiresAt: frame.times.local_expiry_at, eligibleAt, line };
         spent.push(now);
         this.data.spend[spendKey] = spent;
         added++;
@@ -188,17 +190,20 @@ export class Candidates {
     }
     this.prune(now); this.save();
   }
-  resetSession(session: string, now: number): void {
+  resetSession(session: string, now: number, endedId?: string): void {
     this.resetEpoch.set(session, (this.resetEpoch.get(session) ?? 0) + 1);
-    for (const [key, c] of Object.entries(this.data.pending)) if (c.sessionKey === session) {
+    for (const [key, c] of Object.entries(this.data.pending)) if (c.sessionKey === session && (endedId === undefined || c.sessionId === endedId)) {
       delete this.data.pending[key]; this.data.settled[key] = c.expiresAt + 5000;
     }
     this.prune(now); this.save();
   }
-  deleteSession(session: string): void {
-    for (const [key, c] of Object.entries(this.data.pending)) if (c.sessionKey === session) delete this.data.pending[key];
-    for (const key of Object.keys(this.data.settled)) if (key.endsWith(`:${session}`)) delete this.data.settled[key];
-    for (const key of Object.keys(this.data.spend)) if (key.endsWith(`:${session}`)) delete this.data.spend[key];
+  deleteSession(session: string, endedId?: string): void {
+    for (const [key, c] of Object.entries(this.data.pending)) if (c.sessionKey === session && (endedId === undefined || c.sessionId === endedId)) delete this.data.pending[key];
+    // A late deletion for an old generation must not erase successor tombstones or budget.
+    if (endedId === undefined) {
+      for (const key of Object.keys(this.data.settled)) if (key.endsWith(`:${session}`)) delete this.data.settled[key];
+      for (const key of Object.keys(this.data.spend)) if (key.endsWith(`:${session}`)) delete this.data.spend[key];
+    }
     this.proven.delete(session); this.save();
   }
   targetSessions(): string[] {
@@ -209,8 +214,9 @@ export class Candidates {
   async slots(sessionKey: string, now: number, settled: (key: string) => boolean = () => false): Promise<LogicalSlot[]> {
     if (!this.ambientEnabled) return [];
     this.prune(now);
-    if (!await this.validRoute(sessionKey)) return [];
-    const rows = Object.values(this.data.pending).filter((c) => c.sessionKey === sessionKey && c.expiresAt > now && c.eligibleAt <= now && !settled(c.key));
+    const sessionId = await this.validRoute(sessionKey);
+    if (!sessionId) return [];
+    const rows = Object.values(this.data.pending).filter((c) => c.sessionKey === sessionKey && c.sessionId === sessionId && c.expiresAt > now && c.eligibleAt <= now && !settled(c.key));
     return (["canticle:digest", "canticle:alarm"] as const).flatMap((slot) => {
       const chosen: Candidate[] = []; let bytes = 0;
       for (const c of rows.filter((r) => (r.class === "alarm") === (slot === "canticle:alarm")).sort((a, b) => a.expiresAt - b.expiresAt || b.heardAt - a.heardAt)) {

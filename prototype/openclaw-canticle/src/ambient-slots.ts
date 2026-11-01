@@ -16,7 +16,7 @@ export type Oc0Host = {
   query(sessionKey: string, idempotencyKey: string): Promise<EntryOutcome>;
   withdraw(sessionKey: string, idempotencyKey: string): Promise<EntryOutcome>;
 };
-type Entry = { id: string; sessionKey: string; slot: SlotKey; frames: SlotFrame[]; deadline: number; retention: number; status: "enqueuing" | "pending" | "settled"; outcome?: EntryOutcome; previous?: string };
+type Entry = { id: string; sessionKey: string; sessionId?: string; slot: SlotKey; frames: SlotFrame[]; deadline: number; retention: number; status: "enqueuing" | "pending" | "settled"; outcome?: EntryOutcome; previous?: string };
 type Note = { key: string; expiresAt: number; line: string };
 type Ledger = { v: 1; binding: string; entries: Entry[]; settled: Record<string, number>; tainted?: Record<string, number>; notes?: Record<string, Note> };
 const SLOTS: SlotKey[] = ["canticle:digest", "canticle:alarm"];
@@ -40,6 +40,7 @@ export class AmbientSlots {
     const d = raw as Ledger;
     if (d.entries.length > 8192 || d.entries.some((e) => !e || typeof e.id !== "string" || e.id.length > 200 || !SLOTS.includes(e.slot) ||
       typeof e.sessionKey !== "string" || e.sessionKey !== e.sessionKey.toLowerCase() || !TARGET_SESSION_KEY.test(e.sessionKey) || e.sessionKey === "agent:main:main" ||
+      (e.sessionId !== undefined && (typeof e.sessionId !== "string" || !e.sessionId)) ||
       !Array.isArray(e.frames) || e.frames.length < 1 || e.frames.length > 5 ||
       !Number.isSafeInteger(e.deadline) || !Number.isSafeInteger(e.retention) ||
       e.frames.some((f) => !f || typeof f.key !== "string" || f.key.length > 300 || !Number.isSafeInteger(f.expiresAt) ||
@@ -51,7 +52,7 @@ export class AmbientSlots {
     if (!d.settled || typeof d.settled !== "object" || Array.isArray(d.settled) || Object.keys(d.settled).length > 8192 ||
       Object.values(d.settled).some((n) => !Number.isSafeInteger(n))) throw new Error("invalid ambient settled tombstones");
     if (d.tainted !== undefined && (!d.tainted || typeof d.tainted !== "object" || Array.isArray(d.tainted) || Object.keys(d.tainted).length > 4096 ||
-      Object.entries(d.tainted).some(([key, n]) => key !== key.toLowerCase() || !TARGET_SESSION_KEY.test(key) || key === "agent:main:main" || !Number.isSafeInteger(n)))) throw new Error("invalid ambient taint");
+      Object.entries(d.tainted).some(([key, n]) => { const [session = "", id, extra] = key.split("\0"); return session !== session.toLowerCase() || !TARGET_SESSION_KEY.test(session) || session === "agent:main:main" || (id !== undefined && !id) || extra !== undefined || !Number.isSafeInteger(n); }))) throw new Error("invalid ambient taint");
     if (d.notes !== undefined && (!d.notes || typeof d.notes !== "object" || Array.isArray(d.notes) || Object.keys(d.notes).length > 8192 ||
       Object.values(d.notes).some((n) => !n || typeof n.key !== "string" || n.key.length > 300 || !Number.isSafeInteger(n.expiresAt) || typeof n.line !== "string" || Buffer.byteLength(n.line) > 300))) throw new Error("invalid ambient notes");
     d.tainted ??= {}; d.notes ??= {};
@@ -74,7 +75,7 @@ export class AmbientSlots {
   }
   private settle(e: Entry, outcome: EntryOutcome, now: number): void {
     e.status = "settled"; e.outcome = outcome;
-    if (outcome === "consumed") (this.data.tainted ??= {})[e.sessionKey] ??= now;
+    if (outcome === "consumed") (this.data.tainted ??= {})[e.sessionId ? `${e.sessionKey}\0${e.sessionId}` : e.sessionKey] ??= now;
     if (outcome === "consumed" || outcome === "discarded") for (const f of e.frames) this.data.settled[f.key] = f.expiresAt + 5000;
     if (outcome === "expired") for (const f of e.frames) if (f.expiresAt <= now) this.data.settled[f.key] = f.expiresAt + 5000;
     this.save();
@@ -87,10 +88,21 @@ export class AmbientSlots {
       return proof.sessionKey === session && proof.exists === true && proof.onHost === true;
     } catch { return false; }
   }
+  private async generation(session: string): Promise<string | null> {
+    if (!this.route) return null;
+    try {
+      const proof = await this.route(session);
+      return proof.sessionKey === session && proof.exists === true && proof.onHost === true &&
+        typeof proof.sessionId === "string" && proof.sessionId.length > 0 ? proof.sessionId : null;
+    } catch { return null; }
+  }
   /** Query every ambiguous entry before allowing this session to deliver again. A failed query fails closed. */
   async reconcile(session: string, now: number): Promise<void> {
     this.prune(now);
+    const generation = this.route ? await this.generation(session) : null;
+    if (this.route && !generation) throw new Error("canticle host session generation unavailable");
     for (const e of this.data.entries.filter((x) => x.sessionKey === session && x.status !== "settled")) {
+      if (this.route && e.sessionId !== generation) throw new Error("canticle slot belongs to another session generation");
       if (!await this.validRoute(session)) throw new Error("canticle host route proof lost before OC-0 reconcile");
       const outcome = await this.host.query(session, e.id);
       if (outcome === "pending") { e.status = "pending"; this.save(); }
@@ -100,8 +112,11 @@ export class AmbientSlots {
   /** Rebuilds one of the two slots, retaining only live, unconsumed frame keys. */
   async sync(request: SlotRequest, now: number): Promise<void> {
     if (!SLOTS.includes(request.slot)) throw new Error("invalid canticle slot");
+    const generation = this.route ? await this.generation(request.sessionKey) : null;
+    if (this.route && !generation) throw new Error("canticle host session generation unavailable");
     if (!await this.validRoute(request.sessionKey)) throw new Error("canticle host route proof lost before slot reconcile");
     await this.reconcile(request.sessionKey, now);
+    if (this.route && await this.generation(request.sessionKey) !== generation) throw new Error("canticle host session generation changed");
     if (!await this.validRoute(request.sessionKey)) throw new Error("canticle host route proof lost after slot reconcile");
     const previous = this.active(request.sessionKey, request.slot);
     const unique = new Map<string, SlotFrame>();
@@ -120,11 +135,11 @@ export class AmbientSlots {
     }
     // A supersession may carry only confirmed-pending keys; consumed predecessors were settled above.
     if (this.data.entries.length >= 8192) throw new Error("ambient slot ledger full");
-    const e: Entry = { id: `canticle-slot:${randomUUID()}`, sessionKey: request.sessionKey, slot: request.slot,
+    const e: Entry = { id: `canticle-slot:${randomUUID()}`, sessionKey: request.sessionKey, ...(generation ? { sessionId: generation } : {}), slot: request.slot,
       frames, deadline: Math.min(...frames.map((f) => f.expiresAt)), retention: Math.max(...frames.map((f) => f.expiresAt)),
       status: "enqueuing", ...(previous ? { previous: previous.id } : {}) };
     this.data.entries.push(e); this.save();
-    if (!await this.validRoute(request.sessionKey)) throw new Error("canticle host route proof lost before slot enqueue");
+    if (!await this.validRoute(request.sessionKey) || (this.route && await this.generation(request.sessionKey) !== generation)) throw new Error("canticle host route proof lost before slot enqueue");
     let result: Awaited<ReturnType<Oc0Host["enqueue"]>>;
     try {
       result = await this.host.enqueue({ idempotencyKey: e.id, sessionKey: e.sessionKey, supersedeKey: e.slot,
@@ -165,26 +180,35 @@ export class AmbientSlots {
     }
     if (expiry !== undefined) { this.data.settled[key] = expiry + 5000; this.save(); }
   }
-  isTainted(session: string): boolean { return this.data.tainted?.[session] !== undefined; }
+  isTainted(session: string, sessionId?: string | null): boolean {
+    return this.data.tainted?.[session] !== undefined || (sessionId
+      ? this.data.tainted?.[`${session}\0${sessionId}`] !== undefined
+      : Object.keys(this.data.tainted ?? {}).some((key) => key.startsWith(`${session}\0`)));
+  }
   /** The host has cleared pending entries on reset/disable. Keep admitted frame keys settled. */
-  reset(session: string, now: number, clearTaint: boolean): void {
+  reset(session: string, now: number, clearTaint: boolean, endedId?: string): void {
     this.prune(now);
-    for (const e of this.data.entries.filter((entry) => entry.sessionKey === session)) {
+    for (const e of this.data.entries.filter((entry) => entry.sessionKey === session && (endedId === undefined || entry.sessionId === endedId))) {
       if (e.status !== "settled") for (const f of e.frames) this.data.settled[f.key] = f.expiresAt + 5000;
       e.status = "settled"; e.outcome = "withdrawn";
     }
-    // Without a generation token, a delayed callback cannot distinguish old from successor consumption.
-    if (clearTaint) delete this.data.tainted?.[session];
-    for (const key of Object.keys(this.data.notes ?? {})) if (key.endsWith(`:${session}`)) delete this.data.notes![key];
+    if (clearTaint) {
+      if (endedId) delete this.data.tainted?.[`${session}\0${endedId}`];
+      else delete this.data.tainted?.[session];
+    }
+    if (endedId === undefined) for (const key of Object.keys(this.data.notes ?? {})) if (key.endsWith(`:${session}`)) delete this.data.notes![key];
     this.save();
   }
   /** Deleting a session removes its own admission history as well as its taint. */
-  deleteSession(session: string, clearTaint: boolean): void {
-    const removed = this.data.entries.filter((e) => e.sessionKey === session);
-    this.data.entries = this.data.entries.filter((e) => e.sessionKey !== session);
+  deleteSession(session: string, clearTaint: boolean, endedId?: string): void {
+    const removed = this.data.entries.filter((e) => e.sessionKey === session && (endedId === undefined || e.sessionId === endedId));
+    this.data.entries = this.data.entries.filter((e) => e.sessionKey !== session || (endedId !== undefined && e.sessionId !== endedId));
     for (const e of removed) for (const f of e.frames) delete this.data.settled[f.key];
-    if (clearTaint) delete this.data.tainted?.[session];
-    for (const key of Object.keys(this.data.notes ?? {})) if (key.endsWith(`:${session}`)) delete this.data.notes![key];
+    if (clearTaint) {
+      if (endedId) delete this.data.tainted?.[`${session}\0${endedId}`];
+      else delete this.data.tainted?.[session];
+    }
+    if (endedId === undefined) for (const key of Object.keys(this.data.notes ?? {})) if (key.endsWith(`:${session}`)) delete this.data.notes![key];
     this.save();
   }
   /** Expiry of an already consumed item is a local event, not a daemon retract. */

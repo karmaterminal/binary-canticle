@@ -69,3 +69,28 @@ test("delayed reset preserves a successor consumption taint", async () => {
     assert.equal(restored.isTainted(session), true);
   } finally { removeDir(root); }
 });
+
+test("generation-free host proof refuses slots and delayed old reset preserves successor taint", async () => {
+  const root = tempDir(), host = new Host();
+  let generation: string | undefined;
+  try {
+    const route = async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: generation });
+    const a = new AmbientSlots(root, "rune", host, route); a.load();
+    const request = (key: string) => ({ sessionKey: session, slot: "canticle:digest" as const,
+      frames: [{ key, line: key, expiresAt: now + 120_000 }] });
+    await assert.rejects(a.sync(request("old"), now), /generation unavailable/);
+    generation = "old";
+    await a.sync(request("old"), now);
+    a.reset(session, now, true, "old");
+    generation = "new";
+    await a.sync(request("new"), now);
+    host.entries.set(a.pending(session)[0]!.id, "consumed");
+    await a.reconcile(session, now);
+    assert.equal(a.isTainted(session, "new"), true);
+    a.reset(session, now, true, "old");
+    a.deleteSession(session, true, "old");
+    const restored = new AmbientSlots(root, "rune", host, route); restored.load();
+    assert.equal(restored.isTainted(session, "new"), true);
+    assert.equal(restored.isTainted(session, "old"), false);
+  } finally { removeDir(root); }
+});
