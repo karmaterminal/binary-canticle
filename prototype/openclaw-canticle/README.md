@@ -45,7 +45,7 @@ Contents: [Phases](#phases) · [How it fits](#how-it-fits) · [Tools](#tools) ·
      │       own station's control socket (publish only):              │   outbox.json, and a lease
      └──────────────────────── sing, hush, status ◀───────────────────┘
                                                                        ▼
-                                                     six tools, answered only when a session calls one
+                                                     seven tools, answered only when a session calls one
 ```
 
 - The daemon owns the port and the manifest, verifies and judges; the binding reads its records (§14.18.1,
@@ -60,13 +60,14 @@ Contents: [Phases](#phases) · [How it fits](#how-it-fits) · [Tools](#tools) ·
 
 ## Tools
 
-All six are **optional** tools: a session gets one only when OpenClaw's tool policy allows it. Each acts on the
+All seven are **optional** tools: a session gets one only when OpenClaw's tool policy allows it. Each acts on the
 binding of the plugin instance that registered it. The publish tools are not offered at all unless
 `publish.enabled` is true, never to a sub-agent session (`subagent:…` or `agent:ID:subagent:…`, §15.5), and
 never to a call that names no session.
 
 | Tool | Parameters | Result |
 |---|---|---|
+| `canticle_discover` | `domain`: exact configured unicast DNS domain; `stream`: optional exact public stream name | At most 8 operator-cataloged stations with public streams, key id, in-zone SRV locator hints and TXT mismatch flags. DNS never supplies identity, trust, liveness or a connection. |
 | `canticle_listen` | `what`: `new` (default), `journal` or `on_air`; `since`: a cursor; `station`, `stream`: exact names; `limit`: 1–20, default 10; `view`: `digest` (default) or `items`; `includeSelf` | `new` and `journal`: `entries` (each with `seq` and `kind`, and for heard items `idem`, station, stream, class, `disposition`, `source`, times, `air` and marks), `from`, `next`, `truncated`, `pruned_before`, `filtered`, `untrusted`, `receive`. `on_air`: `entries` (each `idem`, `station`, `stream`, `current`, `expires_at`), `known`, `current`, `carried`, `truncated`, `untrusted`, `receive`, and no cursor |
 | `canticle_status` | none | receive health and reasons, join snapshot, presence, on-air counts, journal size and what is new for this session, mutes, this session's taint and text access, outbox counts. Never heard text. |
 | `canticle_mute` | `station`, `stream` (either or both, or neither for everything), `ttlSeconds`: 1–86 400; or `clear`: a mute id or `all` | the mute and the active mutes |
@@ -381,6 +382,12 @@ CANTICLE_INTEROP=require node --test 'test/*.test.ts'   # fail, rather than skip
   `.github/ci/requirements-station.txt`, `CANTICLE_PYTHON` to pick the interpreter): the binding hears another
   prince, sings and hears its own item back, plucks it, restarts into a rejoin, and rides out a daemon restart
   without journaling anything twice. Without that Python it is skipped, unless `CANTICLE_INTEROP=require`.
+- `canticle_discover` is an incremental read-only §13 DNS-SD slice. It requires `discovery.domains` (up to 8
+  explicit lowercase unicast domains) and an operator-provisioned `discovery.catalog` (up to 128 entries, each
+  `{name, publicKey, publicStreams}`). An empty catalog makes no DNS query. The operator must provision only
+  public stream names; DNS `streams`, `sid`, and `k` are cross-check hints and never add names or keys. It reads
+  PTR → instance SRV/TXT only, caps instances at 32, output stations at 8, and cache at 128 records with TTLs
+  no longer than 300 seconds. `.local`/mDNS, DNSSEC validation, connecting and publishing are out of scope.
 - Typecheck: `tsc -p tsconfig.json` with `typescript` and `@types/node` as locked in
   `.github/ci/openclaw-canticle/` (CI runs it).
 - Two fixtures in `prototype/canticle-station/tests/fixtures/` are written for both this plugin and

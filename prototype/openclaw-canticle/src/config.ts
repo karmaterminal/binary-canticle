@@ -28,6 +28,7 @@ export type BindingConfig = {
     maxLive: number;
   };
   delivery: { mode: "explicit" };
+  discovery: { domains: string[]; catalog: { name: string; publicKey: string; publicStreams: string[] }[] };
 };
 
 export class ConfigError extends Error {}
@@ -37,6 +38,7 @@ export const SESSION_CLASSES = ["chatter", "ambient", "live-state", "advisory", 
 
 const KEY_ID = /^[0-9a-f]{16}$/;
 const STREAM_PATTERN = /^(\*|[a-z][a-z0-9-]{0,30}(\.[a-z][a-z0-9-]{0,30}){0,3}(\.\*)?)$/;
+const DOMAIN = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
 
 export function parseConfig(raw: unknown): BindingConfig {
   const c = obj(raw ?? {}, "config");
@@ -77,6 +79,28 @@ export function parseConfig(raw: unknown): BindingConfig {
   if (delivery.mode !== undefined && delivery.mode !== "explicit") {
     throw new ConfigError("delivery.mode: only \"explicit\" exists in this version; push and wake delivery are a separate opt-in");
   }
+  const discover = c.discovery === undefined ? {} : obj(c.discovery, "discovery");
+  const domains = discover.domains === undefined ? [] : strList(discover.domains, "discovery.domains");
+  if (domains.length > 8 || domains.some((x) => !DOMAIN.test(x) || x.endsWith(".local"))) {
+    throw new ConfigError("discovery.domains: at most 8 explicit lowercase unicast DNS domains (no .local)");
+  }
+  const rawCatalog = discover.catalog === undefined ? [] : discover.catalog;
+  if (!Array.isArray(rawCatalog) || rawCatalog.length > 128) throw new ConfigError("discovery.catalog: at most 128 stations");
+  const catalog = rawCatalog.map((v, i) => {
+    const entry = obj(v, `discovery.catalog[${i}]`);
+    const name = str(entry.name, "discovery.catalog.name");
+    const publicKey = str(entry.publicKey, "discovery.catalog.publicKey");
+    const publicStreams = strList(entry.publicStreams, "discovery.catalog.publicStreams");
+    if (!STATION_NAME.test(name) || !/^[A-Za-z0-9+/]{43}=$/.test(publicKey) || Buffer.from(publicKey, "base64").length !== 32 ||
+        publicStreams.length > 32 || publicStreams.some((s) => !STREAM_PATTERN.test(s) || s === "*" || s.endsWith(".*")) ||
+        new Set(publicStreams).size !== publicStreams.length) {
+      throw new ConfigError("discovery.catalog: invalid station, Ed25519 public key, or public stream list");
+    }
+    return { name, publicKey, publicStreams };
+  });
+  if (new Set(catalog.map((x) => x.name)).size !== catalog.length || new Set(domains).size !== domains.length) {
+    throw new ConfigError("discovery: duplicate station or domain");
+  }
   return {
     binding,
     daemon: { socket, uid: d.uid === undefined ? null : int(d.uid, "daemon.uid", 0, 2 ** 31) },
@@ -102,6 +126,7 @@ export function parseConfig(raw: unknown): BindingConfig {
       maxLive: p.maxLive === undefined ? 16 : int(p.maxLive, "publish.maxLive", 1, 64),
     },
     delivery: { mode: "explicit" },
+    discovery: { domains, catalog },
   };
 }
 
