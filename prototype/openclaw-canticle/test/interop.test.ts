@@ -122,7 +122,8 @@ test("Mirari fixture -> station -> daemon -> binding: mute, manual read, source 
     const reader = { sessionKey: "agent:mirari:reader", sessionId: "mirari-test", subagent: false, anonymous: false };
     const make = (tune: string[]) => new Binding({
       config: parseConfig({ binding: "mirari-test", daemon: { socket: join(run, "daemon.sock") },
-        stateDir: join(dir, "binding"), listen: { tune, payloadSessions: [reader.sessionKey] } }),
+        stateDir: join(dir, "binding"), listen: { tune, payloadSessions: [reader.sessionKey],
+          subscriptions: [{ sessionKey: reader.sessionKey, tune: ["mirari:wake"] }] } }),
       root: join(dir, "binding"), tickMs: 200,
       link: { backoff: { firstMs: 100, maxMs: 500, jitter: 0 } },
     });
@@ -149,13 +150,7 @@ test("Mirari fixture -> station -> daemon -> binding: mute, manual read, source 
     assert.equal(first.status, 0, first.stderr);
     assert.equal(first.stdout.trim(), "published");
     const heard = () => binding!.listen(reader, { what: "journal", view: "items", stream: "wake" });
-    try {
-      await waitFor(() => heard().text.includes("checked tests"), "Mirari item at binding", 15_000);
-    } catch (error) {
-      const stationStatus = await stationClient(join(run, "mirari.ctl"))({ op: "status" });
-      throw new Error(`Mirari item missing: ${String(error)}; journal=${JSON.stringify(heard())}; ` +
-        `stationStatus=${JSON.stringify(stationStatus)}; daemon=${JSON.stringify(daemon.lines)}; station=${JSON.stringify(station.lines)}`);
-    }
+    await waitFor(() => heard().text.includes("checked tests"), "Mirari item at binding", 15_000);
     const observed = heard();
     const entries = observed.details.entries as { kind: string; disposition?: string; station?: string }[];
     assert.equal(entries.filter((e) => e.kind === "heard" && e.station === "mirari" && e.disposition === "muted").length, 1);
