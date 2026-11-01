@@ -51,6 +51,44 @@ test("binding wires OC-0 only with both seams; restart does not admit stale cand
   } finally { await b?.stop(); await daemon.stop(); removeDir(root); }
 });
 
+test("canticle_mute revokes queued candidates and pending OC-0 slots", async () => {
+  const root = tempDir(), daemon = new FakeDaemon(root), host = new Host(), now = Date.now();
+  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [{
+    id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
+    streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
+  }] } });
+  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true }), oc0Host: host });
+  try {
+    await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 6, issued_at: now, ttl_ms: 120_000 });
+    await waitFor(() => host.pending() === 1);
+    b.mute({ sessionKey: session, sessionId: null, subagent: false, anonymous: false }, { station: "cael", stream: "lens.threat" });
+    await waitFor(() => b.candidates.pendingCount === 0 && host.pending() === 0);
+  } finally { await b.stop(); await daemon.stop(); removeDir(root); }
+});
+
+test("route proof failure gates consumed withdrawal notes", async () => {
+  const root = tempDir(), daemon = new FakeDaemon(root), host = new Host(), now = Date.now();
+  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [{
+    id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
+    streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
+  }] } });
+  let routeValid = true;
+  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: routeValid, onHost: routeValid }), oc0Host: host });
+  try {
+    await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 8, issued_at: now, ttl_ms: 120_000 });
+    await waitFor(() => host.records.length === 1);
+    host.drain(); await b.tick();
+    await waitFor(() => b.isTainted({ sessionKey: session, sessionId: null, subagent: false, anonymous: false }));
+    routeValid = false;
+    daemon.retract({ key_id: KEY_CAEL, stream: "lens.threat", seq: 8 });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(b.ambient?.notes(session, now + 30_000).length, 0);
+    assert.doesNotMatch(host.records.map((r) => r.text).join("\n"), /withdrawn\/expired/);
+  } finally { await b.stop(); await daemon.stop(); removeDir(root); }
+});
+
 test("drained frame retracted while binding runs queues one metadata-only digest note", async () => {
   const root = tempDir(), daemon = new FakeDaemon(root), host = new Host(), now = Date.now();
   const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [{

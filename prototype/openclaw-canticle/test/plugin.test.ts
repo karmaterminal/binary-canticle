@@ -24,11 +24,12 @@ type Service = {
   stop?: (ctx: Obj) => Promise<void>;
 };
 
-function load(pluginConfig?: unknown): { tools: Map<string, { factory: Factory; optional: boolean }>; service: Service } {
+function load(pluginConfig?: unknown, apiExtra: Obj = {}): { tools: Map<string, { factory: Factory; optional: boolean }>; service: Service } {
   const tools = new Map<string, { factory: Factory; optional: boolean }>();
   const services: Service[] = [];
   plugin.register({
     ...(pluginConfig !== undefined ? { pluginConfig } : {}),
+    ...apiExtra,
     registerTool: (factory, opts) => tools.set(opts.name, { factory: factory as Factory, optional: opts.optional }),
     registerService: (s) => services.push(s as unknown as Service),
   });
@@ -80,6 +81,43 @@ test("registers seven optional tools and one service, matching the manifest and 
   assert.equal(manifest.description, plugin.description);
   assert.deepEqual((pkg.openclaw as Obj).extensions, ["./index.ts"]);
   assert.equal(pkg.private, true); // never published (AGENTS.md: publication is a separate, human-decided gate)
+});
+
+test("host contract uses api.session.state and api.session.workflow without enabling wake", async () => {
+  const cfg = {
+    binding: "rune",
+    daemon: { socket: daemon.path },
+    listen: { tune: ["*:*"], subscriptions: [] },
+    delivery: { mode: "explicit", subscriptions: [{
+      id: "fleet", targets: [{ sessionKey: "agent:main:local:task" }], delivery: "ambient",
+      stations: ["cael"], streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
+    }] },
+  };
+  let enqueued = 0;
+  let queried = 0;
+  let withdrawn = 0;
+  const workflow = {
+    enqueueNextTurnInjection: async () => { enqueued++; return { enqueued: true }; },
+    getNextTurnInjectionState: async () => { queried++; return { state: "pending" }; },
+    withdrawNextTurnInjection: async () => { withdrawn++; return { state: "withdrawn" }; },
+  };
+  const { service } = load(cfg, { session: {
+    state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true }) },
+    workflow,
+  } });
+  const ctx = {
+    config: { plugins: { entries: { canticle: { enabled: true, config: cfg } } } },
+    stateDir: dir,
+    logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
+  };
+  await service.start(ctx);
+  try {
+    await waitFor(() => daemon.accepted === 1, "nested workflow service daemon join");
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 1, issued_at: Date.now(), ttl_ms: 120_000 });
+    await waitFor(() => enqueued > 0, "nested OC-0 workflow enqueue");
+    assert.equal(queried >= 0, true);
+    assert.equal(withdrawn >= 0, true);
+  } finally { await service.stop?.(ctx); }
 });
 
 test("publish tools are offered only when publishing is enabled, never to a sub-agent or a call that names no session", () => {

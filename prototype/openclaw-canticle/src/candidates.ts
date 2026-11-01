@@ -25,6 +25,7 @@ export class Candidates {
   private readonly route: RouteProof;
   private data: Ledger;
   private readonly proven = new Set<string>();
+  private muteScopes: { station: string | null; stream: string | null }[] = [];
   private readonly retractedInFlight = new Set<string>();
   private readonly cancelledRuns = new Set<string>();
   constructor(root: string, binding: string, subscriptions: Subscription[], route: RouteProof) {
@@ -104,10 +105,26 @@ export class Candidates {
     if (dirty) this.save();
   }
   tick(now: number): void { this.prune(now); }
+  /** Keep in-memory admission and queued rows behind the binding's live mute scopes. */
+  setMutes(scopes: { station: string | null; stream: string | null }[], now: number): void {
+    this.muteScopes = scopes.filter((scope, i) => scopes.findIndex((other) => other.station === scope.station && other.stream === scope.stream) === i);
+    for (const [key, c] of Object.entries(this.data.pending)) {
+      if (this.mutedByScope(c.station, c.stream)) {
+        delete this.data.pending[key];
+        this.data.settled[key] = c.expiresAt + 5000;
+      }
+    }
+    this.prune(now);
+  }
+  private mutedByScope(station: string, stream: string): boolean {
+    return this.muteScopes.some((scope) =>
+      (scope.station === null || scope.station === station) &&
+      (scope.stream === null || scope.stream === stream));
+  }
   /** A route proof must come from the host, never from the frame or the subscription itself. */
   async accept(frame: HeardFrame, run: string, now: number, self: boolean, muted: boolean, mayAdmit: () => boolean = () => true): Promise<number> {
     this.prune(now);
-    if (muted || !mayAdmit() || frame.times.local_expiry_at <= now || Object.keys(this.data.pending).length >= MAX_PENDING || Object.keys(this.data.settled).length >= MAX_SETTLED) return 0;
+    if (muted || this.mutedByScope(frame.station, frame.stream) || !mayAdmit() || frame.times.local_expiry_at <= now || Object.keys(this.data.pending).length >= MAX_PENDING || Object.keys(this.data.settled).length >= MAX_SETTLED) return 0;
     let added = 0;
     for (const sub of this.subscriptions) {
       if (sub.delivery !== "ambient" || (self && !sub.stations.includes(frame.station)) || !match(sub.stations, frame.station) || !match(sub.streams, frame.stream) || !match(sub.classes, frame.class) || !match(sub.scopes, frame.scope) || !match(sub.lenses, frame.lens)) continue;

@@ -35,6 +35,10 @@ test("new, journal, on_air and status only show a session's subscribed items", a
   for (const what of ["new", "journal", "on_air"]) {
     const r = binding.listen(SESSION, { what, view: "items", station: "cael", includeSelf: true });
     assert.match(r.text, /visible-secret/);
+    if (what === "on_air") {
+      const entries = r.details.entries as { station: string; stream: string }[];
+      assert.deepEqual(entries.map((e) => `${e.station}:${e.stream}`), ["cael:chatter"]);
+    }
     if (what !== "on_air") assert.equal(r.details.filtered, 0);
     assert.doesNotMatch(JSON.stringify(r), /hidden-secret|alerts/);
     const other = binding.listen(OTHER_SESSION, { what, view: "digest", includeSelf: true });

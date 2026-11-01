@@ -3,10 +3,11 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { readJson, writeJsonAtomic } from "./store.ts";
+import type { RouteProof } from "./candidates.ts";
 
 export type SlotKey = "canticle:digest" | "canticle:alarm";
 export type EntryOutcome = "pending" | "consumed" | "withdrawn" | "expired" | "discarded" | "unknown";
-export type SlotFrame = { key: string; expiresAt: number; line: string };
+export type SlotFrame = { key: string; expiresAt: number; line: string; station?: string; stream?: string };
 export type SlotRequest = { sessionKey: string; slot: SlotKey; frames: SlotFrame[] };
 export type HostEntry = { idempotencyKey: string; sessionKey: string; supersedeKey: SlotKey; expectedPreviousKey?: string; text: string; deadline: number; outcomeRetention: number; provenance: "canticle" };
 export type Oc0Host = {
@@ -23,9 +24,10 @@ export class AmbientSlots {
   private readonly path: string;
   private readonly binding: string;
   private readonly host: Oc0Host;
+  private readonly route: RouteProof | null;
   private data: Ledger;
-  constructor(root: string, binding: string, host: Oc0Host) {
-    this.path = join(root, "ambient-slots.json"); this.binding = binding; this.host = host;
+  constructor(root: string, binding: string, host: Oc0Host, route: RouteProof | null = null) {
+    this.path = join(root, "ambient-slots.json"); this.binding = binding; this.host = host; this.route = route;
     this.data = { v: 1, binding, entries: [], settled: {}, tainted: {}, notes: {} };
   }
   private save(): void { writeJsonAtomic(this.path, this.data); }
@@ -65,6 +67,13 @@ export class AmbientSlots {
     if (outcome === "consumed" || outcome === "discarded") for (const f of e.frames) this.data.settled[f.key] = f.expiresAt + 5000;
     if (outcome === "expired") for (const f of e.frames) if (f.expiresAt <= now) this.data.settled[f.key] = f.expiresAt + 5000;
     this.save();
+  }
+  private async validRoute(session: string): Promise<boolean> {
+    if (this.route === null) return true;
+    try {
+      const proof = await this.route(session);
+      return proof.sessionKey === session && proof.exists === true && proof.onHost === true;
+    } catch { return false; }
   }
   /** Query every ambiguous entry before allowing this session to deliver again. A failed query fails closed. */
   async reconcile(session: string, now: number): Promise<void> {
@@ -118,8 +127,9 @@ export class AmbientSlots {
   async retract(session: string, key: string, now: number): Promise<void> {
     await this.reconcile(session, now);
     for (const e of this.data.entries.filter((x) => x.sessionKey === session && x.status === "pending" && x.frames.some((f) => f.key === key))) await this.withdraw(e, now);
+    const routeValid = await this.validRoute(session);
     const expiry = this.data.entries.flatMap((e) => e.frames).find((f) => f.key === key)?.expiresAt;
-    if (this.data.entries.some((e) => e.sessionKey === session && e.outcome === "consumed" && e.frames.some((f) => f.key === key)) && expiry !== undefined) {
+    if (routeValid && this.data.entries.some((e) => e.sessionKey === session && e.outcome === "consumed" && e.frames.some((f) => f.key === key)) && expiry !== undefined) {
       const noteKey = `canticle-note:${key}`;
       (this.data.notes ??= {})[noteKey] ??= { key: noteKey, expiresAt: Math.max(expiry, now + 60_000), line: `[canticle:withdrawn/expired] ${key} withdrawn/expired` };
       this.save();

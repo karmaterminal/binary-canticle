@@ -122,7 +122,7 @@ export class Binding {
     this.lease.onError = (e) => this.log(`canticle: state lease error: ${e.message}`);
     this.journal = new Journal(join(o.root, "journal"), o.config.journal);
     this.candidates = new Candidates(o.root, o.config.binding, o.config.delivery.subscriptions, o.routeProof ?? (async (sessionKey) => ({ sessionKey, exists: false, onHost: false })));
-    this.ambient = o.routeProof && o.oc0Host ? new AmbientSlots(o.root, o.config.binding, o.oc0Host) : null;
+    this.ambient = o.routeProof && o.oc0Host ? new AmbientSlots(o.root, o.config.binding, o.oc0Host, o.routeProof) : null;
     const self = o.config.station?.keyId ?? null;
     this.receiver = new Receiver(
       {
@@ -251,6 +251,9 @@ export class Binding {
       this.state = this.loadState(now);
       this.journal.load(this.state.carried_keys, now);
       this.candidates.load(now);
+      this.candidates.setMutes(this.state.mutes
+        .filter((m) => m.until === null || m.until > now)
+        .map((m) => ({ station: m.station, stream: m.stream })), now);
       await this.candidates.preflightRoutes();
       if (this.ambient) {
         this.ambient.load();
@@ -312,11 +315,13 @@ export class Binding {
       return;
     }
     const now = this.clock();
+    const st = this.state as StateFile;
+    const liveMutes = st.mutes.filter((m) => m.until === null || m.until > now);
+    this.candidates.setMutes(liveMutes.map((m) => ({ station: m.station, stream: m.stream })), now);
     this.ambient?.expire(now);
     this.receiver.tick(now);
     this.candidates.tick(now);
     this.queueAmbient(() => this.syncAmbient());
-    const st = this.state as StateFile;
     let dirty = false;
     if (this.journal.prune(now)) {
       st.carried_keys = this.journal.carried(now);
@@ -448,7 +453,7 @@ export class Binding {
         await this.ambient.sync({ sessionKey: session, slot,
           frames: [
             ...(landing.allowed && slot === "canticle:digest" ? this.ambient.notes(session, now) : []),
-            ...admitted.map((c) => ({ key: c.key, expiresAt: c.expiresAt, line: c.line })),
+            ...admitted.map((c) => ({ key: c.key, expiresAt: c.expiresAt, line: c.line, station: c.station, stream: c.stream })),
           ].slice(0, 5) }, now);
         // A landing update may arrive while OC-0 is awaiting an enqueue response. Withdraw
         // before this flight completes; the queued update will then rebuild from current state.
@@ -955,7 +960,9 @@ export class Binding {
       if (p.clear === "all") {
         const n = st.mutes.length;
         st.mutes = [];
+        this.candidates.setMutes([], now);
         this.saveState();
+        this.queueAmbient(() => this.syncAmbient());
         return { text: `[canticle:mute] cleared ${n} mute(s)`, details: { ok: true, cleared: n, mutes: [] } };
       }
       const m = typeof p.clear === "string" ? MUTE_ID.exec(p.clear) : null;
@@ -970,7 +977,11 @@ export class Binding {
       if (st.mutes.length === before) {
         return this.refuse("canticle_mute", "not_found", `no active mute ${p.clear}`);
       }
+      this.candidates.setMutes(st.mutes
+        .filter((m) => m.until === null || m.until > now)
+        .map((m) => ({ station: m.station, stream: m.stream })), now);
       this.saveState();
+      this.queueAmbient(() => this.syncAmbient());
       return { text: `[canticle:mute] cleared ${p.clear}`, details: { ok: true, cleared: 1, mutes: st.mutes } };
     }
     const station = p.station ?? null;
@@ -997,7 +1008,11 @@ export class Binding {
       by: c.sessionKey,
     };
     st.mutes = [...kept, mute];
+    this.candidates.setMutes(st.mutes
+      .filter((m) => m.until === null || m.until > now)
+      .map((m) => ({ station: m.station, stream: m.stream })), now);
     this.saveState();
+    this.queueAmbient(() => this.syncAmbient());
     return {
       text: `[canticle:mute] ${mute.id} mutes ${mute.station ?? "*"}:${mute.stream ?? "*"}${mute.until !== null ? ` until ${iso(mute.until)}` : " until cleared"}. Items heard under it are journaled as muted: canticle_listen still reads them, and no later push will carry them.`,
       details: { ok: true, mute, mutes: st.mutes },

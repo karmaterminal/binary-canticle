@@ -17,8 +17,7 @@ type PluginApi = {
   pluginConfig?: unknown;
   session?: { state?: { resolveLocalSessionRoute?: (sessionKey: string) => Promise<{
     sessionKey: string; exists: boolean; onHost: boolean;
-  }> } };
-  workflow?: Partial<Oc0Workflow>;
+  }> }; workflow?: Partial<Oc0Workflow> };
   registerTool: (factory: (ctx: ToolContext) => unknown, opts: { name: string; optional: boolean }) => void;
   registerService: (service: {
     id: string;
@@ -71,9 +70,9 @@ export default {
               return resolve(sessionKey);
             },
             ...(api.session?.state?.resolveLocalSessionRoute &&
-              api.workflow?.enqueueNextTurnInjection && api.workflow?.getNextTurnInjectionState &&
-              api.workflow?.withdrawNextTurnInjection
-              ? { oc0Host: oc0HostFromWorkflow(api.workflow as Oc0Workflow) } : {}),
+              api.session?.workflow?.enqueueNextTurnInjection && api.session?.workflow?.getNextTurnInjectionState &&
+              api.session?.workflow?.withdrawNextTurnInjection
+              ? { oc0Host: oc0HostFromWorkflow(api.session.workflow as Oc0Workflow) } : {}),
             log: (msg) => ctx.logger?.info?.(msg),
           });
           await b.start();

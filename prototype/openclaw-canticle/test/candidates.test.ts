@@ -28,6 +28,21 @@ test("subscription shape rejects wildcards, shared main, duplicate ids and wake"
   assert.throws(() => parseConfig({ ...base, subscriptions: [{ id: "legacy" }] }), /top-level subscriptions/);
 });
 
+test("binding mutes revoke queued candidates and block matching in-flight admissions", async () => {
+  const root = tempDir(); const now = 1_790_000_000_000;
+  try {
+    const cfg = config({ perHour: 10 });
+    const ledger = new Candidates(root, "rune", cfg.delivery.subscriptions, async (key) => ({ sessionKey: key, exists: true, onHost: true }));
+    ledger.load(now);
+    assert.equal(await ledger.accept(frame(now, 1), "run", now, false, false), 1);
+    ledger.setMutes([{ station: "cael", stream: null }], now);
+    assert.equal(ledger.pendingCount, 0);
+    assert.equal(await ledger.accept(frame(now, 2), "run", now, false, false), 0);
+    ledger.setMutes([], now);
+    assert.equal(await ledger.accept(frame(now, 3), "run", now, false, false), 1);
+  } finally { removeDir(root); }
+});
+
 test("candidate ledger fails closed without host route proof, filters and budgets before persistence", async () => {
   const root = tempDir(); const now = 1_790_000_000_000;
   try {
