@@ -84,8 +84,8 @@ never to a call that names no session.
   and `tainted`. (OpenClaw shows a returned failure's text to the model and to a Gateway `tools.invoke` caller; a
   thrown error reaches a `tools.invoke` caller only as "tool execution failed".) A sing the outbox weighs and
   turns down is a result instead: `status: "rejected"` or `"budget_exhausted"` with a `reason`.
-- **A call that names no session** (OpenClaw passed neither a session key nor an agent id) is not given a shared
-  identity. It gets `canticle_status`, `canticle_mute`, and operational notes in `journal` digests, but no subscribed
+- **A call that names no exact session** (OpenClaw passed no `sessionKey`, even if it passed an `agentId`) is not given a shared
+  identity. An agent ID is not a substitute for an exact session key. It gets `canticle_status`, `canticle_mute`, and operational notes in `journal` digests, but no subscribed
   heard items or on-air items; a `new` read and heard text are refused (`no_session`), because a checkpoint and a
   taint mark belong to one session.
 - **Results are host-written text** with the same facts in `details.canticle` (the fields in the table above);

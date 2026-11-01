@@ -113,7 +113,7 @@ test("publish tools are offered only when publishing is enabled, never to a sub-
       assert.ok(publishing.tools.get(name)?.factory(ctx), `${name} for ${JSON.stringify(ctx)}`);
     }
   }
-  assert.ok(publishing.tools.get("canticle_sing")?.factory({ agentId: "main" })); // an agent id names its session
+  assert.equal(publishing.tools.get("canticle_sing")?.factory({ agentId: "main" }), null);
 });
 
 test("only canticle_listen returns network content, and every schema refuses unknown parameters", () => {
@@ -155,7 +155,7 @@ test("the tools say the service is not running until it starts, and a bad config
 
 test("a started service answers through the tools, and a refusal is a failed result that changes nothing", async () => {
   const clock = new Clock(Date.now());
-  const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: ["agent:main:*"], subscriptions: [{ sessionKey: "agent:main:main", tune: ["*:*"] }] } };
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: ["agent:main", "agent:main:main"], subscriptions: [{ sessionKey: "agent:main:main", tune: ["*:*"] }, { sessionKey: "agent:main", tune: ["*:*"] }] } };
   const { tools, service } = load(cfg);
   const logs: string[] = [];
   const ctx = {
@@ -196,6 +196,12 @@ test("a started service answers through the tools, and a refusal is a failed res
     assert.equal(digest.content[0]?.text.includes("hello from cael"), false);
     assert.doesNotMatch(digest.content[0]?.text ?? "", /heard text is not shown to this session/);
     assert.equal((digest.details.canticle as Obj).untrusted, false);
+    // A syntactically valid agent-wide-looking key must not turn agentId-only context into read authority.
+    const missingSession = tool(tools, "canticle_listen", { agentId: "main" });
+    await refused(missingSession.execute("c10", { what: "journal", view: "items" }), "no_session", /no exact session/);
+    const agentDigest = await missingSession.execute("c11", { what: "journal" });
+    assert.doesNotMatch(JSON.stringify(agentDigest), /hello from cael|cael:chatter/);
+    assert.equal((agentDigest.details.canticle as Obj).untrusted, false);
   } finally {
     await service.stop?.(ctx);
   }

@@ -18,8 +18,8 @@ import { type Air, heardMarks, iso, presenceText, renderEntry, renderViewItem } 
 import { type StationClient, stationClient } from "./station.ts";
 import { Lease, LeaseHeld, ensureDir, readJson, writeJsonAtomic } from "./store.ts";
 
-/** Who called a tool. An anonymous call named neither a session nor an agent, so it has no checkpoint, taint mark or
- * rate limit of its own: it gets status, mutes and digests of the journal and the view, and nothing else. */
+/** Who called a tool. A call without an exact session key is anonymous, even when an agent id is present.
+ * It has no checkpoint, taint mark or rate limit of its own and receives only operational status. */
 export type Caller = { sessionKey: string; sessionId: string | null; subagent: boolean; anonymous: boolean };
 export type Result = { text: string; details: Obj };
 
@@ -456,7 +456,7 @@ export class Binding {
       return this.refuse(
         "canticle_listen",
         "no_session",
-        "this call names no session, and a new read's checkpoint and heard text's taint (§14.12) belong to one; read what journal or on_air as digests",
+        "this call names no exact session, and a new read's checkpoint and heard text's taint (§14.12) belong to one; journal and on_air digests are empty without a subscription",
       );
     }
     if (view === "items" && !this.mayReadText(c)) {
@@ -800,7 +800,7 @@ export class Binding {
       `journal: ${visibleEntries} visible entries; ${waiting} heard entr${waiting === 1 ? "y" : "ies"} new for this session`,
       `mutes: ${daemonMute ? "daemon MUTE active; " : ""}${mutes.length === 0 ? "none" : mutes.map((m) => `${m.id} ${m.station ?? "*"}:${m.stream ?? "*"}${m.until !== null ? ` until ${iso(m.until)}` : ""}`).join(", ")}`,
       c.anonymous
-        ? "this call names no session: status, mutes, and digests of the journal and on air only"
+        ? "this call names no exact session: operational status and mutes only; journal and on-air digests are empty"
         : `this session: ${this.isTainted(c) ? "tainted (has read heard text; cannot sing until reset)" : "not tainted"}; ${this.mayReadText(c) ? "may read heard text (view items)" : "reads digests only (not in listen.payloadSessions)"}`,
       out === null
         ? "publish: disabled"
