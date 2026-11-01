@@ -115,5 +115,6 @@ listen` writes one JSON event per line to stdout.
   rotates the file; a harness that tails it can truncate it.
 - **Status lines** (a station's start line, `listener_state`, warnings) carry paths, key-ids and
   addresses, but no item text. Under systemd they go to the user journal.
-- `canticle ambient --log` and `canticle tuner --log` append to the file you name. Both hold item
-  text, as above.
+- `canticle ambient --log` appends the emitter's JSON records, including item text, to the file you name.
+- `canticle tuner` has no `--log` option. It exposes only the synthetic-only human view and does not retain or
+  publish listener events, item text, binary bodies, findings, body references, digests or state keys.
