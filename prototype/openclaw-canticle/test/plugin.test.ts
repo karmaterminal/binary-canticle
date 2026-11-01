@@ -24,11 +24,13 @@ type Service = {
   stop?: (ctx: Obj) => Promise<void>;
 };
 
-function load(pluginConfig?: unknown): { tools: Map<string, { factory: Factory; optional: boolean }>; service: Service } {
+type LifecycleHandler = (event: { sessionId: string; sessionKey: string; lifecycleRevision?: string; nextSessionId?: string }, context: { sessionId: string; sessionKey: string; agentId: string }) => Promise<void>;
+function load(pluginConfig?: unknown, apiExtra: Obj = {}): { tools: Map<string, { factory: Factory; optional: boolean }>; service: Service } {
   const tools = new Map<string, { factory: Factory; optional: boolean }>();
   const services: Service[] = [];
   plugin.register({
     ...(pluginConfig !== undefined ? { pluginConfig } : {}),
+    ...apiExtra,
     registerTool: (factory, opts) => tools.set(opts.name, { factory: factory as Factory, optional: opts.optional }),
     registerService: (s) => services.push(s as unknown as Service),
   });
@@ -36,7 +38,7 @@ function load(pluginConfig?: unknown): { tools: Map<string, { factory: Factory; 
   return { tools, service: services[0] as Service };
 }
 
-function tool(tools: ReturnType<typeof load>["tools"], name: string, ctx: Obj = { sessionKey: "agent:main:main", sessionId: "s-1" }): Tool {
+function tool(tools: ReturnType<typeof load>["tools"], name: string, ctx: Obj = { sessionKey: "agent:main:main", sessionId: "s-1", lifecycleRevision: "r-1" }): Tool {
   const t = tools.get(name)?.factory(ctx);
   assert.ok(t, `${name} is offered`);
   return t;
@@ -82,6 +84,83 @@ test("registers seven optional tools and one service, matching the manifest and 
   assert.equal(pkg.private, true); // never published (AGENTS.md: publication is a separate, human-decided gate)
 });
 
+test("production entry wires complete workflow to two exact sessions and consumes independently", async () => {
+  const first = "agent:main:local:task";
+  const second = "agent:main:local:other";
+  const cfg = {
+    binding: "rune",
+    daemon: { socket: daemon.path },
+    listen: { tune: ["*:*"], subscriptions: [] },
+    delivery: { mode: "explicit", subscriptions: [{
+      id: "fleet", targets: [{ sessionKey: first }, { sessionKey: second }], delivery: "ambient",
+      stations: ["cael"], streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
+    }] },
+  };
+  const entries = new Map<string, { sessionKey: string; expectedSessionId: string; expectedLifecycleRevision: string; text: string; state: string }>();
+  const workflow = {
+    enqueueNextTurnInjection: async (entry: { sessionKey: string; expectedSessionId: string; expectedLifecycleRevision: string; idempotencyKey: string; text: string }) => {
+      entries.set(entry.idempotencyKey, { ...entry, state: "pending" }); return { enqueued: true };
+    },
+    getNextTurnInjectionState: async ({ idempotencyKey }: { idempotencyKey: string }) => ({ state: entries.get(idempotencyKey)?.state ?? "unknown" }),
+    withdrawNextTurnInjection: async ({ idempotencyKey }: { idempotencyKey: string }) => {
+      const entry = entries.get(idempotencyKey); if (entry?.state === "pending") entry.state = "withdrawn";
+      return { state: entry?.state ?? "unknown" };
+    },
+  };
+  const { tools, service } = load(cfg, { session: {
+    state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: `id:${sessionKey}`, lifecycleRevision: `rev:${sessionKey}` }) },
+    workflow,
+  }, on: () => undefined });
+  const ctx = {
+    config: { plugins: { entries: { canticle: { enabled: true, config: cfg } } } },
+    stateDir: dir,
+    logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
+  };
+  await service.start(ctx);
+  try {
+    await waitFor(() => daemon.accepted === 1, "nested workflow service daemon join");
+    const status = tool(tools, "canticle_status", { sessionKey: first, sessionId: `id:${first}`, lifecycleRevision: `rev:${first}` });
+    const joinDeadline = Date.now() + 4_000;
+    while (!((await status.execute("join", {})).details.canticle.on_air as Obj).known) {
+      assert.ok(Date.now() < joinDeadline, "timed out waiting for completed join snapshot");
+      await sleep(5);
+    }
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 1, issued_at: Date.now(), ttl_ms: 120_000 });
+    await waitFor(() => [...entries.values()].filter((entry) => entry.state === "pending").length === 2, "two exact session slots");
+    const active = [...entries.values()];
+    assert.deepEqual(active.map((entry) => entry.sessionKey).sort(), [first, second].sort());
+    for (const entry of active) {
+      assert.equal(entry.expectedSessionId, `id:${entry.sessionKey}`);
+      assert.equal(entry.expectedLifecycleRevision, `rev:${entry.sessionKey}`);
+    }
+    active.find((entry) => entry.sessionKey === first)!.state = "consumed";
+    const firstTaintDeadline = Date.now() + 7_000;
+    while (!((await status.execute("first-drain", {})).details.canticle.session as Obj).tainted) {
+      assert.ok(Date.now() < firstTaintDeadline, "timed out waiting for first session consumption");
+      await sleep(10);
+    }
+    const secondStatus = tool(tools, "canticle_status", { sessionKey: second, sessionId: `id:${second}`, lifecycleRevision: `rev:${second}` });
+    assert.equal(((await secondStatus.execute("second-still-pending", {})).details.canticle.session as Obj).tainted, false);
+    assert.equal(active.find((entry) => entry.sessionKey === second)!.state, "pending", "drain is target-specific");
+  } finally { await service.stop?.(ctx); }
+});
+
+test("ambient entry fails closed for every incomplete workflow or route seam", async () => {
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [{
+    id: "fleet", targets: [{ sessionKey: "agent:main:local:task" }], delivery: "ambient",
+    stations: ["cael"], streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
+  }] } };
+  const ctx = { stateDir: dir };
+  const complete = { enqueueNextTurnInjection: async () => ({ enqueued: true }),
+    getNextTurnInjectionState: async () => ({ state: "pending" }), withdrawNextTurnInjection: async () => ({ state: "withdrawn" }) };
+  const route = { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: "id", lifecycleRevision: "rev" }) };
+  for (const session of [{ workflow: complete }, ...Object.keys(complete).map((missing) => ({ state: route,
+    workflow: Object.fromEntries(Object.entries(complete).filter(([name]) => name !== missing)) }))]) {
+    const { service } = load(cfg, { session, on: () => undefined });
+    await assert.rejects(service.start(ctx), /complete generation-bound/);
+  }
+});
+
 test("publish tools are offered only when publishing is enabled, never to a sub-agent or a call that names no session", () => {
   const readOnly = load({ binding: "rune", daemon: { socket: daemon.path } });
   for (const name of READ_TOOLS) {
@@ -113,7 +192,7 @@ test("publish tools are offered only when publishing is enabled, never to a sub-
       assert.ok(publishing.tools.get(name)?.factory(ctx), `${name} for ${JSON.stringify(ctx)}`);
     }
   }
-  assert.ok(publishing.tools.get("canticle_sing")?.factory({ agentId: "main" })); // an agent id names its session
+  assert.equal(publishing.tools.get("canticle_sing")?.factory({ agentId: "main" }), null);
 });
 
 test("only network-facing read tools return network content, and every schema refuses unknown parameters", () => {
@@ -155,8 +234,8 @@ test("the tools say the service is not running until it starts, and a bad config
 
 test("a started service answers through the tools, and a refusal is a failed result that changes nothing", async () => {
   const clock = new Clock(Date.now());
-  const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: ["agent:main:*"] } };
-  const { tools, service } = load(cfg);
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: ["agent:main:reader"], subscriptions: [{ sessionKey: "agent:main:reader", tune: ["*:*"] }] } };
+  const { tools, service } = load(cfg, { session: { state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true }) } } });
   const logs: string[] = [];
   const ctx = {
     config: { plugins: { entries: { canticle: { enabled: true, config: cfg } } } },
@@ -169,7 +248,7 @@ test("a started service answers through the tools, and a refusal is a failed res
     const status = tool(tools, "canticle_status");
     await waitFor(() => daemon.accepted === 1, "the daemon connection");
     daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "chatter", seq: 1, issued_at: clock.t, text: "hello from cael" });
-    const listen = tool(tools, "canticle_listen");
+    const listen = tool(tools, "canticle_listen", { sessionKey: "agent:main:reader", sessionId: "s-1", lifecycleRevision: "r-1" });
     const end = Date.now() + 4_000;
     let out = await listen.execute("c3", { what: "journal", view: "items" });
     while (out.content[0]?.text.includes("hello from cael") !== true) {
@@ -188,14 +267,20 @@ test("a started service answers through the tools, and a refusal is a failed res
     await refused(listen.execute("c5", { what: "everything" }), "bad_param", /what/);
     const st = await status.execute("c6", {});
     assert.equal(st.content[0]?.text.includes("hello from cael"), false); // status never carries heard text
-    // A session the configuration does not list reads digests: no sender text, and no taint.
+    // A session without a subscription sees no item, even in digests; no sender text or taint.
     const outsider = tool(tools, "canticle_listen", { sessionKey: "agent:discord-bound:main", sessionId: "d-1" });
     await refused(outsider.execute("c8", { what: "journal", view: "items" }), "payload_not_allowed", /payload_not_allowed/);
     const digest = await outsider.execute("c9", { what: "journal" });
-    assert.match(digest.content[0]?.text ?? "", /\[canticle:heard\] cael:chatter class=chatter/);
+    assert.doesNotMatch(digest.content[0]?.text ?? "", /\[canticle:heard\] cael:chatter/);
     assert.equal(digest.content[0]?.text.includes("hello from cael"), false);
-    assert.match(digest.content[0]?.text ?? "", /heard text is not shown to this session/);
+    assert.doesNotMatch(digest.content[0]?.text ?? "", /heard text is not shown to this session/);
     assert.equal((digest.details.canticle as Obj).untrusted, false);
+    // A syntactically valid agent-wide-looking key must not turn agentId-only context into read authority.
+    const missingSession = tool(tools, "canticle_listen", { agentId: "main" });
+    await refused(missingSession.execute("c10", { what: "journal", view: "items" }), "no_session", /no exact session/);
+    const agentDigest = await missingSession.execute("c11", { what: "journal" });
+    assert.doesNotMatch(JSON.stringify(agentDigest), /hello from cael|cael:chatter/);
+    assert.equal((agentDigest.details.canticle as Obj).untrusted, false);
   } finally {
     await service.stop?.(ctx);
   }
@@ -294,7 +379,7 @@ const FULL = {
   daemon: { socket: "/run/user/1000/canticle/daemon.sock", uid: 1000 },
   stateDir: "/home/rune/.openclaw/canticle/rune",
   station: { name: "rune", keyId: KEY_RUNE },
-  listen: { tune: ["*:chatter", "cael:*", "*:alerts.*"], includeSelf: false, payloadSessions: ["agent:reader:*"] },
+  listen: { tune: ["*:chatter", "cael:*", "*:alerts.*"], includeSelf: false, payloadSessions: ["agent:reader:reader"], subscriptions: [{ sessionKey: "agent:reader:reader", tune: ["cael:chatter"] }] },
   journal: { maxEntries: 5000, maxBytes: 8388608, maxAgeHours: 24 },
   publish: {
     enabled: true,
@@ -305,7 +390,7 @@ const FULL = {
     perHour: 60,
     maxLive: 16,
   },
-  delivery: { mode: "explicit" },
+  delivery: { mode: "explicit", subscriptions: [] },
   discovery: { domains: ["example.org"], catalog: [] },
 };
 
@@ -317,6 +402,7 @@ test("the manifest schema accepts every key the plugin reads, and nothing it doe
   assert.equal(parsed.publish.enabled, true);
   assert.equal(parsed.journal.maxAgeMs, 24 * 3_600_000);
   assert.deepEqual(schemaErrors(schema, { ...FULL, extra: 1 }), ["<root>: unknown extra"]);
+  assert.deepEqual(schemaErrors(schema, { ...FULL, subscriptions: [] }), ["<root>: unknown subscriptions"]);
   assert.deepEqual(schemaErrors(schema, { ...FULL, publish: { ...FULL.publish, perMinute: 6 } }), ["<root>.publish.perMinute: out of range"]);
 });
 
@@ -327,10 +413,112 @@ test("a config the service refuses still passes the boot-time schema: it fails t
     { binding: "rune", daemon: { socket: "/d.sock" }, publish: { enabled: true, socket: "/s.ctl" } }, // no station
     { binding: "rune", daemon: { socket: "/d.sock" }, publish: { enabled: true } }, // no publish socket
     { binding: "rune", daemon: { socket: "/d.sock" }, listen: { tune: ["not a tune"] } },
-    { binding: "rune", daemon: { socket: "/d.sock" }, listen: { payloadSessions: ["agent:*:main"] } }, // * only at the end
+    { binding: "rune", daemon: { socket: "/d.sock" }, listen: { payloadSessions: ["agent:main:*"] } }, // wildcard payload grants are refused
   ];
   for (const c of refusedAtStart) {
     assert.deepEqual(schemaErrors(schema, c), [], JSON.stringify(c));
     assert.throws(() => parseConfig(c), ConfigError, JSON.stringify(c));
   }
+});
+
+test("ambient service fails closed without both lifecycle callbacks; ringbuffer-only still starts", async () => {
+  const subscription = { id: "fleet", targets: [{ sessionKey: "agent:main:local:task" }], delivery: "ambient",
+    stations: ["cael"], streams: ["lens.threat"], classes: ["live-state"], perHour: 10 };
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [subscription] } };
+  const ctx = { stateDir: dir, logger: { info: () => undefined } };
+  const absent = load(cfg);
+  await assert.rejects(absent.service.start(ctx), /session_reset\/session_delete callbacks/);
+  assert.equal(existsSync(join(dir, "canticle")), false);
+  const rejected = load(cfg, { on: (name: string) => { if (name === "session_delete") throw new Error("unknown hook"); } });
+  await assert.rejects(rejected.service.start(ctx), /session_reset\/session_delete callbacks/);
+  const ring = { ...cfg, delivery: { ...cfg.delivery, subscriptions: [{ ...subscription, delivery: "ringbuffer_only" }] } };
+  const safe = load(ring);
+  await safe.service.start(ctx);
+  await safe.service.stop?.(ctx);
+});
+
+test("typed reset and delete callbacks clear only the ended exact session", async () => {
+  const key = "agent:main:reader";
+  let currentSessionId = "old";
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: [key], subscriptions: [{ sessionKey: key, tune: ["*:*"] }] } };
+  const hooks = new Map<string, LifecycleHandler>();
+  const { tools, service } = load(cfg, { on: (name: string, handler: LifecycleHandler) => hooks.set(name, handler),
+    session: { state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: currentSessionId, lifecycleRevision: `r-${currentSessionId}` }) } } });
+  assert.deepEqual([...hooks.keys()], ["session_reset", "session_delete"]);
+  const ctx = { stateDir: dir, logger: { info: () => undefined } };
+  await service.start(ctx);
+  try {
+    await waitFor(() => daemon.accepted === 1);
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "chatter", seq: 1, issued_at: Date.now(), text: "hello" });
+    const reader = tool(tools, "canticle_listen", { sessionKey: key, sessionId: "old" });
+    const deadline = Date.now() + 4_000;
+    while (!(await reader.execute("read", { what: "journal", view: "items" })).content[0]?.text.includes("hello")) {
+      assert.ok(Date.now() < deadline, "timed out waiting for heard text");
+      await sleep(10);
+    }
+    const state = () => JSON.parse(readFileSync(join(dir, "canticle", "rune", "state.json"), "utf8")) as { taint: Record<string, unknown>; checkpoints: Record<string, unknown> };
+    assert.ok(state().taint.old);
+    await reader.execute("checkpoint", { what: "new" });
+    assert.ok(state().checkpoints[key], "checkpoint is keyed by sessionKey, not sessionId");
+    const event = { sessionId: "old", sessionKey: key, lifecycleRevision: "r-old" };
+    const context = { ...event, agentId: "main" };
+    await hooks.get("session_reset")!({ ...event, nextSessionId: "new" }, { ...context, sessionKey: "agent:main:other" });
+    assert.ok(state().taint.old, "mismatched context cannot clear another session");
+    await hooks.get("session_reset")!({ sessionId: "old", sessionKey: key }, context);
+    assert.ok(state().taint.old, "ID-only callback cannot clear taint");
+    assert.ok(state().checkpoints[key], "ID-only callback cannot clear checkpoint");
+    await hooks.get("session_reset")!({ ...event, nextSessionId: "new" }, context);
+    assert.equal(state().taint.old, undefined);
+    assert.equal(state().checkpoints[key], undefined);
+    currentSessionId = "new";
+    const successor = tool(tools, "canticle_listen", { sessionKey: key, sessionId: "new" });
+    await successor.execute("new-checkpoint", { what: "new" });
+    assert.ok(state().checkpoints[key]);
+    await hooks.get("session_reset")!({ ...event, nextSessionId: "new" }, context);
+    assert.ok(state().checkpoints[key], "late old-generation reset cannot erase successor checkpoint");
+    await reader.execute("read2", { what: "journal", view: "items" });
+    assert.ok(state().taint.old);
+    await hooks.get("session_delete")!(event, context);
+    assert.ok(state().taint.old, "late delete cannot clear shared taint without matching current generation");
+    assert.equal(state().checkpoints.old, undefined);
+  } finally { await service.stop?.(ctx); }
+});
+
+test("delayed same-ID r1 reset preserves r2 taint and checkpoint", async () => {
+  const key = "agent:main:reader", id = "same";
+  let revision = "r1";
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: [key], subscriptions: [{ sessionKey: key, tune: ["*:*"] }] } };
+  const hooks = new Map<string, LifecycleHandler>();
+  const { tools, service } = load(cfg, { on: (name: string, handler: LifecycleHandler) => hooks.set(name, handler),
+    session: { state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: id, lifecycleRevision: revision }) } } });
+  const ctx = { stateDir: dir, logger: { info: () => undefined } };
+  await service.start(ctx);
+  try {
+    await waitFor(() => daemon.accepted === 1);
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "chatter", seq: 1, issued_at: Date.now(), text: "hello" });
+    const reader = tool(tools, "canticle_listen", { sessionKey: key, sessionId: id });
+    const deadline = Date.now() + 4_000;
+    while (!(await reader.execute("read", { what: "journal", view: "items" })).content[0]?.text.includes("hello")) {
+      assert.ok(Date.now() < deadline, "timed out waiting for heard text");
+      await sleep(10);
+    }
+    const state = () => JSON.parse(readFileSync(join(dir, "canticle", "rune", "state.json"), "utf8")) as { taint: Record<string, unknown>; checkpoints: Record<string, unknown> };
+    await reader.execute("checkpoint", { what: "new" });
+    const event = { sessionId: id, sessionKey: key, lifecycleRevision: "r1" };
+    const context = { sessionId: id, sessionKey: key, agentId: "main" };
+    await hooks.get("session_reset")!(event, context);
+    assert.equal(state().taint[id], undefined);
+    revision = "r2";
+    await reader.execute("r2-read", { what: "journal", view: "items" });
+    await reader.execute("r2-checkpoint", { what: "new" });
+    assert.ok(state().taint[id]);
+    const checkpoint = state().checkpoints[key];
+    assert.ok(checkpoint);
+    await hooks.get("session_reset")!(event, context);
+    assert.ok(state().taint[id], "late r1 reset cannot erase r2 taint with reused ID");
+    assert.deepEqual(state().checkpoints[key], checkpoint, "late r1 reset cannot erase r2 checkpoint");
+    await hooks.get("session_reset")!({ sessionId: id, sessionKey: key }, context);
+    assert.ok(state().taint[id], "ID-only reset retains taint");
+    assert.deepEqual(state().checkpoints[key], checkpoint);
+  } finally { await service.stop?.(ctx); }
 });

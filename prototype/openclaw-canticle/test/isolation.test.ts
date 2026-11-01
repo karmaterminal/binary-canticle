@@ -102,7 +102,7 @@ test("cross-binding read, cursor advance, mute and publish are refused, and chan
   await waitFor(() => a.outbox?.get("out:rune:1")?.heard_at !== null && b.outbox?.get("out:scribe:1")?.heard_at !== null, "both items heard back");
   const bRead = b.listen(scribeSession, { view: "digest" });
   const bCursor = bRead.details.next as string;
-  const bMute = (b.mute(scribeSession, { station: "cael" }).details.mute as { id: string }).id;
+  const bMute = ((await b.mute(scribeSession, { station: "cael" })).details.mute as { id: string }).id;
   a.listen(SESSION, { view: "digest" });
   const beforeA = snapshot(a, runeStation);
   const beforeB = snapshot(b, scribeStation);
@@ -111,7 +111,7 @@ test("cross-binding read, cursor advance, mute and publish are refused, and chan
   assert.equal(read.details.refused, "not_this_binding");
   const advance = a.listen(SESSION, { what: "new", since: bCursor });
   assert.equal(advance.details.refused, "not_this_binding");
-  const unmute = a.mute(SESSION, { clear: bMute });
+  const unmute = await a.mute(SESSION, { clear: bMute });
   assert.equal(unmute.details.refused, "not_this_binding");
   const hush = await a.hush(SESSION, { item: "out:scribe:1" });
   assert.equal(hush.details.refused, "not_this_binding");
