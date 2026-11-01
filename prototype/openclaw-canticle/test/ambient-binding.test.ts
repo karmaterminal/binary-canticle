@@ -62,7 +62,7 @@ test("canticle_mute revokes queued candidates and pending OC-0 slots", async () 
     await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
     daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 6, issued_at: now, ttl_ms: 120_000 });
     await waitFor(() => host.pending() === 1);
-    b.mute({ sessionKey: session, sessionId: null, subagent: false, anonymous: false }, { station: "cael", stream: "lens.threat" });
+    await b.mute({ sessionKey: session, sessionId: null, subagent: false, anonymous: false }, { station: "cael", stream: "lens.threat" });
     await waitFor(() => b.candidates.pendingCount === 0 && host.pending() === 0);
   } finally { await b.stop(); await daemon.stop(); removeDir(root); }
 });

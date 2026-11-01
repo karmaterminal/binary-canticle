@@ -83,7 +83,7 @@ test("registers seven optional tools and one service, matching the manifest and 
   assert.equal(pkg.private, true); // never published (AGENTS.md: publication is a separate, human-decided gate)
 });
 
-test("host contract uses api.session.state and api.session.workflow without enabling wake", async () => {
+test("host contract exposes route/workflow data without activating OC-0 or wake", async () => {
   const cfg = {
     binding: "rune",
     daemon: { socket: daemon.path },
@@ -114,9 +114,10 @@ test("host contract uses api.session.state and api.session.workflow without enab
   try {
     await waitFor(() => daemon.accepted === 1, "nested workflow service daemon join");
     daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 1, issued_at: Date.now(), ttl_ms: 120_000 });
-    await waitFor(() => enqueued > 0, "nested OC-0 workflow enqueue");
-    assert.equal(queried >= 0, true);
-    assert.equal(withdrawn >= 0, true);
+    await sleep(30);
+    assert.equal(enqueued, 0, "the plugin does not activate ambient workflow from this contract alone");
+    assert.equal(queried, 0);
+    assert.equal(withdrawn, 0);
   } finally { await service.stop?.(ctx); }
 });
 
@@ -193,8 +194,8 @@ test("the tools say the service is not running until it starts, and a bad config
 
 test("a started service answers through the tools, and a refusal is a failed result that changes nothing", async () => {
   const clock = new Clock(Date.now());
-  const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: ["agent:main", "agent:main:main"], subscriptions: [{ sessionKey: "agent:main:main", tune: ["*:*"] }, { sessionKey: "agent:main", tune: ["*:*"] }] } };
-  const { tools, service } = load(cfg);
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: ["agent:main:reader"], subscriptions: [{ sessionKey: "agent:main:reader", tune: ["*:*"] }] } };
+  const { tools, service } = load(cfg, { session: { state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true }) } } });
   const logs: string[] = [];
   const ctx = {
     config: { plugins: { entries: { canticle: { enabled: true, config: cfg } } } },
@@ -207,7 +208,7 @@ test("a started service answers through the tools, and a refusal is a failed res
     const status = tool(tools, "canticle_status");
     await waitFor(() => daemon.accepted === 1, "the daemon connection");
     daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "chatter", seq: 1, issued_at: clock.t, text: "hello from cael" });
-    const listen = tool(tools, "canticle_listen");
+    const listen = tool(tools, "canticle_listen", { sessionKey: "agent:main:reader", sessionId: "s-1" });
     const end = Date.now() + 4_000;
     let out = await listen.execute("c3", { what: "journal", view: "items" });
     while (out.content[0]?.text.includes("hello from cael") !== true) {
@@ -338,7 +339,7 @@ const FULL = {
   daemon: { socket: "/run/user/1000/canticle/daemon.sock", uid: 1000 },
   stateDir: "/home/rune/.openclaw/canticle/rune",
   station: { name: "rune", keyId: KEY_RUNE },
-  listen: { tune: ["*:chatter", "cael:*", "*:alerts.*"], includeSelf: false, payloadSessions: ["agent:reader:*"], subscriptions: [{ sessionKey: "agent:reader:main", tune: ["cael:chatter"] }] },
+  listen: { tune: ["*:chatter", "cael:*", "*:alerts.*"], includeSelf: false, payloadSessions: ["agent:reader:reader"], subscriptions: [{ sessionKey: "agent:reader:reader", tune: ["cael:chatter"] }] },
   journal: { maxEntries: 5000, maxBytes: 8388608, maxAgeHours: 24 },
   publish: {
     enabled: true,
@@ -372,7 +373,7 @@ test("a config the service refuses still passes the boot-time schema: it fails t
     { binding: "rune", daemon: { socket: "/d.sock" }, publish: { enabled: true, socket: "/s.ctl" } }, // no station
     { binding: "rune", daemon: { socket: "/d.sock" }, publish: { enabled: true } }, // no publish socket
     { binding: "rune", daemon: { socket: "/d.sock" }, listen: { tune: ["not a tune"] } },
-    { binding: "rune", daemon: { socket: "/d.sock" }, listen: { payloadSessions: ["agent:*:main"] } }, // * only at the end
+    { binding: "rune", daemon: { socket: "/d.sock" }, listen: { payloadSessions: ["agent:main:*"] } }, // wildcard payload grants are refused
   ];
   for (const c of refusedAtStart) {
     assert.deepEqual(schemaErrors(schema, c), [], JSON.stringify(c));

@@ -133,15 +133,15 @@ test("local expiry creates one metadata-only note without a retract record", asy
     const a = new AmbientSlots(root, "rune", host); a.load();
     await a.sync(req("canticle:digest", key), now);
     host.drain("canticle:digest"); await a.reconcile(sessionKey, now);
-    a.expire(now + 120_000);
+    await a.expire(now + 120_000);
     const b = new AmbientSlots(root, "rune", host); b.load();
     assert.equal(b.notes(sessionKey, now + 120_000).length, 1);
     assert.match(b.notes(sessionKey, now + 120_000)[0]!.line, /withdrawn\/expired/);
-    b.expire(now + 120_000);
+    await b.expire(now + 120_000);
     assert.equal(b.notes(sessionKey, now + 120_000).length, 1);
     await b.sync({ sessionKey, slot: "canticle:digest", frames: b.notes(sessionKey, now + 120_000) }, now + 120_000);
     host.drain("canticle:digest"); await b.reconcile(sessionKey, now + 120_000);
-    b.expire(now + 120_000);
+    await b.expire(now + 120_000);
     assert.equal(b.notes(sessionKey, now + 120_000).length, 0);
   } finally { removeDir(root); }
 });

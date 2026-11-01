@@ -96,10 +96,10 @@ test("a subscription cannot widen receiver acceptance without a local route; exp
   daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", seq: 1, issued_at: clock.t, class: "advisory" });
   const subscription = { id: "fleet", delivery: "ambient", targets: [{ sessionKey: "agent:main:local:task" }], stations: ["cael"], streams: ["lens.threat"], classes: ["advisory"] };
   const readScope = [{ sessionKey: OTHER_SESSION.sessionKey, tune: ["*:*"] }];
-  b = await up({ listen: { tune: [], payloadSessions: ["*"], subscriptions: readScope }, delivery: { mode: "explicit", subscriptions: [subscription] } });
+  b = await up({ listen: { tune: [], payloadSessions: [SESSION.sessionKey], subscriptions: readScope }, delivery: { mode: "explicit", subscriptions: [subscription] } });
   assert.equal(heardCount(b), 0);
   await b.stop();
-  b = await up({ listen: { tune: ["cael:lens.threat"], payloadSessions: ["*"], subscriptions: readScope }, delivery: { mode: "explicit", subscriptions: [subscription] } });
+  b = await up({ listen: { tune: ["cael:lens.threat"], payloadSessions: [SESSION.sessionKey], subscriptions: readScope }, delivery: { mode: "explicit", subscriptions: [subscription] } });
   assert.equal(heardCount(b), 1);
 });
 
@@ -122,12 +122,12 @@ test("a repeated, resurfaced or snapshot copy of one item is journaled once; a r
 
 test("mutes: items heard under one are journaled muted, still read by hand, and stay muted after it lifts", async () => {
   b = await up();
-  const m = b.mute(SESSION, { station: "cael", ttlSeconds: 60 });
+  const m = await b.mute(SESSION, { station: "cael", ttlSeconds: 60 });
   const id = (m.details.mute as { id: string }).id;
   assert.equal(id, "mute:rune:1");
   daemon.surface(cael(1, "while muted"));
   await waitFor(() => heardCount(b) === 1, "the muted item");
-  b.mute(SESSION, { clear: id });
+  await b.mute(SESSION, { clear: id });
   daemon.surface(cael(2, "after the mute"));
   await waitFor(() => heardCount(b) === 2, "the second item");
   const read = b.listen(SESSION, { view: "items" });
@@ -139,11 +139,11 @@ test("mutes: items heard under one are journaled muted, still read by hand, and 
   assert.match(read.text, /muted \(mute:rune:1\): readable here, never pushed/);
   assert.match(read.text, /while muted/); // a mute never stops a manual read
   // One scope holds one choice: a second mute of the same scope replaces the first.
-  b.mute(SESSION, { station: "cael" });
-  const again = b.mute(SESSION, { station: "cael", ttlSeconds: 5 });
+  await b.mute(SESSION, { station: "cael" });
+    const again = await b.mute(SESSION, { station: "cael", ttlSeconds: 5 });
   assert.equal((again.details.mutes as unknown[]).length, 1);
   // The daemon's own MUTE wins as well.
-  b.mute(SESSION, { clear: "all" });
+  await b.mute(SESSION, { clear: "all" });
   daemon.emit("landing_state", { mute: { until: null, by: "test" }, breaker: "closed", until: null, modulation: [] });
   daemon.surface(cael(3, "under the daemon's mute"));
   await waitFor(() => heardCount(b) === 3, "the third item");
@@ -284,7 +284,7 @@ test("a new read passes over what its filters leave out for good, and a new read
 });
 
 test("a call that names no session reads digests of the journal and on air, never new reads or heard text", async () => {
-  b = await up(); // listen.payloadSessions is "*": every session that names itself may read heard text
+  b = await up(); // exact payload grants are exercised by named sessions in the suite
   daemon.surface(cael(1, "for named sessions only"));
   await waitFor(() => heardCount(b) === 1, "the item");
   const anonymous = callerOf({});
@@ -311,7 +311,7 @@ test("a call that names no session reads digests of the journal and on air, neve
 });
 
 test("a taint table that overflows fails closed: every session that may read heard text counts as tainted", async () => {
-  const cfg = { listen: { payloadSessions: ["agent:main:*"], subscriptions: [{ sessionKey: SESSION.sessionKey, tune: ["*:*"] }, { sessionKey: OTHER_SESSION.sessionKey, tune: ["*:*"] }] } };
+  const cfg = { listen: { payloadSessions: [SESSION.sessionKey, OTHER_SESSION.sessionKey, "agent:main:early"], subscriptions: [{ sessionKey: SESSION.sessionKey, tune: ["*:*"] }, { sessionKey: OTHER_SESSION.sessionKey, tune: ["*:*"] }, { sessionKey: "agent:main:early", tune: ["*:*"] }] } };
   b = await up(cfg);
   daemon.surface(cael(1));
   await waitFor(() => heardCount(b) === 1, "the item");

@@ -1,7 +1,7 @@
 // Durable ambient candidate ledger. The binding alone may hand bounded slots to OC-0.
 import { join } from "node:path";
 import { randomInt } from "node:crypto";
-import { type Subscription } from "./config.ts";
+import { TARGET_SESSION_KEY, type Subscription } from "./config.ts";
 import { type HeardFrame, isObj } from "./records.ts";
 import { readJson, writeJsonAtomic } from "./store.ts";
 
@@ -23,16 +23,18 @@ export class Candidates {
   private readonly binding: string;
   private readonly subscriptions: Subscription[];
   private readonly route: RouteProof;
+  private readonly ambientEnabled: boolean;
   private data: Ledger;
   private readonly proven = new Set<string>();
   private muteScopes: { station: string | null; stream: string | null }[] = [];
   private readonly retractedInFlight = new Set<string>();
   private readonly cancelledRuns = new Set<string>();
-  constructor(root: string, binding: string, subscriptions: Subscription[], route: RouteProof) {
+  constructor(root: string, binding: string, subscriptions: Subscription[], route: RouteProof, ambientEnabled = true) {
     this.path = join(root, "candidates.json");
     this.binding = binding;
     this.subscriptions = subscriptions;
     this.route = route;
+    this.ambientEnabled = ambientEnabled;
     this.data = { v: 1, binding, pending: {}, settled: {}, spend: {} };
   }
   load(now: number): void {
@@ -43,6 +45,7 @@ export class Candidates {
       if (Object.keys(d.pending).length > MAX_PENDING || Object.keys(d.settled).length > MAX_SETTLED || Object.keys(d.spend).length > 2048) throw new Error("candidate ledger exceeds bounds");
       for (const [key, c] of Object.entries(d.pending)) {
         if (!isObj(c) || c.key !== key || typeof c.sessionKey !== "string" ||
+          c.sessionKey !== c.sessionKey.toLowerCase() || !TARGET_SESSION_KEY.test(c.sessionKey) || c.sessionKey === "agent:main:main" ||
           !Array.isArray(c.subscriptionIds) || c.subscriptionIds.length > 64 || c.subscriptionIds.some((id: unknown) => typeof id !== "string") ||
           typeof c.station !== "string" || typeof c.stream !== "string" || typeof c.class !== "string" ||
           (c.scope !== null && typeof c.scope !== "string") || (c.lens !== null && !Number.isSafeInteger(c.lens)) ||
@@ -61,6 +64,7 @@ export class Candidates {
       match(s.scopes, c.scope) && match(s.lenses, c.lens)));
   }
   private async validRoute(sessionKey: string): Promise<boolean> {
+    if (sessionKey !== sessionKey.toLowerCase() || !TARGET_SESSION_KEY.test(sessionKey) || sessionKey === "agent:main:main") return false;
     try {
       const proof = await this.route(sessionKey);
       const valid = proof !== null && proof.sessionKey === sessionKey && proof.exists === true && proof.onHost === true;
@@ -70,6 +74,7 @@ export class Candidates {
   }
   /** A subscription can broaden receiver acceptance only with a proven local target. */
   async acceptsAmbient(frame: HeardFrame): Promise<boolean> {
+    if (!this.ambientEnabled) return false;
     for (const s of this.subscriptions) {
       if (s.delivery !== "ambient" || !match(s.stations, frame.station) || !match(s.streams, frame.stream) ||
         !match(s.classes, frame.class) || !match(s.scopes, frame.scope) || !match(s.lenses, frame.lens)) continue;
@@ -78,11 +83,12 @@ export class Candidates {
     return false;
   }
   async preflightRoutes(): Promise<void> {
+    if (!this.ambientEnabled) return;
     for (const key of new Set(this.subscriptions.flatMap((s) => s.delivery === "ambient" ? s.targets.map((t) => t.sessionKey) : []))) await this.validRoute(key);
   }
   /** Cached preflight gates receiver acceptance; admission refreshes the proof before persistence. */
   matchesAmbient(frame: HeardFrame): boolean {
-    return this.subscriptions.some((s) => s.delivery === "ambient" &&
+    return this.ambientEnabled && this.subscriptions.some((s) => s.delivery === "ambient" &&
       match(s.stations, frame.station) && match(s.streams, frame.stream) &&
       match(s.classes, frame.class) && match(s.scopes, frame.scope) && match(s.lenses, frame.lens) &&
       s.targets.some((t) => this.proven.has(t.sessionKey)));
@@ -187,10 +193,12 @@ export class Candidates {
     this.proven.delete(session); this.save();
   }
   targetSessions(): string[] {
+    if (!this.ambientEnabled) return [];
     return [...new Set(this.subscriptions.flatMap((s) => s.delivery === "ambient" ? s.targets.map((t) => t.sessionKey) : []))];
   }
   /** Route-checked, bounded logical slots; exclude keys already settled by OC-0. */
   async slots(sessionKey: string, now: number, settled: (key: string) => boolean = () => false): Promise<LogicalSlot[]> {
+    if (!this.ambientEnabled) return [];
     this.prune(now);
     if (!await this.validRoute(sessionKey)) return [];
     const rows = Object.values(this.data.pending).filter((c) => c.sessionKey === sessionKey && c.expiresAt > now && c.eligibleAt <= now && !settled(c.key));

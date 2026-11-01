@@ -93,12 +93,13 @@ test("restart retains candidates, while untune, target and filter changes revoke
   let binding: Binding | null = null;
   try {
     await daemon.start();
-    binding = new Binding({ config: cfg, root, clock: () => now, routeProof: proof, tickMs: 3_600_000 });
+    const oc0 = { enqueue: async () => ({ accepted: true as const }), query: async () => "pending" as const, withdraw: async () => "withdrawn" as const };
+    binding = new Binding({ config: cfg, root, clock: () => now, routeProof: proof, oc0Host: oc0, tickMs: 3_600_000 });
     await binding.start();
     await waitFor(() => binding!.receiver.current());
     assert.equal(await binding.candidates.accept(frame(now, 1), daemon.run, now, false, false), 1);
     await binding.stop();
-    binding = new Binding({ config: cfg, root, clock: () => now, routeProof: proof, tickMs: 3_600_000 });
+    binding = new Binding({ config: cfg, root, clock: () => now, routeProof: proof, oc0Host: oc0, tickMs: 3_600_000 });
     await binding.start();
     await waitFor(() => binding!.receiver.current());
     assert.equal(binding.candidates.pendingCount, 1);

@@ -10,7 +10,7 @@ import { randomBytes } from "node:crypto";
 import { Candidates, type RouteProof } from "./candidates.ts";
 import { AmbientSlots, type Oc0Host } from "./ambient-slots.ts";
 import { join } from "node:path";
-import { type BindingConfig, sessionMatches, tuned } from "./config.ts";
+import { type BindingConfig, TARGET_SESSION_KEY, sessionMatches, tuned } from "./config.ts";
 import { DaemonLink } from "./daemon.ts";
 import { type Entry, type HeardEntry, Journal } from "./journal.ts";
 import { type HushOutcome, Outbox, OutboxClosed, type Row, type SingOutcome, isLive, shownState } from "./outbox.ts";
@@ -101,6 +101,9 @@ export class Binding {
   readonly outbox: Outbox | null;
   readonly candidates: Candidates;
   readonly ambient: AmbientSlots | null;
+  private readonly routeProof: RouteProof;
+  private readonly provenPayloadRoutes = new Set<string>();
+  private readonly provenLocalRoutes = new Set<string>();
   private ambientFlight: Promise<void> = Promise.resolve();
   private landingRevision = 0;
   private readonly candidateFlights = new Set<Promise<void>>();
@@ -121,8 +124,9 @@ export class Binding {
     this.lease = new Lease(o.root);
     this.lease.onError = (e) => this.log(`canticle: state lease error: ${e.message}`);
     this.journal = new Journal(join(o.root, "journal"), o.config.journal);
-    this.candidates = new Candidates(o.root, o.config.binding, o.config.delivery.subscriptions, o.routeProof ?? (async (sessionKey) => ({ sessionKey, exists: false, onHost: false })));
-    this.ambient = o.routeProof && o.oc0Host ? new AmbientSlots(o.root, o.config.binding, o.oc0Host, o.routeProof) : null;
+    this.routeProof = o.routeProof ?? (async (sessionKey) => ({ sessionKey, exists: false, onHost: false }));
+    this.candidates = new Candidates(o.root, o.config.binding, o.config.delivery.subscriptions, this.routeProof, o.oc0Host !== undefined);
+    this.ambient = o.routeProof && o.oc0Host ? new AmbientSlots(o.root, o.config.binding, o.oc0Host, this.routeProof) : null;
     const self = o.config.station?.keyId ?? null;
     this.receiver = new Receiver(
       {
@@ -255,9 +259,17 @@ export class Binding {
         .filter((m) => m.until === null || m.until > now)
         .map((m) => ({ station: m.station, stream: m.stream })), now);
       await this.candidates.preflightRoutes();
+      this.provenPayloadRoutes.clear();
+      this.provenLocalRoutes.clear();
+      for (const key of new Set(this.cfg.listen.payloadSessions)) {
+        await this.provePayloadRoute({ sessionKey: key, sessionId: null, subagent: false, anonymous: false });
+      }
+      for (const key of new Set(this.cfg.listen.subscriptions.map((s) => s.sessionKey))) {
+        await this.proveLocalRoute({ sessionKey: key, sessionId: null, subagent: false, anonymous: false });
+      }
       if (this.ambient) {
         this.ambient.load();
-        this.ambient.expire(now);
+        await this.ambient.expire(now);
         for (const session of this.ambient.sessions()) await this.ambient.reconcile(session, now);
         await this.syncAmbient();
       }
@@ -318,7 +330,7 @@ export class Binding {
     const st = this.state as StateFile;
     const liveMutes = st.mutes.filter((m) => m.until === null || m.until > now);
     this.candidates.setMutes(liveMutes.map((m) => ({ station: m.station, stream: m.stream })), now);
-    this.ambient?.expire(now);
+    await this.ambient?.expire(now);
     this.receiver.tick(now);
     this.candidates.tick(now);
     this.queueAmbient(() => this.syncAmbient());
@@ -438,7 +450,7 @@ export class Binding {
   private async syncAmbient(): Promise<void> {
     if (!this.ambient) return;
     const now = this.clock();
-    this.ambient.expire(now);
+    await this.ambient.expire(now);
     for (const session of new Set([...this.candidates.targetSessions(), ...this.ambient.sessions()])) {
       const slots = await this.candidates.slots(session, now, (key) => this.ambient!.outcome(key));
       for (const slot of ["canticle:digest", "canticle:alarm"] as const) {
@@ -531,9 +543,59 @@ export class Binding {
     return c.sessionId ?? `key:${c.sessionKey}`;
   }
 
-  /** Whether this session may read heard text: the binding's configuration lists such sessions in listen.payloadSessions. */
+  private exactLocalCaller(c: Caller): boolean {
+    const key = c.sessionKey.toLowerCase();
+    return !c.anonymous && !c.subagent && key === c.sessionKey && TARGET_SESSION_KEY.test(key) && key !== "agent:main:main";
+  }
+
+  /** Whether this exact session has both an exact payload grant and a current host-local-route proof. */
   mayReadText(c: Caller): boolean {
-    return !c.anonymous && sessionMatches(this.cfg.listen.payloadSessions, c.sessionKey);
+    return this.exactLocalCaller(c) && sessionMatches(this.cfg.listen.payloadSessions, c.sessionKey) && this.provenPayloadRoutes.has(c.sessionKey) && this.provenLocalRoutes.has(c.sessionKey);
+  }
+
+  /** Refresh the host-authoritative local route for an exact caller. */
+  async proveLocalRoute(c: Caller): Promise<boolean> {
+    if (!this.exactLocalCaller(c)) {
+      this.provenLocalRoutes.delete(c.sessionKey);
+      return false;
+    }
+    try {
+      const proof = await this.routeProof(c.sessionKey);
+      const valid = proof.sessionKey === c.sessionKey && proof.exists === true && proof.onHost === true;
+      if (valid) this.provenLocalRoutes.add(c.sessionKey); else this.provenLocalRoutes.delete(c.sessionKey);
+      return valid;
+    } catch {
+      this.provenLocalRoutes.delete(c.sessionKey);
+      return false;
+    }
+  }
+
+  /** Refresh the host-authoritative route at a payload-read side-effect boundary. */
+  async provePayloadRoute(c: Caller): Promise<boolean> {
+    if (!this.exactLocalCaller(c) || !sessionMatches(this.cfg.listen.payloadSessions, c.sessionKey)) {
+      this.provenPayloadRoutes.delete(c.sessionKey);
+      return false;
+    }
+    try {
+      const proof = await this.routeProof(c.sessionKey);
+      const valid = proof.sessionKey === c.sessionKey && proof.exists === true && proof.onHost === true;
+      if (valid) {
+        this.provenPayloadRoutes.add(c.sessionKey);
+        this.provenLocalRoutes.add(c.sessionKey);
+      } else {
+        this.provenPayloadRoutes.delete(c.sessionKey);
+        this.provenLocalRoutes.delete(c.sessionKey);
+      }
+      return valid;
+    } catch {
+      this.provenPayloadRoutes.delete(c.sessionKey);
+      this.provenLocalRoutes.delete(c.sessionKey);
+      return false;
+    }
+  }
+
+  private muteAuthorized(c: Caller): boolean {
+    return this.exactLocalCaller(c);
   }
 
   private subscribed(c: Caller, station: string, stream: string): boolean {
@@ -872,6 +934,7 @@ export class Binding {
     }
     const now = this.clock();
     const rx = this.receiver.status();
+    const muteMetadataVisible = this.exactLocalCaller(c) && this.provenLocalRoutes.has(c.sessionKey);
     const current = this.receiver.onAir(now).filter((i) => this.subscribed(c, i.frame.station, i.frame.stream)).length;
     const carried = this.receiver.carried(now).filter((i) => this.subscribed(c, i.frame.station, i.frame.stream)).length;
     const presence = this.receiver
@@ -885,7 +948,8 @@ export class Binding {
         waiting += 1;
       }
     }
-    const mutes = st.mutes.filter((m) => m.until === null || m.until > now);
+    const allLiveMutes = st.mutes.filter((m) => m.until === null || m.until > now);
+    const mutes = muteMetadataVisible ? allLiveMutes : [];
     const visibleEntries = [...this.journal.scan(this.journal.oldest - 1)].filter((e) => this.visible(c, e)).length;
     const landing = rx.landing;
     const daemonMute = landing !== null && isObj(landing.mute);
@@ -906,7 +970,7 @@ export class Binding {
         last_record_at: rx.last_record_at,
         last_failure: rx.last_failure,
         daemon: rx.daemon === null ? null : { state: rx.daemon.state, reasons: rx.daemon.reasons },
-        landing: landing === null ? null : { muted: daemonMute, breaker: landing.breaker },
+        landing: landing === null ? null : { muted: muteMetadataVisible ? daemonMute : null, breaker: landing.breaker },
         counts: { ...this.receiver.counts, ...this.link.framing, ...this.counts },
       },
       on_air: { known: this.receiver.current(), current, carried },
@@ -939,7 +1003,9 @@ export class Binding {
         : `on air: unknown (no current view)${carried > 0 ? `; ${carried} carried item(s) from before the gap` : ""}`,
       `presence: ${presence.length === 0 ? "none known" : presence.map((x) => `${x.station ?? x.key_id}: ${presenceText(x.state, x.last_beacon_at)}`).join("; ")}`,
       `journal: ${visibleEntries} visible entries; ${waiting} heard entr${waiting === 1 ? "y" : "ies"} new for this session`,
-      `mutes: ${daemonMute ? "daemon MUTE active; " : ""}${mutes.length === 0 ? "none" : mutes.map((m) => `${m.id} ${m.station ?? "*"}:${m.stream ?? "*"}${m.until !== null ? ` until ${iso(m.until)}` : ""}`).join(", ")}`,
+      muteMetadataVisible
+        ? `mutes: ${daemonMute ? "daemon MUTE active; " : ""}${mutes.length === 0 ? "none" : mutes.map((m) => `${m.id} ${m.station ?? "*"}:${m.stream ?? "*"}${m.until !== null ? ` until ${iso(m.until)}` : ""}`).join(", ")}`
+        : "mutes: hidden",
       c.anonymous
         ? "this call names no exact session: operational status and mutes only; journal and on-air digests are empty"
         : `this session: ${this.isTainted(c) ? "tainted (has read heard text; cannot sing until reset)" : "not tainted"}; ${this.mayReadText(c) ? "may read heard text (view items)" : "reads digests only (not in listen.payloadSessions)"}`,
@@ -950,10 +1016,21 @@ export class Binding {
     return { text: lines.join("\n"), details };
   }
 
-  mute(c: Caller, p: Obj): Result {
+  async mute(c: Caller, p: Obj): Promise<Result> {
     const st = this.state;
     if (st === null) {
       return this.refuse("canticle_mute", "not_running", "the canticle service is not running");
+    }
+    if (!this.muteAuthorized(c)) {
+      return this.refuse("canticle_mute", "not_authorized", "binding-wide muting requires an exact, non-anonymous, non-subagent session");
+    }
+    try {
+      const proof = await this.routeProof(c.sessionKey);
+      if (proof.sessionKey !== c.sessionKey || proof.exists !== true || proof.onHost !== true) {
+        return this.refuse("canticle_mute", "route_not_proven", "the caller's exact local session route is not proven");
+      }
+    } catch {
+      return this.refuse("canticle_mute", "route_not_proven", "the caller's exact local session route is not proven");
     }
     const now = this.clock();
     if (p.clear !== undefined) {

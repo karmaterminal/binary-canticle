@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { readJson, writeJsonAtomic } from "./store.ts";
 import type { RouteProof } from "./candidates.ts";
+import { TARGET_SESSION_KEY } from "./config.ts";
 
 export type SlotKey = "canticle:digest" | "canticle:alarm";
 export type EntryOutcome = "pending" | "consumed" | "withdrawn" | "expired" | "discarded" | "unknown";
@@ -37,12 +38,22 @@ export class AmbientSlots {
     if (!raw || typeof raw !== "object" || (raw as Ledger).v !== 1 || (raw as Ledger).binding !== this.binding ||
       !Array.isArray((raw as Ledger).entries) || typeof (raw as Ledger).settled !== "object") throw new Error("invalid ambient slot ledger");
     const d = raw as Ledger;
-    if (d.entries.length > 8192 || d.entries.some((e) => !e || typeof e.id !== "string" || !SLOTS.includes(e.slot) ||
-      typeof e.sessionKey !== "string" || !Array.isArray(e.frames) || e.frames.length > 5 ||
-      e.frames.some((f) => typeof f.key !== "string" || !Number.isSafeInteger(f.expiresAt) || typeof f.line !== "string") ||
-      !["enqueuing", "pending", "settled"].includes(e.status))) throw new Error("invalid ambient slot entries");
-    if (d.tainted !== undefined && (!d.tainted || typeof d.tainted !== "object" || Object.values(d.tainted).some((n) => !Number.isSafeInteger(n)))) throw new Error("invalid ambient taint");
-    if (d.notes !== undefined && (!d.notes || typeof d.notes !== "object" || Object.values(d.notes).some((n) => !n || typeof n.key !== "string" || !Number.isSafeInteger(n.expiresAt) || typeof n.line !== "string"))) throw new Error("invalid ambient notes");
+    if (d.entries.length > 8192 || d.entries.some((e) => !e || typeof e.id !== "string" || e.id.length > 200 || !SLOTS.includes(e.slot) ||
+      typeof e.sessionKey !== "string" || e.sessionKey !== e.sessionKey.toLowerCase() || !TARGET_SESSION_KEY.test(e.sessionKey) || e.sessionKey === "agent:main:main" ||
+      !Array.isArray(e.frames) || e.frames.length < 1 || e.frames.length > 5 ||
+      !Number.isSafeInteger(e.deadline) || !Number.isSafeInteger(e.retention) ||
+      e.frames.some((f) => !f || typeof f.key !== "string" || f.key.length > 300 || !Number.isSafeInteger(f.expiresAt) ||
+        typeof f.line !== "string" || Buffer.byteLength(f.line) > 1536) ||
+      (e.frames.length > 1 && Buffer.byteLength(e.frames.map((f) => f.line).join("\n")) > 1536) ||
+      (e.previous !== undefined && typeof e.previous !== "string") ||
+      !["enqueuing", "pending", "settled"].includes(e.status) ||
+      (e.status === "settled" && (typeof e.outcome !== "string" || !["pending", "consumed", "withdrawn", "expired", "discarded", "unknown"].includes(e.outcome))))) throw new Error("invalid ambient slot entries");
+    if (!d.settled || typeof d.settled !== "object" || Array.isArray(d.settled) || Object.keys(d.settled).length > 8192 ||
+      Object.values(d.settled).some((n) => !Number.isSafeInteger(n))) throw new Error("invalid ambient settled tombstones");
+    if (d.tainted !== undefined && (!d.tainted || typeof d.tainted !== "object" || Array.isArray(d.tainted) || Object.keys(d.tainted).length > 4096 ||
+      Object.entries(d.tainted).some(([key, n]) => key !== key.toLowerCase() || !TARGET_SESSION_KEY.test(key) || key === "agent:main:main" || !Number.isSafeInteger(n)))) throw new Error("invalid ambient taint");
+    if (d.notes !== undefined && (!d.notes || typeof d.notes !== "object" || Array.isArray(d.notes) || Object.keys(d.notes).length > 8192 ||
+      Object.values(d.notes).some((n) => !n || typeof n.key !== "string" || n.key.length > 300 || !Number.isSafeInteger(n.expiresAt) || typeof n.line !== "string" || Buffer.byteLength(n.line) > 300))) throw new Error("invalid ambient notes");
     d.tainted ??= {}; d.notes ??= {};
     this.data = d;
   }
@@ -69,6 +80,7 @@ export class AmbientSlots {
     this.save();
   }
   private async validRoute(session: string): Promise<boolean> {
+    if (session !== session.toLowerCase() || !TARGET_SESSION_KEY.test(session) || session === "agent:main:main") return false;
     if (this.route === null) return true;
     try {
       const proof = await this.route(session);
@@ -79,6 +91,7 @@ export class AmbientSlots {
   async reconcile(session: string, now: number): Promise<void> {
     this.prune(now);
     for (const e of this.data.entries.filter((x) => x.sessionKey === session && x.status !== "settled")) {
+      if (!await this.validRoute(session)) throw new Error("canticle host route proof lost before OC-0 reconcile");
       const outcome = await this.host.query(session, e.id);
       if (outcome === "pending") { e.status = "pending"; this.save(); }
       else this.settle(e, outcome, now);
@@ -87,7 +100,9 @@ export class AmbientSlots {
   /** Rebuilds one of the two slots, retaining only live, unconsumed frame keys. */
   async sync(request: SlotRequest, now: number): Promise<void> {
     if (!SLOTS.includes(request.slot)) throw new Error("invalid canticle slot");
+    if (!await this.validRoute(request.sessionKey)) throw new Error("canticle host route proof lost before slot reconcile");
     await this.reconcile(request.sessionKey, now);
+    if (!await this.validRoute(request.sessionKey)) throw new Error("canticle host route proof lost after slot reconcile");
     const previous = this.active(request.sessionKey, request.slot);
     const unique = new Map<string, SlotFrame>();
     for (const f of request.frames) if (f.expiresAt > now && this.data.settled[f.key] === undefined) unique.set(f.key, f);
@@ -96,13 +111,20 @@ export class AmbientSlots {
     const same = previous?.status === "pending" && previous.frames.length === frames.length &&
       previous.frames.every((f, i) => f.key === frames[i]?.key && f.line === frames[i]?.line);
     if (same) return;
-    if (!frames.length) { if (previous) await this.withdraw(previous, now); return; }
+    if (!frames.length) {
+      if (previous) {
+        if (!await this.validRoute(request.sessionKey)) throw new Error("canticle host route proof lost before slot withdrawal");
+        await this.withdraw(previous, now);
+      }
+      return;
+    }
     // A supersession may carry only confirmed-pending keys; consumed predecessors were settled above.
     if (this.data.entries.length >= 8192) throw new Error("ambient slot ledger full");
     const e: Entry = { id: `canticle-slot:${randomUUID()}`, sessionKey: request.sessionKey, slot: request.slot,
       frames, deadline: Math.min(...frames.map((f) => f.expiresAt)), retention: Math.max(...frames.map((f) => f.expiresAt)),
       status: "enqueuing", ...(previous ? { previous: previous.id } : {}) };
     this.data.entries.push(e); this.save();
+    if (!await this.validRoute(request.sessionKey)) throw new Error("canticle host route proof lost before slot enqueue");
     let result: Awaited<ReturnType<Oc0Host["enqueue"]>>;
     try {
       result = await this.host.enqueue({ idempotencyKey: e.id, sessionKey: e.sessionKey, supersedeKey: e.slot,
@@ -119,14 +141,21 @@ export class AmbientSlots {
     this.save();
   }
   private async withdraw(e: Entry, now: number): Promise<void> {
+    if (!await this.validRoute(e.sessionKey)) throw new Error("canticle host route proof lost before OC-0 withdrawal");
     const result = await this.host.withdraw(e.sessionKey, e.id);
     if (result === "pending" || result === "unknown") throw new Error("OC-0 withdrawal unresolved");
     this.settle(e, result, now);
   }
   /** Withdraw before settling a retracted frame, so a post-return drain cannot render it. */
   async retract(session: string, key: string, now: number): Promise<void> {
+    const initialRouteValid = await this.validRoute(session);
+    if (!initialRouteValid) return;
     await this.reconcile(session, now);
-    for (const e of this.data.entries.filter((x) => x.sessionKey === session && x.status === "pending" && x.frames.some((f) => f.key === key))) await this.withdraw(e, now);
+    if (!await this.validRoute(session)) return;
+    for (const e of this.data.entries.filter((x) => x.sessionKey === session && x.status === "pending" && x.frames.some((f) => f.key === key))) {
+      if (!await this.validRoute(session)) return;
+      await this.withdraw(e, now);
+    }
     const routeValid = await this.validRoute(session);
     const expiry = this.data.entries.flatMap((e) => e.frames).find((f) => f.key === key)?.expiresAt;
     if (routeValid && this.data.entries.some((e) => e.sessionKey === session && e.outcome === "consumed" && e.frames.some((f) => f.key === key)) && expiry !== undefined) {
@@ -158,10 +187,11 @@ export class AmbientSlots {
     this.save();
   }
   /** Expiry of an already consumed item is a local event, not a daemon retract. */
-  expire(now: number): void {
+  async expire(now: number): Promise<void> {
     let dirty = false;
     for (const e of this.data.entries) {
       if (e.outcome !== "consumed") continue;
+      if (!await this.validRoute(e.sessionKey)) continue;
       for (const f of e.frames) {
         if (f.expiresAt > now) continue;
         const key = `canticle-note:${f.key}`;

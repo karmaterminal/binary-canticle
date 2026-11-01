@@ -10,7 +10,7 @@ export type Subscription = {
   id: string; stations: string[]; streams: string[]; classes: string[]; scopes: string[]; lenses: string[];
   targets: { sessionKey: string }[]; delivery: "ringbuffer_only" | "ambient"; perHour: number;
 };
-export const TARGET_SESSION_KEY = /^agent:[a-z][a-z0-9_-]*:(?:main|[a-z][a-z0-9_-]*(?::[a-z0-9_-]+){1,5})$/;
+export const TARGET_SESSION_KEY = /^agent:[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*(?::[a-z0-9_-]+){0,5}$/;
 
 export type BindingConfig = {
   /** This binding's name: unique among the bindings on one host, and part of every id it issues. */
@@ -19,8 +19,8 @@ export type BindingConfig = {
   stateDir: string | null;
   /** This binding's own station, when it has one: its frames are `self` and confirm outbox rows. */
   station: { name: string; keyId: string } | null;
-  /** payloadSessions: the session keys that may read heard text (patterns: "*", an exact key, or a prefix ending in
-   * "*"). Every other session reads digests only. */
+  /** payloadSessions: canonical exact, non-shared session keys that may read heard text. Every other session
+   * reads digests only; wildcards, prefixes and shared/main keys are not payload grants. */
   listen: { tune: Tune[]; includeSelf: boolean; payloadSessions: string[]; subscriptions: { sessionKey: string; tune: Tune[] }[] };
   journal: { maxEntries: number; maxBytes: number; maxAgeMs: number };
   publish: {
@@ -67,6 +67,7 @@ export function parseConfig(raw: unknown): BindingConfig {
     station = { name, keyId };
   }
   const l = c.listen === undefined ? {} : obj(c.listen, "listen");
+  onlyKeys(l, ["tune", "includeSelf", "payloadSessions", "subscriptions"], "listen");
   const tune = (l.tune === undefined ? ["*:*"] : strList(l.tune, "listen.tune")).map(parseTune);
   const listenSubscriptions = subscriptionsOf(l.subscriptions);
   const j = c.journal === undefined ? {} : obj(c.journal, "journal");
@@ -82,6 +83,7 @@ export function parseConfig(raw: unknown): BindingConfig {
     }
   }
   const delivery = c.delivery === undefined ? {} : obj(c.delivery, "delivery");
+  onlyKeys(delivery, ["mode", "subscriptions"], "delivery");
   if (delivery.mode !== undefined && delivery.mode !== "explicit") {
     throw new ConfigError("delivery.mode: only \"explicit\" exists in this version; push and wake delivery are a separate opt-in");
   }
@@ -93,12 +95,14 @@ export function parseConfig(raw: unknown): BindingConfig {
   const ambientSubscriptions: Subscription[] = subscriptionsRaw.map((value, i) => {
     const at = `delivery.subscriptions[${i}]`;
     const s = obj(value, at);
+    onlyKeys(s, ["id", "targets", "delivery", "stations", "streams", "classes", "scopes", "lenses", "perHour"], at);
     const id = str(s.id, `${at}.id`);
     if (!STATION_NAME.test(id)) throw new ConfigError(`${at}.id: invalid id`);
     if (!Array.isArray(s.targets) || s.targets.length < 1 || s.targets.length > 32) throw new ConfigError(`${at}.targets: 1 to 32 exact targets`);
     const targets = s.targets.map((value: unknown, j: number) => {
       const targetAt = `${at}.targets[${j}]`;
       const t = obj(value, targetAt);
+      onlyKeys(t, ["sessionKey"], targetAt);
       const sessionKey = str(t.sessionKey, `${targetAt}.sessionKey`);
       if (!TARGET_SESSION_KEY.test(sessionKey) || sessionKey !== sessionKey.toLowerCase() || sessionKey === "agent:main:main") {
         throw new ConfigError(`${targetAt}: canonical, exact, non-shared session key required`);
@@ -146,7 +150,7 @@ export function parseConfig(raw: unknown): BindingConfig {
     listen: {
       tune,
       includeSelf: l.includeSelf === undefined ? false : bool(l.includeSelf, "listen.includeSelf"),
-      payloadSessions: l.payloadSessions === undefined ? [] : sessionPatterns(l.payloadSessions, "listen.payloadSessions"),
+      payloadSessions: l.payloadSessions === undefined ? [] : payloadSessionsOf(l.payloadSessions),
       subscriptions: listenSubscriptions,
     },
     journal: {
@@ -183,10 +187,10 @@ export function parseTune(text: string): Tune {
   return { station, stream };
 }
 
-/** Whether a session key matches one of the patterns: "*", an exact key, or a prefix ending in "*". */
-export function sessionMatches(patterns: string[], sessionKey: string): boolean {
-  const k = sessionKey.toLowerCase();
-  return patterns.some((p) => p === "*" || p === k || (p.endsWith("*") && k.startsWith(p.slice(0, -1))));
+/** Whether a session key has an exact payload-text grant. Wildcards and prefixes are never payload grants. */
+export function sessionMatches(exactKeys: string[], sessionKey: string): boolean {
+  const k = sessionKey;
+  return exactKeys.some((p) => p === k);
 }
 
 function subscriptionsOf(v: unknown): BindingConfig["listen"]["subscriptions"] {
@@ -196,9 +200,10 @@ function subscriptionsOf(v: unknown): BindingConfig["listen"]["subscriptions"] {
   return v.map((raw, i) => {
     const at = `listen.subscriptions[${i}]`;
     const sub = obj(raw, at);
-    const sessionKey = str(sub.sessionKey, `${at}.sessionKey`).toLowerCase();
-    if (!/^[^\s*]{1,200}$/.test(sessionKey) || seen.has(sessionKey)) {
-      throw new ConfigError(`${at}.sessionKey: expected a unique exact session key (no wildcard)`);
+    onlyKeys(sub, ["sessionKey", "tune"], at);
+    const sessionKey = str(sub.sessionKey, `${at}.sessionKey`);
+    if (sessionKey !== sessionKey.toLowerCase() || !TARGET_SESSION_KEY.test(sessionKey) || sessionKey === "agent:main:main" || seen.has(sessionKey)) {
+      throw new ConfigError(`${at}.sessionKey: expected a unique canonical, exact, non-shared session key (no wildcard)`);
     }
     seen.add(sessionKey);
     const names = strList(sub.tune, `${at}.tune`);
@@ -207,17 +212,17 @@ function subscriptionsOf(v: unknown): BindingConfig["listen"]["subscriptions"] {
   });
 }
 
-function sessionPatterns(v: unknown, at: string): string[] {
-  const list = strList(v, at);
-  if (list.length > 64) {
-    throw new ConfigError(`${at}: at most 64 patterns`);
-  }
-  for (const p of list) {
-    if (!/^(\*|[^\s*]{1,200}\*?)$/.test(p)) {
-      throw new ConfigError(`${at}: ${JSON.stringify(p)} is not a session key, a prefix ending in *, or *`);
+function payloadSessionsOf(v: unknown): string[] {
+  const list = strList(v, "listen.payloadSessions");
+  if (list.length > 64) throw new ConfigError("listen.payloadSessions: at most 64 exact session keys");
+  const exact = list;
+  for (const p of exact) {
+    if (p !== p.toLowerCase() || !TARGET_SESSION_KEY.test(p) || p === "agent:main:main") {
+      throw new ConfigError(`listen.payloadSessions: ${JSON.stringify(p)} is not a canonical, exact, non-shared session key`);
     }
   }
-  return list.map((p) => p.toLowerCase());
+  if (new Set(exact).size !== exact.length) throw new ConfigError("listen.payloadSessions: duplicate session key");
+  return exact;
 }
 
 export function tuned(tune: Tune[], station: string, stream: string): boolean {
@@ -233,6 +238,12 @@ function obj(v: unknown, at: string): Obj {
     throw new ConfigError(`${at}: expected an object`);
   }
   return v;
+}
+
+function onlyKeys(v: Obj, allowed: string[], at: string): void {
+  for (const key of Object.keys(v)) {
+    if (!allowed.includes(key)) throw new ConfigError(`${at}: unknown key ${key}`);
+  }
 }
 
 function str(v: unknown, at: string): string {
