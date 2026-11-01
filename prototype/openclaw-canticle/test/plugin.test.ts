@@ -24,7 +24,7 @@ type Service = {
   stop?: (ctx: Obj) => Promise<void>;
 };
 
-type LifecycleHandler = (event: { sessionId: string; sessionKey: string; nextSessionId?: string }, context: { sessionId: string; sessionKey: string; agentId: string }) => Promise<void>;
+type LifecycleHandler = (event: { sessionId: string; sessionKey: string; lifecycleRevision?: string; nextSessionId?: string }, context: { sessionId: string; sessionKey: string; agentId: string }) => Promise<void>;
 function load(pluginConfig?: unknown, apiExtra: Obj = {}): { tools: Map<string, { factory: Factory; optional: boolean }>; service: Service } {
   const tools = new Map<string, { factory: Factory; optional: boolean }>();
   const services: Service[] = [];
@@ -84,26 +84,31 @@ test("registers seven optional tools and one service, matching the manifest and 
   assert.equal(pkg.private, true); // never published (AGENTS.md: publication is a separate, human-decided gate)
 });
 
-test("host contract exposes route/workflow data without activating OC-0 or wake", async () => {
+test("production entry wires complete workflow to two exact sessions and consumes independently", async () => {
+  const first = "agent:main:local:task";
+  const second = "agent:main:local:other";
   const cfg = {
     binding: "rune",
     daemon: { socket: daemon.path },
     listen: { tune: ["*:*"], subscriptions: [] },
     delivery: { mode: "explicit", subscriptions: [{
-      id: "fleet", targets: [{ sessionKey: "agent:main:local:task" }], delivery: "ambient",
+      id: "fleet", targets: [{ sessionKey: first }, { sessionKey: second }], delivery: "ambient",
       stations: ["cael"], streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
     }] },
   };
-  let enqueued = 0;
-  let queried = 0;
-  let withdrawn = 0;
+  const entries = new Map<string, { sessionKey: string; expectedSessionId: string; expectedLifecycleRevision: string; text: string; state: string }>();
   const workflow = {
-    enqueueNextTurnInjection: async () => { enqueued++; return { enqueued: true }; },
-    getNextTurnInjectionState: async () => { queried++; return { state: "pending" }; },
-    withdrawNextTurnInjection: async () => { withdrawn++; return { state: "withdrawn" }; },
+    enqueueNextTurnInjection: async (entry: { sessionKey: string; expectedSessionId: string; expectedLifecycleRevision: string; idempotencyKey: string; text: string }) => {
+      entries.set(entry.idempotencyKey, { ...entry, state: "pending" }); return { enqueued: true };
+    },
+    getNextTurnInjectionState: async ({ idempotencyKey }: { idempotencyKey: string }) => ({ state: entries.get(idempotencyKey)?.state ?? "unknown" }),
+    withdrawNextTurnInjection: async ({ idempotencyKey }: { idempotencyKey: string }) => {
+      const entry = entries.get(idempotencyKey); if (entry?.state === "pending") entry.state = "withdrawn";
+      return { state: entry?.state ?? "unknown" };
+    },
   };
   const { service } = load(cfg, { session: {
-    state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true }) },
+    state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: `id:${sessionKey}`, lifecycleRevision: `rev:${sessionKey}` }) },
     workflow,
   }, on: () => undefined });
   const ctx = {
@@ -115,11 +120,33 @@ test("host contract exposes route/workflow data without activating OC-0 or wake"
   try {
     await waitFor(() => daemon.accepted === 1, "nested workflow service daemon join");
     daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 1, issued_at: Date.now(), ttl_ms: 120_000 });
-    await sleep(30);
-    assert.equal(enqueued, 0, "the plugin does not activate ambient workflow from this contract alone");
-    assert.equal(queried, 0);
-    assert.equal(withdrawn, 0);
+    await waitFor(() => [...entries.values()].filter((entry) => entry.state === "pending").length === 2, "two exact session slots");
+    const active = [...entries.values()];
+    assert.deepEqual(active.map((entry) => entry.sessionKey).sort(), [first, second].sort());
+    for (const entry of active) {
+      assert.equal(entry.expectedSessionId, `id:${entry.sessionKey}`);
+      assert.equal(entry.expectedLifecycleRevision, `rev:${entry.sessionKey}`);
+    }
+    active.find((entry) => entry.sessionKey === first)!.state = "consumed";
+    await sleep(20);
+    assert.equal(active.find((entry) => entry.sessionKey === second)!.state, "pending", "drain is target-specific");
   } finally { await service.stop?.(ctx); }
+});
+
+test("ambient entry fails closed for every incomplete workflow or route seam", async () => {
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [{
+    id: "fleet", targets: [{ sessionKey: "agent:main:local:task" }], delivery: "ambient",
+    stations: ["cael"], streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
+  }] } };
+  const ctx = { stateDir: dir };
+  const complete = { enqueueNextTurnInjection: async () => ({ enqueued: true }),
+    getNextTurnInjectionState: async () => ({ state: "pending" }), withdrawNextTurnInjection: async () => ({ state: "withdrawn" }) };
+  const route = { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: "id", lifecycleRevision: "rev" }) };
+  for (const session of [{ workflow: complete }, ...Object.keys(complete).map((missing) => ({ state: route,
+    workflow: Object.fromEntries(Object.entries(complete).filter(([name]) => name !== missing)) }))]) {
+    const { service } = load(cfg, { session, on: () => undefined });
+    await assert.rejects(service.start(ctx), /complete generation-bound/);
+  }
 });
 
 test("publish tools are offered only when publishing is enabled, never to a sub-agent or a call that names no session", () => {
@@ -421,10 +448,12 @@ test("typed reset and delete callbacks clear only the ended exact session", asyn
     assert.ok(state().taint.old);
     await reader.execute("checkpoint", { what: "new" });
     assert.ok(state().checkpoints[key], "checkpoint is keyed by sessionKey, not sessionId");
-    const event = { sessionId: "old", sessionKey: key };
+    const event = { sessionId: "old", sessionKey: key, lifecycleRevision: "r-old" };
     const context = { ...event, agentId: "main" };
     await hooks.get("session_reset")!({ ...event, nextSessionId: "new" }, { ...context, sessionKey: "agent:main:other" });
     assert.ok(state().taint.old, "mismatched context cannot clear another session");
+    await hooks.get("session_reset")!({ sessionId: "old", sessionKey: key }, context);
+    assert.ok(state().taint.old, "revision-free reset cannot clear same-ID successor state");
     await hooks.get("session_reset")!({ ...event, nextSessionId: "new" }, context);
     assert.equal(state().taint.old, undefined);
     assert.equal(state().checkpoints[key], undefined);
