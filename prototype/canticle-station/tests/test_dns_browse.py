@@ -59,13 +59,19 @@ class BrowseTests(unittest.TestCase):
         expected_sid = self.grant.key_id.hex()
         expected_key = 'ed25519:' + base64.b64encode(PUB).decode()
         self.answers[(INSTANCE, 'TXT')] = Answer((('sid=0000000000000000', 'k=ed25519:bogus',
-                                                   'streams=hymn', f'sid={expected_sid}'),
-                                                  (f'k={expected_key}', 'sid=ffffffffffffffff')),
+                                                   'streams=hymn', f'SiD={expected_sid}'),
+                                                  (f'K={expected_key}', 'SID=ffffffffffffffff')),
                                                  120)
         row = Browser(FakeResolver(self.answers), self.manifest, 'example.org').browse()['stations'][0]
         self.assertEqual(row['mismatches'], ['txt-invalid'])
         self.assertEqual(row['key_id'], expected_sid)
         self.assertEqual(row['public_streams'], ['hymn'])
+
+    def test_lone_mixed_case_txt_keys_are_checked_for_mismatch(self):
+        self.answers[(INSTANCE, 'TXT')] = Answer((('SiD=0000000000000000',
+                                                   'K=ed25519:bogus', 'StReAmS=private'),), 120)
+        row = Browser(FakeResolver(self.answers), self.manifest, 'example.org').browse()['stations'][0]
+        self.assertEqual(row['mismatches'], ['k', 'sid', 'streams'])
 
     def test_oversized_txt_is_ignored_and_reported(self):
         self.answers[(INSTANCE, 'TXT')] = Answer(((('streams=' + 'x' * 5000),),), 120)

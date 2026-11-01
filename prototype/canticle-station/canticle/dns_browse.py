@@ -120,6 +120,7 @@ class Browser:
                 for item in strings:
                     if "=" in item:
                         k, v = item.split("=", 1)
+                        k = k.lower()  # DNS-SD TXT keys are case-insensitive.
                         if k in hints or k in duplicate_keys:
                             hints.pop(k, None)
                             duplicate_keys.add(k)
