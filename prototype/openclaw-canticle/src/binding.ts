@@ -121,7 +121,7 @@ export class Binding {
     this.lease = new Lease(o.root);
     this.lease.onError = (e) => this.log(`canticle: state lease error: ${e.message}`);
     this.journal = new Journal(join(o.root, "journal"), o.config.journal);
-    this.candidates = new Candidates(o.root, o.config.binding, o.config.subscriptions, o.routeProof ?? (async (sessionKey) => ({ sessionKey, exists: false, onHost: false })));
+    this.candidates = new Candidates(o.root, o.config.binding, o.config.delivery.subscriptions, o.routeProof ?? (async (sessionKey) => ({ sessionKey, exists: false, onHost: false })));
     this.ambient = o.routeProof && o.oc0Host ? new AmbientSlots(o.root, o.config.binding, o.oc0Host) : null;
     const self = o.config.station?.keyId ?? null;
     this.receiver = new Receiver(

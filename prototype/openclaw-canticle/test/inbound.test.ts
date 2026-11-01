@@ -95,10 +95,11 @@ test("a join snapshot and live records become journal entries and the current vi
 test("a subscription cannot widen receiver acceptance without a local route; explicit tune still reads", async () => {
   daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", seq: 1, issued_at: clock.t, class: "advisory" });
   const subscription = { id: "fleet", delivery: "ambient", targets: [{ sessionKey: "agent:main:local:task" }], stations: ["cael"], streams: ["lens.threat"], classes: ["advisory"] };
-  b = await up({ listen: { tune: [], payloadSessions: ["*"] }, subscriptions: [subscription] });
+  const readScope = [{ sessionKey: OTHER_SESSION.sessionKey, tune: ["*:*"] }];
+  b = await up({ listen: { tune: [], payloadSessions: ["*"], subscriptions: readScope }, delivery: { mode: "explicit", subscriptions: [subscription] } });
   assert.equal(heardCount(b), 0);
   await b.stop();
-  b = await up({ listen: { tune: ["cael:lens.threat"], payloadSessions: ["*"] }, subscriptions: [subscription] });
+  b = await up({ listen: { tune: ["cael:lens.threat"], payloadSessions: ["*"], subscriptions: readScope }, delivery: { mode: "explicit", subscriptions: [subscription] } });
   assert.equal(heardCount(b), 1);
 });
 

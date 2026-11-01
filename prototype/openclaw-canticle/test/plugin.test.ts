@@ -311,8 +311,7 @@ const FULL = {
     perHour: 60,
     maxLive: 16,
   },
-  delivery: { mode: "explicit" },
-  subscriptions: [],
+  delivery: { mode: "explicit", subscriptions: [] },
   discovery: { domains: ["example.org"], catalog: [] },
 };
 
@@ -324,6 +323,7 @@ test("the manifest schema accepts every key the plugin reads, and nothing it doe
   assert.equal(parsed.publish.enabled, true);
   assert.equal(parsed.journal.maxAgeMs, 24 * 3_600_000);
   assert.deepEqual(schemaErrors(schema, { ...FULL, extra: 1 }), ["<root>: unknown extra"]);
+  assert.deepEqual(schemaErrors(schema, { ...FULL, subscriptions: [] }), ["<root>: unknown subscriptions"]);
   assert.deepEqual(schemaErrors(schema, { ...FULL, publish: { ...FULL.publish, perMinute: 6 } }), ["<root>.publish.perMinute: out of range"]);
 });
 

@@ -2,7 +2,7 @@
 
 ## Ambient candidate and conditional OC-0 adapter slice
 
-`subscriptions` are operator-configured, explicit IDs with exact `targets[].sessionKey`, optional station/stream/class/scope/lens filters, `delivery: "ringbuffer_only" | "ambient"`, and a per-target rolling-hour `perHour` cap. A missing filter means any value; lens IDs are decimal strings. `wake` is rejected. The default remains no subscriptions and explicit-read-only tools. The ambient ledger persists in `candidates.json` under this binding's state root; it keeps at most 4,096 candidates and exposes at most two **logical** slots per session, with five items and 1,536 bytes per digest. It stores no payload text in those lines. Retractions, expiry and rejoin remove pending candidates and leave tombstones through local expiry plus skew. Chatter, ambient and advisory candidates retain a per-session desynchronization draw across restart.
+`delivery.subscriptions` are operator-configured, explicit consent to ambient delivery: IDs with exact `targets[].sessionKey`, optional station/stream/class/scope/lens filters, `delivery: "ringbuffer_only" | "ambient"`, and a per-target rolling-hour `perHour` cap. A missing filter means any value; lens IDs are decimal strings. `wake` is rejected. The separate `listen.subscriptions` table grants exact-session read scope only and is not a consent to push or ambient delivery. The default remains no subscription tables and explicit-read-only tools. A top-level `subscriptions` key is rejected rather than silently treated as legacy configuration. The ambient ledger persists in `candidates.json` under this binding's state root; it keeps at most 4,096 candidates and exposes at most two **logical** slots per session, with five items and 1,536 bytes per digest. It stores no payload text in those lines. Retractions, expiry and rejoin remove pending candidates and leave tombstones through local expiry plus skew. Chatter, ambient and advisory candidates retain a per-session desynchronization draw across restart.
 
 The ledger requires the host-authoritative `api.session.state.resolveLocalSessionRoute` proof and admits a candidate only for the exact key with `exists: true` and `onHost: true`. Missing, rejecting, or nonmatching proof fails closed. A startup preflight gates receiver acceptance, and each candidate admission refreshes the proof. `src/ambient-slots.ts` persists the OC-0 entry handshake; `src/oc0-host.ts` maps it to workflow field names. The service wires the adapter only when the route proof and all three OC-0 workflow methods exist on the same host. It reconciles persisted entries before connecting to the daemon, rebuilds on admission, timer and retract, and withdraws a touched pending slot before rebuilding survivors. Without the complete host seam, there is no enqueue, session injection or wake. The inspected OC-0 branch has the workflow seam but not the route proof, while the inspected route-proof fork has the proof but not OC-0; neither activates ambient delivery.
 
@@ -326,6 +326,7 @@ Gateway boot. Write `enabled: false` explicitly until a prince opts the seat in 
           binding: "rune",                                          // unique on the host; part of every id
           daemon: { socket: "/run/user/1000/canticle/daemon.sock" },
           listen: { tune: ["*:chatter"], subscriptions: [{ sessionKey: "agent:main:main", tune: ["*:chatter"] }], payloadSessions: [] }, // digests for this exact session only
+          delivery: { mode: "explicit", subscriptions: [] }, // separate consent for ambient delivery
           // station: { name: "rune", keyId: "0123456789abcdef" },  // this prince's own station, when it has one
           // publish: { enabled: false },                           // P2: not until the princes decide it
         },
@@ -351,6 +352,7 @@ Gateway boot. Write `enabled: false` explicitly until a prince opts the seat in 
 | `publish.classes` | `["chatter"]` | Classes sessions may ask for: `chatter`, `ambient`, `live-state`, `advisory`, `finding-ref`, `root`. Never `alarm`, `regulatory` or `control` (§10.4, §15.1). |
 | `publish.perMinute`, `perHour`, `maxLive` | 5, 60, 16 | Can only be lowered (`maxLive` up to 64). |
 | `delivery.mode` | `"explicit"` | The only mode in this version. |
+| `delivery.subscriptions` | `[]` | Operator consent for bounded ambient delivery, with exact targets and optional filters. Separate from `listen.subscriptions`, which grants read scope only. Top-level `subscriptions` is rejected. |
 
 ## Trying it on a seat
 

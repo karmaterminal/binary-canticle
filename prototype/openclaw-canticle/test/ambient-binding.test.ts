@@ -30,10 +30,10 @@ class Host implements Oc0Host {
 test("binding wires OC-0 only with both seams; restart does not admit stale candidate before landing", async () => {
   const root = tempDir(), daemon = new FakeDaemon(root), host = new Host();
   const now = Date.now();
-  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, subscriptions: [{
+  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [{
     id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
-  }] });
+  }] } });
   const proof = async (key: string) => ({ sessionKey: key, exists: true, onHost: true });
   const make = (oc0Host?: Oc0Host) => new Binding({ config: cfg, root, routeProof: proof, ...(oc0Host ? { oc0Host } : {}), tickMs: 3_600_000 });
   let b: Binding | null = null;
@@ -53,10 +53,10 @@ test("binding wires OC-0 only with both seams; restart does not admit stale cand
 
 test("drained frame retracted while binding runs queues one metadata-only digest note", async () => {
   const root = tempDir(), daemon = new FakeDaemon(root), host = new Host(), now = Date.now();
-  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, subscriptions: [{
+  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [{
     id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
-  }] });
+  }] } });
   const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true }), oc0Host: host });
   try {
     await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
@@ -75,10 +75,10 @@ test("drained frame retracted while binding runs queues one metadata-only digest
 
 test("retract withdraws a pending slot before rebuilding the surviving frame", async () => {
   const root = tempDir(), daemon = new FakeDaemon(root), host = new Host(), now = Date.now();
-  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, subscriptions: [{
+  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [{
     id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
-  }] });
+  }] } });
   const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true }), oc0Host: host });
   try {
     await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
@@ -92,10 +92,10 @@ test("retract withdraws a pending slot before rebuilding the surviving frame", a
 
 test("landing MUTE and regulatory change withdraw pending host entry; clear state only admits new frames", async () => {
   const root = tempDir(), daemon = new FakeDaemon(root), host = new Host(), now = Date.now();
-  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, subscriptions: [{
+  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [{
     id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
-  }] });
+  }] } });
   const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true }), oc0Host: host });
   try {
     await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
@@ -130,10 +130,10 @@ test("landing MUTE racing an in-flight host enqueue withdraws its accepted entry
     }
   }
   const host = new SlowHost();
-  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, subscriptions: [{
+  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [{
     id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
-  }] });
+  }] } });
   const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true }), oc0Host: host });
   try {
     await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
@@ -159,10 +159,10 @@ test("breaker change racing an in-flight enqueue withdraws the old entry before 
     }
   }
   const host = new SlowHost();
-  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, subscriptions: [{
+  const cfg = parseConfig({ binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [{
     id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
-  }] });
+  }] } });
   const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true }), oc0Host: host });
   try {
     await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());

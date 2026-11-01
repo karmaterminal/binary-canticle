@@ -14,6 +14,7 @@ afterEach(async () => { await binding?.stop(); await daemon.stop(); removeDir(di
 test("exact-key subscriptions are bounded, unique, and untuned by default", () => {
   const base = { binding: "rune", daemon: { socket: "/tmp/canticle.sock" } };
   assert.deepEqual(parseConfig(base).listen.subscriptions, []);
+  assert.throws(() => parseConfig({ ...base, subscriptions: [{ id: "legacy" }] }), /top-level subscriptions/);
   for (const subscriptions of [
     [{ sessionKey: "agent:*", tune: ["*:*"] }],
     [{ sessionKey: "A", tune: ["*:*"] }, { sessionKey: "a", tune: ["*:*"] }],

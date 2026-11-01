@@ -32,8 +32,7 @@ export type BindingConfig = {
     perHour: number;
     maxLive: number;
   };
-  delivery: { mode: "explicit" };
-  subscriptions: Subscription[];
+  delivery: { mode: "explicit"; subscriptions: Subscription[] };
   discovery: { domains: string[]; catalog: { name: string; publicKey: string; publicStreams: string[] }[] };
 };
 
@@ -69,7 +68,7 @@ export function parseConfig(raw: unknown): BindingConfig {
   }
   const l = c.listen === undefined ? {} : obj(c.listen, "listen");
   const tune = (l.tune === undefined ? ["*:*"] : strList(l.tune, "listen.tune")).map(parseTune);
-  const subscriptions = subscriptionsOf(l.subscriptions);
+  const listenSubscriptions = subscriptionsOf(l.subscriptions);
   const j = c.journal === undefined ? {} : obj(c.journal, "journal");
   const p = c.publish === undefined ? {} : obj(c.publish, "publish");
   const enabled = p.enabled === undefined ? false : bool(p.enabled, "publish.enabled");
@@ -86,32 +85,37 @@ export function parseConfig(raw: unknown): BindingConfig {
   if (delivery.mode !== undefined && delivery.mode !== "explicit") {
     throw new ConfigError("delivery.mode: only \"explicit\" exists in this version; push and wake delivery are a separate opt-in");
   }
-  const subscriptionsRaw = c.subscriptions === undefined ? [] : c.subscriptions;
-  if (!Array.isArray(subscriptionsRaw) || subscriptionsRaw.length > 64) throw new ConfigError("subscriptions: at most 64 entries");
-  const subscriptions: Subscription[] = subscriptionsRaw.map((value, i) => {
-    const s = obj(value, `subscriptions[${i}]`);
-    const id = str(s.id, `subscriptions[${i}].id`);
-    if (!STATION_NAME.test(id)) throw new ConfigError(`subscriptions[${i}].id: invalid id`);
-    if (!Array.isArray(s.targets) || s.targets.length < 1 || s.targets.length > 32) throw new ConfigError(`subscriptions[${i}].targets: 1 to 32 exact targets`);
+  if (c.subscriptions !== undefined) {
+    throw new ConfigError("subscriptions: top-level subscriptions are not accepted; move ambient consent subscriptions to delivery.subscriptions");
+  }
+  const subscriptionsRaw = delivery.subscriptions === undefined ? [] : delivery.subscriptions;
+  if (!Array.isArray(subscriptionsRaw) || subscriptionsRaw.length > 64) throw new ConfigError("delivery.subscriptions: at most 64 entries");
+  const ambientSubscriptions: Subscription[] = subscriptionsRaw.map((value, i) => {
+    const at = `delivery.subscriptions[${i}]`;
+    const s = obj(value, at);
+    const id = str(s.id, `${at}.id`);
+    if (!STATION_NAME.test(id)) throw new ConfigError(`${at}.id: invalid id`);
+    if (!Array.isArray(s.targets) || s.targets.length < 1 || s.targets.length > 32) throw new ConfigError(`${at}.targets: 1 to 32 exact targets`);
     const targets = s.targets.map((value: unknown, j: number) => {
-      const t = obj(value, `subscriptions[${i}].targets[${j}]`);
-      const sessionKey = str(t.sessionKey, `subscriptions[${i}].targets[${j}].sessionKey`);
+      const targetAt = `${at}.targets[${j}]`;
+      const t = obj(value, targetAt);
+      const sessionKey = str(t.sessionKey, `${targetAt}.sessionKey`);
       if (!TARGET_SESSION_KEY.test(sessionKey) || sessionKey !== sessionKey.toLowerCase() || sessionKey === "agent:main:main") {
-        throw new ConfigError(`subscriptions[${i}].targets[${j}]: canonical, exact, non-shared session key required`);
+        throw new ConfigError(`${targetAt}: canonical, exact, non-shared session key required`);
       }
       return { sessionKey };
     });
-    if (new Set(targets.map((t: {sessionKey: string}) => t.sessionKey)).size !== targets.length) throw new ConfigError(`subscriptions[${i}]: duplicate targets`);
+    if (new Set(targets.map((t: {sessionKey: string}) => t.sessionKey)).size !== targets.length) throw new ConfigError(`${at}: duplicate targets`);
     const names = (field: string, pattern: RegExp) => {
-      const list = s[field] === undefined ? [] : strList(s[field], `subscriptions[${i}].${field}`);
-      if (list.length > 64 || list.some((v) => !pattern.test(v)) || new Set(list).size !== list.length) throw new ConfigError(`subscriptions[${i}].${field}: invalid filter`);
+      const list = s[field] === undefined ? [] : strList(s[field], `${at}.${field}`);
+      if (list.length > 64 || list.some((v) => !pattern.test(v)) || new Set(list).size !== list.length) throw new ConfigError(`${at}.${field}: invalid filter`);
       return list;
     };
     const posture = s.delivery === undefined ? "ringbuffer_only" : s.delivery;
-    if (posture !== "ringbuffer_only" && posture !== "ambient") throw new ConfigError(`subscriptions[${i}].delivery: P1 allows ringbuffer_only or ambient, never wake`);
-    return { id, targets, delivery: posture, stations: names("stations", STATION_NAME), streams: names("streams", STREAM_PATTERN), classes: names("classes", STATION_NAME), scopes: names("scopes", STATION_NAME), lenses: names("lenses", /^(?:0|[1-9]\d{0,4})$/), perHour: s.perHour === undefined ? 60 : int(s.perHour, `subscriptions[${i}].perHour`, 1, 600) };
+    if (posture !== "ringbuffer_only" && posture !== "ambient") throw new ConfigError(`${at}.delivery: P1 allows ringbuffer_only or ambient, never wake`);
+    return { id, targets, delivery: posture, stations: names("stations", STATION_NAME), streams: names("streams", STREAM_PATTERN), classes: names("classes", STATION_NAME), scopes: names("scopes", STATION_NAME), lenses: names("lenses", /^(?:0|[1-9]\d{0,4})$/), perHour: s.perHour === undefined ? 60 : int(s.perHour, `${at}.perHour`, 1, 600) };
   });
-  if (new Set(subscriptions.map((s) => s.id)).size !== subscriptions.length) throw new ConfigError("subscriptions: duplicate id");
+  if (new Set(ambientSubscriptions.map((s) => s.id)).size !== ambientSubscriptions.length) throw new ConfigError("delivery.subscriptions: duplicate id");
   const discover = c.discovery === undefined ? {} : obj(c.discovery, "discovery");
   const domains = discover.domains === undefined ? [] : strList(discover.domains, "discovery.domains");
   if (domains.length > 8 || domains.some((x) => !DOMAIN.test(x) || x.endsWith(".local"))) {
@@ -143,7 +147,7 @@ export function parseConfig(raw: unknown): BindingConfig {
       tune,
       includeSelf: l.includeSelf === undefined ? false : bool(l.includeSelf, "listen.includeSelf"),
       payloadSessions: l.payloadSessions === undefined ? [] : sessionPatterns(l.payloadSessions, "listen.payloadSessions"),
-      subscriptions,
+      subscriptions: listenSubscriptions,
     },
     journal: {
       maxEntries: j.maxEntries === undefined ? 5_000 : int(j.maxEntries, "journal.maxEntries", 100, 100_000),
@@ -159,8 +163,7 @@ export function parseConfig(raw: unknown): BindingConfig {
       perHour: p.perHour === undefined ? 60 : int(p.perHour, "publish.perHour", 1, 60),
       maxLive: p.maxLive === undefined ? 16 : int(p.maxLive, "publish.maxLive", 1, 64),
     },
-    delivery: { mode: "explicit" },
-    subscriptions,
+    delivery: { mode: "explicit", subscriptions: ambientSubscriptions },
     discovery: { domains, catalog },
   };
 }
