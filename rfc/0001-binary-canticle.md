@@ -2791,9 +2791,9 @@ DECISION D8 (recommended: ews for the fastest demo — it already has the SeedLi
 - Never show listener sets, per-session postures or taint states of other operators' sessions (§19.3, Never 15).
 - Render UNOBSERVABLE as "not observable since *t*", STALE as stale (not calm), and EXERCISE visibly.
 
-### 18.9 Web tuner: a local observer
+### 18.9 Web tuner: a human-safe presence demo
 
-A **web tuner** shows a person what one local listener hears (#57): the stations it has verified, their streams, and the live ring of a channel the person picks. It is a dashboard under §18.8, with these further rules:
+A **web tuner** is a read-only, metadata-only human presence demo (#57), separate from agent-only `canticle listen`, `canticle tap`, and the hearer ring. The reference is synthetic-only: its station API is empty by default and `--demo-fixture` shows invented station and stream metadata independent of listener traffic. Verified live traffic, including station names and activity timing, MUST NOT appear in its human response merely because the listener heard it. A future real-station view requires an explicit station-signed public-presence declaration verified against that station's pinned key; an unsigned manifest or viewer-side list may only narrow that election. It is a dashboard under §18.8, with these further rules:
 
 - **The browser stays off the wire.** A browser never joins a multicast group, holds a canticle key or verifies frames itself. It talks to a local gateway, which runs a listener (§7.4-§7.8) and serves that listener's verified view. In this version the gateway:
   - binds a loopback address only;
@@ -2801,18 +2801,9 @@ A **web tuner** shows a person what one local listener hears (#57): the stations
   - serves a strict content-security policy.
 
   Serving beyond the host needs an authenticated front end, and is out of scope for v1.
-- **Tuning is local observation.**
-  - Picking a channel in the tuner is a gateway-local subscription. It MUST NOT send anything to a station or relay (I-1, I-2).
-  - It is not a session tune (§14.6.1): it grants no landing consent, and nothing the tuner shows lands in any session or memory.
-  - The gateway has no control socket. It cannot sing, hush, or change what its listener admits.
-- **Truth of the ring.**
-  - The tuner shows an item only while its listener holds it, until local expiry (§14.6.3).
-  - A page that opens late sees only what is on air now. Items that just left the air may be listed briefly, labelled expired, withdrawn or superseded, never as live.
-  - Sequence numbers up to the beacon's `head_seq` that the listener never heard are shown as gaps, never filled in.
-  - Presence follows the rendering rules of §8.6.
-- **Verification is shown, not assumed.** A station appears only after a beacon verifies against its manifest key. Datagrams that fail verification are counted, but never attributed to a station and never shown.
-- **Heard text is data.** The page renders heard content as text, never as markup, and truncates it for display.
-- **Budget.** The gateway bounds how many channels it serves, how often each is polled, and how many items and characters each response carries. The reference allows 16 channels, at most 4 polls a second each, and 64 items of 512 characters. Its own state per channel is bounded too, however long a stream runs: the reference keeps at most 128 heard sequence numbers, a window that moves up with the head and restarts at each epoch, and 32 tombstones. It never reports a sequence number below that window as a gap.
+- **No human tune or item route.** The gateway MUST NOT serve a live ring, journal, item text, binary body, digest, finding, state key, or private station metadata through any browser API, DOM, log option, or drill-through route. It has no human tune, sing, hush, or control socket. Agent-only reads remain separate and require their own exact-session authority.
+- **Presence requires consent.** Synthetic fixture metadata is explicitly labelled invented. Real-station presence remains unavailable until a broadcaster-owned signed declaration and its revocation/expiry semantics are specified and tested. A verified beacon alone does not grant human visibility.
+- **Negative proof.** Plant a distinctive private station and payload in listener traffic and assert that neither occurs in any human API response or page bytes, while the synthetic fixture still renders. Refuse non-GET API methods and item-bearing legacy routes such as `/api/ring`.
 
 Reference: `prototype/canticle-station/canticle/tuner.py` (`canticle tuner`), and the same-host proof in `prototype/canticle-station/proofs/web-lanes/`.
 

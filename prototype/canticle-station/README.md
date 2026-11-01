@@ -231,7 +231,7 @@ canticle tuner --manifest fleet.json --multicast --demo-fixture
 
 ### Same-host proof for #57 and #58
 
-[`proofs/web-lanes/`](proofs/web-lanes/) holds a historical bounded run as root (`run.sh`), its analysis (`analyze.py`) and the results. Its live-metadata dashboard assertions describe the earlier implementation and are not evidence for the current synthetic-only human view. The station and emitters run in one network namespace; the listeners, tuner and headless Chromium run in another, joined by a veth pair over LAN multicast. That is **same-host** evidence, on one kernel and one clock. It is not a second host.
+[`proofs/web-lanes/`](proofs/web-lanes/) holds the bounded same-host web proof runner (`run.sh`) and analysis (`analyze.py`). The current assertions exercise the synthetic-only human view; older saved results are historical and do not prove this replacement. The station and emitters run in one network namespace; the listeners, tuner and headless Chromium run in another, joined by a veth pair over LAN multicast. That is **same-host** evidence, on one kernel and one clock. It is not a second host.
 
 ## Record v1 and the host daemon (BC-2, D35, #77)
 
