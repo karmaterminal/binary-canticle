@@ -4,7 +4,7 @@
 // (RFC-0001 §14.18.7), and the tools then answer that the service is not running.
 
 import { Binding } from "./src/binding.ts";
-import { parseConfig, stateRootOf } from "./src/config.ts";
+import { TARGET_SESSION_KEY, parseConfig, stateRootOf } from "./src/config.ts";
 import { TOOL_NAMES, type ToolContext, createTool } from "./src/tools.ts";
 import { Discoverer } from "./src/discover.ts";
 
@@ -12,8 +12,12 @@ const PLUGIN_ID = "canticle";
 
 type Logger = { info?: (msg: string) => void; warn?: (msg: string) => void; error?: (msg: string) => void };
 type ServiceContext = { config?: unknown; stateDir: string; logger?: Logger };
+type LifecycleEvent = { sessionId: string; sessionKey: string; nextSessionId?: string };
+type LifecycleContext = { sessionId: string; sessionKey: string; agentId: string };
 type PluginApi = {
   pluginConfig?: unknown;
+  /** OpenClaw #1523: post-commit, metadata-only session lifecycle hooks. */
+  on?: (name: "session_reset" | "session_delete", handler: (event: LifecycleEvent, context: LifecycleContext) => Promise<void>) => void;
   session?: { state?: { resolveLocalSessionRoute?: (sessionKey: string) => Promise<{
     sessionKey: string; exists: boolean; onHost: boolean;
   }> } };
@@ -41,12 +45,32 @@ export default {
     let failure: string | null = "not started";
     let publish = false;
     let discovery: Discoverer | null = null;
+    let lifecycleHooksReady = false;
     try {
       publish = parseConfig(api.pluginConfig).publish.enabled;
     } catch {
       publish = false; // the service reports the config error when it starts
     }
     const state = () => ({ binding, failure, publish, discovery });
+    const onLifecycle = (kind: "reset" | "delete") => async (event: LifecycleEvent, context: LifecycleContext) => {
+      // Reject mismatched or noncanonical metadata: never let one session clear another's state.
+      if (!event || !context || event.sessionKey !== context.sessionKey || event.sessionId !== context.sessionId ||
+        !event.sessionId || !TARGET_SESSION_KEY.test(event.sessionKey) || event.sessionKey === "agent:main:main" ||
+        event.sessionKey !== event.sessionKey.toLowerCase() ||
+        !event.sessionKey.startsWith(`agent:${context.agentId}:`)) return;
+      const b = binding;
+      if (!b) return;
+      if (kind === "reset") await b.resetSession(event.sessionKey, event.sessionId);
+      else await b.deleteSession(event.sessionKey, event.sessionId);
+    };
+    // Registration happens at plugin load, before the service can receive lifecycle events.
+    if (typeof api.on === "function") {
+      try {
+        api.on("session_reset", onLifecycle("reset"));
+        api.on("session_delete", onLifecycle("delete"));
+        lifecycleHooksReady = true;
+      } catch { /* An older host may reject these hook names. Ambient stays disabled. */ }
+    }
     for (const name of TOOL_NAMES) {
       api.registerTool((ctx) => createTool(name, ctx ?? {}, state), { name, optional: true });
     }
@@ -59,6 +83,9 @@ export default {
         try {
           const cfg = parseConfig(configOf(ctx, api));
           publish = cfg.publish.enabled;
+          if (cfg.delivery.subscriptions.some((s) => s.delivery === "ambient") && !lifecycleHooksReady) {
+            throw new Error("ambient delivery requires OpenClaw session_reset/session_delete callbacks; configure ringbuffer_only until the host supports them");
+          }
           d = new Discoverer(cfg.discovery);
           b = new Binding({
             config: cfg,

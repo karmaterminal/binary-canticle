@@ -24,6 +24,7 @@ type Service = {
   stop?: (ctx: Obj) => Promise<void>;
 };
 
+type LifecycleHandler = (event: { sessionId: string; sessionKey: string; nextSessionId?: string }, context: { sessionId: string; sessionKey: string; agentId: string }) => Promise<void>;
 function load(pluginConfig?: unknown, apiExtra: Obj = {}): { tools: Map<string, { factory: Factory; optional: boolean }>; service: Service } {
   const tools = new Map<string, { factory: Factory; optional: boolean }>();
   const services: Service[] = [];
@@ -104,7 +105,7 @@ test("host contract exposes route/workflow data without activating OC-0 or wake"
   const { service } = load(cfg, { session: {
     state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true }) },
     workflow,
-  } });
+  }, on: () => undefined });
   const ctx = {
     config: { plugins: { entries: { canticle: { enabled: true, config: cfg } } } },
     stateDir: dir,
@@ -379,4 +380,54 @@ test("a config the service refuses still passes the boot-time schema: it fails t
     assert.deepEqual(schemaErrors(schema, c), [], JSON.stringify(c));
     assert.throws(() => parseConfig(c), ConfigError, JSON.stringify(c));
   }
+});
+
+test("ambient service fails closed without both lifecycle callbacks; ringbuffer-only still starts", async () => {
+  const subscription = { id: "fleet", targets: [{ sessionKey: "agent:main:local:task" }], delivery: "ambient",
+    stations: ["cael"], streams: ["lens.threat"], classes: ["live-state"], perHour: 10 };
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [subscription] } };
+  const ctx = { stateDir: dir, logger: { info: () => undefined } };
+  const absent = load(cfg);
+  await assert.rejects(absent.service.start(ctx), /session_reset\/session_delete callbacks/);
+  assert.equal(existsSync(join(dir, "canticle")), false);
+  const rejected = load(cfg, { on: (name: string) => { if (name === "session_delete") throw new Error("unknown hook"); } });
+  await assert.rejects(rejected.service.start(ctx), /session_reset\/session_delete callbacks/);
+  const ring = { ...cfg, delivery: { ...cfg.delivery, subscriptions: [{ ...subscription, delivery: "ringbuffer_only" }] } };
+  const safe = load(ring);
+  await safe.service.start(ctx);
+  await safe.service.stop?.(ctx);
+});
+
+test("typed reset and delete callbacks clear only the ended exact session", async () => {
+  const key = "agent:main:reader";
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: [key], subscriptions: [{ sessionKey: key, tune: ["*:*"] }] } };
+  const hooks = new Map<string, LifecycleHandler>();
+  const { tools, service } = load(cfg, { on: (name: string, handler: LifecycleHandler) => hooks.set(name, handler),
+    session: { state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true }) } } });
+  assert.deepEqual([...hooks.keys()], ["session_reset", "session_delete"]);
+  const ctx = { stateDir: dir, logger: { info: () => undefined } };
+  await service.start(ctx);
+  try {
+    await waitFor(() => daemon.accepted === 1);
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "chatter", seq: 1, issued_at: Date.now(), text: "hello" });
+    const reader = tool(tools, "canticle_listen", { sessionKey: key, sessionId: "old" });
+    const deadline = Date.now() + 4_000;
+    while (!(await reader.execute("read", { what: "journal", view: "items" })).content[0]?.text.includes("hello")) {
+      assert.ok(Date.now() < deadline, "timed out waiting for heard text");
+      await sleep(10);
+    }
+    const state = () => JSON.parse(readFileSync(join(dir, "canticle", "rune", "state.json"), "utf8")) as { taint: Record<string, unknown>; checkpoints: Record<string, unknown> };
+    assert.ok(state().taint.old);
+    const event = { sessionId: "old", sessionKey: key };
+    const context = { ...event, agentId: "main" };
+    await hooks.get("session_reset")!({ ...event, nextSessionId: "new" }, { ...context, sessionKey: "agent:main:other" });
+    assert.ok(state().taint.old, "mismatched context cannot clear another session");
+    await hooks.get("session_reset")!({ ...event, nextSessionId: "new" }, context);
+    assert.equal(state().taint.old, undefined);
+    await reader.execute("read2", { what: "journal", view: "items" });
+    assert.ok(state().taint.old);
+    await hooks.get("session_delete")!(event, context);
+    assert.equal(state().taint.old, undefined);
+    assert.equal(state().checkpoints.old, undefined);
+  } finally { await service.stop?.(ctx); }
 });
