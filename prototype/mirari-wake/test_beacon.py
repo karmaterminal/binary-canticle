@@ -52,9 +52,9 @@ class BeaconTest(unittest.TestCase):
         self.assertEqual(len(self.sent), 1)
         self.assertEqual(self.tick(), "idle")
         self.assertEqual(len(self.sent), 1)
-        self.add(id="step1", topic="changed label")
-        self.assertEqual(self.tick(now=110), "idle")
-        self.assertEqual(len(self.sent), 1)
+        self.add(id="step2", topic="changed label")
+        self.assertEqual(self.tick(now=110), "published")
+        self.assertEqual(len(self.sent), 2)
         req = self.sent[0]
         self.assertEqual((req["stream"], req["class"], req["scope"], req["ttl"]),
                          ("wake", "chatter", "lan", 60))
@@ -71,6 +71,39 @@ class BeaconTest(unittest.TestCase):
             self.tick()
         self.assertEqual(self.sent, [])
         self.assertFalse(self.state.exists())
+
+    def test_duplicate_id_across_batches_refuses_without_checkpoint_advance(self):
+        for n in range(beacon.MAX_ROWS):
+            self.add(id=f"step{n}")
+        self.assertEqual(self.tick(), "published")
+        checkpoint = self.state.read_bytes()
+        self.add(id="step0", topic="different label")
+        with self.assertRaisesRegex(ValueError, "duplicate source row id"):
+            self.tick(now=110)
+        self.assertEqual(len(self.sent), 1)
+        self.assertEqual(self.state.read_bytes(), checkpoint)
+
+    def test_same_length_fixture_replacement_refuses_without_checkpoint_advance(self):
+        self.add(id="step1", topic="first label")
+        self.assertEqual(self.tick(), "published")
+        checkpoint = self.state.read_bytes()
+        original = self.source.read_bytes()
+        replacement = original.replace(b"first label", b"other label")
+        self.assertEqual(len(original), len(replacement))
+        self.source.write_bytes(replacement)
+        self.source.chmod(0o600)
+        with self.assertRaisesRegex(ValueError, "source changed before checkpoint"):
+            self.tick(now=110)
+        self.assertEqual(len(self.sent), 1)
+        self.assertEqual(self.state.read_bytes(), checkpoint)
+
+    def test_predictable_checkpoint_tmp_path_is_not_touched(self):
+        self.add()
+        sentinel = self.state.with_name(self.state.name + ".tmp")
+        sentinel.write_text("keep")
+        self.assertEqual(self.tick(), "published")
+        self.assertEqual(sentinel.read_text(), "keep")
+        self.assertEqual(self.state.stat().st_mode & 0o777, 0o600)
 
     def test_consent_and_source_must_be_owner_private(self):
         self.add()

@@ -8,6 +8,7 @@ import os
 import re
 import socket
 import stat
+import tempfile
 import time
 from pathlib import Path
 
@@ -35,13 +36,16 @@ def _load_json(path: Path) -> dict:
 
 def _save(path: Path, obj: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    with tmp.open("w", encoding="utf-8") as out:
-        os.chmod(tmp, 0o600)
-        json.dump(obj, out, sort_keys=True)
-        out.flush()
-        os.fsync(out.fileno())
-    os.replace(tmp, path)
+    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as out:
+            json.dump(obj, out, sort_keys=True)
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(name, path)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
 
 
 def authorization(path: Path, source: Path, actor: str) -> dict:
@@ -61,15 +65,22 @@ def authorization(path: Path, source: Path, actor: str) -> dict:
     return cfg
 
 
-def read_rows(source: Path, actor: str, after: int, seen: set[str]) -> tuple[list[dict], int, str]:
+def read_rows(source: Path, actor: str, after: int, seen: set[str],
+              prefix_sha256: str | None) -> tuple[list[dict], int, str, str]:
     _check_file(source)
     snapshot = source.read_bytes()
     if len(snapshot) > 1_048_576:
         raise ValueError("source exceeds 1 MiB fixture bound")
     lineage = hashlib.sha256(snapshot).hexdigest()[:16]
+    lines = snapshot.splitlines(keepends=True)
+    if after > len(lines):
+        raise ValueError("source shrank; operator must inspect before resetting state")
+    if after and (prefix_sha256 is None or
+                  hashlib.sha256(b"".join(lines[:after])).hexdigest() != prefix_sha256):
+        raise ValueError("source changed before checkpoint; operator must inspect before resetting state")
     rows = []
     batch_seen: set[str] = set()
-    for n, raw in enumerate(snapshot.splitlines(keepends=True), 1):
+    for n, raw in enumerate(lines, 1):
         if n <= after:
             continue
         if len(raw) > MAX_LINE:
@@ -86,15 +97,15 @@ def read_rows(source: Path, actor: str, after: int, seen: set[str]) -> tuple[lis
         if not isinstance(topic, str) or not SAFE_TOPIC.fullmatch(topic) or SECRET.search(topic) or HEARD.search(topic):
             continue
         event_id = row.get("id")
-        if not isinstance(event_id, str) or not ID.fullmatch(event_id) or event_id in seen:
+        if not isinstance(event_id, str) or not ID.fullmatch(event_id):
             continue
-        if event_id in batch_seen:
-            raise ValueError("duplicate source row id in batch")
+        if event_id in seen or event_id in batch_seen:
+            raise ValueError("duplicate source row id")
         batch_seen.add(event_id)
         rows.append({"id": event_id, "kind": row["kind"], "topic": topic})
         if len(rows) >= MAX_ROWS:
-            return rows, n, lineage
-    return rows, n if 'n' in locals() else 0, lineage
+            return rows, n, lineage, hashlib.sha256(b"".join(lines[:n])).hexdigest()
+    return rows, len(lines), lineage, hashlib.sha256(snapshot).hexdigest()
 
 
 def summarize(actor: str, rows: list[dict], lineage: str) -> tuple[str, str]:
@@ -131,14 +142,14 @@ def tick(*, auth: Path, source: Path, state: Path, actor: str, socket_path: str,
     if old and (old.get("actor") != actor or old.get("source") != str(source.resolve())):
         raise ValueError("state bound to a different source")
     seen = set(old.get("seen", []))
-    rows, end, lineage = read_rows(source, actor, old.get("offset", 0), seen)
-    if end < old.get("offset", 0):
-        raise ValueError("source shrank; operator must inspect before resetting state")
+    rows, end, lineage, prefix_sha256 = read_rows(
+        source, actor, old.get("offset", 0), seen, old.get("prefix_sha256"))
     if not rows:
         if now - old.get("last_activity", now) >= cfg["inactive_s"]:
             return "inactive-stop"
         _save(state, {**old, "actor": actor, "source": str(source.resolve()),
-                      "offset": end, "last_activity": old.get("last_activity", now)})
+                      "offset": end, "prefix_sha256": prefix_sha256,
+                      "last_activity": old.get("last_activity", now)})
         return "idle"
     text, identity = summarize(actor, rows, lineage)
     if identity != old.get("identity"):
@@ -153,7 +164,8 @@ def tick(*, auth: Path, source: Path, state: Path, actor: str, socket_path: str,
         sink(socket_path, req)
     seen.update(r["id"] for r in rows)
     _save(state, {"actor": actor, "source": str(source.resolve()), "offset": end,
-                  "identity": identity, "last_activity": now, "seen": sorted(seen)})
+                  "prefix_sha256": prefix_sha256, "identity": identity,
+                  "last_activity": now, "seen": sorted(seen)})
     return "published"
 
 
