@@ -152,8 +152,9 @@ test("Mirari fixture -> station -> daemon -> binding: mute, manual read, source 
     try {
       await waitFor(() => heard().text.includes("checked tests"), "Mirari item at binding", 15_000);
     } catch (error) {
+      const stationStatus = await stationClient(join(run, "mirari.ctl"))({ op: "status" });
       throw new Error(`Mirari item missing: ${String(error)}; journal=${JSON.stringify(heard())}; ` +
-        `daemon=${JSON.stringify(daemon.lines)}; station=${JSON.stringify(station.lines)}`);
+        `stationStatus=${JSON.stringify(stationStatus)}; daemon=${JSON.stringify(daemon.lines)}; station=${JSON.stringify(station.lines)}`);
     }
     const observed = heard();
     const entries = observed.details.entries as { kind: string; disposition?: string; station?: string }[];
