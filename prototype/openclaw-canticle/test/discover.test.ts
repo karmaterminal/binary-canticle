@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "node:test";
 import { parseConfig } from "../src/config.ts";
 import { createSystemDns, Discoverer } from "../src/discover.ts";
@@ -38,6 +39,24 @@ test("only catalog public streams surface; DNS mismatches never confer identity"
   assert.equal(seen.length, 3);
   assert.deepEqual(seen, [`PTR:${service}`, `SRV:${instance}`, `TXT:${instance}`]);
   assert.deepEqual((await d.browse(domain, "private") as {stations: unknown[]}).stations, []);
+});
+
+test("repeated TXT keys invalidate and discard hints across records, including later repeats", async () => {
+  const keyId = createHash("sha256").update(Buffer.from(key, "base64")).digest("hex").slice(0, 16);
+  const dns = async (name: string, kind: string) => {
+    if (name === service && kind === "PTR") return [{ type: "PTR", value: instance }];
+    if (name === instance && kind === "SRV") return [];
+    if (name === instance && kind === "TXT") return [
+      { type: "TXT", entries: [`sid=${keyId}`, "k=ed25519:wrong", "streams=private"] },
+      { type: "TXT", entries: ["sid=0000000000000000", `k=ed25519:${key}`, "streams=hymn", `sid=${keyId}`] },
+    ];
+    return [];
+  };
+  const result = await new Discoverer(config(), dns).browse(domain) as {
+    stations: { public_streams: string[]; mismatches: string[] }[];
+  };
+  assert.deepEqual(result.stations[0]?.mismatches, ["txt-invalid"]);
+  assert.deepEqual(result.stations[0]?.public_streams, ["hymn"]);
 });
 
 test("TTL refresh, negative cache, out-of-zone target, and instance bound", async () => {

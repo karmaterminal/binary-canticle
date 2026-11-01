@@ -82,6 +82,7 @@ export class Discoverer {
       if (stations.length >= MAX_RESULTS) { outputTruncated = true; break; }
       const [srv, txt] = await Promise.all([this.query(instance, "SRV"), this.query(instance, "TXT")]);
       const hints = new Map<string, string>();
+      const seenKeys = new Set<string>();
       let invalid = false;
       for (const r of txt) {
         const entries = r.entries;
@@ -89,7 +90,15 @@ export class Discoverer {
             entries.reduce((n, x) => n + Buffer.byteLength(x), 0) > 4096) { invalid = true; continue; }
         for (const entry of entries) {
           const i = entry.indexOf("=");
-          if (i > 0 && i <= 9 && !hints.has(entry.slice(0, i))) hints.set(entry.slice(0, i), entry.slice(i + 1));
+          if (i <= 0 || i > 9) continue;
+          const name = entry.slice(0, i);
+          if (seenKeys.has(name)) {
+            invalid = true;
+            hints.delete(name); // A repeated key is unusable, even if a later value agrees.
+          } else {
+            seenKeys.add(name);
+            hints.set(name, entry.slice(i + 1));
+          }
         }
       }
       const key = Buffer.from(grant.publicKey, "base64");
