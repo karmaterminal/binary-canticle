@@ -153,10 +153,10 @@ export function isSubagent(sessionKey: string): boolean {
   return k.startsWith("subagent:") || /^agent:[^:]+:subagent:/.test(k);
 }
 
-/** The caller a tool acts for. A context with neither a session key nor an agent id names no session, and such
- * calls are anonymous rather than one shared identity: no publish tools, no new reads and no heard text. */
+/** The caller a tool acts for. An agent id cannot identify an exact session: missing session keys fail closed
+ * instead of sharing read visibility, checkpoint, taint and publish authority across that agent's sessions. */
 export function callerOf(ctx: ToolContext): Caller {
-  const key = named(ctx.sessionKey) ?? (named(ctx.agentId) !== null ? `agent:${ctx.agentId}` : null);
+  const key = named(ctx.sessionKey);
   if (key === null) {
     return { sessionKey: "(no session)", sessionId: null, subagent: false, anonymous: true };
   }

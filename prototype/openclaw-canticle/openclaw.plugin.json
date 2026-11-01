@@ -34,7 +34,8 @@
         "properties": {
           "tune": { "type": "array", "maxItems": 64, "items": { "type": "string", "maxLength": 100 } },
           "includeSelf": { "type": "boolean" },
-          "payloadSessions": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 201 } }
+          "payloadSessions": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 201 } },
+          "subscriptions": { "type": "array", "maxItems": 64, "items": { "type": "object", "additionalProperties": false, "required": ["sessionKey", "tune"], "properties": { "sessionKey": { "type": "string", "minLength": 1, "maxLength": 200 }, "tune": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "type": "string", "maxLength": 100 } } } } }
         }
       },
       "journal": {
