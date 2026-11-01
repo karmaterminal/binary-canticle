@@ -28,10 +28,11 @@ class MirariLoopbackTest(unittest.TestCase):
             source.write_text(json.dumps({"actor": "alice", "origin": "actor", "shareable": True,
                                           "lineage": "local", "kind": "tool", "id": "step1",
                                           "topic": "checked tests", "raw_body": "PRIVATE BODY NOT FOR WIRE"}) + "\n")
+            key = Ed25519PrivateKey.generate()
             auth.write_text(json.dumps({"enabled": True, "actor": "alice", "station": "familiar",
+                                        "station_key_id": wire.key_id(wire.public_key_bytes(key)).hex(),
                                         "source": str(source), "audience": "lan", "stream": "wake",
                                         "ttl_s": 3, "cadence_s": 30, "inactive_s": 60}))
-            key = Ed25519PrivateKey.generate()
             manifest = Manifest([StationEntry("familiar", wire.public_key_bytes(key),
                                               frozenset({1}), ("wake",))])
             station = Station(key, [StreamConfig("wake")], epoch=1, now_ms=runner.now_ms(),
@@ -64,6 +65,13 @@ class MirariLoopbackTest(unittest.TestCase):
                     self.assertEqual(len(items), 1)
                     self.assertIn("checked tests", items[0].data["text"])
                     self.assertNotIn("PRIVATE BODY", items[0].data["text"])
+                    self.assertEqual(station.streams["wake"].head_seq, 1)
+                    # A swapped socket cannot sing under another station key:
+                    # the receiver checks expected_key_id inside dispatch.
+                    direct = runner._dispatch(station, {"op": "sing", "stream": "wake", "class": "chatter",
+                        "scope": "lan", "text": "wrong station", "expected_key_id": "fedcba9876543210"},
+                        frozenset({"chatter"}))
+                    self.assertFalse(direct["ok"])
                     self.assertEqual(station.streams["wake"].head_seq, 1)
                     for _ in range(100):
                         if any(e.kind == "expired" and e.stream == "wake" for e in events):

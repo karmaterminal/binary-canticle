@@ -17,10 +17,18 @@ class BeaconTest(unittest.TestCase):
         root = Path(self.tmp.name)
         self.source, self.auth, self.state = (root / name for name in ("fixture.jsonl", "auth.json", "state.json"))
         self.cfg = {"enabled": True, "actor": "alice", "station": "familiar",
+                    "station_key_id": "0123456789abcdef",
                     "source": str(self.source), "audience": "lan", "stream": "wake",
                     "ttl_s": 60, "cadence_s": 30, "inactive_s": 60}
         self.auth.write_text(json.dumps(self.cfg))
         self.sent = []
+        self.station_key_id = self.cfg["station_key_id"]
+
+    def sink(self, _path, req):
+        if req["op"] == "status":
+            return {"ok": True, "key_id": self.station_key_id}
+        self.sent.append(req)
+        return {"ok": True}
 
     def add(self, **kw):
         row = {"actor": "alice", "origin": "actor", "shareable": True,
@@ -32,7 +40,7 @@ class BeaconTest(unittest.TestCase):
     def tick(self, now=100):
         return beacon.tick(auth=self.auth, source=self.source, state=self.state,
                            actor="alice", socket_path="fake", now=now,
-                           sink=lambda _, req: self.sent.append(req))
+                           sink=self.sink)
 
     def test_dedupe_restart_and_provenance(self):
         self.add()
@@ -47,6 +55,7 @@ class BeaconTest(unittest.TestCase):
         req = self.sent[0]
         self.assertEqual((req["stream"], req["class"], req["scope"], req["ttl"]),
                          ("wake", "chatter", "lan", 60))
+        self.assertEqual(req["expected_key_id"], self.cfg["station_key_id"])
         self.assertIn("source sha256:", req["text"])
         self.assertIn("row:", req["text"])
         self.assertLessEqual(len(req["text"].encode()), 800)
@@ -57,11 +66,22 @@ class BeaconTest(unittest.TestCase):
         self.add(id="secret", topic="token sk-abcdef123456")
         self.add(id="heard", topic="canticle heard text")
         self.add(id="raw", topic="safe label", lineage="canticle")
+        for kind in ("summary", "event", "tool", "file"):
+            self.add(id=f"echo-{kind}", kind=kind, topic=f"echo {kind}", from_canticle=True)
         self.add(id="other", actor="bob", topic="other work")
         self.tick()
         self.assertIn("reviewed code", self.sent[0]["text"])
         for forbidden in ("sk-abcdef", "canticle heard", "other work", "safe label"):
             self.assertNotIn(forbidden, self.sent[0]["text"])
+        self.assertIn("observed 1 shareable actions", self.sent[0]["text"])
+
+    def test_mistargeted_station_socket_refuses_before_publish_or_checkpoint(self):
+        self.add()
+        self.station_key_id = "fedcba9876543210"
+        with self.assertRaisesRegex(ValueError, "station socket key_id"):
+            self.tick()
+        self.assertEqual(self.sent, [])
+        self.assertFalse(self.state.exists())
 
     def test_bounds_inactivity_and_revocation(self):
         self.add()

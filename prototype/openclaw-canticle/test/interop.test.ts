@@ -134,7 +134,8 @@ test("Mirari fixture -> station -> daemon -> binding: mute, manual read, source 
     const state = join(dir, "beacon-state.json");
     writeFileSync(source, JSON.stringify({ actor: "alice", origin: "actor", shareable: true, lineage: "local",
       kind: "tool", id: "step1", topic: "checked tests", raw_body: "PRIVATE BODY NOT FOR WIRE" }) + "\n");
-    const authorization = { enabled: true, actor: "alice", station: "mirari", source,
+    const authorization = { enabled: true, actor: "alice", station: "mirari",
+      station_key_id: (JSON.parse(key.stdout) as { key_id: string }).key_id, source,
       audience: "lan", stream: "wake", ttl_s: 30, cadence_s: 30, inactive_s: 60 };
     writeFileSync(auth, JSON.stringify(authorization));
     const emit = () => spawnSync(PY, ["-c", "import runpy,sys; b=runpy.run_path(sys.argv[1]); print(b['tick'](auth=b['Path'](sys.argv[2]), source=b['Path'](sys.argv[3]), state=b['Path'](sys.argv[4]), actor='alice', socket_path=sys.argv[5]))",

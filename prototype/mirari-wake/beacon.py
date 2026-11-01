@@ -19,6 +19,7 @@ SAFE_TOPIC = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9 _.,:/#-]{0,63}$")
 SECRET = re.compile(r"(?i)(?:api[_-]?key|token|password|secret|authorization|bearer|private[_-]?key|sk-[a-z0-9]|gh[pousr]_[a-z0-9]|AKIA[0-9A-Z]{16})")
 HEARD = re.compile(r"(?i)(?:canticle|heard|receiver|receptor|wake|beacon)")
 ID = re.compile(r"^[a-zA-Z0-9_-]{1,48}$")
+KEY_ID = re.compile(r"^[0-9a-f]{16}$")
 
 
 def _check_file(path: Path) -> None:
@@ -49,6 +50,8 @@ def authorization(path: Path, source: Path, actor: str) -> dict:
         raise ValueError("source authorization disabled or actor mismatch")
     if not ID.fullmatch(actor) or not ID.fullmatch(cfg.get("station", "")):
         raise ValueError("invalid actor/station")
+    if not KEY_ID.fullmatch(cfg.get("station_key_id", "")):
+        raise ValueError("authorized station key_id must be 16 lowercase hex digits")
     if cfg.get("source") != str(source.resolve()) or cfg.get("audience") != "lan":
         raise ValueError("source and LAN audience must be explicit")
     if cfg.get("stream") != "wake" or not 1 <= cfg.get("ttl_s", 0) <= 300:
@@ -75,7 +78,7 @@ def read_rows(source: Path, actor: str, after: int, seen: set[str]) -> tuple[lis
             # Only actor-authored, explicitly shareable metadata; no tool result or log body.
             if row.get("origin") != "actor" or row.get("shareable") is not True:
                 continue
-            if row.get("lineage") != "local" or row.get("kind") == "summary" and row.get("from_canticle"):
+            if row.get("lineage") != "local" or row.get("from_canticle"):
                 continue
             topic = row.get("topic")
             if not isinstance(topic, str) or not SAFE_TOPIC.fullmatch(topic) or SECRET.search(topic) or HEARD.search(topic):
@@ -136,8 +139,14 @@ def tick(*, auth: Path, source: Path, state: Path, actor: str, socket_path: str,
         return "idle"
     text, identity = summarize(actor, cfg["station"], rows, source)
     if identity != old.get("identity"):
+        # The station control socket speaks for a key, not a station name. Bind
+        # authorization to that key before submitting anything to a socket.
+        status = sink(socket_path, {"op": "status"})
+        if not isinstance(status, dict) or status.get("key_id") != cfg["station_key_id"]:
+            raise ValueError("station socket key_id differs from authorized station")
         req = {"op": "sing", "stream": "wake", "class": "chatter", "scope": "lan",
-               "ttl": cfg["ttl_s"], "text": text, "state_key": f"wake-{identity}"}
+               "ttl": cfg["ttl_s"], "text": text, "state_key": f"wake-{identity}",
+               "expected_key_id": cfg["station_key_id"]}
         sink(socket_path, req)
     seen.update(r["id"] for r in rows)
     _save(state, {"actor": actor, "source": str(source.resolve()), "offset": end,
