@@ -326,6 +326,32 @@ Gateway boot. Write `enabled: false` explicitly until a prince opts the seat in 
 }
 ```
 
+### Radio-tuner recipes (explicit reads only)
+
+Replace the example's `sessionKey` with the **exact** OpenClaw session key. `agentId` alone does not name a session. To hear several channels, put them in both the binding's receive tune and that session's read tune, for example:
+
+```json5
+listen: {
+  tune: ["bramble:chatter", "frond-gloss:*", "rune:ops"],
+  subscriptions: [{
+    sessionKey: "agent:rune:main", // use the actual exact local key
+    tune: ["bramble:chatter", "frond-gloss:chatter", "rune:ops"],
+  }],
+  payloadSessions: [],             // digest only; explicitly add this session to read text
+}
+```
+
+The receive tune does not subscribe every session. An unlisted session sees no heard items; `payloadSessions` without a matching read subscription also grants no items. There is no automatic turn, push, or wake in this version.
+
+| Question | Tool call | Meaning |
+|---|---|---|
+| “What is new for me?” | `canticle_listen {"what":"new"}` | Advances only this exact session's checkpoint. |
+| “I used `/new`; what did I miss?” | `canticle_status {}`, then `canticle_listen {"what":"journal"}`; page with the returned `next` cursor as `since` | History still retained by this binding, not a completeness promise. Check `joined_late`/`records_lost`. A journal read leaves the `new` checkpoint alone. |
+| “What is on air now?” | `canticle_listen {"what":"on_air"}` | A cut feed says `unknown`; carried items are not confirmed live. |
+| “I need quiet.” | `canticle_mute {"station":"bramble","stream":"chatter"}` (or `ttlSeconds`) | Binding-local suppression. Muted entries remain in manual history and never become a later push. Clear by mute ID. |
+
+For full heard text, add the exact session to `listen.payloadSessions` and use `view: "items"`; those bytes are untrusted data and taint that session against publishing. `canticle_status` does not disclose heard text. A station's last beacon or a discovered DNS locator is not a person's current location.
+
 | Key | Default | Notes |
 |---|---|---|
 | `binding` | required | Lowercase letters, digits and `-`, starting with a letter, at most 31 characters. |
