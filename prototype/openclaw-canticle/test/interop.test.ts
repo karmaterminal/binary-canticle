@@ -149,7 +149,12 @@ test("Mirari fixture -> station -> daemon -> binding: mute, manual read, source 
     assert.equal(first.status, 0, first.stderr);
     assert.equal(first.stdout.trim(), "published");
     const heard = () => binding!.listen(reader, { what: "journal", view: "items", stream: "wake" });
-    await waitFor(() => heard().text.includes("checked tests"), "Mirari item at binding", 15_000);
+    try {
+      await waitFor(() => heard().text.includes("checked tests"), "Mirari item at binding", 15_000);
+    } catch (error) {
+      throw new Error(`Mirari item missing: ${String(error)}; journal=${JSON.stringify(heard())}; ` +
+        `daemon=${JSON.stringify(daemon.lines)}; station=${JSON.stringify(station.lines)}`);
+    }
     const observed = heard();
     const entries = observed.details.entries as { kind: string; disposition?: string; station?: string }[];
     assert.equal(entries.filter((e) => e.kind === "heard" && e.station === "mirari" && e.disposition === "muted").length, 1);
