@@ -23,9 +23,9 @@ KEY_ID = re.compile(r"^[0-9a-f]{16}$")
 
 
 def _check_file(path: Path) -> None:
-    mode = path.lstat().st_mode
-    if not stat.S_ISREG(mode) or path.is_symlink():
-        raise ValueError("source must be a regular non-symlink file")
+    info = path.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
+        raise ValueError(f"{path} must be a regular, owner-owned mode 0600 file (no symlinks)")
 
 
 def _load_json(path: Path) -> dict:
@@ -61,43 +61,46 @@ def authorization(path: Path, source: Path, actor: str) -> dict:
     return cfg
 
 
-def read_rows(source: Path, actor: str, after: int, seen: set[str]) -> tuple[list[dict], int]:
+def read_rows(source: Path, actor: str, after: int, seen: set[str]) -> tuple[list[dict], int, str]:
     _check_file(source)
-    if source.stat().st_size > 1_048_576:
+    snapshot = source.read_bytes()
+    if len(snapshot) > 1_048_576:
         raise ValueError("source exceeds 1 MiB fixture bound")
+    lineage = hashlib.sha256(snapshot).hexdigest()[:16]
     rows = []
-    with source.open("rb") as inp:
-        for n, raw in enumerate(inp, 1):
-            if n <= after:
-                continue
-            if len(raw) > MAX_LINE:
-                raise ValueError("oversized source row")
-            row = json.loads(raw)
-            if row.get("actor") != actor or row.get("kind") not in KINDS:
-                continue
-            # Only actor-authored, explicitly shareable metadata; no tool result or log body.
-            if row.get("origin") != "actor" or row.get("shareable") is not True:
-                continue
-            if row.get("lineage") != "local" or row.get("from_canticle"):
-                continue
-            topic = row.get("topic")
-            if not isinstance(topic, str) or not SAFE_TOPIC.fullmatch(topic) or SECRET.search(topic) or HEARD.search(topic):
-                continue
-            event_id = row.get("id")
-            if not isinstance(event_id, str) or not ID.fullmatch(event_id) or event_id in seen:
-                continue
-            rows.append({"id": event_id, "kind": row["kind"], "topic": topic})
-            if len(rows) >= MAX_ROWS:
-                return rows, n
-        return rows, n if 'n' in locals() else 0
+    batch_seen: set[str] = set()
+    for n, raw in enumerate(snapshot.splitlines(keepends=True), 1):
+        if n <= after:
+            continue
+        if len(raw) > MAX_LINE:
+            raise ValueError("oversized source row")
+        row = json.loads(raw)
+        if row.get("actor") != actor or row.get("kind") not in KINDS:
+            continue
+        # Only actor-authored, explicitly shareable metadata; no tool result or log body.
+        if row.get("origin") != "actor" or row.get("shareable") is not True:
+            continue
+        if row.get("lineage") != "local" or row.get("from_canticle"):
+            continue
+        topic = row.get("topic")
+        if not isinstance(topic, str) or not SAFE_TOPIC.fullmatch(topic) or SECRET.search(topic) or HEARD.search(topic):
+            continue
+        event_id = row.get("id")
+        if not isinstance(event_id, str) or not ID.fullmatch(event_id) or event_id in seen:
+            continue
+        if event_id in batch_seen:
+            raise ValueError("duplicate source row id in batch")
+        batch_seen.add(event_id)
+        rows.append({"id": event_id, "kind": row["kind"], "topic": topic})
+        if len(rows) >= MAX_ROWS:
+            return rows, n, lineage
+    return rows, n if 'n' in locals() else 0, lineage
 
 
-def summarize(actor: str, station: str, rows: list[dict], source: Path) -> tuple[str, str]:
-    unique = list({r["id"]: r for r in rows}.values())
-    lineage = hashlib.sha256(source.read_bytes()).hexdigest()[:16]
-    identity = hashlib.sha256(json.dumps([actor, lineage, sorted(r["id"] for r in unique)]).encode()).hexdigest()[:16]
-    labels = list(dict.fromkeys(r["topic"] for r in unique))[:5]
-    text = f"actor {actor}; observed {len(unique)} shareable actions: {', '.join(labels)}; source sha256:{lineage}; row:{identity}"
+def summarize(actor: str, rows: list[dict], lineage: str) -> tuple[str, str]:
+    identity = hashlib.sha256(json.dumps([actor, lineage, sorted(r["id"] for r in rows)]).encode()).hexdigest()[:16]
+    labels = list(dict.fromkeys(r["topic"] for r in rows))[:5]
+    text = f"actor {actor}; observed {len(rows)} shareable actions: {', '.join(labels)}; source sha256:{lineage}; row:{identity}"
     if SECRET.search(text) or len(text.encode()) > MAX_ITEM:
         raise ValueError("unsafe or oversized beacon")
     return text, identity
@@ -128,7 +131,7 @@ def tick(*, auth: Path, source: Path, state: Path, actor: str, socket_path: str,
     if old and (old.get("actor") != actor or old.get("source") != str(source.resolve())):
         raise ValueError("state bound to a different source")
     seen = set(old.get("seen", []))
-    rows, end = read_rows(source, actor, old.get("offset", 0), seen)
+    rows, end, lineage = read_rows(source, actor, old.get("offset", 0), seen)
     if end < old.get("offset", 0):
         raise ValueError("source shrank; operator must inspect before resetting state")
     if not rows:
@@ -137,7 +140,7 @@ def tick(*, auth: Path, source: Path, state: Path, actor: str, socket_path: str,
         _save(state, {**old, "actor": actor, "source": str(source.resolve()),
                       "offset": end, "last_activity": old.get("last_activity", now)})
         return "idle"
-    text, identity = summarize(actor, cfg["station"], rows, source)
+    text, identity = summarize(actor, rows, lineage)
     if identity != old.get("identity"):
         # The station control socket speaks for a key, not a station name. Bind
         # authorization to that key before submitting anything to a socket.

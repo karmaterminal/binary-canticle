@@ -28,11 +28,13 @@ class MirariLoopbackTest(unittest.TestCase):
             source.write_text(json.dumps({"actor": "alice", "origin": "actor", "shareable": True,
                                           "lineage": "local", "kind": "tool", "id": "step1",
                                           "topic": "checked tests", "raw_body": "PRIVATE BODY NOT FOR WIRE"}) + "\n")
+            source.chmod(0o600)
             key = Ed25519PrivateKey.generate()
             auth.write_text(json.dumps({"enabled": True, "actor": "alice", "station": "familiar",
                                         "station_key_id": wire.key_id(wire.public_key_bytes(key)).hex(),
                                         "source": str(source), "audience": "lan", "stream": "wake",
                                         "ttl_s": 3, "cadence_s": 30, "inactive_s": 60}))
+            auth.chmod(0o600)
             manifest = Manifest([StationEntry("familiar", wire.public_key_bytes(key),
                                               frozenset({1}), ("wake",))])
             station = Station(key, [StreamConfig("wake")], epoch=1, now_ms=runner.now_ms(),

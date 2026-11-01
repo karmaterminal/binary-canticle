@@ -49,6 +49,11 @@ jobs:
         env:
           PYTHONPATH: prototype/canticle-station
         run: python -m unittest discover -s prototype/canticle-station/tests -v
+      - name: Run Mirari fixture tests (local sockets only)
+        env:
+          PYTHONPATH: prototype/canticle-station
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m unittest discover -s prototype/mirari-wake -p 'test_*.py' -v
       - name: Check the pilot nft table with nft (root, throwaway network namespace)
         env:
           PYTHONPATH: prototype/canticle-station

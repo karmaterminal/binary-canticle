@@ -1,5 +1,7 @@
 import importlib.util
+import hashlib
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -22,6 +24,7 @@ class BeaconTest(unittest.TestCase):
                     "ttl_s": 60, "cadence_s": 30, "inactive_s": 60}
         self.auth.write_text(json.dumps(self.cfg))
         self.sent = []
+        self.auth.chmod(0o600)
         self.station_key_id = self.cfg["station_key_id"]
 
     def sink(self, _path, req):
@@ -36,6 +39,7 @@ class BeaconTest(unittest.TestCase):
         row.update(kw)
         with self.source.open("a") as f:
             f.write(json.dumps(row) + "\n")
+        self.source.chmod(0o600)
 
     def tick(self, now=100):
         return beacon.tick(auth=self.auth, source=self.source, state=self.state,
@@ -43,7 +47,6 @@ class BeaconTest(unittest.TestCase):
                            sink=self.sink)
 
     def test_dedupe_restart_and_provenance(self):
-        self.add()
         self.add()
         self.assertEqual(self.tick(), "published")
         self.assertEqual(len(self.sent), 1)
@@ -60,6 +63,43 @@ class BeaconTest(unittest.TestCase):
         self.assertIn("row:", req["text"])
         self.assertLessEqual(len(req["text"].encode()), 800)
         self.assertNotIn("fixture.jsonl", req["text"])
+
+    def test_duplicate_ids_in_batch_refuse_without_submission_or_checkpoint(self):
+        self.add()
+        self.add(topic="changed label")
+        with self.assertRaisesRegex(ValueError, "duplicate source row id"):
+            self.tick()
+        self.assertEqual(self.sent, [])
+        self.assertFalse(self.state.exists())
+
+    def test_consent_and_source_must_be_owner_private(self):
+        self.add()
+        for path in (self.auth, self.source):
+            path.chmod(0o666)
+            with self.assertRaisesRegex(ValueError, "mode 0600"):
+                self.tick()
+            self.assertEqual(self.sent, [])
+            self.assertFalse(self.state.exists())
+            path.chmod(0o600)
+        with patch.object(beacon.os, "getuid", return_value=os.getuid() + 1):
+            with self.assertRaisesRegex(ValueError, "owner-owned"):
+                self.tick()
+
+    def test_digest_is_from_the_parsed_snapshot(self):
+        self.add()
+        original = self.source.read_bytes()
+        real_read = Path.read_bytes
+        def append_after_read(path):
+            data = real_read(path)
+            if path == self.source:
+                with path.open("a") as out:
+                    out.write(json.dumps({"actor": "alice", "origin": "actor", "shareable": True,
+                        "lineage": "local", "kind": "event", "id": "later", "topic": "later action"}) + "\n")
+            return data
+        with patch.object(Path, "read_bytes", append_after_read):
+            self.assertEqual(self.tick(), "published")
+        self.assertIn("source sha256:" + hashlib.sha256(original).hexdigest()[:16], self.sent[0]["text"])
+        self.assertNotIn("later action", self.sent[0]["text"])
 
     def test_redaction_and_no_echo(self):
         self.add(id="safe", topic="reviewed code")

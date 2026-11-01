@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { Binding } from "../src/binding.ts";
@@ -134,10 +134,12 @@ test("Mirari fixture -> station -> daemon -> binding: mute, manual read, source 
     const state = join(dir, "beacon-state.json");
     writeFileSync(source, JSON.stringify({ actor: "alice", origin: "actor", shareable: true, lineage: "local",
       kind: "tool", id: "step1", topic: "checked tests", raw_body: "PRIVATE BODY NOT FOR WIRE" }) + "\n");
+    chmodSync(source, 0o600);
     const authorization = { enabled: true, actor: "alice", station: "mirari",
       station_key_id: (JSON.parse(key.stdout) as { key_id: string }).key_id, source,
       audience: "lan", stream: "wake", ttl_s: 30, cadence_s: 30, inactive_s: 60 };
     writeFileSync(auth, JSON.stringify(authorization));
+    chmodSync(auth, 0o600);
     const emit = () => spawnSync(PY, ["-c", "import runpy,sys; b=runpy.run_path(sys.argv[1]); print(b['tick'](auth=b['Path'](sys.argv[2]), source=b['Path'](sys.argv[3]), state=b['Path'](sys.argv[4]), actor='alice', socket_path=sys.argv[5]))",
       join(import.meta.dirname, "..", "..", "mirari-wake", "beacon.py"), auth, source, state, join(run, "mirari.ctl")],
       { env: ENV, encoding: "utf8" });
