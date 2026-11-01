@@ -91,7 +91,7 @@ export class Discoverer {
         for (const entry of entries) {
           const i = entry.indexOf("=");
           if (i <= 0 || i > 9) continue;
-          const name = entry.slice(0, i);
+          const name = entry.slice(0, i).toLowerCase();
           if (seenKeys.has(name)) {
             invalid = true;
             hints.delete(name); // A repeated key is unusable, even if a later value agrees.

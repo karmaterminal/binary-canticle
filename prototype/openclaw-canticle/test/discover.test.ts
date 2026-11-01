@@ -59,6 +59,35 @@ test("repeated TXT keys invalidate and discard hints across records, including l
   assert.deepEqual(result.stations[0]?.public_streams, ["hymn"]);
 });
 
+test("TXT keys differing only by case are duplicate and unusable", async () => {
+  const dns = async (name: string, kind: string) => {
+    if (name === service && kind === "PTR") return [{ type: "PTR", value: instance }];
+    if (name === instance && kind === "TXT") return [
+      { type: "TXT", entries: ["StReAmS=private"] },
+      { type: "TXT", entries: ["streams=hymn"] },
+    ];
+    return [];
+  };
+  const result = await new Discoverer(config(), dns).browse(domain) as {
+    stations: { public_streams: string[]; mismatches: string[] }[];
+  };
+  assert.deepEqual(result.stations[0]?.mismatches, ["txt-invalid"]);
+  assert.deepEqual(result.stations[0]?.public_streams, ["hymn"]);
+});
+
+test("a lone mixed-case TXT key is checked against the catalog", async () => {
+  const dns = async (name: string, kind: string) => {
+    if (name === service && kind === "PTR") return [{ type: "PTR", value: instance }];
+    if (name === instance && kind === "TXT") return [{ type: "TXT", entries: ["StReAmS=private"] }];
+    return [];
+  };
+  const result = await new Discoverer(config(), dns).browse(domain) as {
+    stations: { public_streams: string[]; mismatches: string[] }[];
+  };
+  assert.deepEqual(result.stations[0]?.mismatches, ["streams"]);
+  assert.deepEqual(result.stations[0]?.public_streams, ["hymn"]);
+});
+
 test("TTL refresh, negative cache, out-of-zone target, and instance bound", async () => {
   let now = 0;
   let calls = 0;
