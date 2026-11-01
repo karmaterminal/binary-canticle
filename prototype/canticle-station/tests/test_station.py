@@ -470,6 +470,20 @@ class SocketGrantTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             runner.socket_grant(st, ["advisory"])  # not granted to the key at all
 
+    def test_public_catalog_only_returns_explicit_public_subset(self):
+        st = self.station()
+        allowed = runner.socket_grant(st)
+        self.assertEqual(runner._dispatch(st, {"op": "public_catalog"}, allowed)["public_streams"], [])
+        st.grant = StationEntry("keeper", wire.public_key_bytes(SK), st.grant.classes,
+                                ("chatter", "private.posture"), scopes=st.grant.scopes,
+                                public_streams=("chatter",))
+        catalog = runner._dispatch(st, {"op": "public_catalog"}, allowed)
+        self.assertEqual(catalog, {"ok": True, "station": "keeper", "key_id": st.key_id.hex(),
+                                   "public_key": wire.public_key_bytes(SK).hex(), "public_streams": ["chatter"]})
+        st.grant = StationEntry("keeper", wire.public_key_bytes(SK), st.grant.classes,
+                                ("chatter",), revoked=True, public_streams=("chatter",))
+        self.assertFalse(runner._dispatch(st, {"op": "public_catalog"}, allowed)["ok"])
+
     def test_dispatch_refuses_before_signing(self):
         st = self.station()
         allowed = runner.socket_grant(st)

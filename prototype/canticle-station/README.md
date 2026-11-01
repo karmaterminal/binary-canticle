@@ -17,6 +17,19 @@ them loop until they expire.
 | §10.4 Publisher grants | The station signs only the classes, scopes and streams its manifest entry grants, checked before a `seq` is allocated. The control socket has its own grant, narrower than the key's (`--socket-class`), and never accepts `regulatory`, `alarm` or `control`, because their op-level and typed-body checks (§10.4, §15.4) are not implemented here; `host` scope is refused because this station only speaks UDP; one station per key (an exclusive lease on the key file); epochs from a locked, fsynced counter. |
 | §11.1-§11.2 Bindings | Host-local submission over a unix socket (mode 0600, peer uid checked); UDP unicast and LAN multicast (`239.255.13.13:9999`, provisional per D22, IP TTL 1, don't-fragment). |
 | §11.2, §13.6, §15.7 Onboarding (#73) | `canticle doctor` checks Python, `cryptography` (with an RFC 8032 known answer), `stations.toml`, the manifest and the listener's UDP address, and only reports multicast. `stations.toml` locates the manifest and the listener's address. `canticle manifest verify` and `show` read the unsigned spike-0 manifest; manifests refuse small-order keys (§9.3) and key-ids that do not match their keys (§10.3). |
+
+### Public discovery catalog prerequisite
+
+An optional `public_streams` list on each spike-0 manifest station entry is the explicit subset of
+`streams` that may be named in DNS-SD (§13.2). Missing means empty; the verifier and loader refuse
+invalid names, duplicates and names outside `streams`. This is a disclosure designation, not a
+publisher grant or proof of public scope. The station's existing uid-restricted control socket
+answers `{"op":"public_catalog"}` with its manifest station name, key-id, public key (hex), and
+only that explicit `public_streams` list. A revoked grant is refused. This operation is read-only
+and returns no live status or private stream names. It is the **station** control socket, not the
+host receptor-record daemon socket; the latter has no single local station identity. DNS remains
+a locator and cross-check hint, never an identity or trust source. This spike does not publish or
+resolve DNS records, and its manifest remains unsigned.
 | §6.7 Findings (FP-1, #112) | `canticle/finding.py`: the finding body (content type 11) and its strict reader. `canticle sing --finding` and `--body-ref`, and the control socket's `finding` and `body_ref` fields, put a keyed `advisory` finding and a `finding-ref` doorbell on air. `canticle tap` shows a finding field by field, with a host-authored line that attributes it to its signer. See [Findings](#findings-fp-1-112). |
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
 | §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only gateway over one listener, and a read-only page to pick a station:stream and watch its live ring, with expiry and gaps shown honestly. |
