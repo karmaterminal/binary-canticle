@@ -84,26 +84,31 @@ test("registers seven optional tools and one service, matching the manifest and 
   assert.equal(pkg.private, true); // never published (AGENTS.md: publication is a separate, human-decided gate)
 });
 
-test("host contract exposes route/workflow data without activating OC-0 or wake", async () => {
+test("production entry wires complete workflow to two exact sessions and consumes independently", async () => {
+  const first = "agent:main:local:task";
+  const second = "agent:main:local:other";
   const cfg = {
     binding: "rune",
     daemon: { socket: daemon.path },
     listen: { tune: ["*:*"], subscriptions: [] },
     delivery: { mode: "explicit", subscriptions: [{
-      id: "fleet", targets: [{ sessionKey: "agent:main:local:task" }], delivery: "ambient",
+      id: "fleet", targets: [{ sessionKey: first }, { sessionKey: second }], delivery: "ambient",
       stations: ["cael"], streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
     }] },
   };
-  let enqueued = 0;
-  let queried = 0;
-  let withdrawn = 0;
+  const entries = new Map<string, { sessionKey: string; expectedSessionId: string; expectedLifecycleRevision: string; text: string; state: string }>();
   const workflow = {
-    enqueueNextTurnInjection: async () => { enqueued++; return { enqueued: true }; },
-    getNextTurnInjectionState: async () => { queried++; return { state: "pending" }; },
-    withdrawNextTurnInjection: async () => { withdrawn++; return { state: "withdrawn" }; },
+    enqueueNextTurnInjection: async (entry: { sessionKey: string; expectedSessionId: string; expectedLifecycleRevision: string; idempotencyKey: string; text: string }) => {
+      entries.set(entry.idempotencyKey, { ...entry, state: "pending" }); return { enqueued: true };
+    },
+    getNextTurnInjectionState: async ({ idempotencyKey }: { idempotencyKey: string }) => ({ state: entries.get(idempotencyKey)?.state ?? "unknown" }),
+    withdrawNextTurnInjection: async ({ idempotencyKey }: { idempotencyKey: string }) => {
+      const entry = entries.get(idempotencyKey); if (entry?.state === "pending") entry.state = "withdrawn";
+      return { state: entry?.state ?? "unknown" };
+    },
   };
-  const { service } = load(cfg, { session: {
-    state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true }) },
+  const { tools, service } = load(cfg, { session: {
+    state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: `id:${sessionKey}`, lifecycleRevision: `rev:${sessionKey}` }) },
     workflow,
   }, on: () => undefined });
   const ctx = {
@@ -114,12 +119,46 @@ test("host contract exposes route/workflow data without activating OC-0 or wake"
   await service.start(ctx);
   try {
     await waitFor(() => daemon.accepted === 1, "nested workflow service daemon join");
+    const status = tool(tools, "canticle_status", { sessionKey: first, sessionId: `id:${first}`, lifecycleRevision: `rev:${first}` });
+    const joinDeadline = Date.now() + 4_000;
+    while (!((await status.execute("join", {})).details.canticle.on_air as Obj).known) {
+      assert.ok(Date.now() < joinDeadline, "timed out waiting for completed join snapshot");
+      await sleep(5);
+    }
     daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 1, issued_at: Date.now(), ttl_ms: 120_000 });
-    await sleep(30);
-    assert.equal(enqueued, 0, "the plugin does not activate ambient workflow from this contract alone");
-    assert.equal(queried, 0);
-    assert.equal(withdrawn, 0);
+    await waitFor(() => [...entries.values()].filter((entry) => entry.state === "pending").length === 2, "two exact session slots");
+    const active = [...entries.values()];
+    assert.deepEqual(active.map((entry) => entry.sessionKey).sort(), [first, second].sort());
+    for (const entry of active) {
+      assert.equal(entry.expectedSessionId, `id:${entry.sessionKey}`);
+      assert.equal(entry.expectedLifecycleRevision, `rev:${entry.sessionKey}`);
+    }
+    active.find((entry) => entry.sessionKey === first)!.state = "consumed";
+    const firstTaintDeadline = Date.now() + 7_000;
+    while (!((await status.execute("first-drain", {})).details.canticle.session as Obj).tainted) {
+      assert.ok(Date.now() < firstTaintDeadline, "timed out waiting for first session consumption");
+      await sleep(10);
+    }
+    const secondStatus = tool(tools, "canticle_status", { sessionKey: second, sessionId: `id:${second}`, lifecycleRevision: `rev:${second}` });
+    assert.equal(((await secondStatus.execute("second-still-pending", {})).details.canticle.session as Obj).tainted, false);
+    assert.equal(active.find((entry) => entry.sessionKey === second)!.state, "pending", "drain is target-specific");
   } finally { await service.stop?.(ctx); }
+});
+
+test("ambient entry fails closed for every incomplete workflow or route seam", async () => {
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, delivery: { mode: "explicit", subscriptions: [{
+    id: "fleet", targets: [{ sessionKey: "agent:main:local:task" }], delivery: "ambient",
+    stations: ["cael"], streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
+  }] } };
+  const ctx = { stateDir: dir };
+  const complete = { enqueueNextTurnInjection: async () => ({ enqueued: true }),
+    getNextTurnInjectionState: async () => ({ state: "pending" }), withdrawNextTurnInjection: async () => ({ state: "withdrawn" }) };
+  const route = { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: "id", lifecycleRevision: "rev" }) };
+  for (const session of [{ workflow: complete }, ...Object.keys(complete).map((missing) => ({ state: route,
+    workflow: Object.fromEntries(Object.entries(complete).filter(([name]) => name !== missing)) }))]) {
+    const { service } = load(cfg, { session, on: () => undefined });
+    await assert.rejects(service.start(ctx), /complete generation-bound/);
+  }
 });
 
 test("publish tools are offered only when publishing is enabled, never to a sub-agent or a call that names no session", () => {
