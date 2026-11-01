@@ -158,7 +158,7 @@ class TunerHttp:
 
 
 async def run_tuner(listener: Listener, bind: tuple[str, int], group: Optional[str], http_host: str,
-                    http_port: int, stop: Optional[asyncio.Event] = None, on_event=None, ready=None,
+                    http_port: int, stop: Optional[asyncio.Event] = None, ready=None,
                     demo_fixture: bool = False) -> None:
     """Hear on UDP and serve a synthetic-only human view on a loopback HTTP port."""
     from . import runner
@@ -170,8 +170,6 @@ async def run_tuner(listener: Listener, bind: tuple[str, int], group: Optional[s
 
     def handle(ev: Event) -> None:
         view.observe(ev, _now_ms())
-        if on_event is not None:
-            on_event(ev)
 
     try:
         await runner.run_listener(listener, bind, handle, group, stop)

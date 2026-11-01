@@ -1,11 +1,14 @@
 import asyncio
+import hashlib
 import json
 import random
+import subprocess
+import sys
 import unittest
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from canticle import vectors, wire
+from canticle import finding, vectors, wire
 from canticle.listener import Listener
 from canticle.manifest import Manifest, StationEntry
 from canticle.station import Station, StreamConfig
@@ -17,18 +20,32 @@ KID = wire.key_id(wire.public_key_bytes(SK))
 PRIVATE_PAYLOAD = "PRIVATE-MACHINE-BOY-CONVERSATION-NEVER-FOR-HUMANS"
 PRIVATE_STATION = "private-cael"
 PRIVATE_STREAM = "private-chatter"
+PRIVATE_STATE_KEY = "private-incident-state-key"
+PRIVATE_BODY_REF_URL = "https://private.invalid/evidence-ledger"
+PRIVATE_BODY_REF_DIGEST = bytes.fromhex("ab" * 32)
+PRIVATE_FINDING_SUMMARY = "PRIVATE-FINDING-SUMMARY-NEVER-FOR-HUMANS"
+PRIVATE_NOT_PROVED = "PRIVATE-NOT-PROVED-DETAIL-NEVER-FOR-HUMANS"
+PRIVATE_BINARY = b"PRIVATE-BINARY-BODY-NEVER-FOR-HUMANS"
+PRIVATE_FINDING_BODY = finding.encode({"incident": PRIVATE_STATE_KEY, "subject": PRIVATE_STATION,
+                                       "voice": "observer", "status": "open", "severity": "moderate",
+                                       "summary": PRIVATE_FINDING_SUMMARY, "not_proved": PRIVATE_NOT_PROVED})
 
 
 def setup(demo_fixture=False):
     st = Station(SK, [StreamConfig(PRIVATE_STREAM)], epoch=1, rng=random.Random(1), now_ms=T0)
     m = Manifest([StationEntry(PRIVATE_STATION, wire.public_key_bytes(SK),
-                               frozenset({1, 2}), (PRIVATE_STREAM,))])
+                               frozenset({1, 2, 4, 5}), (PRIVATE_STREAM,))])
     lst = Listener(m, ephemeral=True, warmup=False)
     return st, lst, TunerView(lst, demo_fixture=demo_fixture)
 
 
 def feed(st, lst, view):
     st.sing(T0, PRIVATE_STREAM, text=PRIVATE_PAYLOAD, ttl_s=60)
+    st.sing(T0, PRIVATE_STREAM, body=PRIVATE_BINARY, ctype=42, ttl_s=60)
+    st.sing(T0, PRIVATE_STREAM, cls="finding-ref",
+            body_ref=(PRIVATE_BODY_REF_URL, PRIVATE_BODY_REF_DIGEST, 1234), ttl_s=60)
+    st.sing(T0, PRIVATE_STREAM, body=PRIVATE_FINDING_BODY, cls="advisory", ctype=finding.CTYPE,
+            state_key=PRIVATE_STATE_KEY, ttl_s=60)
     for t in range(T0, T0 + 3_000, 100):
         for frame in st.poll(t):
             for ev in lst.hear(frame, t):
@@ -40,8 +57,27 @@ def feed(st, lst, view):
 def assert_private_absent(test, value):
     encoded = json.dumps(value)
     for secret in (PRIVATE_PAYLOAD, PRIVATE_STATION, PRIVATE_STREAM, KID.hex(),
-                   "digest", "payload", "unverified_datagrams"):
+                   PRIVATE_STATE_KEY, PRIVATE_BODY_REF_URL, PRIVATE_BODY_REF_DIGEST.hex(),
+                   PRIVATE_FINDING_SUMMARY, PRIVATE_NOT_PROVED, PRIVATE_BINARY.decode("ascii"),
+                   hashlib.sha256(PRIVATE_PAYLOAD.encode()).hexdigest(),
+                   hashlib.sha256(PRIVATE_BINARY).hexdigest(),
+                   hashlib.sha256(PRIVATE_FINDING_BODY).hexdigest(),
+                   "digest", "payload", "unverified_datagrams", "finding", "body_ref",
+                   "state_key", "binary_bytes", "text", "digests", "dedup", "evidence"):
         test.assertNotIn(secret, encoded)
+    forbidden_keys = {"text", "finding", "body_ref", "body", "base64", "binary_bytes",
+                      "state_key", "sha256", "digests", "dedup", "evidence",
+                      "issued_at", "expires_at", "local_expiry", "gap"}
+    if isinstance(value, dict):
+        def keys(obj):
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    test.assertNotIn(k, forbidden_keys)
+                    keys(v)
+            elif isinstance(obj, list):
+                for v in obj:
+                    keys(v)
+        keys(value)
 
 
 class TunerViewPrivacyTest(unittest.TestCase):
@@ -145,6 +181,15 @@ class TunerHttpPrivacyTest(unittest.TestCase):
         for host in ("0.0.0.0", "192.168.1.5", "localhost"):
             with self.assertRaises(ValueError):
                 TunerHttp(self.view, host, 0)
+
+
+class TunerCliPrivacyTest(unittest.TestCase):
+    def test_tuner_has_no_event_log_option(self):
+        result = subprocess.run([sys.executable, "-m", "canticle", "tuner", "--help"],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                text=True, check=False)
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("--log", result.stdout)
 
 
 if __name__ == "__main__":

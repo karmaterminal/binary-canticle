@@ -430,12 +430,6 @@ def cmd_tuner(a) -> int:
         return 1
     state, _lease = _listener_state(a, role="tuner")
     lst = Listener(m, state_path=state, ephemeral=a.ephemeral)
-    log = open(a.log, "a") if a.log else None
-
-    def on_event(ev) -> None:
-        if log is not None:
-            log.write(json.dumps({"t_ms": runner.now_ms(), **ev.to_json()}) + "\n")
-            log.flush()
 
     def ready(port: int) -> None:
         print(json.dumps({"tuner": f"http://{http_host}:{port}/", "udp": a.bind,
@@ -447,7 +441,7 @@ def cmd_tuner(a) -> int:
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, stop.set)
         await run_tuner(lst, runner.parse_addr(a.bind), runner.MCAST_GROUP if a.multicast else None,
-                        http_host, http_port, stop, on_event=on_event, ready=ready,
+                        http_host, http_port, stop, ready=ready,
                         demo_fixture=a.demo_fixture)
 
     asyncio.run(main())
@@ -672,7 +666,6 @@ def main(argv=None) -> int:
     u.add_argument("--demo-fixture", action="store_true", help="show an explicitly synthetic sample station")
     u.add_argument("--state", help="listener safety state file (as for listen)")
     u.add_argument("--ephemeral", action="store_true", help="UNSAFE: keep no listener state across restarts")
-    u.add_argument("--log", help="append every listener event, as JSON lines, here")
     u.set_defaults(fn=cmd_tuner)
 
     dm = sub.add_parser("daemon", help="the host daemon: one UDP listener, record v1 to every binding over a unix socket",
