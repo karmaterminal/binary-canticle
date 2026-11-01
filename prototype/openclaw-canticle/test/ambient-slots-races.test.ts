@@ -4,6 +4,7 @@ import { AmbientSlots, type EntryOutcome, type HostEntry, type Oc0Host } from ".
 import { removeDir, tempDir } from "./helpers.ts";
 
 const now = 1_790_000_000_000, session = "agent:main:local:task";
+const proof = async (key: string) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1", lifecycleRevision: "r-1" });
 class Host implements Oc0Host {
   entries = new Map<string, EntryOutcome>();
   async enqueue(e: HostEntry) {
@@ -21,7 +22,7 @@ class Host implements Oc0Host {
 test("consumed predecessor in conditional supersede race never carries old frame", async () => {
   const root = tempDir(), host = new Host();
   try {
-    const a = new AmbientSlots(root, "rune", host); a.load();
+    const a = new AmbientSlots(root, "rune", host, proof); a.load();
     const request = (keys: string[]) => ({ sessionKey: session, slot: "canticle:digest" as const,
       frames: keys.map((key) => ({ key, line: key, expiresAt: now + 120_000 })) });
     await a.sync(request(["a"]), now);
@@ -44,7 +45,7 @@ test("consumed predecessor in conditional supersede race never carries old frame
 test("host entry expiry settles only individually expired frame keys", async () => {
   const root = tempDir(), host = new Host();
   try {
-    const a = new AmbientSlots(root, "rune", host); a.load();
+    const a = new AmbientSlots(root, "rune", host, proof); a.load();
     await a.sync({ sessionKey: session, slot: "canticle:digest", frames: [
       { key: "early", line: "early", expiresAt: now + 1000 },
       { key: "late", line: "late", expiresAt: now + 10_000 },
@@ -59,13 +60,13 @@ test("host entry expiry settles only individually expired frame keys", async () 
 test("delayed reset preserves a successor consumption taint", async () => {
   const root = tempDir(), host = new Host();
   try {
-    const a = new AmbientSlots(root, "rune", host); a.load();
+    const a = new AmbientSlots(root, "rune", host, proof); a.load();
     await a.sync({ sessionKey: session, slot: "canticle:digest", frames: [{ key: "successor", line: "successor", expiresAt: now + 120_000 }] }, now);
     host.entries.set(a.pending(session)[0]!.id, "consumed");
     await a.reconcile(session, now);
     assert.equal(a.isTainted(session), true);
     a.reset(session, now, false);
-    const restored = new AmbientSlots(root, "rune", host); restored.load();
+    const restored = new AmbientSlots(root, "rune", host, proof); restored.load();
     assert.equal(restored.isTainted(session), true);
   } finally { removeDir(root); }
 });
@@ -74,7 +75,7 @@ test("generation-free host proof refuses slots and delayed old reset preserves s
   const root = tempDir(), host = new Host();
   let generation: string | undefined;
   try {
-    const route = async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: generation });
+    const route = async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: generation, lifecycleRevision: generation ? `r-${generation}` : undefined });
     const a = new AmbientSlots(root, "rune", host, route); a.load();
     const request = (key: string) => ({ sessionKey: session, slot: "canticle:digest" as const,
       frames: [{ key, line: key, expiresAt: now + 120_000 }] });
@@ -92,5 +93,45 @@ test("generation-free host proof refuses slots and delayed old reset preserves s
     const restored = new AmbientSlots(root, "rune", host, route); restored.load();
     assert.equal(restored.isTainted(session, "new"), true);
     assert.equal(restored.isTainted(session, "old"), false);
+  } finally { removeDir(root); }
+});
+
+test("same-ID reset and route change block stale OC-0 calls; another session stays isolated", async () => {
+  const root = tempDir(), host = new Host(), other = "agent:main:local:other";
+  const revision = new Map([[session, "before"], [other, "other-revision"]]);
+  const route = async (key: string) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "same", lifecycleRevision: revision.get(key) ?? null });
+  try {
+    const a = new AmbientSlots(root, "rune", host, route); a.load();
+    const request = (key: string, item: string) => ({ sessionKey: key, slot: "canticle:digest" as const,
+      frames: [{ key: item, line: item, expiresAt: now + 120_000 }] });
+    await a.sync(request(session, "old"), now);
+    await a.sync(request(other, "other"), now);
+    revision.set(session, "after");
+    await assert.rejects(a.reconcile(session, now), /another session generation/);
+    await assert.rejects(a.sync(request(session, "new"), now), /another session generation/);
+    await a.reconcile(other, now);
+    assert.equal(a.pending(other).length, 1);
+    assert.equal(a.pending(session)[0]?.lifecycleRevision, "before");
+  } finally { removeDir(root); }
+});
+
+test("delayed same-ID callback cannot clear successor revision slots or taint", async () => {
+  const root = tempDir(), host = new Host();
+  let revision = "before";
+  const route = async (key: string) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "same", lifecycleRevision: revision });
+  try {
+    const a = new AmbientSlots(root, "rune", host, route); a.load();
+    const request = (key: string) => ({ sessionKey: session, slot: "canticle:digest" as const,
+      frames: [{ key, line: key, expiresAt: now + 120_000 }] });
+    await a.sync(request("old"), now);
+    a.reset(session, now, true, "same", "before");
+    revision = "after";
+    await a.sync(request("new"), now);
+    host.entries.set(a.pending(session)[0]!.id, "consumed");
+    await a.reconcile(session, now);
+    a.reset(session, now, true, "same", "before");
+    a.deleteSession(session, true, "same", "before");
+    assert.equal(a.isTainted(session, "same"), true);
+    assert.equal(a.outcome("new"), true);
   } finally { removeDir(root); }
 });

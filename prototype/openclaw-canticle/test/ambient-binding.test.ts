@@ -34,7 +34,7 @@ test("binding wires OC-0 only with both seams; restart does not admit stale cand
     id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
   }] } });
-  const proof = async (key: string) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" });
+  const proof = async (key: string) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1", lifecycleRevision: "r-1" });
   const make = (oc0Host?: Oc0Host) => new Binding({ config: cfg, root, routeProof: proof, ...(oc0Host ? { oc0Host } : {}), tickMs: 3_600_000 });
   let b: Binding | null = null;
   try {
@@ -57,7 +57,7 @@ test("canticle_mute revokes queued candidates and pending OC-0 slots", async () 
     id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
   }] } });
-  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" }), oc0Host: host });
+  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1", lifecycleRevision: "r-1" }), oc0Host: host });
   try {
     await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
     daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 6, issued_at: now, ttl_ms: 120_000 });
@@ -74,7 +74,7 @@ test("route proof failure gates consumed withdrawal notes", async () => {
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
   }] } });
   let routeValid = true;
-  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: routeValid, onHost: routeValid, sessionId: "s-1" }), oc0Host: host });
+  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: routeValid, onHost: routeValid, sessionId: "s-1", lifecycleRevision: "r-1" }), oc0Host: host });
   try {
     await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
     daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 8, issued_at: now, ttl_ms: 120_000 });
@@ -95,7 +95,7 @@ test("drained frame retracted while binding runs queues one metadata-only digest
     id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
   }] } });
-  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" }), oc0Host: host });
+  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1", lifecycleRevision: "r-1" }), oc0Host: host });
   try {
     await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
     daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 7, issued_at: now, ttl_ms: 120_000 });
@@ -117,7 +117,7 @@ test("retract withdraws a pending slot before rebuilding the surviving frame", a
     id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
   }] } });
-  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" }), oc0Host: host });
+  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1", lifecycleRevision: "r-1" }), oc0Host: host });
   try {
     await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
     for (const seq of [1, 2]) daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq, issued_at: now, ttl_ms: 120_000 });
@@ -134,7 +134,7 @@ test("landing MUTE and regulatory change withdraw pending host entry; clear stat
     id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
   }] } });
-  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" }), oc0Host: host });
+  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1", lifecycleRevision: "r-1" }), oc0Host: host });
   try {
     await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
     daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 21, issued_at: now, ttl_ms: 120_000 });
@@ -172,7 +172,7 @@ test("landing MUTE racing an in-flight host enqueue withdraws its accepted entry
     id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
   }] } });
-  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" }), oc0Host: host });
+  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1", lifecycleRevision: "r-1" }), oc0Host: host });
   try {
     await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
     daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 31, issued_at: now, ttl_ms: 120_000 });
@@ -201,7 +201,7 @@ test("breaker change racing an in-flight enqueue withdraws the old entry before 
     id: "fleet", targets: [{ sessionKey: session }], delivery: "ambient", stations: ["cael"],
     streams: ["lens.threat"], classes: ["live-state"], perHour: 10,
   }] } });
-  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1" }), oc0Host: host });
+  const b = new Binding({ config: cfg, root, routeProof: async (key) => ({ sessionKey: key, exists: true, onHost: true, sessionId: "s-1", lifecycleRevision: "r-1" }), oc0Host: host });
   try {
     await daemon.start(); await b.start(); await waitFor(() => b.receiver.current());
     daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", class: "live-state", seq: 41, issued_at: now, ttl_ms: 120_000 });

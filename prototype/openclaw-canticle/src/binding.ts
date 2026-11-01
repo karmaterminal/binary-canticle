@@ -613,13 +613,15 @@ export class Binding {
       (st.taint_overflow !== null && this.mayReadText(c) && (st.taint_cleared?.[key] ?? -1) < st.taint_overflow));
   }
   /** Called only after the host has cleared this session's pending injections on /new. */
-  async resetSession(sessionKey: string, sessionId: string | null): Promise<void> {
+  async resetSession(sessionKey: string, sessionId: string | null, lifecycleRevision?: string): Promise<void> {
     await this.ambientFlight;
     const st = this.state;
     if (!st) throw new Error("canticle binding is not running");
     const now = this.clock();
-    this.ambient?.reset(sessionKey, now, sessionId !== null, sessionId ?? undefined);
-    this.candidates.resetSession(sessionKey, now, sessionId ?? undefined);
+    if (lifecycleRevision) {
+      this.ambient?.reset(sessionKey, now, sessionId !== null, sessionId ?? undefined, lifecycleRevision);
+      this.candidates.resetSession(sessionKey, now, sessionId ?? undefined, lifecycleRevision);
+    } // An ID-only callback cannot distinguish a same-ID reset; leave ambient blocked.
     for (const key of [sessionId, `key:${sessionKey}`]) {
       if (key === null) continue;
       delete st.taint[key];
@@ -636,10 +638,12 @@ export class Binding {
     this.saveState();
   }
   /** Called after host session deletion; no slot outcome or taint history survives. */
-  async deleteSession(sessionKey: string, sessionId: string | null): Promise<void> {
-    await this.resetSession(sessionKey, sessionId);
-    this.ambient?.deleteSession(sessionKey, sessionId !== null, sessionId ?? undefined);
-    this.candidates.deleteSession(sessionKey, sessionId ?? undefined);
+  async deleteSession(sessionKey: string, sessionId: string | null, lifecycleRevision?: string): Promise<void> {
+    await this.resetSession(sessionKey, sessionId, lifecycleRevision);
+    if (lifecycleRevision) {
+      this.ambient?.deleteSession(sessionKey, sessionId !== null, sessionId ?? undefined, lifecycleRevision);
+      this.candidates.deleteSession(sessionKey, sessionId ?? undefined, lifecycleRevision);
+    }
     const st = this.state!;
     for (const key of [sessionId, `key:${sessionKey}`]) if (key !== null) delete st.taint_cleared?.[key];
     this.saveState();

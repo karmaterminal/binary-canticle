@@ -12,14 +12,14 @@ const PLUGIN_ID = "canticle";
 
 type Logger = { info?: (msg: string) => void; warn?: (msg: string) => void; error?: (msg: string) => void };
 type ServiceContext = { config?: unknown; stateDir: string; logger?: Logger };
-type LifecycleEvent = { sessionId: string; sessionKey: string; nextSessionId?: string };
+type LifecycleEvent = { sessionId: string; sessionKey: string; lifecycleRevision?: string; nextSessionId?: string };
 type LifecycleContext = { sessionId: string; sessionKey: string; agentId: string };
 type PluginApi = {
   pluginConfig?: unknown;
   /** OpenClaw #1523: post-commit, metadata-only session lifecycle hooks. */
   on?: (name: "session_reset" | "session_delete", handler: (event: LifecycleEvent, context: LifecycleContext) => Promise<void>) => void;
   session?: { state?: { resolveLocalSessionRoute?: (sessionKey: string) => Promise<{
-    sessionKey: string; exists: boolean; onHost: boolean;
+    sessionKey: string; exists: boolean; onHost: boolean; sessionId: string | null; lifecycleRevision: string | null;
   }> } };
   registerTool: (factory: (ctx: ToolContext) => unknown, opts: { name: string; optional: boolean }) => void;
   registerService: (service: {
@@ -60,8 +60,8 @@ export default {
         !event.sessionKey.startsWith(`agent:${context.agentId}:`)) return;
       const b = binding;
       if (!b) return;
-      if (kind === "reset") await b.resetSession(event.sessionKey, event.sessionId);
-      else await b.deleteSession(event.sessionKey, event.sessionId);
+      if (kind === "reset") await b.resetSession(event.sessionKey, event.sessionId, event.lifecycleRevision);
+      else await b.deleteSession(event.sessionKey, event.sessionId, event.lifecycleRevision);
     };
     // Registration happens at plugin load, before the service can receive lifecycle events.
     if (typeof api.on === "function") {
@@ -92,7 +92,7 @@ export default {
             root: stateRootOf(cfg, ctx.stateDir),
             routeProof: async (sessionKey) => {
               const resolve = api.session?.state?.resolveLocalSessionRoute;
-              if (!resolve) return { sessionKey, exists: false, onHost: false };
+              if (!resolve) return { sessionKey, exists: false, onHost: false, sessionId: null, lifecycleRevision: null };
               return resolve(sessionKey);
             },
             log: (msg) => ctx.logger?.info?.(msg),

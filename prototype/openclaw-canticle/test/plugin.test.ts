@@ -38,7 +38,7 @@ function load(pluginConfig?: unknown, apiExtra: Obj = {}): { tools: Map<string, 
   return { tools, service: services[0] as Service };
 }
 
-function tool(tools: ReturnType<typeof load>["tools"], name: string, ctx: Obj = { sessionKey: "agent:main:main", sessionId: "s-1" }): Tool {
+function tool(tools: ReturnType<typeof load>["tools"], name: string, ctx: Obj = { sessionKey: "agent:main:main", sessionId: "s-1", lifecycleRevision: "r-1" }): Tool {
   const t = tools.get(name)?.factory(ctx);
   assert.ok(t, `${name} is offered`);
   return t;
@@ -209,7 +209,7 @@ test("a started service answers through the tools, and a refusal is a failed res
     const status = tool(tools, "canticle_status");
     await waitFor(() => daemon.accepted === 1, "the daemon connection");
     daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "chatter", seq: 1, issued_at: clock.t, text: "hello from cael" });
-    const listen = tool(tools, "canticle_listen", { sessionKey: "agent:main:reader", sessionId: "s-1" });
+    const listen = tool(tools, "canticle_listen", { sessionKey: "agent:main:reader", sessionId: "s-1", lifecycleRevision: "r-1" });
     const end = Date.now() + 4_000;
     let out = await listen.execute("c3", { what: "journal", view: "items" });
     while (out.content[0]?.text.includes("hello from cael") !== true) {
@@ -404,7 +404,7 @@ test("typed reset and delete callbacks clear only the ended exact session", asyn
   const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: [key], subscriptions: [{ sessionKey: key, tune: ["*:*"] }] } };
   const hooks = new Map<string, LifecycleHandler>();
   const { tools, service } = load(cfg, { on: (name: string, handler: LifecycleHandler) => hooks.set(name, handler),
-    session: { state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: currentSessionId }) } } });
+    session: { state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: currentSessionId, lifecycleRevision: `r-${currentSessionId}` }) } } });
   assert.deepEqual([...hooks.keys()], ["session_reset", "session_delete"]);
   const ctx = { stateDir: dir, logger: { info: () => undefined } };
   await service.start(ctx);
