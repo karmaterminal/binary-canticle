@@ -29,6 +29,7 @@ export class Candidates {
   private muteScopes: { station: string | null; stream: string | null }[] = [];
   private readonly retractedInFlight = new Set<string>();
   private readonly cancelledRuns = new Set<string>();
+  private readonly resetEpoch = new Map<string, number>();
   constructor(root: string, binding: string, subscriptions: Subscription[], route: RouteProof, ambientEnabled = true) {
     this.path = join(root, "candidates.json");
     this.binding = binding;
@@ -135,8 +136,10 @@ export class Candidates {
     for (const sub of this.subscriptions) {
       if (sub.delivery !== "ambient" || (self && !sub.stations.includes(frame.station)) || !match(sub.stations, frame.station) || !match(sub.streams, frame.stream) || !match(sub.classes, frame.class) || !match(sub.scopes, frame.scope) || !match(sub.lenses, frame.lens)) continue;
       for (const target of sub.targets) {
+        const epoch = this.resetEpoch.get(target.sessionKey) ?? 0;
         if (!await this.validRoute(target.sessionKey)) continue;
-        if (!mayAdmit() || this.retractedInFlight.has(frame.idem) || this.cancelledRuns.has(run)) continue;
+        if (!mayAdmit() || this.retractedInFlight.has(frame.idem) || this.cancelledRuns.has(run) ||
+          (this.resetEpoch.get(target.sessionKey) ?? 0) !== epoch) continue;
         const spendKey = `${sub.id}:${target.sessionKey}`;
         const spent = this.data.spend[spendKey] ?? [];
         const key = `${frame.idem}:${target.sessionKey}`;
@@ -181,6 +184,7 @@ export class Candidates {
     this.prune(now); this.save();
   }
   resetSession(session: string, now: number): void {
+    this.resetEpoch.set(session, (this.resetEpoch.get(session) ?? 0) + 1);
     for (const [key, c] of Object.entries(this.data.pending)) if (c.sessionKey === session) {
       delete this.data.pending[key]; this.data.settled[key] = c.expiresAt + 5000;
     }

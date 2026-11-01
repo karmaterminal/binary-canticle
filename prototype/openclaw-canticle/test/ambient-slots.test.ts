@@ -114,13 +114,13 @@ test("reset clears taint and pending slots but retains frame tombstones; delete 
     await a.sync(req("canticle:digest", key), now);
     host.drain("canticle:digest"); await a.reconcile(sessionKey, now);
     assert.equal(a.isTainted(sessionKey), true);
-    a.reset(sessionKey, now);
+    a.reset(sessionKey, now, true);
     const b = new AmbientSlots(root, "rune", host); b.load();
     assert.equal(b.isTainted(sessionKey), false);
     assert.equal(b.outcome(key), true);
     await b.sync(req("canticle:digest", key), now);
     assert.equal(host.entries.size, 1, "reset cannot re-admit consumed frame");
-    b.deleteSession(sessionKey);
+    b.deleteSession(sessionKey, true);
     const c = new AmbientSlots(root, "rune", host); c.load();
     assert.equal(c.outcome(key), false);
     assert.equal(c.sessions().includes(sessionKey), false);

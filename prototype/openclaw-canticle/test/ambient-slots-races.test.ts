@@ -55,3 +55,17 @@ test("host entry expiry settles only individually expired frame keys", async () 
     assert.equal(a.outcome("late"), false);
   } finally { removeDir(root); }
 });
+
+test("delayed reset preserves a successor consumption taint", async () => {
+  const root = tempDir(), host = new Host();
+  try {
+    const a = new AmbientSlots(root, "rune", host); a.load();
+    await a.sync({ sessionKey: session, slot: "canticle:digest", frames: [{ key: "successor", line: "successor", expiresAt: now + 120_000 }] }, now);
+    host.entries.set(a.pending(session)[0]!.id, "consumed");
+    await a.reconcile(session, now);
+    assert.equal(a.isTainted(session), true);
+    a.reset(session, now, false);
+    const restored = new AmbientSlots(root, "rune", host); restored.load();
+    assert.equal(restored.isTainted(session), true);
+  } finally { removeDir(root); }
+});

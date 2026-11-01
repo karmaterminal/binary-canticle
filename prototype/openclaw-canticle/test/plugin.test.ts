@@ -418,12 +418,15 @@ test("typed reset and delete callbacks clear only the ended exact session", asyn
     }
     const state = () => JSON.parse(readFileSync(join(dir, "canticle", "rune", "state.json"), "utf8")) as { taint: Record<string, unknown>; checkpoints: Record<string, unknown> };
     assert.ok(state().taint.old);
+    await reader.execute("checkpoint", { what: "new" });
+    assert.ok(state().checkpoints[key], "checkpoint is keyed by sessionKey, not sessionId");
     const event = { sessionId: "old", sessionKey: key };
     const context = { ...event, agentId: "main" };
     await hooks.get("session_reset")!({ ...event, nextSessionId: "new" }, { ...context, sessionKey: "agent:main:other" });
     assert.ok(state().taint.old, "mismatched context cannot clear another session");
     await hooks.get("session_reset")!({ ...event, nextSessionId: "new" }, context);
     assert.equal(state().taint.old, undefined);
+    assert.equal(state().checkpoints[key], undefined);
     await reader.execute("read2", { what: "journal", view: "items" });
     assert.ok(state().taint.old);
     await hooks.get("session_delete")!(event, context);

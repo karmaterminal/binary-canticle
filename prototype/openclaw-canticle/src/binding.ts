@@ -618,21 +618,21 @@ export class Binding {
     const st = this.state;
     if (!st) throw new Error("canticle binding is not running");
     const now = this.clock();
-    this.ambient?.reset(sessionKey, now);
+    this.ambient?.reset(sessionKey, now, false);
     this.candidates.resetSession(sessionKey, now);
     for (const key of [sessionId, `key:${sessionKey}`]) {
       if (key === null) continue;
       delete st.taint[key];
-      delete st.checkpoints[key];
       if (st.taint_overflow !== null && Object.keys(st.taint_cleared ?? {}).length < TAINT_MAX)
         (st.taint_cleared ??= {})[key] = now;
     }
+    delete st.checkpoints[sessionKey];
     this.saveState();
   }
   /** Called after host session deletion; no slot outcome or taint history survives. */
   async deleteSession(sessionKey: string, sessionId: string | null): Promise<void> {
     await this.resetSession(sessionKey, sessionId);
-    this.ambient?.deleteSession(sessionKey);
+    this.ambient?.deleteSession(sessionKey, false);
     this.candidates.deleteSession(sessionKey);
     const st = this.state!;
     for (const key of [sessionId, `key:${sessionKey}`]) if (key !== null) delete st.taint_cleared?.[key];

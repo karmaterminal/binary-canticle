@@ -167,3 +167,21 @@ test("a Promise-shaped, rejected, or mismatched host proof grants no candidate",
     } finally { removeDir(root); }
   }
 });
+
+test("reset fences an in-flight route proof, but permits a fresh generation", async () => {
+  const root = tempDir(); const now = 1_790_000_000_000;
+  let release: ((value: { sessionKey: string; exists: boolean; onHost: boolean }) => void) | undefined;
+  let delayed = true;
+  try {
+    const ledger = new Candidates(root, "rune", config({ perHour: 10 }).delivery.subscriptions,
+      (key) => delayed ? new Promise((resolve) => { release = resolve; }) : Promise.resolve({ sessionKey: key, exists: true, onHost: true }));
+    ledger.load(now);
+    const admission = ledger.accept(frame(now, 10), "run", now, false, false);
+    ledger.resetSession(session, now);
+    release?.({ sessionKey: session, exists: true, onHost: true });
+    assert.equal(await admission, 0);
+    assert.equal(ledger.pendingCount, 0);
+    delayed = false;
+    assert.equal(await ledger.accept(frame(now, 11), "run", now, false, false), 1);
+  } finally { removeDir(root); }
+});

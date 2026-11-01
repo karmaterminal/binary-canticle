@@ -167,22 +167,23 @@ export class AmbientSlots {
   }
   isTainted(session: string): boolean { return this.data.tainted?.[session] !== undefined; }
   /** The host has cleared pending entries on reset/disable. Keep admitted frame keys settled. */
-  reset(session: string, now: number): void {
+  reset(session: string, now: number, clearTaint: boolean): void {
     this.prune(now);
     for (const e of this.data.entries.filter((entry) => entry.sessionKey === session)) {
       if (e.status !== "settled") for (const f of e.frames) this.data.settled[f.key] = f.expiresAt + 5000;
       e.status = "settled"; e.outcome = "withdrawn";
     }
-    delete this.data.tainted?.[session];
+    // Without a generation token, a delayed callback cannot distinguish old from successor consumption.
+    if (clearTaint) delete this.data.tainted?.[session];
     for (const key of Object.keys(this.data.notes ?? {})) if (key.endsWith(`:${session}`)) delete this.data.notes![key];
     this.save();
   }
   /** Deleting a session removes its own admission history as well as its taint. */
-  deleteSession(session: string): void {
+  deleteSession(session: string, clearTaint: boolean): void {
     const removed = this.data.entries.filter((e) => e.sessionKey === session);
     this.data.entries = this.data.entries.filter((e) => e.sessionKey !== session);
     for (const e of removed) for (const f of e.frames) delete this.data.settled[f.key];
-    delete this.data.tainted?.[session];
+    if (clearTaint) delete this.data.tainted?.[session];
     for (const key of Object.keys(this.data.notes ?? {})) if (key.endsWith(`:${session}`)) delete this.data.notes![key];
     this.save();
   }
