@@ -1,5 +1,4 @@
-// Canticle human-facing metadata dashboard.
-// Read-only: this page consumes only /api/stations and never exposes item payloads.
+// Canticle synthetic-only human dashboard.
 "use strict";
 
 const STATIONS_MS = 2000;
@@ -32,12 +31,13 @@ async function refreshStations() {
   try {
     const s = await api("/api/stations");
     box.replaceChildren();
-    status.textContent = s.stations.length ? "" : "Waiting for a verified beacon…";
+    status.textContent = s.stations.length ? "Synthetic demo fixture — no live observations" :
+      "Live station metadata is private. No stations are shared with this dashboard.";
     for (const st of s.stations) {
       const beaconClass = st.beacon_active ? "ok" : "stale";
       const card = el("div", {class: "station", "data-testid": "station", "data-station": st.name},
         el("h3", {}, st.name,
-          el("span", {class: "badge ok"}, "verified"),
+          el("span", {class: "badge stale"}, "synthetic fixture"),
           el("span", {class: "badge " + beaconClass}, st.beacon_active ? "beacon active" : "beacon inactive")),
         el("div", {class: "kv"},
           `presence ${st.presence} · epoch ${st.epoch} · key ${st.key_id}`),
@@ -46,7 +46,7 @@ async function refreshStations() {
           `last beacon ${secs(st.beacon_age_ms)} ago`));
 
       const table = el("table", {},
-        el("thead", {}, el("tr", {}, el("th", {}, "public stream"), el("th", {}, "health"),
+        el("thead", {}, el("tr", {}, el("th", {}, "demo stream"), el("th", {}, "health"),
           el("th", {}, "head"), el("th", {}, "live"), el("th", {}, "TTL / lease"), el("th", {}, "loop")))),
         el("tbody"));
       for (const sm of st.streams) {
@@ -61,9 +61,6 @@ async function refreshStations() {
       card.append(table);
       box.append(card);
     }
-    const bad = Object.entries(s.unverified_datagrams || {}).map(([k, v]) => `${k} ${v}`).join(", ");
-    document.getElementById("unverified").textContent =
-      "Unverified datagrams (counted, never shown): " + (bad || "none");
   } catch (e) {
     status.textContent = "Gateway unreachable: " + e.message;
   }

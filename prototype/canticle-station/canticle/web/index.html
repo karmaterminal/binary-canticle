@@ -10,20 +10,19 @@
 <body>
 <header>
   <h1>Canticle dashboard</h1>
-  <p class="boundary">Human-facing read-only metadata. This board shows verified presence and public stream
-    contracts only: no machine-boy message text, summaries, journal entries or listener payloads.</p>
+  <p class="boundary">Human-facing synthetic-only demo. Live station identity, activity, streams and
+    machine-boy conversations are private and never sent to this page.</p>
 </header>
 <main>
   <section aria-labelledby="stations-h">
-    <h2 id="stations-h">Stations and public streams</h2>
-    <p id="stations-status" class="muted" role="status">Waiting for a verified beacon…</p>
+    <h2 id="stations-h">Demo station</h2>
+    <p id="stations-status" class="muted" role="status">Loading demo view…</p>
     <div id="stations" data-testid="stations"></div>
-    <p id="unverified" class="muted" data-testid="unverified"></p>
   </section>
 </main>
 <footer>
-  <p class="muted">Agent-only hearing is separate and remains authorized by local session policy.
-    A beacon or lease state proves station observability, not a human location or session consumption.</p>
+  <p class="muted">Agent-only hearing remains separate and authorized by local session policy.
+    This page does not display observations from that listener.</p>
 </footer>
 </body>
 </html>

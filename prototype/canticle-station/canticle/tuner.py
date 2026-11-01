@@ -1,8 +1,8 @@
-"""A human-facing, metadata-only web dashboard: a loopback gateway over one listener (RFC-0001 §18.9).
+"""A human-facing, synthetic-only web dashboard: a loopback gateway (RFC-0001 §18.9).
 
 The browser never touches the network Canticle travels on. It talks HTTP to this gateway on a
-loopback address. The gateway runs a ``Listener`` (§7.4-§7.8, §8.6) and publishes only verified
-station, beacon, presence, lease and stream-contract metadata.
+loopback address. The gateway runs a ``Listener`` (§7.4-§7.8, §8.6), but never publishes its
+observations. The manifest is trust configuration, not broadcaster consent for human disclosure.
 
 This is not the agent listener plane. It has no item text, summaries, journal, digests, ring, tune,
 or subscription endpoint. It has no control socket and cannot sing or hush. Agent-only listening
@@ -39,60 +39,32 @@ def _now_ms() -> int:
 
 
 class TunerView:
-    """A metadata-only projection of the listener's verified state.
+    """Human view with no path from listener state to HTTP output.
 
-    It deliberately has no item, ring, tombstone, gap or text view. Its only purpose is human
-    observability of station presence and stream/beacon/TTL contracts.
+    A synthetic fixture can demonstrate the UI. Neither a verified beacon nor a manifest entry
+    grants human visibility; a future live view needs broadcaster-controlled consent.
     """
 
-    def __init__(self, listener: Listener):
-        self.listener = listener
-        self.started_ms: Optional[int] = None
+    def __init__(self, listener: Listener, demo_fixture: bool = False):
+        del listener
+        self.demo_fixture = demo_fixture
 
     def observe(self, ev: Event, now_ms: int) -> None:
-        del ev
-        if self.started_ms is None:
-            self.started_ms = now_ms
+        del ev, now_ms
 
     def stations(self, now_ms: int) -> dict:
-        lst = self.listener
         out = []
-        for kid, st in lst.stations.items():
-            entry = lst.manifest.entry(kid)
-            if entry is None or st.last_beacon is None:
-                continue
-            presence = lst.presence_state(kid, now_ms)
-            beacon_active = presence not in ("UNOBSERVABLE", "UNOBSERVABLE:signed_off")
-            beacon_age_ms = max(0, now_ms - st.last_beacon)
-            beacon_period_ms = st.period_ms
-            lease_remaining_ms = max(0, 3 * (beacon_period_ms or 1000) - beacon_age_ms) if beacon_active else 0
-            streams = []
-            for sid, e in sorted(st.stream_entries.items()):
-                name = entry.stream_names.get(sid)
-                if name is None:
-                    continue  # private or unnamed streams never enter the human projection
-                stream_health = "active" if beacon_active and e.live > 0 else (
-                    "idle" if beacon_active else "unobservable")
-                streams.append({"stream_id": f"{sid:08x}", "name": name,
-                                "health": stream_health, "head_seq": e.head_seq, "live": e.live,
-                                "loop_ms": e.loop_ms, "loop_max_ms": e.loop_max_ms,
-                                "ttl_s": e.default_ttl_s, "default_ttl_s": e.default_ttl_s,
-                                "max_ttl_s": e.max_ttl_s, "lease_active": beacon_active,
-                                "lease_remaining_ms": lease_remaining_ms})
-            out.append({"key_id": kid.hex(), "name": entry.name, "verified": True, "epoch": st.epoch_hwm,
-                        "presence": presence, "beacon_active": beacon_active,
-                        "lease_active": beacon_active, "lease_remaining_ms": lease_remaining_ms,
-                        "last_beacon_ms": st.last_beacon, "beacon_age_ms": beacon_age_ms,
-                        "beacon_period_ms": beacon_period_ms,
-                        "beacon": {"active": beacon_active, "age_ms": beacon_age_ms,
-                                   "period_ms": beacon_period_ms, "lease_remaining_ms": lease_remaining_ms},
-                        "streams": streams})
-        unverified = {k: v for k, v in lst.evidence_counts.items()
-                      if k in ("unknown-key", "bad-signature", "malformed", "revoked")}
-        return {"now_ms": now_ms, "gateway_started_ms": self.started_ms, "stations": out,
-                "unverified_datagrams": unverified,
-                "note": "Human view: verified station and public stream metadata only. "
-                        "No item text, summaries, journal entries or payload-bearing events are exposed."}
+        if self.demo_fixture:
+            out.append({"key_id": "0000000000000000", "name": "demo-station", "verified": False,
+                        "synthetic": True, "epoch": 0, "presence": "DEMO ONLY",
+                        "beacon_active": False, "lease_active": False, "lease_remaining_ms": 0,
+                        "beacon_age_ms": 0,
+                        "streams": [{"stream_id": "00000000", "name": "demo-stream",
+                                     "health": "idle", "head_seq": 0, "live": 0,
+                                     "ttl_s": 60, "lease_active": False, "lease_remaining_ms": 0,
+                                     "loop_ms": 1000}]})
+        return {"now_ms": now_ms, "stations": out, "synthetic": self.demo_fixture,
+                "note": "No observed station, stream or message metadata is exposed to humans."}
 
 
 # ---------------------------------------------------------------- HTTP
@@ -178,7 +150,7 @@ class TunerHttp:
             if url.path == "/api/stations":
                 return self._json(self.view.stations(now))
             raise _HttpError(404, "not found")
-        raise _HttpError(405, "GET only; this human-facing gateway cannot change or reveal listener payloads")
+        raise _HttpError(405, "GET only")
 
     @staticmethod
     def _json(obj) -> tuple[int, str, bytes]:
@@ -186,10 +158,11 @@ class TunerHttp:
 
 
 async def run_tuner(listener: Listener, bind: tuple[str, int], group: Optional[str], http_host: str,
-                    http_port: int, stop: Optional[asyncio.Event] = None, on_event=None, ready=None) -> None:
-    """Hear on UDP and serve only the human metadata projection on a loopback HTTP port."""
+                    http_port: int, stop: Optional[asyncio.Event] = None, on_event=None, ready=None,
+                    demo_fixture: bool = False) -> None:
+    """Hear on UDP and serve a synthetic-only human view on a loopback HTTP port."""
     from . import runner
-    view = TunerView(listener)
+    view = TunerView(listener, demo_fixture=demo_fixture)
     http = TunerHttp(view, http_host, http_port)
     port = await http.start()
     if ready is not None:

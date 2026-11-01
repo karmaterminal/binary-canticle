@@ -19,7 +19,7 @@ them loop until they expire.
 | §11.2, §13.6, §15.7 Onboarding (#73) | `canticle doctor` checks Python, `cryptography` (with an RFC 8032 known answer), `stations.toml`, the manifest and the listener's UDP address, and only reports multicast. `stations.toml` locates the manifest and the listener's address. `canticle manifest verify` and `show` read the unsigned spike-0 manifest; manifests refuse small-order keys (§9.3) and key-ids that do not match their keys (§10.3). |
 | §6.7 Findings (FP-1, #112) | `canticle/finding.py`: the finding body (content type 11) and its strict reader. `canticle sing --finding` and `--body-ref`, and the control socket's `finding` and `body_ref` fields, put a keyed `advisory` finding and a `finding-ref` doorbell on air. `canticle tap` shows a finding field by field, with a host-authored line that attributes it to its signer. See [Findings](#findings-fp-1-112). |
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
-| §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only gateway over one listener, and a human-facing metadata-only read-only dashboard for station presence, public stream health, TTL/lease and beacon state. It has no item, ring or payload view. |
+| §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only synthetic-only human dashboard over one listener. Live station identity, streams, activity and payloads are never published to humans. |
 | §14.18.3 Record v1 (BC-2, #77) | `canticle/records.py`: the listener's outcomes as receptor record v1 (`hello`, `landing_state`, `frame`, `retract`, `presence`, `health`, `fatal`, `bye`) under the disposition mapping, with fixed health counters and a bounded table of unverified key ids (D34). See [Record v1 and the host daemon](#record-v1-and-the-host-daemon-bc-2-d35-77). |
 | §11.1, §14.18.2 Host daemon (D35, #77) | `canticle daemon`: the host's one UDP listener, carrying record v1 to every binding over a unix `SOCK_STREAM` socket with peer-credential checks, a two-record bootstrap per connection and per-connection isolation. |
 | §14.18.3 Join snapshot (BC-1b, D36, #84) | `canticle daemon` serves the opt-in join snapshot: an atomic cut at watermark *W*, presence and deliverable frames as `snapshot` records (`snap_seq` 1..n, `rec_seq` *W*), `snapshot_end`, the `min(511, free − 513)` and 1 MiB bound, and the deferred cut of #86 (wait until the live state fits, 2 s bound). See [Join snapshot](#join-snapshot-bc-1b-d36-84). |
@@ -215,21 +215,23 @@ canticle ambient --control ./room.sock --stream hymn --fixture proofs/web-lanes/
 ```sh
 canticle tuner --manifest fleet.json --multicast --http 127.0.0.1:8765
 # then open http://127.0.0.1:8765/
+# optional UI demonstration with invented data only:
+canticle tuner --manifest fleet.json --multicast --demo-fixture
 ```
 
-- **What it shows.** The gateway runs one listener, but its human-facing projection is deliberately metadata-only. `/api/stations` and the dashboard list verified station identity, epoch, presence, beacon activity/age/lease countdown, and manifest-named public stream health, head, live count, loop and TTL/lease contract. Unnamed streams are omitted.
+- **What it shows.** The gateway runs one listener, but `/api/stations` returns an empty station list by default, regardless of verified traffic. `--demo-fixture` shows one explicitly synthetic station and stream, never derived from the manifest, beacons or listener state.
 - **What it does not show.** There is no live ring, item text, finding or summary, body digest, state key, sequence/history, tombstone, gap, journal or payload-bearing event in the server response or DOM. No `/api/ring`, `/api/tune`, `/api/leave`, `/api/journal`, `/api/sing` or `/api/hush` path exists. The gateway accepts GET only. A station's activity proves neither a human location nor that an agent session consumed anything.
 - **What it is not.** The dashboard is not the agent listener plane. It does not tune a station or a session, set subscriptions, send frames, sing or hush. Agent-only listener/daemon and exact session-read policy remain separately authorized capabilities under taint and untrusted-content framing.
 - **Trust boundary.**
   - It binds loopback only, and refuses any other address.
   - It answers only requests whose `Host` is its own address, which blocks DNS rebinding.
   - It serves a strict CSP (`script-src 'self'`, no inline script), plus `nosniff`, `no-referrer` and `no-store`.
-  - Unverified datagrams are counted, never shown or attributed to a station.
-  - The projection holds no item text or payload-derived summary and has no tune/channel or tombstone state. The listener's own safety state and quotas remain separate.
+  - Neither verified nor unverified datagram metadata is shown. A manifest entry is not broadcaster consent for human disclosure. A live view requires a separate broadcaster-controlled metadata opt-in design.
+  - The projection holds no listener reference, item text or payload-derived summary and has no tune/channel or tombstone state. The listener's own safety state and quotas remain separate.
 
 ### Same-host proof for #57 and #58
 
-[`proofs/web-lanes/`](proofs/web-lanes/) holds a bounded run as root (`run.sh`), its analysis (`analyze.py`) and the results. The station and emitters run in one network namespace; the listeners, tuner and headless Chromium run in another, joined by a veth pair over LAN multicast. That is **same-host** evidence, on one kernel and one clock. It is not a second host.
+[`proofs/web-lanes/`](proofs/web-lanes/) holds a historical bounded run as root (`run.sh`), its analysis (`analyze.py`) and the results. Its live-metadata dashboard assertions describe the earlier implementation and are not evidence for the current synthetic-only human view. The station and emitters run in one network namespace; the listeners, tuner and headless Chromium run in another, joined by a veth pair over LAN multicast. That is **same-host** evidence, on one kernel and one clock. It is not a second host.
 
 ## Record v1 and the host daemon (BC-2, D35, #77)
 
@@ -325,7 +327,7 @@ key revoked or gone (`revoked`), key quarantined (`quarantined`), a sticky PLUCK
 supersession mark (`superseded`) or local expiry passed (`expired`). It is idempotent (#79 review).
 
 The listener change is opt-in: `Listener(receptor_mode=True)` reports the outcomes it was silent on and admits
-lower-epoch tuples as above. `canticle listen` behaves as before; `canticle tuner` remains a separate metadata-only human projection and does not expose listener payload records or agent-session reads.
+lower-epoch tuples as above. `canticle listen` behaves as before; `canticle tuner` remains a separate synthetic-only human projection and does not expose live station metadata, listener payload records or agent-session reads.
 
 **Not emitted yet, or emitted differently** (each a known gap, not a silent one):
 
@@ -569,9 +571,9 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
     reading it back, and refusing two such tables as nft lists them (`NftTest`: it needs nft and root or
     unprivileged user namespaces, and skips without them);
   - the units, and the README's worked examples against the tested values.
-- `test_tuner.py` covers the human metadata dashboard and privacy boundary:
-  - verified station presence, beacon/lease state and public stream health/TTL metadata;
-  - unnamed and private streams omitted from the human projection;
+- `test_tuner.py` covers the human synthetic dashboard and privacy boundary:
+  - verified live traffic cannot enumerate a station, key, stream or activity through the view or HTTP;
+  - the optional fixture is explicitly synthetic and independent of listener state;
   - distinctive item text absent from the view, JSON response, and static page;
   - no `/api/ring`, `/api/tune`, `/api/leave`, journal or item path; mutations return 405;
   - security headers/CSP, DNS rebinding, method and loopback-only boundaries.
