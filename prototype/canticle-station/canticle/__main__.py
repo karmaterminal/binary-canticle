@@ -663,7 +663,7 @@ def main(argv=None) -> int:
     b.add_argument("--log", help="append JSON records here instead of stdout")
     b.set_defaults(fn=cmd_ambient)
 
-    u = sub.add_parser("tuner", help="read-only web tuner: a loopback gateway over one listener")
+    u = sub.add_parser("tuner", help="read-only human metadata dashboard: a loopback gateway over one listener")
     u.add_argument("--manifest", required=True)
     u.add_argument("--bind", default=f"0.0.0.0:{runner.DEFAULT_PORT}", help="UDP address to hear on")
     u.add_argument("--multicast", action="store_true")

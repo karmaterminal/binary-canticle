@@ -120,7 +120,7 @@ and removal commands for each, and the gate for publishing to ClawHub.
 | Listener | `canticle listen` | The same verification as the daemon, printed as one JSON event per line. For onboarding, tests and quick checks. It cannot share the UDP port with a daemon. |
 | Agent bindings | not in this repo | Read record v1 from the daemon and decide what reaches which session. frond-ear's `host-daemon` source implements this, listen-only and silent: its sessions read heard items when they call a `hear` tool, under a `[canticle:heard]` banner (karmaterminal/frond-ear, a private repository). It is off unless configured, and no seat runs it yet; it stays off on the mixed hosts (silas, ronan) until the mixed-host proofs of §14.18.2 pass there (RFC §23.2, question 23). The OpenClaw plugin (RFC §16.2) and the Claude Code MCP server and hooks (§16.5) are planned, not built. |
 | Doctor | `canticle doctor` | Checks Python, `cryptography`, `stations.toml`, the manifest and the listener's address. Writes nothing. |
-| Tuner | `canticle tuner` | A read-only web page on loopback that shows one listener's view of the stations and their live rings. |
+| Tuner | `canticle tuner` | A read-only loopback human dashboard that shows verified station presence, public stream health, TTL/lease and beacon metadata. It exposes no item text or payload-bearing events. |
 | Background emitter | `canticle ambient` | Puts paced, short-TTL lines from a fixture file on air through a station. No model calls. |
 
 Linux is the only host the spike is built and tested for. The station's control socket and the daemon's
