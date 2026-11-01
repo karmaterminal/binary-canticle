@@ -108,6 +108,8 @@ class Browser:
             srv = self._query(instance, "SRV")
             txt = self._query(instance, "TXT")
             hints = {}
+            # A repeated key has no usable value, even if it appears again later.
+            duplicate_keys = set()
             txt_invalid = False
             for strings in txt.records:
                 if (not isinstance(strings, tuple) or len(strings) > MAX_TXT_STRINGS
@@ -118,7 +120,11 @@ class Browser:
                 for item in strings:
                     if "=" in item:
                         k, v = item.split("=", 1)
-                        if k not in hints:
+                        if k in hints or k in duplicate_keys:
+                            hints.pop(k, None)
+                            duplicate_keys.add(k)
+                            txt_invalid = True
+                        else:
                             hints[k] = v
             mismatches = []
             if txt_invalid:
