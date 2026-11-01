@@ -52,7 +52,7 @@ export class AmbientSlots {
     if (!d.settled || typeof d.settled !== "object" || Array.isArray(d.settled) || Object.keys(d.settled).length > 8192 ||
       Object.values(d.settled).some((n) => !Number.isSafeInteger(n))) throw new Error("invalid ambient settled tombstones");
     if (d.tainted !== undefined && (!d.tainted || typeof d.tainted !== "object" || Array.isArray(d.tainted) || Object.keys(d.tainted).length > 4096 ||
-      Object.entries(d.tainted).some(([key, n]) => { const [session = "", id, extra] = key.split("\0"); return session !== session.toLowerCase() || !TARGET_SESSION_KEY.test(session) || session === "agent:main:main" || (id !== undefined && !id) || extra !== undefined || !Number.isSafeInteger(n); }))) throw new Error("invalid ambient taint");
+      Object.entries(d.tainted).some(([key, n]) => { const [session = "", id, revision, extra] = key.split("\0"); return session !== session.toLowerCase() || !TARGET_SESSION_KEY.test(session) || session === "agent:main:main" || (id !== undefined && !id) || (revision !== undefined && !revision) || extra !== undefined || !Number.isSafeInteger(n); }))) throw new Error("invalid ambient taint");
     if (d.notes !== undefined && (!d.notes || typeof d.notes !== "object" || Array.isArray(d.notes) || Object.keys(d.notes).length > 8192 ||
       Object.values(d.notes).some((n) => !n || typeof n.key !== "string" || n.key.length > 300 || !Number.isSafeInteger(n.expiresAt) || typeof n.line !== "string" || Buffer.byteLength(n.line) > 300))) throw new Error("invalid ambient notes");
     d.tainted ??= {}; d.notes ??= {};
@@ -75,7 +75,7 @@ export class AmbientSlots {
   }
   private settle(e: Entry, outcome: EntryOutcome, now: number): void {
     e.status = "settled"; e.outcome = outcome;
-    if (outcome === "consumed") (this.data.tainted ??= {})[e.sessionId ? `${e.sessionKey}\0${e.sessionId}` : e.sessionKey] ??= now;
+    if (outcome === "consumed") (this.data.tainted ??= {})[`${e.sessionKey}\0${e.sessionId}\0${e.lifecycleRevision}`] ??= now;
     if (outcome === "consumed" || outcome === "discarded") for (const f of e.frames) this.data.settled[f.key] = f.expiresAt + 5000;
     if (outcome === "expired") for (const f of e.frames) if (f.expiresAt <= now) this.data.settled[f.key] = f.expiresAt + 5000;
     this.save();
@@ -188,7 +188,7 @@ export class AmbientSlots {
   }
   isTainted(session: string, sessionId?: string | null): boolean {
     return this.data.tainted?.[session] !== undefined || (sessionId
-      ? this.data.tainted?.[`${session}\0${sessionId}`] !== undefined
+      ? Object.keys(this.data.tainted ?? {}).some((key) => key === `${session}\0${sessionId}` || key.startsWith(`${session}\0${sessionId}\0`))
       : Object.keys(this.data.tainted ?? {}).some((key) => key.startsWith(`${session}\0`)));
   }
   /** The host has cleared pending entries on reset/disable. Keep admitted frame keys settled. */
@@ -199,8 +199,8 @@ export class AmbientSlots {
       e.status = "settled"; e.outcome = "withdrawn";
     }
     if (clearTaint) {
-      if (endedId && !this.data.entries.some((e) => e.sessionKey === session && e.sessionId === endedId && endedRevision !== undefined && e.lifecycleRevision !== endedRevision)) delete this.data.tainted?.[`${session}\0${endedId}`];
-      else delete this.data.tainted?.[session];
+      // ID-only callbacks and legacy ID-only marks cannot distinguish same-ID revisions.
+      if (endedId && endedRevision) delete this.data.tainted?.[`${session}\0${endedId}\0${endedRevision}`];
     }
     if (endedId === undefined) for (const key of Object.keys(this.data.notes ?? {})) if (key.endsWith(`:${session}`)) delete this.data.notes![key];
     this.save();
@@ -211,8 +211,8 @@ export class AmbientSlots {
     this.data.entries = this.data.entries.filter((e) => e.sessionKey !== session || (endedId !== undefined && (e.sessionId !== endedId || (endedRevision !== undefined && e.lifecycleRevision !== endedRevision))));
     for (const e of removed) for (const f of e.frames) delete this.data.settled[f.key];
     if (clearTaint) {
-      if (endedId && !this.data.entries.some((e) => e.sessionKey === session && e.sessionId === endedId && endedRevision !== undefined && e.lifecycleRevision !== endedRevision)) delete this.data.tainted?.[`${session}\0${endedId}`];
-      else delete this.data.tainted?.[session];
+      // ID-only callbacks and legacy ID-only marks cannot distinguish same-ID revisions.
+      if (endedId && endedRevision) delete this.data.tainted?.[`${session}\0${endedId}\0${endedRevision}`];
     }
     if (endedId === undefined) for (const key of Object.keys(this.data.notes ?? {})) if (key.endsWith(`:${session}`)) delete this.data.notes![key];
     this.save();

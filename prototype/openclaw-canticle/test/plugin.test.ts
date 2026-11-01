@@ -24,7 +24,7 @@ type Service = {
   stop?: (ctx: Obj) => Promise<void>;
 };
 
-type LifecycleHandler = (event: { sessionId: string; sessionKey: string; nextSessionId?: string }, context: { sessionId: string; sessionKey: string; agentId: string }) => Promise<void>;
+type LifecycleHandler = (event: { sessionId: string; sessionKey: string; lifecycleRevision?: string; nextSessionId?: string }, context: { sessionId: string; sessionKey: string; agentId: string }) => Promise<void>;
 function load(pluginConfig?: unknown, apiExtra: Obj = {}): { tools: Map<string, { factory: Factory; optional: boolean }>; service: Service } {
   const tools = new Map<string, { factory: Factory; optional: boolean }>();
   const services: Service[] = [];
@@ -421,10 +421,13 @@ test("typed reset and delete callbacks clear only the ended exact session", asyn
     assert.ok(state().taint.old);
     await reader.execute("checkpoint", { what: "new" });
     assert.ok(state().checkpoints[key], "checkpoint is keyed by sessionKey, not sessionId");
-    const event = { sessionId: "old", sessionKey: key };
+    const event = { sessionId: "old", sessionKey: key, lifecycleRevision: "r-old" };
     const context = { ...event, agentId: "main" };
     await hooks.get("session_reset")!({ ...event, nextSessionId: "new" }, { ...context, sessionKey: "agent:main:other" });
     assert.ok(state().taint.old, "mismatched context cannot clear another session");
+    await hooks.get("session_reset")!({ sessionId: "old", sessionKey: key }, context);
+    assert.ok(state().taint.old, "ID-only callback cannot clear taint");
+    assert.ok(state().checkpoints[key], "ID-only callback cannot clear checkpoint");
     await hooks.get("session_reset")!({ ...event, nextSessionId: "new" }, context);
     assert.equal(state().taint.old, undefined);
     assert.equal(state().checkpoints[key], undefined);
@@ -437,7 +440,46 @@ test("typed reset and delete callbacks clear only the ended exact session", asyn
     await reader.execute("read2", { what: "journal", view: "items" });
     assert.ok(state().taint.old);
     await hooks.get("session_delete")!(event, context);
-    assert.equal(state().taint.old, undefined);
+    assert.ok(state().taint.old, "late delete cannot clear shared taint without matching current generation");
     assert.equal(state().checkpoints.old, undefined);
+  } finally { await service.stop?.(ctx); }
+});
+
+test("delayed same-ID r1 reset preserves r2 taint and checkpoint", async () => {
+  const key = "agent:main:reader", id = "same";
+  let revision = "r1";
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: { payloadSessions: [key], subscriptions: [{ sessionKey: key, tune: ["*:*"] }] } };
+  const hooks = new Map<string, LifecycleHandler>();
+  const { tools, service } = load(cfg, { on: (name: string, handler: LifecycleHandler) => hooks.set(name, handler),
+    session: { state: { resolveLocalSessionRoute: async (sessionKey: string) => ({ sessionKey, exists: true, onHost: true, sessionId: id, lifecycleRevision: revision }) } } });
+  const ctx = { stateDir: dir, logger: { info: () => undefined } };
+  await service.start(ctx);
+  try {
+    await waitFor(() => daemon.accepted === 1);
+    daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "chatter", seq: 1, issued_at: Date.now(), text: "hello" });
+    const reader = tool(tools, "canticle_listen", { sessionKey: key, sessionId: id });
+    const deadline = Date.now() + 4_000;
+    while (!(await reader.execute("read", { what: "journal", view: "items" })).content[0]?.text.includes("hello")) {
+      assert.ok(Date.now() < deadline, "timed out waiting for heard text");
+      await sleep(10);
+    }
+    const state = () => JSON.parse(readFileSync(join(dir, "canticle", "rune", "state.json"), "utf8")) as { taint: Record<string, unknown>; checkpoints: Record<string, unknown> };
+    await reader.execute("checkpoint", { what: "new" });
+    const event = { sessionId: id, sessionKey: key, lifecycleRevision: "r1" };
+    const context = { sessionId: id, sessionKey: key, agentId: "main" };
+    await hooks.get("session_reset")!(event, context);
+    assert.equal(state().taint[id], undefined);
+    revision = "r2";
+    await reader.execute("r2-read", { what: "journal", view: "items" });
+    await reader.execute("r2-checkpoint", { what: "new" });
+    assert.ok(state().taint[id]);
+    const checkpoint = state().checkpoints[key];
+    assert.ok(checkpoint);
+    await hooks.get("session_reset")!(event, context);
+    assert.ok(state().taint[id], "late r1 reset cannot erase r2 taint with reused ID");
+    assert.deepEqual(state().checkpoints[key], checkpoint, "late r1 reset cannot erase r2 checkpoint");
+    await hooks.get("session_reset")!({ sessionId: id, sessionKey: key }, context);
+    assert.ok(state().taint[id], "ID-only reset retains taint");
+    assert.deepEqual(state().checkpoints[key], checkpoint);
   } finally { await service.stop?.(ctx); }
 });

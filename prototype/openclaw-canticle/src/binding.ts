@@ -622,19 +622,23 @@ export class Binding {
       this.ambient?.reset(sessionKey, now, sessionId !== null, sessionId ?? undefined, lifecycleRevision);
       this.candidates.resetSession(sessionKey, now, sessionId ?? undefined, lifecycleRevision);
     } // An ID-only callback cannot distinguish a same-ID reset; leave ambient blocked.
-    for (const key of [sessionId, `key:${sessionKey}`]) {
-      if (key === null) continue;
-      delete st.taint[key];
-      if (st.taint_overflow !== null && Object.keys(st.taint_cleared ?? {}).length < TAINT_MAX)
-        (st.taint_cleared ??= {})[key] = now;
-    }
-    // A delayed callback for the old generation must not clear a successor's cursor.
+    // Shared explicit taint and checkpoint keys have no revision. Only the current
+    // exact generation can safely clear them; ID-only callbacks fail closed.
     let currentIsEnded = false;
     try {
       const proof = await this.routeProof(sessionKey);
-      currentIsEnded = proof.sessionKey === sessionKey && proof.sessionId === sessionId;
+      currentIsEnded = !!lifecycleRevision && proof.sessionKey === sessionKey && proof.sessionId === sessionId &&
+        proof.lifecycleRevision === lifecycleRevision && proof.exists === true && proof.onHost === true;
     } catch { /* Unknown generation: preserve shared state. */ }
-    if (currentIsEnded) delete st.checkpoints[sessionKey];
+    if (currentIsEnded) {
+      for (const key of [sessionId, `key:${sessionKey}`]) {
+        if (key === null) continue;
+        delete st.taint[key];
+        if (st.taint_overflow !== null && Object.keys(st.taint_cleared ?? {}).length < TAINT_MAX)
+          (st.taint_cleared ??= {})[key] = now;
+      }
+      delete st.checkpoints[sessionKey];
+    }
     this.saveState();
   }
   /** Called after host session deletion; no slot outcome or taint history survives. */
@@ -645,7 +649,14 @@ export class Binding {
       this.candidates.deleteSession(sessionKey, sessionId ?? undefined, lifecycleRevision);
     }
     const st = this.state!;
-    for (const key of [sessionId, `key:${sessionKey}`]) if (key !== null) delete st.taint_cleared?.[key];
+    // An old or ID-only delete cannot revoke a successor's overflow clearance.
+    let currentIsEnded = false;
+    try {
+      const proof = await this.routeProof(sessionKey);
+      currentIsEnded = !!lifecycleRevision && proof.sessionKey === sessionKey && proof.sessionId === sessionId &&
+        proof.lifecycleRevision === lifecycleRevision && proof.exists === true && proof.onHost === true;
+    } catch { /* Preserve shared state when route proof is unavailable. */ }
+    if (currentIsEnded) for (const key of [sessionId, `key:${sessionKey}`]) if (key !== null) delete st.taint_cleared?.[key];
     this.saveState();
   }
 

@@ -133,5 +133,9 @@ test("delayed same-ID callback cannot clear successor revision slots or taint", 
     a.deleteSession(session, true, "same", "before");
     assert.equal(a.isTainted(session, "same"), true);
     assert.equal(a.outcome("new"), true);
+    a.reset(session, now, true, "same");
+    assert.equal(a.isTainted(session, "same"), true, "ID-only callback retains r2 taint");
+    a.reset(session, now, true, "same", "after");
+    assert.equal(a.isTainted(session, "same"), false, "exact r2 callback clears r2 taint");
   } finally { removeDir(root); }
 });

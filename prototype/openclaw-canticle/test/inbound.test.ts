@@ -337,11 +337,11 @@ test("a taint table that overflows fails closed: every session that may read hea
   b = await up(cfg);
   assert.equal(b.isTainted(early), true); // and it holds across a restart
   await b.resetSession(early.sessionKey, early.sessionId);
-  assert.equal(b.isTainted(early), false, "explicit reset clears even an overflow-implied taint");
+  assert.equal(b.isTainted(early), true, "ID-only reset cannot clear an overflow-implied taint");
   assert.equal(b.isTainted(OTHER_SESSION), true, "reset does not clear another session's taint");
   await b.stop();
   b = await up(cfg);
-  assert.equal(b.isTainted(early), false, "the reset mark survives restart");
+  assert.equal(b.isTainted(early), true, "ID-only reset remains fail-closed across restart");
 });
 
 test("a cut feed: on air reads unknown with carried items, until a complete join snapshot makes it current", async () => {
