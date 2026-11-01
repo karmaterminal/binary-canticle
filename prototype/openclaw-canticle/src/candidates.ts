@@ -115,13 +115,17 @@ export class Candidates {
   /** Keep in-memory admission and queued rows behind the binding's live mute scopes. */
   setMutes(scopes: { station: string | null; stream: string | null }[], now: number): void {
     this.muteScopes = scopes.filter((scope, i) => scopes.findIndex((other) => other.station === scope.station && other.stream === scope.stream) === i);
+    let revoked = false;
     for (const [key, c] of Object.entries(this.data.pending)) {
       if (this.mutedByScope(c.station, c.stream)) {
         delete this.data.pending[key];
         this.data.settled[key] = c.expiresAt + 5000;
+        revoked = true;
       }
     }
     this.prune(now);
+    // prune only saves its own changes; a mute revocation must survive restart too.
+    if (revoked) this.save();
   }
   private mutedByScope(station: string, stream: string): boolean {
     return this.muteScopes.some((scope) =>
@@ -138,7 +142,8 @@ export class Candidates {
       for (const target of sub.targets) {
         const epoch = this.resetEpoch.get(target.sessionKey) ?? 0;
         if (!await this.validRoute(target.sessionKey)) continue;
-        if (!mayAdmit() || this.retractedInFlight.has(frame.idem) || this.cancelledRuns.has(run) ||
+        if (this.mutedByScope(frame.station, frame.stream) || !mayAdmit() ||
+          this.retractedInFlight.has(frame.idem) || this.cancelledRuns.has(run) ||
           (this.resetEpoch.get(target.sessionKey) ?? 0) !== epoch) continue;
         const spendKey = `${sub.id}:${target.sessionKey}`;
         const spent = this.data.spend[spendKey] ?? [];

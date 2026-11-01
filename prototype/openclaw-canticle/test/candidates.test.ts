@@ -43,6 +43,47 @@ test("binding mutes revoke queued candidates and block matching in-flight admiss
   } finally { removeDir(root); }
 });
 
+test("mute revocation and its tombstone survive restart when pruning has nothing to save", async () => {
+  const root = tempDir(); const now = 1_790_000_000_000;
+  const proof = async (key: string) => ({ sessionKey: key, exists: true, onHost: true });
+  try {
+    const subs = config({ perHour: 10 }).delivery.subscriptions;
+    const ledger = new Candidates(root, "rune", subs, proof);
+    ledger.load(now);
+    const mutedFrame = frame(now, 1);
+    assert.equal(await ledger.accept(mutedFrame, "run", now, false, false), 1);
+    ledger.setMutes([{ station: "cael", stream: null }], now);
+    assert.equal(ledger.pendingCount, 0);
+
+    const restarted = new Candidates(root, "rune", subs, proof);
+    restarted.load(now);
+    assert.equal(restarted.pendingCount, 0);
+    assert.equal((await restarted.slots(session, now + 60_001)).length, 0);
+    assert.equal(await restarted.accept(mutedFrame, "run", now, false, false), 0);
+    assert.equal(await restarted.accept(frame(now, 2), "run", now, false, false), 1);
+  } finally { removeDir(root); }
+});
+
+test("mute arriving during awaited route proof fences admission, then unmute permits a fresh frame", async () => {
+  const root = tempDir(); const now = 1_790_000_000_000;
+  let release: ((value: { sessionKey: string; exists: boolean; onHost: boolean }) => void) | undefined;
+  let delayed = true;
+  try {
+    const ledger = new Candidates(root, "rune", config({ perHour: 10 }).delivery.subscriptions,
+      (key) => delayed ? new Promise((resolve) => { release = resolve; }) : Promise.resolve({ sessionKey: key, exists: true, onHost: true }));
+    ledger.load(now);
+    const admission = ledger.accept(frame(now, 1), "run", now, false, false);
+    assert.ok(release, "route proof is in flight");
+    ledger.setMutes([{ station: "cael", stream: null }], now);
+    release({ sessionKey: session, exists: true, onHost: true });
+    assert.equal(await admission, 0);
+    assert.equal(ledger.pendingCount, 0);
+    ledger.setMutes([], now);
+    delayed = false;
+    assert.equal(await ledger.accept(frame(now, 2), "run", now, false, false), 1);
+  } finally { removeDir(root); }
+});
+
 test("candidate ledger fails closed without host route proof, filters and budgets before persistence", async () => {
   const root = tempDir(); const now = 1_790_000_000_000;
   try {
