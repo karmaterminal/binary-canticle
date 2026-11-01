@@ -77,7 +77,7 @@ ip netns exec "$NB" "$PY" -m canticle listen --manifest "$WORK/fleet.json" --mul
   --state "$WORK/early.state" --evidence --timestamps > "$OUT/listen-early.jsonl" 2> "$OUT/listen-early.err" &
 PIDS+=($!); EARLY=$!
 ip netns exec "$NB" "$PY" -m canticle tuner --manifest "$WORK/fleet.json" --multicast \
-  --http 127.0.0.1:8765 --state "$WORK/tuner.state" --log "$OUT/tuner-events.jsonl" 2> "$OUT/tuner.err" &
+  --http 127.0.0.1:8765 --state "$WORK/tuner.state" --demo-fixture 2> "$OUT/tuner.err" &
 PIDS+=($!); TUNER=$!
 sleep 1
 
@@ -99,11 +99,11 @@ ip netns exec "$NA" "$PY" -m canticle ambient --control "$WORK/room.sock" --stre
 PIDS+=($!); EW=$!
 log "emitters started (hymn pid $EH, lens.weather pid $EW) for ${EMIT_S}s"
 
-ip netns exec "$NB" "$PY" "$HERE/snapshots.py" http://127.0.0.1:8765 $((EMIT_S + DRAIN_S + 15)) > "$OUT/ring-snapshots.jsonl" &
+ip netns exec "$NB" "$PY" "$HERE/snapshots.py" http://127.0.0.1:8765 $((EMIT_S + DRAIN_S + 15)) > "$OUT/dashboard-snapshots.jsonl" &
 PIDS+=($!); SNAP=$!
 
 sleep 20
-log "browser 1: tune hymn, leave, retune lens.weather, retune hymn"
+log "browser 1: verify the synthetic fixture view"
 ip netns exec "$NB" node "$HERE/browser.cjs" early "$OUT" >> "$OUT/browser.jsonl" 2>> "$OUT/browser.err"
 
 sleep_until "$LATE_S"
@@ -114,7 +114,7 @@ PIDS+=($!); LATE=$!
 echo "$(t_ms)" > "$OUT/late_start_ms"
 
 sleep_until "$LATE_PAGE_S"
-log "browser 2: a late page tunes hymn (T+${LATE_PAGE_S} s)"
+log "browser 2: a later page verifies the synthetic fixture (T+${LATE_PAGE_S} s)"
 ip netns exec "$NB" node "$HERE/browser.cjs" late "$OUT" >> "$OUT/browser.jsonl" 2>> "$OUT/browser.err"
 
 wait "$EH" "$EW"

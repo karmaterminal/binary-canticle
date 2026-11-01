@@ -32,7 +32,7 @@ a locator and cross-check hint, never an identity or trust source. This spike do
 resolve DNS records, and its manifest remains unsigned.
 | §6.7 Findings (FP-1, #112) | `canticle/finding.py`: the finding body (content type 11) and its strict reader. `canticle sing --finding` and `--body-ref`, and the control socket's `finding` and `body_ref` fields, put a keyed `advisory` finding and a `finding-ref` doorbell on air. `canticle tap` shows a finding field by field, with a host-authored line that attributes it to its signer. See [Findings](#findings-fp-1-112). |
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
-| §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only gateway over one listener, and a read-only page to pick a station:stream and watch its live ring, with expiry and gaps shown honestly. |
+| §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only synthetic-only human dashboard over one listener. Live station identity, streams, activity and payloads are never published to humans. |
 | §14.18.3 Record v1 (BC-2, #77) | `canticle/records.py`: the listener's outcomes as receptor record v1 (`hello`, `landing_state`, `frame`, `retract`, `presence`, `health`, `fatal`, `bye`) under the disposition mapping, with fixed health counters and a bounded table of unverified key ids (D34). See [Record v1 and the host daemon](#record-v1-and-the-host-daemon-bc-2-d35-77). |
 | §11.1, §14.18.2 Host daemon (D35, #77) | `canticle daemon`: the host's one UDP listener, carrying record v1 to every binding over a unix `SOCK_STREAM` socket with peer-credential checks, a two-record bootstrap per connection and per-connection isolation. |
 | §14.18.3 Join snapshot (BC-1b, D36, #84) | `canticle daemon` serves the opt-in join snapshot: an atomic cut at watermark *W*, presence and deliverable frames as `snapshot` records (`snap_seq` 1..n, `rec_seq` *W*), `snapshot_end`, the `min(511, free − 513)` and 1 MiB bound, and the deferred cut of #86 (wait until the live state fits, 2 s bound). See [Join snapshot](#join-snapshot-bc-1b-d36-84). |
@@ -223,32 +223,28 @@ canticle ambient --control ./room.sock --stream hymn --fixture proofs/web-lanes/
 - **Log.** Each tick writes one JSON line (`sing` with `seq`, `size`, `loop_ms` and the text; `breath`; `capped`; `refused`). The first and last lines record `model_calls: 0`.
 - **Sources.** Only a fixture file. A source derived from session logs would be a separate opt-in boundary (RFC §15.4, §15.8), and is not implemented.
 
-### Web tuner (#57, RFC §18.9)
+### Human-facing metadata dashboard (#57, RFC §18.9)
 
 ```sh
 canticle tuner --manifest fleet.json --multicast --http 127.0.0.1:8765
 # then open http://127.0.0.1:8765/
+# optional UI demonstration with invented data only:
+canticle tuner --manifest fleet.json --multicast --demo-fixture
 ```
 
-- **What it shows.** The gateway runs one listener, which hears and verifies every stream its manifest names. The page lists the stations whose beacons verified (key, epoch, presence, beacon age) and their streams (head, live count, loop). Tune a named stream to watch its live ring. Each item shows its text, `seq`, copies heard and a countdown to local expiry. Items that just left the air are listed for 60 s, labelled expired, withdrawn or superseded. Sequence numbers up to the head that this listener never heard are listed as gaps.
-- **What it is not.** Tuning is local to the gateway, and nothing is sent to a station. It is not a session tune: nothing lands anywhere. The gateway has no control socket and cannot sing or hush. A late page sees only what is on air now.
+- **What it shows.** The gateway runs one listener, but `/api/stations` returns an empty station list by default, regardless of verified traffic. `--demo-fixture` shows one explicitly synthetic station and stream, never derived from the manifest, beacons or listener state.
+- **What it does not show.** There is no live ring, item text, finding or summary, body digest, state key, sequence/history, tombstone, gap, journal or payload-bearing event in the server response or DOM. No `/api/ring`, `/api/tune`, `/api/leave`, `/api/journal`, `/api/sing` or `/api/hush` path exists. The gateway accepts GET only. A station's activity proves neither a human location nor that an agent session consumed anything.
+- **What it is not.** The dashboard is not the agent listener plane. It does not tune a station or a session, set subscriptions, send frames, sing or hush. Agent-only listener/daemon and exact session-read policy remain separately authorized capabilities under taint and untrusted-content framing.
 - **Trust boundary.**
   - It binds loopback only, and refuses any other address.
-  - It answers only requests whose `Host` is its own address, which blocks DNS rebinding, and refuses cross-origin POSTs and non-JSON bodies.
+  - It answers only requests whose `Host` is its own address, which blocks DNS rebinding.
   - It serves a strict CSP (`script-src 'self'`, no inline script), plus `nosniff`, `no-referrer` and `no-store`.
-  - Heard text is set with `textContent` only, never parsed as markup.
-  - Unverified datagrams are counted, never shown or attributed to a station.
-- **Budget.**
-  - Channels: at most 16 tuned at once; each lapses after 30 s without a poll.
-  - Polling: at most 4 ring polls a second per channel (the page polls every second).
-  - Responses: at most 64 items, with 512 characters of text each; up to 32 tombstones and 64 gap checks.
-  - Memory: per channel, the gateway keeps at most 128 heard `seq` values (the gap window, moving up with the head and reset at each epoch) and 32 tombstones. The listener's own per-key quotas bound the rest (RFC §7.4).
-
-Unnamed streams (not in the manifest) are verified and listed, but can't be tuned (RFC §5.4). The beacons in this spike carry no `trail_seq`, so a gap can't be told apart from an item that is still looping.
+  - Neither verified nor unverified datagram metadata is shown. A manifest entry is not broadcaster consent for human disclosure. A live view requires a separate broadcaster-controlled metadata opt-in design.
+  - The projection holds no listener reference, item text or payload-derived summary and has no tune/channel or tombstone state. The listener's own safety state and quotas remain separate.
 
 ### Same-host proof for #57 and #58
 
-[`proofs/web-lanes/`](proofs/web-lanes/) holds a bounded run as root (`run.sh`), its analysis (`analyze.py`) and the results. The station and emitters run in one network namespace; the listeners, tuner and headless Chromium run in another, joined by a veth pair over LAN multicast. That is **same-host** evidence, on one kernel and one clock. It is not a second host.
+[`proofs/web-lanes/`](proofs/web-lanes/) holds the bounded same-host web proof runner (`run.sh`) and analysis (`analyze.py`). The current assertions exercise the synthetic-only human view; older saved results are historical and do not prove this replacement. The station and emitters run in one network namespace; the listeners, tuner and headless Chromium run in another, joined by a veth pair over LAN multicast. That is **same-host** evidence, on one kernel and one clock. It is not a second host.
 
 ## Record v1 and the host daemon (BC-2, D35, #77)
 
@@ -344,7 +340,7 @@ key revoked or gone (`revoked`), key quarantined (`quarantined`), a sticky PLUCK
 supersession mark (`superseded`) or local expiry passed (`expired`). It is idempotent (#79 review).
 
 The listener change is opt-in: `Listener(receptor_mode=True)` reports the outcomes it was silent on and admits
-lower-epoch tuples as above. `canticle listen` and `canticle tuner` behave as before.
+lower-epoch tuples as above. `canticle listen` behaves as before; `canticle tuner` remains a separate synthetic-only human projection and does not expose live station metadata, listener payload records or agent-session reads.
 
 **Not emitted yet, or emitted differently** (each a known gap, not a silent one):
 
@@ -588,14 +584,12 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
     reading it back, and refusing two such tables as nft lists them (`NftTest`: it needs nft and root or
     unprivileged user namespaces, and skips without them);
   - the units, and the README's worked examples against the tested values.
-- `test_tuner.py` covers the tuner's view and gateway:
-  - verified stations with heads, and unnamed streams that can't be tuned;
-  - the live ring, then labelled expiry and withdrawal;
-  - a late view that sees only what is on air, with the missed `seq` as a gap;
-  - a lost burst repaired by the next loop copy;
-  - subscriptions (leave, retune, idle lapse, the cap);
-  - bounded memory on a long stream (600 items, at most 128 heard `seq` values kept, the one lost recent item still shown as the only gap), and a fresh window after an epoch change;
-  - the HTTP boundary: headers and CSP, tune, ring, leave and retune, the poll limit, `Host` and `Origin` checks, content type, methods, no write endpoints, loopback only.
+- `test_tuner.py` covers the human synthetic dashboard and privacy boundary:
+  - verified live traffic cannot enumerate a station, key, stream or activity through the view or HTTP;
+  - the optional fixture is explicitly synthetic and independent of listener state;
+  - distinctive item text absent from the view, JSON response, and static page;
+  - no `/api/ring`, `/api/tune`, `/api/leave`, journal or item path; mutations return 405;
+  - security headers/CSP, DNS rebinding, method and loopback-only boundaries.
 
 ## Vectors
 

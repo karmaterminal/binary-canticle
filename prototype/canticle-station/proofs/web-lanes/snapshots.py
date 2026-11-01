@@ -1,6 +1,9 @@
-"""Poll the tuner gateway's API every 5 s for both channels; one compact JSON line per ring read.
+"""Poll the synthetic-only human dashboard every 5 s.
 
     python snapshots.py http://127.0.0.1:8765 <seconds>
+
+This lane intentionally reads only /api/stations. It never calls tune, ring or leave, and records
+only station-card counts and explicit synthetic markers, never listener observations.
 """
 
 import json
@@ -20,28 +23,15 @@ def call(path, body=None):
         return json.loads(r.read())
 
 
-subs = {}
 end = time.time() + SECONDS
 while time.time() < end:
     try:
-        stations = call("/api/stations")["stations"]
-        for st in stations:
-            for sm in st["streams"]:
-                if sm["tunable"] and sm["name"] not in subs:
-                    subs[sm["name"]] = call("/api/tune", {"station": st["key_id"], "stream": sm["stream_id"]})["sub"]
-        for name, sub in list(subs.items()):
-            try:
-                r = call(f"/api/ring?sub={sub}")
-            except urllib.error.HTTPError as e:
-                if e.code == 404:
-                    del subs[name]   # lapsed: tune again next round
-                continue
-            print(json.dumps({"t_ms": r["now_ms"], "stream": name, "head": r["head_seq"],
-                              "live_advertised": r["live_advertised"],
-                              "items": [[i["seq"], i["issued_at"], i["local_expiry_ms"], i["remaining_ms"], i["copies"]]
-                                        for i in r["items"]],
-                              "tombstones": [[t["seq"], t["reason"]] for t in r["tombstones"]],
-                              "unheard": r["unheard_seq"]}), flush=True)
+        response = call("/api/stations")
+        print(json.dumps({"t_ms": response["now_ms"],
+                          "synthetic": response["synthetic"],
+                          "station_count": len(response["stations"]),
+                          "all_synthetic": all(st.get("synthetic") is True for st in response["stations"])}),
+              flush=True)
     except (urllib.error.URLError, OSError, KeyError) as e:
         print(json.dumps({"t_ms": int(time.time() * 1000), "error": str(e)}), flush=True)
     time.sleep(5)

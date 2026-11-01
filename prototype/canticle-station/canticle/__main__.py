@@ -10,7 +10,7 @@
     python -m canticle doctor  [--json] [--probe|--no-probe]                 # check this host; exit 1 if a check fails
     python -m canticle manifest verify|show [fleet.json]
     python -m canticle ambient --control ... --stream hymn --fixture hymn.txt --duration 600   # background emitter
-    python -m canticle tuner   --manifest fleet.json --multicast --http 127.0.0.1:8765         # read-only web view
+    python -m canticle tuner   --manifest fleet.json --multicast --http 127.0.0.1:8765         # synthetic-only web view
 """
 
 from __future__ import annotations
@@ -430,12 +430,6 @@ def cmd_tuner(a) -> int:
         return 1
     state, _lease = _listener_state(a, role="tuner")
     lst = Listener(m, state_path=state, ephemeral=a.ephemeral)
-    log = open(a.log, "a") if a.log else None
-
-    def on_event(ev) -> None:
-        if log is not None:
-            log.write(json.dumps({"t_ms": runner.now_ms(), **ev.to_json()}) + "\n")
-            log.flush()
 
     def ready(port: int) -> None:
         print(json.dumps({"tuner": f"http://{http_host}:{port}/", "udp": a.bind,
@@ -447,7 +441,8 @@ def cmd_tuner(a) -> int:
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, stop.set)
         await run_tuner(lst, runner.parse_addr(a.bind), runner.MCAST_GROUP if a.multicast else None,
-                        http_host, http_port, stop, on_event=on_event, ready=ready)
+                        http_host, http_port, stop, ready=ready,
+                        demo_fixture=a.demo_fixture)
 
     asyncio.run(main())
     return 0
@@ -663,14 +658,14 @@ def main(argv=None) -> int:
     b.add_argument("--log", help="append JSON records here instead of stdout")
     b.set_defaults(fn=cmd_ambient)
 
-    u = sub.add_parser("tuner", help="read-only web tuner: a loopback gateway over one listener")
+    u = sub.add_parser("tuner", help="synthetic-only human dashboard: live station metadata is never published")
     u.add_argument("--manifest", required=True)
     u.add_argument("--bind", default=f"0.0.0.0:{runner.DEFAULT_PORT}", help="UDP address to hear on")
     u.add_argument("--multicast", action="store_true")
     u.add_argument("--http", default="127.0.0.1:8765", help="loopback host:port for the page")
+    u.add_argument("--demo-fixture", action="store_true", help="show an explicitly synthetic sample station")
     u.add_argument("--state", help="listener safety state file (as for listen)")
     u.add_argument("--ephemeral", action="store_true", help="UNSAFE: keep no listener state across restarts")
-    u.add_argument("--log", help="append every listener event, as JSON lines, here")
     u.set_defaults(fn=cmd_tuner)
 
     dm = sub.add_parser("daemon", help="the host daemon: one UDP listener, record v1 to every binding over a unix socket",
