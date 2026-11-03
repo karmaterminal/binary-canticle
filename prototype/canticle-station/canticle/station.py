@@ -61,6 +61,7 @@ class SingResult:
     size: int
     superseded_seq: Optional[int] = None
     kind: str = "item"
+    ttl_clamped_from: Optional[float] = None  # the TTL asked for, when the stream's default cut it (§7.2)
 
     def to_json(self) -> dict:
         return {k: v for k, v in self.__dict__.items() if v is not None}
@@ -190,12 +191,20 @@ class Station:
         self._cursor = 0  # catalog position (stream order) the next paged beacon starts from
         self.streams: dict[str, _Stream] = {}
         self._key_due: list = []  # heap of (forget_at, stream name, state_key), lazily invalidated
+        self.ttl_notes: list[str] = []  # each stream whose configured TTL was cut, for the startup log
         for c in configs:
             if c.cls not in CLASS_BY_NAME:
                 raise ValueError(f"unknown class {c.cls!r}")
             spec = CLASS_BY_NAME[c.cls]
+            asked_max, asked_default = c.max_ttl_s, c.default_ttl_s
             c.max_ttl_s = min(c.max_ttl_s, spec.max_ttl_s, STATION_HARD_CAP_S)
             c.default_ttl_s = min(c.default_ttl_s or spec.default_ttl_s, c.max_ttl_s)
+            if asked_default is not None and asked_default > c.default_ttl_s:
+                self.ttl_notes.append(f"stream {c.name}: default TTL {asked_default} s cut to {c.default_ttl_s} s "
+                                      f"(stream max {c.max_ttl_s} s; class {spec.name} max {spec.max_ttl_s} s)")
+            elif asked_max > c.max_ttl_s and asked_max != DEFAULT_STREAM_MAX_TTL_S:
+                self.ttl_notes.append(f"stream {c.name}: max TTL {asked_max} s cut to {c.max_ttl_s} s "
+                                      f"(class {spec.name} max {spec.max_ttl_s} s)")
             self.streams[c.name] = _Stream(cfg=c, sid=by_name[c.name])
         self._fit_budget()
         self.bseq = 0
@@ -328,7 +337,8 @@ class Station:
         self._admit(st, oa, now_ms)
         return SingResult(stream=stream, seq=it.seq, epoch=self.epoch, issued_at=it.issued_at,
                           expires_at=it.expires_at, ttl_s=ttl_ms / 1000, loop_ms=oa.loop_ms, clamp=oa.clamp,
-                          size=len(frame), superseded_seq=superseded)
+                          size=len(frame), superseded_seq=superseded,
+                          ttl_clamped_from=float(ttl_s) if ttl_s is not None and ttl_s > st.cfg.default_ttl_s else None)
 
     def hush(self, now_ms: int, stream: str, seq: int, reason: int = 0) -> SingResult:
         """Pluck a live item: stop its loop, then loop a PLUCK until its expiry (§7.7)."""

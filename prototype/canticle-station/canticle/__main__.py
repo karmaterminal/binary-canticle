@@ -34,7 +34,7 @@ from . import finding, runner, stations, wire
 from .ids import CLASS_BY_NAME, SCOPES, STATION_NAME_RE
 from .listener import Listener
 from .manifest import FORMAT, Manifest, StationEntry, verify_json
-from .station import Station, StreamConfig, next_epoch
+from .station import DEFAULT_STREAM_MAX_TTL_S, Station, StreamConfig, next_epoch
 
 
 def _load_key(path: str) -> Ed25519PrivateKey:
@@ -120,9 +120,19 @@ def cmd_keygen(a) -> int:
 
 
 def _stream_config(spec: str) -> StreamConfig:
+    """``name[:class[:default_ttl_s[:max_ttl_s]]]``. A default above the stream maximum raises the maximum to it
+    (the class maximum still caps both), so asking for a 900 s default on a live-state stream gets 900 s."""
     name, _, rest = spec.partition(":")
-    cls, _, ttl = rest.partition(":")
-    return StreamConfig(name=name, cls=cls or "chatter", default_ttl_s=int(ttl) if ttl else None)
+    cls, _, rest = rest.partition(":")
+    ttl, _, top = rest.partition(":")
+    default = int(ttl) if ttl else None
+    if top:
+        maximum = int(top)
+    elif default is not None:
+        maximum = max(DEFAULT_STREAM_MAX_TTL_S, default)
+    else:
+        maximum = DEFAULT_STREAM_MAX_TTL_S
+    return StreamConfig(name=name, cls=cls or "chatter", default_ttl_s=default, max_ttl_s=maximum)
 
 
 def cmd_station(a) -> int:
@@ -159,6 +169,8 @@ def cmd_station(a) -> int:
     log = (lambda s: print(s, file=sys.stderr, flush=True))
     log(json.dumps({"station": st.key_id.hex(), "epoch": st.epoch, "control": control,
                     "dests": [f"{h}:{p}" for h, p in dests], "streams": list(st.streams)}))
+    for note in st.ttl_notes:
+        log(json.dumps({"ttl_cut": note}))
 
     async def main():
         stop = asyncio.Event()
@@ -590,7 +602,7 @@ def main(argv=None) -> int:
     s.add_argument("--socket-class", action="append", help="class the control socket may request (repeatable); "
                    "default: every class the key is granted except regulatory, alarm and control, which the "
                    "socket never accepts in this spike")
-    s.add_argument("--stream", action="append", required=True, help="name[:class[:default_ttl_s]]")
+    s.add_argument("--stream", action="append", required=True, help="name[:class[:default_ttl_s[:max_ttl_s]]]; a default above 300 s raises the stream max to it, within the class max")
     s.add_argument("--to", action="append", help="host:port destination (repeatable)")
     s.add_argument("--multicast", action="store_true", help=f"also send to {runner.MCAST_GROUP}")
     s.add_argument("--port", type=int, default=runner.DEFAULT_PORT)
