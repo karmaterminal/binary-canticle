@@ -284,8 +284,11 @@ canticle shape --demo-fixture        # invented stations, marked synthetic
 - **A day (`/api/drum`).** The same arrivals, beacons and observation, in 10-second buckets for 24 hours. It's laid
   out for a seismograph-style helicorder: 96 rows of 15 minutes from `start_ms`, the last row holding now. It's
   sparse:
-  - `observed` as `[from, to)` bucket ranges;
-  - each station's beacon buckets;
+  - `observed` as `[from, to)` bucket ranges. Coverage is an interval, not the bucket a record lands in:
+    - two health records on the same connection at most 30 s apart cover the span between them;
+    - the span since the last record is served as observed while it's under 30 s old, and never stored;
+    - a longer silence, or a new connection, leaves its gap open;
+  - each station's beacon buckets, filled the same way between sightings;
   - its arrivals as `[bucket, stream index, count]`, with stream names listed once in `streams`.
 - **Consent.** No station is shown by default. A manifest entry is not consent to human display, so a host names a
   station only after that station's owner agrees on #133. A broadcaster-signed opt-in is the follow-up.

@@ -286,7 +286,8 @@ class DrumTest(unittest.TestCase):
         self.assertEqual(out["start_ms"], (200 - DRUM_ROWS + 1) * DRUM_ROW_MS)
         self.assertEqual((out["rows"], out["row_ms"], out["bucket_ms"]), (DRUM_ROWS, DRUM_ROW_MS, DRUM_BUCKET_MS))
         idx = lambda t: (t - out["start_ms"]) // DRUM_BUCKET_MS
-        self.assertEqual(out["observed"], [[idx(now - 30_000), idx(now - 20_000) + 1]])
+        self.assertEqual(out["observed"], [[idx(now - 30_000), idx(now) + 1]],
+                         "covered from the first record, through the second, and on to now within the stale bound")
         self.assertEqual(out["streams"], ["chatter", "lens.threat"])
         (cael,) = out["stations"]
         self.assertEqual(cael["beacons"], [idx(now - 32_000), idx(now - 21_000)])
@@ -295,6 +296,49 @@ class DrumTest(unittest.TestCase):
         text = json.dumps(out)
         for needle in ("rm -rf", "canticle:heard", "second", "i1", "aa" * 8, "purpose", "seq"):
             self.assertNotIn(needle, text)
+
+    def test_coverage_is_an_interval_so_jitter_leaves_no_holes_and_a_real_gap_stays_open(self):
+        """🌿 on #138: health at +0.1, 9.9, 20.1, 29.9 and 40.1 s over one connection read [0,1], [2,3], [4,5]."""
+        base = 300 * DRUM_ROW_MS
+        clock = [base]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        seq = 4
+        for offset in (100, 9_900, 20_100, 29_900, 40_100):
+            clock[0] = base + offset
+            sv.tap.apply(health(seq, 400))
+            seq += 1
+        out = sv.flow.project_drum(base + 40_100)
+        idx = lambda t: (t - out["start_ms"]) // DRUM_BUCKET_MS
+        self.assertEqual(out["observed"], [[idx(base), idx(base + 40_100) + 1]], "one range: no holes")
+        self.assertEqual(out["stations"][0]["beacons"], list(range(idx(base - 300), idx(base + 39_700) + 1)))
+        clock[0] = base + 40_100 + STALE_MS + 10_000            # a real silence, longer than the stale bound
+        sv.tap.apply(health(seq, 400))
+        out = sv.flow.project_drum(clock[0])
+        self.assertEqual(len(out["observed"]), 2, "the silence stays a gap")
+        self.assertEqual(out["observed"][1], [idx(clock[0]), idx(clock[0]) + 1])
+
+    def test_a_new_connection_does_not_bridge_the_gap_before_it(self):
+        clock = [400 * DRUM_ROW_MS]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(health(4, 400))
+        clock[0] += 25_000                                               # within STALE_MS, but a new connection
+        rejoined = _StampedView([("*", "*")], lambda: clock[0], sv.flow)   # a fresh connection, as follow makes
+        bootstrap(rejoined, join=False)
+        rejoined.apply(presence(3, "cael"))
+        rejoined.apply(health(4, 400))
+        out = sv.flow.project_drum(clock[0] + STALE_MS + 1)              # past the bound: no open tail either
+        self.assertEqual(len(out["observed"]), 2)
+
+    def test_the_open_interval_since_the_last_record_is_served_not_stored(self):
+        clock = [500 * DRUM_ROW_MS]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(health(4, 400))
+        within = sv.flow.project_drum(clock[0] + 25_000)
+        idx = lambda t: (t - within["start_ms"]) // DRUM_BUCKET_MS
+        self.assertEqual(within["observed"], [[idx(clock[0]), idx(clock[0] + 25_000) + 1]])
+        past = sv.flow.project_drum(clock[0] + STALE_MS + 1)
+        self.assertEqual(past["observed"], [[idx(clock[0]), idx(clock[0]) + 1]])
+        self.assertEqual(sv.flow.drum_observed, {clock[0] // DRUM_BUCKET_MS})
 
     def test_a_day_is_kept_and_no_more(self):
         clock = [5 * DRUM_ROW_MS]

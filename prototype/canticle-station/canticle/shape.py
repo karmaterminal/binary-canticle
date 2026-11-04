@@ -165,6 +165,11 @@ class Flow:
         self._seen: dict = {}   # idem -> local expiry: counted items, so a replay is not counted again
         # /api/drum: 10 s buckets for 24 h, sparse
         self.drum_observed: set = set()
+        # coverage is an interval, not the bucket a record lands in: health comes every 10 s, the bucket is 10 s, so
+        # jitter would leave a connected bucket looking unobserved (🌿 on #138).  Two records on the same connection
+        # at most STALE_MS apart cover the span between them; likewise two sightings of a station's beacon.
+        self._last_health: Optional[tuple] = None          # (view, at)
+        self._last_beacon: dict = {}                        # name -> (view, beacon time)
         self.drum_beacons: dict = {name: set() for name in self.allowed}
         self.drum_arrivals: dict = {name: {} for name in self.allowed}
 
@@ -180,12 +185,15 @@ class Flow:
         if type_ == "health":
             minute = now_ms // MINUTE_MS
             self.observed.add(minute)
-            self.drum_observed.add(now_ms // DRUM_BUCKET_MS)
+            self.drum_observed.update(self._span(self._last_health, view, now_ms))
+            self._last_health = (view, now_ms)
             for key_id, age in ((view.health or {}).get("beacon_age_ms") or {}).items():
                 if key_id in names and isinstance(age, (int, float)) and 0 <= age <= MINUTE_MS:
                     name, p = names[key_id]
-                    self._bucket(name, (now_ms - int(age)) // MINUTE_MS)["beacon"] = True
-                    self.drum_beacons[name].add((now_ms - int(age)) // DRUM_BUCKET_MS)
+                    beacon_at = now_ms - int(age)
+                    self._bucket(name, beacon_at // MINUTE_MS)["beacon"] = True
+                    self.drum_beacons[name].update(self._span(self._last_beacon.get(name), view, beacon_at))
+                    self._last_beacon[name] = (view, beacon_at)
             for name, p in names.values():
                 self._bucket(name, minute)["state"] = _closed(view.presence_state(p), PRESENCE_STATES)
         for kind, fields in changes:
@@ -209,6 +217,14 @@ class Flow:
             drum[stream] = drum.get(stream, 0) + 1
             self.river.append((at, name, stream))
         self._prune(now_ms)
+
+    @staticmethod
+    def _span(last: Optional[tuple], view: TapView, at: int) -> range:
+        """The drum buckets ``at`` covers: from the previous sighting on the same connection when it is at most
+        ``STALE_MS`` earlier, else ``at``'s own bucket.  A new connection, or a longer silence, leaves its gap open."""
+        if last is not None and last[0] is view and 0 <= at - last[1] <= STALE_MS:
+            return range(last[1] // DRUM_BUCKET_MS, at // DRUM_BUCKET_MS + 1)
+        return range(at // DRUM_BUCKET_MS, at // DRUM_BUCKET_MS + 1)
 
     def _prune(self, now_ms: int) -> None:
         for idem in [i for i, exp in self._seen.items() if exp <= now_ms]:
@@ -264,8 +280,13 @@ class Flow:
             i = b - base
             return i if 0 <= i < DRUM_BUCKETS else None
 
+        observed = set(self.drum_observed)
+        if self._last_health is not None and 0 <= now_ms - self._last_health[1] <= STALE_MS:
+            # the open interval since the last record, as far as /api/shape still calls the connection live; served,
+            # not stored, so a connection that dies here never keeps the claim
+            observed.update(range(self._last_health[1] // DRUM_BUCKET_MS, now_ms // DRUM_BUCKET_MS + 1))
         ranges: list = []
-        for i in sorted(i for i in map(index, self.drum_observed) if i is not None):
+        for i in sorted(i for i in map(index, observed) if i is not None):
             if ranges and ranges[-1][1] == i:
                 ranges[-1][1] = i + 1
             else:
