@@ -220,8 +220,10 @@ class Flow:
                             "arrivals": [{"stream": s, "n": n} for s, n in sorted((b or {}).get("arrivals", {}).items())],
                             "state": (b or {}).get("state")})
             out["stations"].append({"name": name, "minutes": row})
+        # newest heard first: placing at heard_at can leave consumption order slightly out of time order (🌿)
         out["river"] = [{"at_ms": at, "station": name, "stream": stream}
-                        for at, name, stream in reversed(self.river) if at > now_ms - WINDOW_MIN * MINUTE_MS]
+                        for at, name, stream in sorted(self.river, key=lambda r: -r[0])
+                        if at > now_ms - WINDOW_MIN * MINUTE_MS]
         return out
 
 

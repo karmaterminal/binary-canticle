@@ -210,6 +210,15 @@ class FlowTest(unittest.TestCase):
         self.assertEqual((row[-2]["arrivals"], row[-1]["arrivals"]), ([{"stream": "chatter", "n": 1}], []))
         self.assertEqual(out["river"][0]["at_ms"], 9 * MINUTE_MS + 50_000)
 
+    def test_the_river_is_newest_heard_first_whatever_order_it_was_consumed_in(self):
+        clock = [10 * MINUTE_MS]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(frame("i1", 4, heard=clock[0] - 1_000))
+        sv.tap.apply(frame("i2", 5, heard=clock[0] - 3_000, stream="lens.threat"))
+        sv.tap.apply(frame("i3", 6, heard=clock[0] - 2_000))
+        self.assertEqual([r["at_ms"] for r in sv.flow.project(clock[0])["river"]],
+                         [clock[0] - 1_000, clock[0] - 2_000, clock[0] - 3_000])
+
     def test_only_named_stations_are_kept(self):
         sv = view_with(presence(3, "cael"), presence(4, "rune", key_id="bb" * 8), stations=("cael",))
         sv.tap.apply(frame("i1", 5, station="rune"))
