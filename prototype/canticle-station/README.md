@@ -32,6 +32,7 @@ a locator and cross-check hint, never an identity or trust source. This spike do
 resolve DNS records, and its manifest remains unsigned.
 | §6.7 Findings (FP-1, #112) | `canticle/finding.py`: the finding body (content type 11) and its strict reader. `canticle sing --finding` and `--body-ref`, and the control socket's `finding` and `body_ref` fields, put a keyed `advisory` finding and a `finding-ref` doorbell on air. `canticle tap` shows a finding field by field, with a host-authored line that attributes it to its signer. See [Findings](#findings-fp-1-112). |
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
+| Shape-only live view (#133) | `canticle shape`: per named station, presence and beacon age; per stream, live count and newest age. Never content; no station without its owner's yes. |
 | §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only synthetic-only human dashboard over one listener. Live station identity, streams, activity and payloads are never published to humans. |
 | §14.18.3 Record v1 (BC-2, #77) | `canticle/records.py`: the listener's outcomes as receptor record v1 (`hello`, `landing_state`, `frame`, `retract`, `presence`, `health`, `fatal`, `bye`) under the disposition mapping, with fixed health counters and a bounded table of unverified key ids (D34). See [Record v1 and the host daemon](#record-v1-and-the-host-daemon-bc-2-d35-77). |
 | §11.1, §14.18.2 Host daemon (D35, #77) | `canticle daemon`: the host's one UDP listener, carrying record v1 to every binding over a unix `SOCK_STREAM` socket with peer-credential checks, a two-record bootstrap per connection and per-connection isolation. |
@@ -241,6 +242,32 @@ canticle tuner --manifest fleet.json --multicast --demo-fixture
   - It serves a strict CSP (`script-src 'self'`, no inline script), plus `nosniff`, `no-referrer` and `no-store`.
   - Neither verified nor unverified datagram metadata is shown. A manifest entry is not broadcaster consent for human disclosure. A live view requires a separate broadcaster-controlled metadata opt-in design.
   - The projection holds no listener reference, item text or payload-derived summary and has no tune/channel or tombstone state. The listener's own safety state and quotas remain separate.
+
+### Shape-only live view (#133)
+
+```sh
+canticle shape --station frond-gloss --station familiar --http 127.0.0.1:8766
+# GET http://127.0.0.1:8766/api/shape
+canticle shape --demo-fixture        # invented stations, marked synthetic
+```
+
+- **What it shows.** For each station named with `--station`: its presence state (the listener's closed words,
+  or `not_heard`) and beacon age. For each of its streams with something live: the live count and how long ago the
+  newest was heard. It also reports whether the daemon connection is up, and the daemon's and this connection's
+  health (`ok` / `degraded`). This is enough for a dashboard (the EWS concept, #12) to show that stations are on
+  air, that the carrier is fresh and that streams are moving.
+- **What it never shows.** No item text, purpose, body digest or reference, sequence, epoch, idem, state key,
+  lineage, key id or finding. The answer is built field by field from a closed list (`ShapeView.project`), not
+  filtered from a record, and any state word outside the closed sets reads `unknown`.
+- **Nothing old shown as current.** The daemon reports beacon ages in its `health` record, every 10 s. The gateway
+  notes when each record arrived, on its own clock, and adds the time since, so an age keeps counting between
+  records. A connection with no health for 30 s (three missed records), even one still open, is stale: the answer
+  reads disconnected (`connected: false`, every station `not_heard`), and the gateway drops it and joins again.
+- **Consent.** No station is shown by default. A manifest entry is not consent to human display, so a host names a
+  station only after that station's owner agrees on #133. A broadcaster-signed opt-in is the follow-up.
+- **What it is.** It's one more read-only client of the host daemon's socket, through `tap`: it binds no UDP port,
+  writes no state and sings nothing. It reconnects with backoff after a daemon restart. HTTP is the tuner's
+  (loopback only, Host check, GET only, the same headers), serving `/api/shape` and nothing else.
 
 ### Same-host proof for #57 and #58
 

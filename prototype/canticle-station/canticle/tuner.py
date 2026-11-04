@@ -91,10 +91,12 @@ def is_loopback(host: str) -> bool:
 class TunerHttp:
     """A small read-only HTTP/1.1 server: one request per connection, loopback only, GET only."""
 
-    def __init__(self, view: TunerView, host: str, port: int, clock=_now_ms):
+    def __init__(self, view, host: str, port: int, clock=_now_ms, api_path: str = "/api/stations",
+                 static: bool = True):
         if not is_loopback(host):
             raise ValueError(f"the tuner gateway binds loopback only in this spike, not {host!r} (RFC §18.9)")
         self.view, self.host, self.port, self.clock = view, host, port, clock
+        self.api_path, self.static = api_path, static
         self.server: Optional[asyncio.base_events.Server] = None
 
     def allowed_hosts(self) -> set[str]:
@@ -144,10 +146,10 @@ class TunerHttp:
         url = urlsplit(target)
         now = self.clock()
         if method == "GET":
-            if url.path in STATIC:
+            if self.static and url.path in STATIC:
                 fname, ctype = STATIC[url.path]
                 return 200, ctype, (WEB_DIR / fname).read_bytes()
-            if url.path == "/api/stations":
+            if url.path == self.api_path:
                 return self._json(self.view.stations(now))
             raise _HttpError(404, "not found")
         raise _HttpError(405, "GET only")
