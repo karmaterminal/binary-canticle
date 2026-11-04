@@ -14,6 +14,9 @@ Nothing old is shown as current.  The daemon reports beacon ages in its ``health
 the time since.  A connection that has heard no health for ``STALE_MS`` is stale: the answer reads disconnected, and
 the gateway drops the connection and joins again.
 
+``/api/drum`` is the same day at finer grain, for a helicorder: 24 hours of 10-second buckets, sparse, in 96
+fifteen-minute rows.
+
 ``/api/flow`` is the same shape over time (#135): for the last hour, minute by minute, whether the gateway was
 observing, whether each named station's beacon was heard, how many items arrived on each stream, and the presence
 state; and the last arrivals, each only a time, a station and a stream.  It is kept in memory, so it starts empty at
@@ -42,6 +45,10 @@ MINUTE_MS = 60_000
 WINDOW_MIN = 60
 RIVER_MAX = 50
 SEEN_MAX = 4096   # item identities remembered, in memory only, to tell a new item from a replayed one
+DRUM_BUCKET_MS = 10_000            # /api/drum: a helicorder day, in 10 s buckets
+DRUM_ROW_MS = 15 * MINUTE_MS       # one drum turn
+DRUM_ROWS = 96                     # 24 h
+DRUM_BUCKETS = DRUM_ROWS * DRUM_ROW_MS // DRUM_BUCKET_MS
 
 
 class _StampedView(TapView):
@@ -123,6 +130,9 @@ class ShapeView:
     def flow_project(self, now_ms: int) -> dict:
         return _demo_flow(now_ms) if self.demo_fixture else self.flow.project(now_ms)
 
+    def drum_project(self, now_ms: int) -> dict:
+        return _demo_drum(now_ms) if self.demo_fixture else self.flow.project_drum(now_ms)
+
     def _stale(self, now_ms: int) -> bool:
         return self.tap is None or self.tap.stale(now_ms)
 
@@ -153,6 +163,10 @@ class Flow:
         self.minutes: dict = {name: {} for name in self.allowed}
         self.river: deque = deque(maxlen=RIVER_MAX)
         self._seen: dict = {}   # idem -> local expiry: counted items, so a replay is not counted again
+        # /api/drum: 10 s buckets for 24 h, sparse
+        self.drum_observed: set = set()
+        self.drum_beacons: dict = {name: set() for name in self.allowed}
+        self.drum_arrivals: dict = {name: {} for name in self.allowed}
 
     def _bucket(self, name: str, minute: int) -> dict:
         return self.minutes[name].setdefault(minute, {"beacon": False, "arrivals": {}, "state": None})
@@ -166,10 +180,12 @@ class Flow:
         if type_ == "health":
             minute = now_ms // MINUTE_MS
             self.observed.add(minute)
+            self.drum_observed.add(now_ms // DRUM_BUCKET_MS)
             for key_id, age in ((view.health or {}).get("beacon_age_ms") or {}).items():
                 if key_id in names and isinstance(age, (int, float)) and 0 <= age <= MINUTE_MS:
                     name, p = names[key_id]
                     self._bucket(name, (now_ms - int(age)) // MINUTE_MS)["beacon"] = True
+                    self.drum_beacons[name].add((now_ms - int(age)) // DRUM_BUCKET_MS)
             for name, p in names.values():
                 self._bucket(name, minute)["state"] = _closed(view.presence_state(p), PRESENCE_STATES)
         for kind, fields in changes:
@@ -189,6 +205,8 @@ class Flow:
             stream = str(fields.get("stream") or "")
             arrivals = self._bucket(name, at // MINUTE_MS)["arrivals"]
             arrivals[stream] = arrivals.get(stream, 0) + 1
+            drum = self.drum_arrivals[name].setdefault(at // DRUM_BUCKET_MS, {})
+            drum[stream] = drum.get(stream, 0) + 1
             self.river.append((at, name, stream))
         self._prune(now_ms)
 
@@ -197,6 +215,12 @@ class Flow:
             del self._seen[idem]
         while len(self._seen) > SEEN_MAX:   # dicts keep insertion order: drop the oldest counted
             del self._seen[next(iter(self._seen))]
+        oldest = (now_ms - DRUM_ROWS * DRUM_ROW_MS) // DRUM_BUCKET_MS
+        self.drum_observed = {b for b in self.drum_observed if b >= oldest}
+        for name in self.allowed:
+            self.drum_beacons[name] = {b for b in self.drum_beacons[name] if b >= oldest}
+            for b in [b for b in self.drum_arrivals[name] if b < oldest]:
+                del self.drum_arrivals[name][b]
         first = now_ms // MINUTE_MS - WINDOW_MIN + 1
         self.observed = {m for m in self.observed if m >= first}
         for buckets in self.minutes.values():
@@ -225,6 +249,38 @@ class Flow:
                         for at, name, stream in sorted(self.river, key=lambda r: -r[0])
                         if at > now_ms - WINDOW_MIN * MINUTE_MS]
         return out
+
+
+    def project_drum(self, now_ms: int) -> dict:
+        """The whole ``/api/drum`` answer: a day of 10 s buckets, as indices from ``start_ms`` (the first of 96 rows of
+        15 minutes; the last row holds now).  Sparse: ``observed`` as [from, to) index ranges, each station's beacon
+        buckets, and its arrivals as [bucket, stream index, count].  Closed words, host-named stations, manifest-bounded
+        stream names, counts and times only."""
+        self._prune(now_ms)
+        start = (now_ms // DRUM_ROW_MS - DRUM_ROWS + 1) * DRUM_ROW_MS
+        base = start // DRUM_BUCKET_MS
+
+        def index(b: int) -> Optional[int]:
+            i = b - base
+            return i if 0 <= i < DRUM_BUCKETS else None
+
+        ranges: list = []
+        for i in sorted(i for i in map(index, self.drum_observed) if i is not None):
+            if ranges and ranges[-1][1] == i:
+                ranges[-1][1] = i + 1
+            else:
+                ranges.append([i, i + 1])
+        streams = sorted({s for name in self.allowed for per in self.drum_arrivals[name].values() for s in per})
+        sid = {s: n for n, s in enumerate(streams)}
+        stations = []
+        for name in self.allowed:
+            arrivals = [[i, sid[s], n] for b, per in sorted(self.drum_arrivals[name].items())
+                        if (i := index(b)) is not None for s, n in sorted(per.items())]
+            beacons = sorted(i for i in map(index, self.drum_beacons[name]) if i is not None)
+            stations.append({"name": name, "beacons": beacons, "arrivals": arrivals})
+        return {"now_ms": now_ms, "since_ms": self.started_at, "synthetic": False, "start_ms": start,
+                "bucket_ms": DRUM_BUCKET_MS, "row_ms": DRUM_ROW_MS, "rows": DRUM_ROWS, "observed": ranges,
+                "streams": streams, "stations": stations}
 
 
 def _closed(value, allowed: set, missing: str = "unknown") -> str:
@@ -257,6 +313,24 @@ def _demo_flow(now_ms: int) -> dict:
                          {"name": "demo-balthasar", "minutes": row(9, "facts")},
                          {"name": "demo-casper", "minutes": row(0, "chatter")}],
             "river": [{"at_ms": now_ms - i * 37_000, "station": "demo-melchior", "stream": "chatter"} for i in range(8)]}
+
+
+def _demo_drum(now_ms: int) -> dict:
+    """Invented, and marked so: a day with a rhythm, a quiet night, an unobserved gap and a burst."""
+    start = (now_ms // DRUM_ROW_MS - DRUM_ROWS + 1) * DRUM_ROW_MS
+    upto = (now_ms - start) // DRUM_BUCKET_MS + 1
+    gap = (3000, 3400)   # an unobserved stretch
+    observed = [[0, gap[0]], [gap[1], upto]]
+    def station(period: int, burst: int, stream: int) -> dict:
+        beacons = [i for i in range(upto) if not gap[0] <= i < gap[1]]
+        arrivals = [[i, stream, 1 + (i // period) % 3] for i in range(0, upto, period) if not gap[0] <= i < gap[1]]
+        arrivals += [[i, stream, 4] for i in range(burst, min(burst + 30, upto), 3)]
+        return {"beacons": beacons, "arrivals": sorted(arrivals)}
+    return {"now_ms": now_ms, "since_ms": start, "synthetic": True, "start_ms": start, "bucket_ms": DRUM_BUCKET_MS,
+            "row_ms": DRUM_ROW_MS, "rows": DRUM_ROWS, "observed": observed, "streams": ["chatter", "facts"],
+            "stations": [{"name": "demo-melchior", **station(37, 5200, 0)},
+                         {"name": "demo-balthasar", **station(181, 7000, 1)},
+                         {"name": "demo-casper", "beacons": [], "arrivals": []}]}
 
 
 async def follow(socket_path: str, view: ShapeView, stop: asyncio.Event, timeout_s: float = 5.0,
@@ -303,7 +377,7 @@ async def run_shape(socket_path: str, stations: Iterable[str], http_host: str, h
                     clock: Callable[[], int] = _now_ms) -> None:
     view = ShapeView(stations, demo_fixture=demo_fixture, clock=clock)
     http = TunerHttp(view, http_host, http_port, clock=clock, api_path="/api/shape", static=False,
-                     routes={"/api/flow": view.flow_project})
+                     routes={"/api/flow": view.flow_project, "/api/drum": view.drum_project})
     port = await http.start()
     if ready is not None:
         ready(port)

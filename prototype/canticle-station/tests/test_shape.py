@@ -12,8 +12,8 @@ import tempfile
 import unittest
 
 from canticle import runner
-from canticle.shape import (MINUTE_MS, PRESENCE_STATES, RIVER_MAX, STALE_MS, WINDOW_MIN, ShapeView, _StampedView,
-                             follow, run_shape)
+from canticle.shape import (DRUM_BUCKET_MS, DRUM_BUCKETS, DRUM_ROW_MS, DRUM_ROWS, MINUTE_MS, PRESENCE_STATES,
+                             RIVER_MAX, STALE_MS, WINDOW_MIN, ShapeView, _StampedView, follow, run_shape)
 from canticle.tuner import TunerHttp
 
 from test_join_snapshot import SnapshotCase
@@ -263,6 +263,65 @@ class FlowTest(unittest.TestCase):
         self.assertTrue(all(s["name"].startswith("demo-") for s in out["stations"]))
 
 
+DRUM_KEYS = {"now_ms", "since_ms", "synthetic", "start_ms", "bucket_ms", "row_ms", "rows", "observed", "streams",
+             "stations"}
+
+
+class DrumTest(unittest.TestCase):
+    """``/api/drum``: a helicorder day in 10 s buckets, sparse, with the same arrival gate as ``/api/flow``."""
+
+    def test_buckets_index_from_the_first_row_and_nothing_is_said(self):
+        now = 200 * DRUM_ROW_MS + 7 * MINUTE_MS + 25_000          # 7m25s into a row
+        clock = [now - 30_000]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(health(4, 2_000))                             # observed at now-30 s; beacon heard at now-32 s
+        clock[0] = now - 20_000
+        sv.tap.apply(health(5, 1_000))                             # the next 10 s bucket: one observed range
+        clock[0] = now - 10_000                                    # consumed 5 s after the daemon heard them
+        sv.tap.apply(frame("i1", 6, text=EVIL, heard=now - 15_000))
+        sv.tap.apply(frame("i2", 7, stream="lens.threat", text="second", heard=now - 15_000))
+        sv.tap.apply(frame("i1", 8, text=EVIL, heard=now - 14_000))   # the same item again: not counted
+        out = sv.flow.project_drum(now)
+        self.assertEqual(set(out), DRUM_KEYS)
+        self.assertEqual(out["start_ms"], (200 - DRUM_ROWS + 1) * DRUM_ROW_MS)
+        self.assertEqual((out["rows"], out["row_ms"], out["bucket_ms"]), (DRUM_ROWS, DRUM_ROW_MS, DRUM_BUCKET_MS))
+        idx = lambda t: (t - out["start_ms"]) // DRUM_BUCKET_MS
+        self.assertEqual(out["observed"], [[idx(now - 30_000), idx(now - 20_000) + 1]])
+        self.assertEqual(out["streams"], ["chatter", "lens.threat"])
+        (cael,) = out["stations"]
+        self.assertEqual(cael["beacons"], [idx(now - 32_000), idx(now - 21_000)])
+        self.assertEqual(cael["arrivals"], [[idx(now - 15_000), 0, 1], [idx(now - 15_000), 1, 1]])
+        self.assertLess(max(i for i, _, _ in cael["arrivals"]), DRUM_BUCKETS)
+        text = json.dumps(out)
+        for needle in ("rm -rf", "canticle:heard", "second", "i1", "aa" * 8, "purpose", "seq"):
+            self.assertNotIn(needle, text)
+
+    def test_a_day_is_kept_and_no_more(self):
+        clock = [5 * DRUM_ROW_MS]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(health(4, 10))
+        sv.tap.apply(frame("i1", 5, heard=clock[0]))
+        clock[0] += DRUM_ROWS * DRUM_ROW_MS + DRUM_BUCKET_MS       # a day and a bucket later
+        sv.tap.apply(health(6, 10))
+        out = sv.flow.project_drum(clock[0])
+        self.assertEqual(out["stations"][0]["arrivals"], [])
+        self.assertEqual(len(out["observed"]), 1, "only the new health record's bucket is still in the day")
+        self.assertFalse(sv.flow.drum_arrivals["cael"])
+
+    def test_only_named_stations_and_a_marked_demo(self):
+        sv = view_with(presence(3, "cael"), presence(4, "rune", key_id="bb" * 8), stations=("cael",))
+        sv.tap.apply(frame("i1", 5, station="rune", heard=10_000))
+        out = sv.flow.project_drum(10_000)
+        self.assertEqual([s["name"] for s in out["stations"]], ["cael"])
+        self.assertNotIn("rune", json.dumps(out))
+        sv.demo_fixture = True
+        demo = sv.drum_project(10 * DRUM_ROW_MS)
+        self.assertEqual(set(demo), DRUM_KEYS)
+        self.assertTrue(demo["synthetic"])
+        self.assertTrue(all(s["name"].startswith("demo-") for s in demo["stations"]))
+        self.assertTrue(all(0 <= i < DRUM_BUCKETS for s in demo["stations"] for i, _, _ in s["arrivals"]))
+
+
 async def http_get(port, path="/api/shape", host=None, method="GET"):
     reader, writer = await asyncio.open_connection("127.0.0.1", port)
     writer.write(f"{method} {path} HTTP/1.1\r\nHost: {host or f'127.0.0.1:{port}'}\r\n\r\n".encode())
@@ -296,6 +355,7 @@ class ShapeDaemonTest(SnapshotCase):
             got = {"api": (status, body),
                    "flow_before": flow_before,
                    "flow": await http_get(ports[0], "/api/flow"),
+                   "drum": await http_get(ports[0], "/api/drum"),
                    "root": await http_get(ports[0], "/"),
                    "tuner_api": await http_get(ports[0], "/api/stations"),
                    "rebind": await http_get(ports[0], host="evil.example:80"),
@@ -328,6 +388,10 @@ class ShapeDaemonTest(SnapshotCase):
         self.assertEqual([(r["station"], r["stream"]) for r in after["river"]], [("cael", "chatter")])
         for needle in (b"rm -rf", b"steal", b"live-state fact", b"second chatter", b"after the join", b"canticle:heard"):
             self.assertNotIn(needle, got["flow"][1])
+            self.assertNotIn(needle, got["drum"][1])
+        drum = json.loads(got["drum"][1])
+        self.assertEqual((got["drum"][0], set(drum)), (200, DRUM_KEYS))
+        self.assertEqual(sum(n for _, _, n in drum["stations"][0]["arrivals"]), 1, "the post-join sing, once")
         self.assertEqual(got["root"][0], 404)
         self.assertEqual(got["tuner_api"][0], 404)
         self.assertEqual(got["rebind"][0], 421)

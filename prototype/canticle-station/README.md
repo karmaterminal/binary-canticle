@@ -249,6 +249,7 @@ canticle tuner --manifest fleet.json --multicast --demo-fixture
 canticle shape --station frond-gloss --station familiar --http 127.0.0.1:8766
 # GET http://127.0.0.1:8766/api/shape    now
 # GET http://127.0.0.1:8766/api/flow     the last hour (#135)
+# GET http://127.0.0.1:8766/api/drum     the last day, for a helicorder
 canticle shape --demo-fixture        # invented stations, marked synthetic
 ```
 
@@ -273,12 +274,19 @@ canticle shape --demo-fixture        # invented stations, marked synthetic
   It also lists the last 50 arrivals, each only `{at_ms, station, stream}`. An arrival is a new emission heard
   live:
   - the daemon marks it `dedup: first`, so an item re-surfaced after a daemon restart doesn't count;
-  - this gateway hasn't counted it already;
+  - this gateway hasn't counted it already. Identities are remembered in memory until the item expires, at most
+    4096 at once, and never served. Past that cap the oldest could be counted again;
   - it hadn't expired before the gateway consumed it;
   - it's placed at the daemon's `heard_at`.
 
   The join snapshot never counts. The history is kept in memory, so it starts empty at each gateway start, and
   `since_ms` says when that was.
+- **A day (`/api/drum`).** The same arrivals, beacons and observation, in 10-second buckets for 24 hours. It's laid
+  out for a seismograph-style helicorder: 96 rows of 15 minutes from `start_ms`, the last row holding now. It's
+  sparse:
+  - `observed` as `[from, to)` bucket ranges;
+  - each station's beacon buckets;
+  - its arrivals as `[bucket, stream index, count]`, with stream names listed once in `streams`.
 - **Consent.** No station is shown by default. A manifest entry is not consent to human display, so a host names a
   station only after that station's owner agrees on #133. A broadcaster-signed opt-in is the follow-up.
 - **What it is.** It's one more read-only client of the host daemon's socket, through `tap`: it binds no UDP port,
