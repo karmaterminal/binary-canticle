@@ -7,11 +7,13 @@ either answer.
 
 import asyncio
 import json
+import pathlib
+import tempfile
 import unittest
 
 from canticle import runner
-from canticle.shape import PRESENCE_STATES, ShapeView, follow, run_shape
-from canticle.tap import TapView
+from canticle.shape import PRESENCE_STATES, STALE_MS, ShapeView, _StampedView, follow, run_shape
+from canticle.tuner import TunerHttp
 
 from test_join_snapshot import SnapshotCase
 from test_tap import EVIL, bootstrap, frame, rec
@@ -26,12 +28,14 @@ def presence(seq, name, state="EQUIPPED_SPEAKING", key_id="aa" * 8):
                last_beacon_at=1)
 
 
-def view_with(*records, stations=("cael",)):
-    tv = TapView([("*", "*")])
+def view_with(*records, stations=("cael",), clock=None):
+    """A connected view fed ``records``, each applied at ``clock()`` (default: 10 000 ms, the projections' ``now``)."""
+    clock = clock or (lambda: 10_000)
+    tv = _StampedView([("*", "*")], clock)
     bootstrap(tv, join=False)
     for r in records:
         tv.apply(r)
-    sv = ShapeView(stations)
+    sv = ShapeView(stations, clock=clock)
     sv.tap, sv.connected = tv, True
     return sv
 
@@ -95,6 +99,37 @@ class ShapeViewTest(unittest.TestCase):
         self.assertEqual((out["connected"], out["daemon"], out["receive"]), (False, "unknown", "unknown"))
         self.assertEqual(out["stations"][0]["state"], "not_heard")
 
+    def test_a_beacon_age_counts_on_from_its_health_record_until_the_connection_is_stale(self):
+        """The daemon's ages are true when its health arrives (every 10 s); between records, and if none comes, the
+        answer ages them on the gateway's clock rather than repeating them (🌫 on #134)."""
+        clock = [1_000]
+        sv = view_with(presence(3, "cael"), rec("health", 4, state="ok", reasons=[], beacon_age_ms={"aa" * 8: 900}),
+                       clock=lambda: clock[0])
+        self.assertEqual(sv.project(1_000)["stations"][0]["beacon_age_ms"], 900)
+        self.assertEqual(sv.project(11_000)["stations"][0]["beacon_age_ms"], 10_900)
+        at_bound = sv.project(1_000 + STALE_MS)
+        self.assertTrue(at_bound["connected"])
+        self.assertEqual(at_bound["stations"][0]["beacon_age_ms"], 900 + STALE_MS)
+        stale = sv.project(1_000 + STALE_MS + 1)
+        keys_ok(self, stale)
+        self.assertEqual((stale["connected"], stale["daemon"], stale["receive"]), (False, "unknown", "unknown"))
+        self.assertEqual((stale["stations"][0]["state"], stale["stations"][0]["beacon_age_ms"]), ("not_heard", None))
+        clock[0] = 20_000   # a fresh health record re-anchors the ages
+        sv.tap.apply(rec("health", 5, state="ok", reasons=[], beacon_age_ms={"aa" * 8: 300}))
+        self.assertEqual(sv.project(21_000)["stations"][0]["beacon_age_ms"], 1_300)
+        self.assertTrue(sv.project(20_000 + STALE_MS)["connected"])
+
+    def test_a_join_with_no_health_yet_goes_stale_from_the_join(self):
+        clock = [5_000]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        self.assertTrue(sv.project(5_000 + STALE_MS)["connected"])
+        self.assertIsNone(sv.project(5_000)["stations"][0]["beacon_age_ms"])
+        self.assertFalse(sv.project(5_000 + STALE_MS + 1)["connected"])
+
+    def test_a_negative_age_is_not_shown(self):
+        sv = view_with(presence(3, "cael"), rec("health", 4, state="ok", reasons=[], beacon_age_ms={"aa" * 8: -5}))
+        self.assertIsNone(sv.project(10_000)["stations"][0]["beacon_age_ms"])
+
     def test_demo_fixture_is_marked_synthetic_and_ignores_the_daemon(self):
         sv = view_with(presence(3, "cael"))
         sv.demo_fixture = True
@@ -157,6 +192,87 @@ class ShapeDaemonTest(SnapshotCase):
         self.assertEqual(got["tuner_api"][0], 404)
         self.assertEqual(got["rebind"][0], 421)
         self.assertEqual(got["post"][0], 405)
+
+    def test_http_ages_on_its_own_clock_and_reads_disconnected_once_stale(self):
+        """🌫's probe on #134: polls at 1 000 and 41 000 ms both said 900 ms and connected."""
+        async def scenario():
+            clock = [1_000]
+            sv = view_with(presence(3, "cael"), rec("health", 4, state="ok", reasons=[], beacon_age_ms={"aa" * 8: 900}),
+                           clock=lambda: clock[0])
+            http = TunerHttp(sv, "127.0.0.1", 0, clock=lambda: clock[0], api_path="/api/shape", static=False)
+            port = await http.start()
+            try:
+                out = []
+                for at in (1_000, 9_000, 41_000):
+                    clock[0] = at
+                    out.append(json.loads((await http_get(port))[1]))
+                return out
+            finally:
+                await http.close()
+
+        first, later, stale = asyncio.run(scenario())
+        self.assertEqual([s["stations"][0]["beacon_age_ms"] for s in (first, later)], [900, 8_900])
+        self.assertTrue(later["connected"])
+        self.assertEqual((stale["connected"], stale["stations"][0]["state"]), (False, "not_heard"))
+
+    def test_follow_drops_an_open_but_silent_daemon_and_joins_again(self):
+        """A daemon that completes the join, reports health once, then holds its socket open saying nothing: once no
+        health has come for STALE_MS the view reads disconnected and follow joins again (🌫 on #134)."""
+        async def scenario():
+            with tempfile.TemporaryDirectory() as tmp:
+                sock = str(pathlib.Path(tmp) / "sock")
+                clock, joins, release = [1_000], [], asyncio.Event()
+
+                async def peer(reader, writer):
+                    joins.append(clock[0])
+                    try:
+                        await reader.readline()
+                        p = presence(3, "cael")
+                        fields = {k: v for k, v in p.items() if k not in ("v", "type", "rec_seq", "run")}
+                        records = [rec("hello", 1, join_snapshot=True), rec("landing_state", 2),
+                                   rec("snapshot", 3, snap_seq=1, entry={"presence": fields}),
+                                   rec("snapshot_end", 3, watermark=3, count=1, truncated=False, omitted=0),
+                                   rec("health", 4, state="ok", reasons=[], beacon_age_ms={"aa" * 8: 900})]
+                        writer.write("".join(json.dumps(r) + "\n" for r in records).encode())
+                        await writer.drain()
+                        await release.wait()
+                    finally:
+                        writer.close()
+
+                server = await asyncio.start_unix_server(peer, sock)
+                sv, stop, sleeps = ShapeView(["cael"], clock=lambda: clock[0]), asyncio.Event(), []
+
+                async def sleep(s):
+                    sleeps.append(s)
+                    if len(joins) >= 2:
+                        stop.set()
+
+                task = asyncio.ensure_future(follow(sock, sv, stop, sleep=sleep))
+                try:
+                    for _ in range(100):
+                        await asyncio.sleep(0.02)
+                        if sv.connected and sv.tap.health:
+                            break
+                    fresh = sv.project(clock[0])
+                    clock[0] += STALE_MS + 1   # the daemon stays open and silent past the bound
+                    stale = sv.project(clock[0])
+                    for _ in range(100):
+                        await asyncio.sleep(0.02)
+                        if len(joins) >= 2:
+                            break
+                    return fresh, stale, list(joins), sleeps
+                finally:
+                    stop.set()
+                    release.set()
+                    await asyncio.wait_for(task, 5)
+                    server.close()
+                    await server.wait_closed()
+
+        fresh, stale, joins, sleeps = asyncio.run(scenario())
+        self.assertEqual((fresh["connected"], fresh["stations"][0]["beacon_age_ms"]), (True, 900))
+        self.assertEqual((stale["connected"], stale["stations"][0]["state"]), (False, "not_heard"))
+        self.assertEqual(len(joins), 2, "follow joined again after the stale connection")
+        self.assertEqual(sleeps[0], 1, "backoff restarts at the first step after a connection that was up")
 
     def test_follow_reconnects_after_the_daemon_is_gone(self):
         """No daemon: follow backs off and retries instead of ending; the view stays disconnected."""

@@ -259,6 +259,10 @@ canticle shape --demo-fixture        # invented stations, marked synthetic
 - **What it never shows.** No item text, purpose, body digest or reference, sequence, epoch, idem, state key,
   lineage, key id or finding. The answer is built field by field from a closed list (`ShapeView.project`), not
   filtered from a record, and any state word outside the closed sets reads `unknown`.
+- **Nothing old shown as current.** The daemon reports beacon ages in its `health` record, every 10 s. The gateway
+  notes when each record arrived, on its own clock, and adds the time since, so an age keeps counting between
+  records. A connection with no health for 30 s (three missed records), even one still open, is stale: the answer
+  reads disconnected (`connected: false`, every station `not_heard`), and the gateway drops it and joins again.
 - **Consent.** No station is shown by default. A manifest entry is not consent to human display, so a host names a
   station only after that station's owner agrees on #133. A broadcaster-signed opt-in is the follow-up.
 - **What it is.** It's one more read-only client of the host daemon's socket, through `tap`: it binds no UDP port,
