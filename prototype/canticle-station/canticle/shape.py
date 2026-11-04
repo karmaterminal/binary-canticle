@@ -94,7 +94,7 @@ class ShapeView:
         manifest bounds, a count or an age in milliseconds."""
         if self.demo_fixture:
             return _demo(now_ms)
-        view = self.tap if self.connected and not self._stale(now_ms) else None
+        view = self._live(now_ms)
         out = {"now_ms": now_ms, "synthetic": False, "connected": view is not None,
                "daemon": _closed((view.health or {}).get("state") if view else None, HEALTH_STATES),
                "receive": view.receive()["health"] if view else "unknown",
@@ -127,11 +127,15 @@ class ShapeView:
             })
         return out
 
+    def _live(self, now_ms: int) -> Optional[_StampedView]:
+        """The connection this answer may call live: connected and not stale, else None."""
+        return self.tap if self.connected and not self._stale(now_ms) else None
+
     def flow_project(self, now_ms: int) -> dict:
         return _demo_flow(now_ms) if self.demo_fixture else self.flow.project(now_ms)
 
     def drum_project(self, now_ms: int) -> dict:
-        return _demo_drum(now_ms) if self.demo_fixture else self.flow.project_drum(now_ms)
+        return _demo_drum(now_ms) if self.demo_fixture else self.flow.project_drum(now_ms, self._live(now_ms))
 
     def _stale(self, now_ms: int) -> bool:
         return self.tap is None or self.tap.stale(now_ms)
@@ -267,11 +271,11 @@ class Flow:
         return out
 
 
-    def project_drum(self, now_ms: int) -> dict:
+    def project_drum(self, now_ms: int, live: Optional[_StampedView] = None) -> dict:
         """The whole ``/api/drum`` answer: a day of 10 s buckets, as indices from ``start_ms`` (the first of 96 rows of
         15 minutes; the last row holds now).  Sparse: ``observed`` as [from, to) index ranges, each station's beacon
         buckets, and its arrivals as [bucket, stream index, count].  Closed words, host-named stations, manifest-bounded
-        stream names, counts and times only."""
+        stream names, counts and times only.  ``live`` is the connection ``/api/shape`` calls live now, or None."""
         self._prune(now_ms)
         start = (now_ms // DRUM_ROW_MS - DRUM_ROWS + 1) * DRUM_ROW_MS
         base = start // DRUM_BUCKET_MS
@@ -281,9 +285,11 @@ class Flow:
             return i if 0 <= i < DRUM_BUCKETS else None
 
         observed = set(self.drum_observed)
-        if self._last_health is not None and 0 <= now_ms - self._last_health[1] <= STALE_MS:
-            # the open interval since the last record, as far as /api/shape still calls the connection live; served,
-            # not stored, so a connection that dies here never keeps the claim
+        if (live is not None and self._last_health is not None and self._last_health[0] is live
+                and 0 <= now_ms - self._last_health[1] <= STALE_MS):
+            # the open interval since the last record, only while the connection that heard it is the one /api/shape
+            # calls live: an EOF or a rejoin ends it at once (🌫 on #138).  Served, not stored, so a connection that
+            # dies here never keeps the claim; the history up to its last record stays
             observed.update(range(self._last_health[1] // DRUM_BUCKET_MS, now_ms // DRUM_BUCKET_MS + 1))
         ranges: list = []
         for i in sorted(i for i in map(index, observed) if i is not None):

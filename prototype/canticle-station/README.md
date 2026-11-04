@@ -286,7 +286,9 @@ canticle shape --demo-fixture        # invented stations, marked synthetic
   sparse:
   - `observed` as `[from, to)` bucket ranges. Coverage is an interval, not the bucket a record lands in:
     - two health records on the same connection at most 30 s apart cover the span between them;
-    - the span since the last record is served as observed while it's under 30 s old, and never stored;
+    - the span since the last record is served as observed while it's under 30 s old and its connection is still the
+      one `/api/shape` calls connected, and never stored. An EOF or a rejoin ends it at once, and the history up to
+      the last record stays;
     - a longer silence, or a new connection, leaves its gap open;
   - each station's beacon buckets, filled the same way between sightings;
   - its arrivals as `[bucket, stream index, count]`, with stream names listed once in `streams`.
