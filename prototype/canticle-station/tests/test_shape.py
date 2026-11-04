@@ -12,8 +12,8 @@ import tempfile
 import unittest
 
 from canticle import runner
-from canticle.shape import (MINUTE_MS, PRESENCE_STATES, RIVER_MAX, STALE_MS, WINDOW_MIN, ShapeView, _StampedView,
-                             follow, run_shape)
+from canticle.shape import (DRUM_BUCKET_MS, DRUM_BUCKETS, DRUM_ROW_MS, DRUM_ROWS, MINUTE_MS, PRESENCE_STATES,
+                             RIVER_MAX, STALE_MS, WINDOW_MIN, ShapeView, _StampedView, follow, run_shape)
 from canticle.tuner import TunerHttp
 
 from test_join_snapshot import SnapshotCase
@@ -263,6 +263,136 @@ class FlowTest(unittest.TestCase):
         self.assertTrue(all(s["name"].startswith("demo-") for s in out["stations"]))
 
 
+DRUM_KEYS = {"now_ms", "since_ms", "synthetic", "start_ms", "bucket_ms", "row_ms", "rows", "observed", "streams",
+             "stations"}
+
+
+class DrumTest(unittest.TestCase):
+    """``/api/drum``: a helicorder day in 10 s buckets, sparse, with the same arrival gate as ``/api/flow``."""
+
+    def test_buckets_index_from_the_first_row_and_nothing_is_said(self):
+        now = 200 * DRUM_ROW_MS + 7 * MINUTE_MS + 25_000          # 7m25s into a row
+        clock = [now - 30_000]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(health(4, 2_000))                             # observed at now-30 s; beacon heard at now-32 s
+        clock[0] = now - 20_000
+        sv.tap.apply(health(5, 1_000))                             # the next 10 s bucket: one observed range
+        clock[0] = now - 10_000                                    # consumed 5 s after the daemon heard them
+        sv.tap.apply(frame("i1", 6, text=EVIL, heard=now - 15_000))
+        sv.tap.apply(frame("i2", 7, stream="lens.threat", text="second", heard=now - 15_000))
+        sv.tap.apply(frame("i1", 8, text=EVIL, heard=now - 14_000))   # the same item again: not counted
+        out = sv.drum_project(now)
+        self.assertEqual(set(out), DRUM_KEYS)
+        self.assertEqual(out["start_ms"], (200 - DRUM_ROWS + 1) * DRUM_ROW_MS)
+        self.assertEqual((out["rows"], out["row_ms"], out["bucket_ms"]), (DRUM_ROWS, DRUM_ROW_MS, DRUM_BUCKET_MS))
+        idx = lambda t: (t - out["start_ms"]) // DRUM_BUCKET_MS
+        self.assertEqual(out["observed"], [[idx(now - 30_000), idx(now) + 1]],
+                         "covered from the first record, through the second, and on to now within the stale bound")
+        self.assertEqual(out["streams"], ["chatter", "lens.threat"])
+        (cael,) = out["stations"]
+        self.assertEqual(cael["beacons"], [idx(now - 32_000), idx(now - 21_000)])
+        self.assertEqual(cael["arrivals"], [[idx(now - 15_000), 0, 1], [idx(now - 15_000), 1, 1]])
+        self.assertLess(max(i for i, _, _ in cael["arrivals"]), DRUM_BUCKETS)
+        text = json.dumps(out)
+        for needle in ("rm -rf", "canticle:heard", "second", "i1", "aa" * 8, "purpose", "seq"):
+            self.assertNotIn(needle, text)
+
+    def test_coverage_is_an_interval_so_jitter_leaves_no_holes_and_a_real_gap_stays_open(self):
+        """🌿 on #138: health at +0.1, 9.9, 20.1, 29.9 and 40.1 s over one connection read [0,1], [2,3], [4,5]."""
+        base = 300 * DRUM_ROW_MS
+        clock = [base]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        seq = 4
+        for offset in (100, 9_900, 20_100, 29_900, 40_100):
+            clock[0] = base + offset
+            sv.tap.apply(health(seq, 400))
+            seq += 1
+        out = sv.drum_project(base + 40_100)
+        idx = lambda t: (t - out["start_ms"]) // DRUM_BUCKET_MS
+        self.assertEqual(out["observed"], [[idx(base), idx(base + 40_100) + 1]], "one range: no holes")
+        self.assertEqual(out["stations"][0]["beacons"], list(range(idx(base - 300), idx(base + 39_700) + 1)))
+        clock[0] = base + 40_100 + STALE_MS + 10_000            # a real silence, longer than the stale bound
+        sv.tap.apply(health(seq, 400))
+        out = sv.drum_project(clock[0])
+        self.assertEqual(len(out["observed"]), 2, "the silence stays a gap")
+        self.assertEqual(out["observed"][1], [idx(clock[0]), idx(clock[0]) + 1])
+
+    def test_a_new_connection_does_not_bridge_the_gap_before_it(self):
+        clock = [400 * DRUM_ROW_MS]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(health(4, 400))
+        clock[0] += 25_000                                               # within STALE_MS, but a new connection
+        rejoined = _StampedView([("*", "*")], lambda: clock[0], sv.flow)   # a fresh connection, as follow makes
+        bootstrap(rejoined, join=False)
+        rejoined.apply(presence(3, "cael"))
+        rejoined.apply(health(4, 400))
+        out = sv.drum_project(clock[0] + STALE_MS + 1)              # past the bound: no open tail either
+        self.assertEqual(len(out["observed"]), 2)
+
+    def test_the_open_interval_since_the_last_record_is_served_not_stored(self):
+        clock = [500 * DRUM_ROW_MS]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(health(4, 400))
+        within = sv.drum_project(clock[0] + 25_000)
+        idx = lambda t: (t - within["start_ms"]) // DRUM_BUCKET_MS
+        self.assertEqual(within["observed"], [[idx(clock[0]), idx(clock[0] + 25_000) + 1]])
+        past = sv.drum_project(clock[0] + STALE_MS + 1)
+        self.assertEqual(past["observed"], [[idx(clock[0]), idx(clock[0]) + 1]])
+        self.assertEqual(sv.flow.drum_observed, {clock[0] // DRUM_BUCKET_MS})
+
+    def test_the_open_interval_ends_when_its_connection_does(self):
+        """🌫 on #138: after an EOF /api/shape reads disconnected at once, so the drum's open tail must end too.  The
+        history up to the last record stays; no bucket after the end is called observed."""
+        clock = [550 * DRUM_ROW_MS]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(health(4, 400))
+        clock[0] += 10_000
+        sv.tap.apply(health(5, 400))
+        ended = clock[0]
+        sv.connected = False                                             # what follow sets when the socket ends
+        out = sv.drum_project(ended + 25_000)
+        idx = lambda t: (t - out["start_ms"]) // DRUM_BUCKET_MS
+        self.assertEqual(out["observed"], [[idx(ended - 10_000), idx(ended) + 1]], "sealed history, no tail")
+        self.assertFalse(sv.project(ended + 25_000)["connected"])
+
+    def test_a_rejoin_does_not_inherit_the_old_connections_tail(self):
+        clock = [560 * DRUM_ROW_MS]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(health(4, 400))
+        last = clock[0]
+        clock[0] += 15_000
+        rejoined = _StampedView([("*", "*")], lambda: clock[0], sv.flow)   # follow's next view, no health yet
+        sv.tap = rejoined
+        out = sv.drum_project(clock[0] + 5_000)
+        idx = lambda t: (t - out["start_ms"]) // DRUM_BUCKET_MS
+        self.assertEqual(out["observed"], [[idx(last), idx(last) + 1]])
+
+    def test_a_day_is_kept_and_no_more(self):
+        clock = [5 * DRUM_ROW_MS]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(health(4, 10))
+        sv.tap.apply(frame("i1", 5, heard=clock[0]))
+        clock[0] += DRUM_ROWS * DRUM_ROW_MS + DRUM_BUCKET_MS       # a day and a bucket later
+        sv.tap.apply(health(6, 10))
+        out = sv.drum_project(clock[0])
+        self.assertEqual(out["stations"][0]["arrivals"], [])
+        self.assertEqual(len(out["observed"]), 1, "only the new health record's bucket is still in the day")
+        self.assertFalse(sv.flow.drum_arrivals["cael"])
+
+    def test_only_named_stations_and_a_marked_demo(self):
+        sv = view_with(presence(3, "cael"), presence(4, "rune", key_id="bb" * 8), stations=("cael",))
+        sv.tap.apply(frame("i1", 5, station="rune", heard=10_000))
+        out = sv.drum_project(10_000)
+        self.assertEqual([s["name"] for s in out["stations"]], ["cael"])
+        self.assertNotIn("rune", json.dumps(out))
+        sv.demo_fixture = True
+        demo = sv.drum_project(10 * DRUM_ROW_MS)
+        self.assertEqual(set(demo), DRUM_KEYS)
+        self.assertTrue(demo["synthetic"])
+        self.assertTrue(all(s["name"].startswith("demo-") for s in demo["stations"]))
+        self.assertTrue(all(0 <= i < DRUM_BUCKETS for s in demo["stations"] for i, _, _ in s["arrivals"]))
+
+
 async def http_get(port, path="/api/shape", host=None, method="GET"):
     reader, writer = await asyncio.open_connection("127.0.0.1", port)
     writer.write(f"{method} {path} HTTP/1.1\r\nHost: {host or f'127.0.0.1:{port}'}\r\n\r\n".encode())
@@ -296,6 +426,7 @@ class ShapeDaemonTest(SnapshotCase):
             got = {"api": (status, body),
                    "flow_before": flow_before,
                    "flow": await http_get(ports[0], "/api/flow"),
+                   "drum": await http_get(ports[0], "/api/drum"),
                    "root": await http_get(ports[0], "/"),
                    "tuner_api": await http_get(ports[0], "/api/stations"),
                    "rebind": await http_get(ports[0], host="evil.example:80"),
@@ -328,6 +459,10 @@ class ShapeDaemonTest(SnapshotCase):
         self.assertEqual([(r["station"], r["stream"]) for r in after["river"]], [("cael", "chatter")])
         for needle in (b"rm -rf", b"steal", b"live-state fact", b"second chatter", b"after the join", b"canticle:heard"):
             self.assertNotIn(needle, got["flow"][1])
+            self.assertNotIn(needle, got["drum"][1])
+        drum = json.loads(got["drum"][1])
+        self.assertEqual((got["drum"][0], set(drum)), (200, DRUM_KEYS))
+        self.assertEqual(sum(n for _, _, n in drum["stations"][0]["arrivals"]), 1, "the post-join sing, once")
         self.assertEqual(got["root"][0], 404)
         self.assertEqual(got["tuner_api"][0], 404)
         self.assertEqual(got["rebind"][0], 421)
@@ -413,6 +548,55 @@ class ShapeDaemonTest(SnapshotCase):
         self.assertEqual((stale["connected"], stale["stations"][0]["state"]), (False, "not_heard"))
         self.assertEqual(len(joins), 2, "follow joined again after the stale connection")
         self.assertEqual(sleeps[0], 1, "backoff restarts at the first step after a connection that was up")
+
+    def test_drum_stops_observing_at_a_real_socket_eof(self):
+        """🌫's repro on #138: the daemon sends its join and one health record, then closes the socket.  Within
+        STALE_MS of that record /api/shape already reads disconnected; /api/drum must not call the time since
+        observed."""
+        async def scenario():
+            with tempfile.TemporaryDirectory() as tmp:
+                sock = str(pathlib.Path(tmp) / "sock")
+                clock, closed = [600 * DRUM_ROW_MS], asyncio.Event()
+
+                async def peer(reader, writer):
+                    try:
+                        await reader.readline()
+                        p = presence(3, "cael")
+                        fields = {k: v for k, v in p.items() if k not in ("v", "type", "rec_seq", "run")}
+                        records = [rec("hello", 1, join_snapshot=True), rec("landing_state", 2),
+                                   rec("snapshot", 3, snap_seq=1, entry={"presence": fields}),
+                                   rec("snapshot_end", 3, watermark=3, count=1, truncated=False, omitted=0),
+                                   rec("health", 4, state="ok", reasons=[], beacon_age_ms={"aa" * 8: 900})]
+                        writer.write("".join(json.dumps(r) + "\n" for r in records).encode())
+                        await writer.drain()
+                    finally:
+                        writer.close()
+                        closed.set()
+
+                server = await asyncio.start_unix_server(peer, sock)
+                sv, stop = ShapeView(["cael"], clock=lambda: clock[0]), asyncio.Event()
+                ended = asyncio.Event()
+
+                async def sleep(_):
+                    ended.set()
+                    await stop.wait()
+
+                task = asyncio.ensure_future(follow(sock, sv, stop, sleep=sleep))
+                try:
+                    await asyncio.wait_for(ended.wait(), 5)             # the EOF ended the connection
+                    heard = clock[0]
+                    clock[0] += 25_000                                   # inside STALE_MS of the record
+                    return heard, sv.project(clock[0]), sv.drum_project(clock[0])
+                finally:
+                    stop.set()
+                    await asyncio.wait_for(task, 5)
+                    server.close()
+                    await server.wait_closed()
+
+        heard, shape, drum = asyncio.run(scenario())
+        idx = lambda t: (t - drum["start_ms"]) // DRUM_BUCKET_MS
+        self.assertFalse(shape["connected"])
+        self.assertEqual(drum["observed"], [[idx(heard), idx(heard) + 1]], "the record's bucket only")
 
     def test_follow_reconnects_after_the_daemon_is_gone(self):
         """No daemon: follow backs off and retries instead of ending; the view stays disconnected."""
