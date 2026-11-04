@@ -265,12 +265,20 @@ canticle shape --demo-fixture        # invented stations, marked synthetic
   records. A connection with no health for 30 s (three missed records), even one still open, is stale: the answer
   reads disconnected (`connected: false`, every station `not_heard`), and the gateway drops it and joins again.
 - **Over time (`/api/flow`, #135).** The last 60 minutes, minute by minute:
-  - whether the gateway was observing (a health record arrived);
-  - for each named station, whether its beacon was heard, its arrivals per stream and its last presence state.
+  - whether the gateway was observing: at least one health record arrived in that minute. That shows the gateway was
+    connected, not that it heard everything, so an observed zero is not proof of uninterrupted quiet;
+  - for each named station, whether its beacon was heard, its arrivals per stream, and its presence state at the
+    minute's last health record.
 
-  It also lists the last 50 arrivals, each only `{at_ms, station, stream}`. Arrivals are live items surfaced after
-  the join; the join snapshot never counts. The history is kept in memory, so it starts empty at each gateway start,
-  and `since_ms` says when that was.
+  It also lists the last 50 arrivals, each only `{at_ms, station, stream}`. An arrival is a new emission heard
+  live:
+  - the daemon marks it `dedup: first`, so an item re-surfaced after a daemon restart doesn't count;
+  - this gateway hasn't counted it already;
+  - it hadn't expired before the gateway consumed it;
+  - it's placed at the daemon's `heard_at`.
+
+  The join snapshot never counts. The history is kept in memory, so it starts empty at each gateway start, and
+  `since_ms` says when that was.
 - **Consent.** No station is shown by default. A manifest entry is not consent to human display, so a host names a
   station only after that station's owner agrees on #133. A broadcaster-signed opt-in is the follow-up.
 - **What it is.** It's one more read-only client of the host daemon's socket, through `tap`: it binds no UDP port,

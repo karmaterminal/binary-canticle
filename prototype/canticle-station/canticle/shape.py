@@ -41,6 +41,7 @@ STALE_MS = 3 * HEALTH_INTERVAL_MS   # three health records missed
 MINUTE_MS = 60_000
 WINDOW_MIN = 60
 RIVER_MAX = 50
+SEEN_MAX = 4096   # item identities remembered, in memory only, to tell a new item from a replayed one
 
 
 class _StampedView(TapView):
@@ -132,9 +133,17 @@ class ShapeView:
 class Flow:
     """The last ``WINDOW_MIN`` minutes, in memory, for the named stations only (#135).
 
-    A minute is *observed* when a health record arrived in it (so the gateway was connected and hearing), and each
-    station's minute records whether its beacon was heard, its arrivals per stream and its last presence state.
-    Arrivals are live surfaced items after the join (tap's ``item`` changes), never the join snapshot.  The river
+    A minute is *observed* when at least one health record arrived in it: the gateway was connected then, which is not
+    proof that it heard everything in that minute.  Each station's minute records whether its beacon was heard, its
+    arrivals per stream and its presence state at the last health record of the minute.
+
+    An arrival is a new emission, heard live: a surfaced item after the join (tap's ``item`` change) that
+    - the daemon reports as ``dedup: first``, not ``resurfaced`` (a daemon restart hearing a still-live item again);
+    - this gateway has not already counted (its identity is remembered, in memory only and never served, until the
+      item expires);
+    - had not already expired when the gateway consumed it.
+
+    It is placed at the daemon's ``heard_at``, not at the gateway's clock.  The join snapshot never counts.  The river
     keeps the last ``RIVER_MAX`` arrivals as a time, a station and a stream, nothing else."""
 
     def __init__(self, stations: Iterable[str], clock: Callable[[], int] = _now_ms):
@@ -143,6 +152,7 @@ class Flow:
         self.observed: set = set()
         self.minutes: dict = {name: {} for name in self.allowed}
         self.river: deque = deque(maxlen=RIVER_MAX)
+        self._seen: dict = {}   # idem -> local expiry: counted items, so a replay is not counted again
 
     def _bucket(self, name: str, minute: int) -> dict:
         return self.minutes[name].setdefault(minute, {"beacon": False, "arrivals": {}, "state": None})
@@ -168,13 +178,25 @@ class Flow:
             name = fields["station"].get("name")
             if name not in self.minutes:
                 continue
+            times = fields.get("times") or {}
+            expiry, heard = times.get("local_expiry_at"), times.get("heard_at")
+            idem = fields.get("idem")
+            if (fields.get("dedup", "first") != "first" or idem in self._seen
+                    or not isinstance(expiry, int) or expiry <= now_ms or not isinstance(heard, int)):
+                continue   # a replay, one already counted, or one already off air: not a new emission
+            self._seen[idem] = expiry
+            at = min(heard, now_ms)
             stream = str(fields.get("stream") or "")
-            arrivals = self._bucket(name, now_ms // MINUTE_MS)["arrivals"]
+            arrivals = self._bucket(name, at // MINUTE_MS)["arrivals"]
             arrivals[stream] = arrivals.get(stream, 0) + 1
-            self.river.append((now_ms, name, stream))
+            self.river.append((at, name, stream))
         self._prune(now_ms)
 
     def _prune(self, now_ms: int) -> None:
+        for idem in [i for i, exp in self._seen.items() if exp <= now_ms]:
+            del self._seen[idem]
+        while len(self._seen) > SEEN_MAX:   # dicts keep insertion order: drop the oldest counted
+            del self._seen[next(iter(self._seen))]
         first = now_ms // MINUTE_MS - WINDOW_MIN + 1
         self.observed = {m for m in self.observed if m >= first}
         for buckets in self.minutes.values():

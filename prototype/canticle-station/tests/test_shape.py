@@ -154,11 +154,11 @@ class FlowTest(unittest.TestCase):
         clock = [5 * MINUTE_MS + 1_000]
         sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
         sv.tap.apply(health(4, 900))
-        sv.tap.apply(frame("i1", 5, text=EVIL))
-        sv.tap.apply(frame("i2", 6, text="second"))
-        sv.tap.apply(frame("i3", 7, stream="lens.threat", text="third"))
+        sv.tap.apply(frame("i1", 5, text=EVIL, heard=clock[0]))
+        sv.tap.apply(frame("i2", 6, text="second", heard=clock[0]))
+        sv.tap.apply(frame("i3", 7, stream="lens.threat", text="third", heard=clock[0]))
         clock[0] = 7 * MINUTE_MS + 30_000
-        sv.tap.apply(frame("i4", 8, text="later"))
+        sv.tap.apply(frame("i4", 8, text="later", heard=clock[0]))
         out = sv.flow.project(clock[0])
         self.assertEqual(set(out), FLOW_KEYS)
         self.assertEqual(len(out["minutes"]), WINDOW_MIN)
@@ -176,6 +176,39 @@ class FlowTest(unittest.TestCase):
         text = json.dumps(out)
         for needle in ("rm -rf", "canticle:heard", "second", "third", "later", "i1", "aa" * 8, "purpose", "seq"):
             self.assertNotIn(needle, text)
+
+    def test_a_replay_is_not_a_new_arrival(self):
+        """🌫 on #136: a daemon restart re-surfaces a still-live item (`dedup: resurfaced`), and the same item can
+        reach the gateway twice; neither is a new emission."""
+        clock = [MINUTE_MS]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(frame("i1", 4, heard=clock[0]))
+        again = frame("i1", 5, heard=clock[0] + 5)
+        sv.tap.apply(again)
+        resurfaced = {**frame("i2", 6, heard=clock[0]), "dedup": "resurfaced"}
+        sv.tap.apply(resurfaced)
+        sv.tap.apply({**frame("i3", 7, heard=clock[0]), "dedup": "first"})
+        out = sv.flow.project(clock[0])
+        self.assertEqual(out["stations"][0]["minutes"][-1]["arrivals"], [{"stream": "chatter", "n": 2}])
+        self.assertEqual(len(out["river"]), 2)
+        self.assertNotIn("i1", json.dumps(out), "remembered identities are never served")
+
+    def test_an_item_already_expired_when_consumed_is_not_an_arrival(self):
+        clock = [10 * MINUTE_MS]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(frame("i1", 4, heard=clock[0] - 5_000, expiry=clock[0]))
+        sv.tap.apply(frame("i2", 5, heard=clock[0] - 5_000, expiry=clock[0] - 1))
+        self.assertEqual(sv.flow.project(clock[0])["river"], [])
+
+    def test_an_arrival_is_placed_at_its_heard_time(self):
+        """A live item the gateway consumes late lands in the minute the daemon heard it, not the gateway's minute."""
+        clock = [10 * MINUTE_MS + 5_000]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(frame("i1", 4, heard=9 * MINUTE_MS + 50_000))
+        out = sv.flow.project(clock[0])
+        row = out["stations"][0]["minutes"]
+        self.assertEqual((row[-2]["arrivals"], row[-1]["arrivals"]), ([{"stream": "chatter", "n": 1}], []))
+        self.assertEqual(out["river"][0]["at_ms"], 9 * MINUTE_MS + 50_000)
 
     def test_only_named_stations_are_kept(self):
         sv = view_with(presence(3, "cael"), presence(4, "rune", key_id="bb" * 8), stations=("cael",))
