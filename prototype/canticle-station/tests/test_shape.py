@@ -12,7 +12,8 @@ import tempfile
 import unittest
 
 from canticle import runner
-from canticle.shape import PRESENCE_STATES, STALE_MS, ShapeView, _StampedView, follow, run_shape
+from canticle.shape import (MINUTE_MS, PRESENCE_STATES, RIVER_MAX, STALE_MS, WINDOW_MIN, ShapeView, _StampedView,
+                             follow, run_shape)
 from canticle.tuner import TunerHttp
 
 from test_join_snapshot import SnapshotCase
@@ -31,11 +32,11 @@ def presence(seq, name, state="EQUIPPED_SPEAKING", key_id="aa" * 8):
 def view_with(*records, stations=("cael",), clock=None):
     """A connected view fed ``records``, each applied at ``clock()`` (default: 10 000 ms, the projections' ``now``)."""
     clock = clock or (lambda: 10_000)
-    tv = _StampedView([("*", "*")], clock)
+    sv = ShapeView(stations, clock=clock)
+    tv = _StampedView([("*", "*")], clock, sv.flow)
     bootstrap(tv, join=False)
     for r in records:
         tv.apply(r)
-    sv = ShapeView(stations, clock=clock)
     sv.tap, sv.connected = tv, True
     return sv
 
@@ -139,6 +140,87 @@ class ShapeViewTest(unittest.TestCase):
         self.assertTrue(all(s["name"].startswith("demo-") for s in out["stations"]))
 
 
+FLOW_KEYS = {"now_ms", "since_ms", "minute_ms", "synthetic", "minutes", "stations", "river"}
+
+
+def health(seq, age, key_id="aa" * 8):
+    return rec("health", seq, state="ok", reasons=[], beacon_age_ms={key_id: age})
+
+
+class FlowTest(unittest.TestCase):
+    """``/api/flow`` (#135): the last hour minute by minute, and the last arrivals, with nothing said."""
+
+    def test_a_minute_records_observation_beacon_arrivals_and_state_and_nothing_said(self):
+        clock = [5 * MINUTE_MS + 1_000]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        sv.tap.apply(health(4, 900))
+        sv.tap.apply(frame("i1", 5, text=EVIL))
+        sv.tap.apply(frame("i2", 6, text="second"))
+        sv.tap.apply(frame("i3", 7, stream="lens.threat", text="third"))
+        clock[0] = 7 * MINUTE_MS + 30_000
+        sv.tap.apply(frame("i4", 8, text="later"))
+        out = sv.flow.project(clock[0])
+        self.assertEqual(set(out), FLOW_KEYS)
+        self.assertEqual(len(out["minutes"]), WINDOW_MIN)
+        self.assertEqual(out["minutes"][-1]["t"], 7 * MINUTE_MS)
+        by_t = {m["t"]: i for i, m in enumerate(out["minutes"])}
+        five, six, seven = (out["stations"][0]["minutes"][by_t[m * MINUTE_MS]] for m in (5, 6, 7))
+        self.assertEqual(five, {"beacon": True, "state": "EQUIPPED_SPEAKING",
+                                "arrivals": [{"stream": "chatter", "n": 2}, {"stream": "lens.threat", "n": 1}]})
+        self.assertEqual(six, {"beacon": False, "state": None, "arrivals": []})
+        self.assertEqual(seven["arrivals"], [{"stream": "chatter", "n": 1}])
+        self.assertFalse(seven["beacon"], "no health record reported a beacon in that minute")
+        self.assertEqual([out["minutes"][by_t[m * MINUTE_MS]]["observed"] for m in (5, 6, 7)], [True, False, False])
+        self.assertEqual(out["river"][0], {"at_ms": 7 * MINUTE_MS + 30_000, "station": "cael", "stream": "chatter"})
+        self.assertEqual(len(out["river"]), 4)
+        text = json.dumps(out)
+        for needle in ("rm -rf", "canticle:heard", "second", "third", "later", "i1", "aa" * 8, "purpose", "seq"):
+            self.assertNotIn(needle, text)
+
+    def test_only_named_stations_are_kept(self):
+        sv = view_with(presence(3, "cael"), presence(4, "rune", key_id="bb" * 8), stations=("cael",))
+        sv.tap.apply(frame("i1", 5, station="rune"))
+        sv.tap.apply(health(6, 100, key_id="bb" * 8))
+        out = sv.flow.project(10_000)
+        self.assertEqual([s["name"] for s in out["stations"]], ["cael"])
+        self.assertEqual(out["river"], [])
+        self.assertNotIn("rune", json.dumps(out))
+
+    def test_the_window_is_an_hour_and_the_river_is_bounded(self):
+        clock = [0]
+        sv = view_with(presence(3, "cael"), clock=lambda: clock[0])
+        seq = 4
+        for i in range(RIVER_MAX + 5):
+            sv.tap.apply(frame(f"i{i}", seq))
+            seq += 1
+        self.assertEqual(len(sv.flow.river), RIVER_MAX)
+        clock[0] = WINDOW_MIN * MINUTE_MS   # minute 0 has just left the window
+        sv.tap.apply(health(seq, 10))
+        out = sv.flow.project(clock[0])
+        self.assertEqual(out["minutes"][0]["t"], MINUTE_MS)
+        self.assertTrue(all(not m["arrivals"] for m in out["stations"][0]["minutes"]))
+        self.assertEqual(out["river"], [], "arrivals older than the window are not shown")
+        self.assertNotIn(0, sv.flow.minutes["cael"], "minute 0's arrivals were pruned")
+        self.assertTrue(out["stations"][0]["minutes"][-2]["beacon"], "a beacon 10 ms before minute 60 is minute 59's")
+
+    def test_a_state_outside_the_closed_set_is_not_echoed_and_a_wild_age_marks_no_beacon(self):
+        clock = [MINUTE_MS * 3]
+        sv = view_with(presence(3, "cael", state="<script>"), clock=lambda: clock[0])
+        sv.tap.apply(health(4, 10 * MINUTE_MS))
+        row = sv.flow.project(clock[0])["stations"][0]["minutes"]
+        self.assertEqual(row[-1]["state"], "unknown")
+        self.assertFalse(any(m["beacon"] for m in row))
+        self.assertNotIn("script", json.dumps(sv.flow.project(clock[0])))
+
+    def test_demo_flow_is_marked_synthetic(self):
+        sv = view_with(presence(3, "cael"))
+        sv.demo_fixture = True
+        out = sv.flow_project(10 * MINUTE_MS)
+        self.assertEqual(set(out), FLOW_KEYS)
+        self.assertTrue(out["synthetic"])
+        self.assertTrue(all(s["name"].startswith("demo-") for s in out["stations"]))
+
+
 async def http_get(port, path="/api/shape", host=None, method="GET"):
     reader, writer = await asyncio.open_connection("127.0.0.1", port)
     writer.write(f"{method} {path} HTTP/1.1\r\nHost: {host or f'127.0.0.1:{port}'}\r\n\r\n".encode())
@@ -166,7 +248,12 @@ class ShapeDaemonTest(SnapshotCase):
                     status, body = await http_get(ports[0])
                     if json.loads(body)["connected"]:
                         break
+            flow_before = await http_get(ports[0], "/api/flow")
+            self.sing(d, st, text="sung after the join")
+            await asyncio.sleep(0.5)
             got = {"api": (status, body),
+                   "flow_before": flow_before,
+                   "flow": await http_get(ports[0], "/api/flow"),
                    "root": await http_get(ports[0], "/"),
                    "tuner_api": await http_get(ports[0], "/api/stations"),
                    "rebind": await http_get(ports[0], host="evil.example:80"),
@@ -188,6 +275,17 @@ class ShapeDaemonTest(SnapshotCase):
         self.assertEqual(rune["state"], "not_heard")
         for needle in (b"rm -rf", b"steal", b"live-state fact", b"second chatter", b"canticle:heard"):
             self.assertNotIn(needle, body)
+        def arrivals(flow):
+            return sum(a["n"] for m in flow["stations"][0]["minutes"] for a in m["arrivals"])
+
+        before, after = (json.loads(got[k][1]) for k in ("flow_before", "flow"))
+        self.assertEqual(got["flow"][0], 200)
+        self.assertEqual(set(after), FLOW_KEYS)
+        self.assertEqual(arrivals(before), 0, "items sung before the gateway joined come in the snapshot, not as arrivals")
+        self.assertEqual(arrivals(after), 1, "the item sung after the join is one arrival")
+        self.assertEqual([(r["station"], r["stream"]) for r in after["river"]], [("cael", "chatter")])
+        for needle in (b"rm -rf", b"steal", b"live-state fact", b"second chatter", b"after the join", b"canticle:heard"):
+            self.assertNotIn(needle, got["flow"][1])
         self.assertEqual(got["root"][0], 404)
         self.assertEqual(got["tuner_api"][0], 404)
         self.assertEqual(got["rebind"][0], 421)
