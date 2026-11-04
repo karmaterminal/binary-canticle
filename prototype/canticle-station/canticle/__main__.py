@@ -337,6 +337,34 @@ def cmd_tap(a) -> int:
         return e.code
 
 
+def cmd_shape(a) -> int:
+    from .daemon import default_socket_path
+    from .shape import run_shape
+    from .tuner import is_loopback
+    http_host, http_port = runner.parse_addr(a.http, 8766)
+    if not is_loopback(http_host):
+        print(f"--http must be a loopback address, not {http_host} (RFC-0001 §18.9)", file=sys.stderr)
+        return 1
+    sock = a.socket or default_socket_path()
+    if sock is None and not a.demo_fixture:
+        print("XDG_RUNTIME_DIR is not set: pass --socket (the daemon's socket path)", file=sys.stderr)
+        return 1
+
+    def ready(port: int) -> None:
+        print(json.dumps({"shape": f"http://{http_host}:{port}/api/shape", "stations": sorted(set(a.station or [])),
+                          "synthetic": a.demo_fixture}), file=sys.stderr, flush=True)
+
+    async def main():
+        stop = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, stop.set)
+        await run_shape(sock, a.station or [], http_host, http_port, stop, ready=ready, demo_fixture=a.demo_fixture)
+
+    asyncio.run(main())
+    return 0
+
+
 def cmd_daemon(a) -> int:
     from .daemon import Daemon, DaemonConfig, default_socket_path, default_state_dir
     try:
@@ -679,6 +707,19 @@ def main(argv=None) -> int:
     dm.add_argument("--allow-uid", type=int, action="append", help="uid allowed to connect (repeatable; default: own uid)")
     dm.add_argument("--health-interval", type=float, default=10.0, help="seconds between health records")
     dm.set_defaults(fn=cmd_daemon)
+
+    sh = sub.add_parser("shape", help="shape-only human view of what the host daemon hears: presence, carrier age, "
+                        "live counts; never content (#133)",
+                        description="A read-only client of the host daemon's socket, like tap, serving one loopback "
+                        "JSON endpoint (/api/shape) built from a closed list of fields: per named station its presence "
+                        "state and beacon age, per stream its live count and newest age. No item text, purpose, "
+                        "digest, sequence or key material. Only stations named with --station appear; name one only "
+                        "after its owner agrees (#133). Binds no UDP port, writes no state, sings nothing.")
+    sh.add_argument("--socket", help="the daemon's unix socket (default $XDG_RUNTIME_DIR/canticle/daemon.sock)")
+    sh.add_argument("--station", action="append", help="a station to show (repeatable); none are shown by default")
+    sh.add_argument("--http", default="127.0.0.1:8766", help="loopback host:port for /api/shape")
+    sh.add_argument("--demo-fixture", action="store_true", help="serve invented, marked-synthetic stations only")
+    sh.set_defaults(fn=cmd_shape)
 
     tp = sub.add_parser("tap", help="read what the host daemon hears: a read-only record v1 client (no bind, no state)",
                         description="Connects to the host daemon's socket as one more binding, asks for the join "
