@@ -17,7 +17,8 @@ export function isNonSharedSessionKey(key: string, mainKey = "main"): boolean {
   if (key !== key.toLowerCase() || !TARGET_SESSION_KEY.test(key)) return false;
   const parts = key.split(":");
   const canonicalMain = mainKey.trim().toLowerCase() || "main";
-  return parts.length !== 3 || (parts[2] !== "main" && parts[2] !== canonicalMain);
+  const rest = parts.slice(2).join(":");
+  return rest !== "main" && rest !== canonicalMain;
 }
 
 export type BindingConfig = {

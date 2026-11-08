@@ -28,6 +28,7 @@ test("exact-key subscriptions are bounded, unique, and untuned by default", () =
     assert.throws(() => parseConfig({ ...base, listen: { subscriptions: [{ sessionKey, tune: ["*:*" ] }] } }, "home"), /non-shared/);
     assert.throws(() => parseConfig({ ...base, delivery: { subscriptions: [{ id: "fleet", targets: [{ sessionKey }] }] } }, "home"), /non-shared/);
   }
+  assert.throws(() => parseConfig({ ...base, listen: { payloadSessions: ["agent:rune:home:x"] } }, "home:x"), /non-shared/);
   for (const subscriptions of [
     [{ sessionKey: "agent:*", tune: ["*:*"] }],
     [{ sessionKey: "A", tune: ["*:*"] }, { sessionKey: "a", tune: ["*:*"] }],
