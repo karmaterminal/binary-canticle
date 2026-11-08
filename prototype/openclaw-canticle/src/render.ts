@@ -197,6 +197,8 @@ export function renderNote(e: NoteEntry): string {
   const n = e.note;
   const at = iso(e.at);
   switch (n.kind) {
+    case "landing_changed":
+      return `[canticle:note] receiver landing state changed at ${at}`;
     case "disconnected":
       return `[canticle:gap] lost the daemon connection (${n.why}) at ${at}: what was heard before is carried, not current`;
     case "joined":

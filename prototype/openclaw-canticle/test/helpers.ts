@@ -501,8 +501,8 @@ export function bridge(station: FakeStation, daemon: FakeDaemon): void {
 }
 
 export function configFor(name: string, dir: string, daemon: FakeDaemon, extra: Obj = {}): BindingConfig {
-  // Tests read heard text from any session unless they set listen themselves.
-  return parseConfig({ binding: name, daemon: { socket: daemon.path }, stateDir: join(dir, `state-${name}`), listen: { payloadSessions: ["*"] }, ...extra });
+  // Tests grant heard text only to exact, non-shared sessions unless they set listen themselves.
+  return parseConfig({ binding: name, daemon: { socket: daemon.path }, stateDir: join(dir, `state-${name}`), listen: { payloadSessions: [SESSION.sessionKey, OTHER_SESSION.sessionKey, "agent:scribe:local:task"], subscriptions: [{ sessionKey: SESSION.sessionKey, tune: ["*:*"] }, { sessionKey: OTHER_SESSION.sessionKey, tune: ["*:*"] }, { sessionKey: "agent:scribe:local:task", tune: ["*:*"] }] }, ...extra });
 }
 
 export function makeBinding(cfg: BindingConfig, clock: Clock, extra: Partial<BindingOptions> = {}): Binding {
@@ -512,9 +512,10 @@ export function makeBinding(cfg: BindingConfig, clock: Clock, extra: Partial<Bin
     clock: clock.now,
     tickMs: 3_600_000,
     link: { backoff: { firstMs: 20, maxMs: 100, jitter: 0 }, snapshotMs: 2_000 },
+    routeProof: extra.routeProof ?? (async (sessionKey) => ({ sessionKey, exists: true, onHost: true })),
     ...extra,
   });
 }
 
-export const SESSION: Caller = { sessionKey: "agent:main:main", sessionId: "s-1", subagent: false, anonymous: false };
+export const SESSION: Caller = { sessionKey: "agent:main:local:task", sessionId: "s-1", subagent: false, anonymous: false };
 export const OTHER_SESSION: Caller = { sessionKey: "agent:main:other", sessionId: "s-2", subagent: false, anonymous: false };

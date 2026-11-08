@@ -92,6 +92,17 @@ test("a join snapshot and live records become journal entries and the current vi
   assert.doesNotMatch(`${journal}\n${b.status(SESSION).text}`, /offline|absent|dead|\bdown\b|unwell/);
 });
 
+test("a subscription cannot widen receiver acceptance without a local route; explicit tune still reads", async () => {
+  daemon.surface({ station: "cael", key_id: KEY_CAEL, stream: "lens.threat", seq: 1, issued_at: clock.t, class: "advisory" });
+  const subscription = { id: "fleet", delivery: "ambient", targets: [{ sessionKey: "agent:main:local:task" }], stations: ["cael"], streams: ["lens.threat"], classes: ["advisory"] };
+  const readScope = [{ sessionKey: OTHER_SESSION.sessionKey, tune: ["*:*"] }];
+  b = await up({ listen: { tune: [], payloadSessions: [SESSION.sessionKey], subscriptions: readScope }, delivery: { mode: "explicit", subscriptions: [subscription] } });
+  assert.equal(heardCount(b), 0);
+  await b.stop();
+  b = await up({ listen: { tune: ["cael:lens.threat"], payloadSessions: [SESSION.sessionKey], subscriptions: readScope }, delivery: { mode: "explicit", subscriptions: [subscription] } });
+  assert.equal(heardCount(b), 1);
+});
+
 test("a repeated, resurfaced or snapshot copy of one item is journaled once; a reordered record ends the connection", async () => {
   b = await up();
   daemon.surface(cael(1));
@@ -111,12 +122,12 @@ test("a repeated, resurfaced or snapshot copy of one item is journaled once; a r
 
 test("mutes: items heard under one are journaled muted, still read by hand, and stay muted after it lifts", async () => {
   b = await up();
-  const m = b.mute(SESSION, { station: "cael", ttlSeconds: 60 });
+  const m = await b.mute(SESSION, { station: "cael", ttlSeconds: 60 });
   const id = (m.details.mute as { id: string }).id;
   assert.equal(id, "mute:rune:1");
   daemon.surface(cael(1, "while muted"));
   await waitFor(() => heardCount(b) === 1, "the muted item");
-  b.mute(SESSION, { clear: id });
+  await b.mute(SESSION, { clear: id });
   daemon.surface(cael(2, "after the mute"));
   await waitFor(() => heardCount(b) === 2, "the second item");
   const read = b.listen(SESSION, { view: "items" });
@@ -128,11 +139,11 @@ test("mutes: items heard under one are journaled muted, still read by hand, and 
   assert.match(read.text, /muted \(mute:rune:1\): readable here, never pushed/);
   assert.match(read.text, /while muted/); // a mute never stops a manual read
   // One scope holds one choice: a second mute of the same scope replaces the first.
-  b.mute(SESSION, { station: "cael" });
-  const again = b.mute(SESSION, { station: "cael", ttlSeconds: 5 });
+  await b.mute(SESSION, { station: "cael" });
+    const again = await b.mute(SESSION, { station: "cael", ttlSeconds: 5 });
   assert.equal((again.details.mutes as unknown[]).length, 1);
   // The daemon's own MUTE wins as well.
-  b.mute(SESSION, { clear: "all" });
+  await b.mute(SESSION, { clear: "all" });
   daemon.emit("landing_state", { mute: { until: null, by: "test" }, breaker: "closed", until: null, modulation: [] });
   daemon.surface(cael(3, "under the daemon's mute"));
   await waitFor(() => heardCount(b) === 3, "the third item");
@@ -273,7 +284,7 @@ test("a new read passes over what its filters leave out for good, and a new read
 });
 
 test("a call that names no session reads digests of the journal and on air, never new reads or heard text", async () => {
-  b = await up(); // listen.payloadSessions is "*": every session that names itself may read heard text
+  b = await up(); // exact payload grants are exercised by named sessions in the suite
   daemon.surface(cael(1, "for named sessions only"));
   await waitFor(() => heardCount(b) === 1, "the item");
   const anonymous = callerOf({});
@@ -287,20 +298,20 @@ test("a call that names no session reads digests of the journal and on air, neve
   const digest = b.listen(anonymous, { what: "journal" });
   assert.equal(digest.details.ok, true);
   assert.equal(digest.text.includes("for named sessions only"), false);
-  assert.match(digest.text, /heard text is not shown to this session/);
+  assert.doesNotMatch(digest.text, /for named sessions only|\[canticle:heard\]/);
   assert.equal(b.listen(anonymous, { what: "on_air" }).details.ok, true);
-  assert.match(b.status(anonymous).text, /this call names no session/);
+  assert.match(b.status(anonymous).text, /this call names no exact session/);
   await b.stop(); // nothing was kept for it under a shared name: no checkpoint, no taint mark
   const st = JSON.parse(readFileSync(join(dir, "state-rune", "state.json"), "utf8")) as Obj;
   assert.deepEqual(st.checkpoints, {});
   assert.deepEqual(st.taint, {});
-  // An agent id alone names that agent's session; blank strings name nothing.
-  assert.deepEqual(callerOf({ agentId: "main" }), { sessionKey: "agent:main", sessionId: null, subagent: false, anonymous: false });
+  // An agent id alone does not identify an exact session; blank strings name nothing.
+  assert.deepEqual(callerOf({ agentId: "main" }), anonymous);
   assert.equal(callerOf({ sessionKey: "", agentId: " ", sessionId: "s-1" }).anonymous, true);
 });
 
 test("a taint table that overflows fails closed: every session that may read heard text counts as tainted", async () => {
-  const cfg = { listen: { payloadSessions: ["agent:main:*"] } };
+  const cfg = { listen: { payloadSessions: [SESSION.sessionKey, OTHER_SESSION.sessionKey, "agent:main:early"], subscriptions: [{ sessionKey: SESSION.sessionKey, tune: ["*:*"] }, { sessionKey: OTHER_SESSION.sessionKey, tune: ["*:*"] }, { sessionKey: "agent:main:early", tune: ["*:*"] }] } };
   b = await up(cfg);
   daemon.surface(cael(1));
   await waitFor(() => heardCount(b) === 1, "the item");
@@ -325,6 +336,12 @@ test("a taint table that overflows fails closed: every session that may read hea
   await b.stop();
   b = await up(cfg);
   assert.equal(b.isTainted(early), true); // and it holds across a restart
+  await b.resetSession(early.sessionKey, early.sessionId);
+  assert.equal(b.isTainted(early), true, "ID-only reset cannot clear an overflow-implied taint");
+  assert.equal(b.isTainted(OTHER_SESSION), true, "reset does not clear another session's taint");
+  await b.stop();
+  b = await up(cfg);
+  assert.equal(b.isTainted(early), true, "ID-only reset remains fail-closed across restart");
 });
 
 test("a cut feed: on air reads unknown with carried items, until a complete join snapshot makes it current", async () => {

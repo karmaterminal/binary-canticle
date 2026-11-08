@@ -7,8 +7,10 @@
 // session cannot sing (stricter than §15.4 item 4; see the README).
 
 import { randomBytes } from "node:crypto";
+import { Candidates, type RouteProof } from "./candidates.ts";
+import { AmbientSlots, type Oc0Host } from "./ambient-slots.ts";
 import { join } from "node:path";
-import { type BindingConfig, sessionMatches, tuned } from "./config.ts";
+import { type BindingConfig, isNonSharedSessionKey, sessionMatches, tuned } from "./config.ts";
 import { DaemonLink } from "./daemon.ts";
 import { type Entry, type HeardEntry, Journal } from "./journal.ts";
 import { type HushOutcome, Outbox, OutboxClosed, type Row, type SingOutcome, isLive, shownState } from "./outbox.ts";
@@ -18,8 +20,8 @@ import { type Air, heardMarks, iso, presenceText, renderEntry, renderViewItem } 
 import { type StationClient, stationClient } from "./station.ts";
 import { Lease, LeaseHeld, ensureDir, readJson, writeJsonAtomic } from "./store.ts";
 
-/** Who called a tool. An anonymous call named neither a session nor an agent, so it has no checkpoint, taint mark or
- * rate limit of its own: it gets status, mutes and digests of the journal and the view, and nothing else. */
+/** Who called a tool. A call without an exact session key is anonymous, even when an agent id is present.
+ * It has no checkpoint, taint mark or rate limit of its own and receives only operational status. */
 export type Caller = { sessionKey: string; sessionId: string | null; subagent: boolean; anonymous: boolean };
 export type Result = { text: string; details: Obj };
 
@@ -44,6 +46,8 @@ type StateFile = {
   taint: Record<string, { at: number }>;
   /** When the taint table first overflowed. From then on every session that may read heard text counts as tainted. */
   taint_overflow: number | null;
+  /** Explicit resets after overflow remain untainted; bounded, with overflow failing closed. */
+  taint_cleared?: Record<string, number>;
   carried_keys: Record<string, number>;
   /** The journal's durable head when this file was saved. A journal found shorter lost entries a cursor may name. */
   journal_head: number;
@@ -57,6 +61,9 @@ export type BindingOptions = {
   station?: StationClient;
   link?: { silenceMs?: number; snapshotMs?: number; backoff?: { firstMs: number; maxMs: number; jitter: number } };
   tickMs?: number;
+  /** Host-authoritative canonical key and reply-route check. Without one, ambient candidates fail closed. */
+  routeProof?: RouteProof;
+  oc0Host?: Oc0Host;
 };
 
 const STATE_V = "openclaw-canticle-state/1";
@@ -92,10 +99,21 @@ export class Binding {
   readonly receiver: Receiver;
   private readonly link: DaemonLink;
   readonly outbox: Outbox | null;
+  readonly candidates: Candidates;
+  readonly ambient: AmbientSlots | null;
+  private readonly routeProof: RouteProof;
+  private readonly hasHostRouteProof: boolean;
+  private readonly provenPayloadRoutes = new Set<string>();
+  private readonly provenLocalRoutes = new Set<string>();
+  private ambientFlight: Promise<void> = Promise.resolve();
+  private landingRevision = 0;
+  private readonly candidateFlights = new Set<Promise<void>>();
   private state: StateFile | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly tickMs: number;
   private running = false;
+  private joinedThisStart = false;
+  private preserveInitialRejoin = false;
   readonly counts = { repeats: 0, withdrawn_unheard: 0, refused: 0, append_errors: 0 };
 
   constructor(o: BindingOptions) {
@@ -107,11 +125,21 @@ export class Binding {
     this.lease = new Lease(o.root);
     this.lease.onError = (e) => this.log(`canticle: state lease error: ${e.message}`);
     this.journal = new Journal(join(o.root, "journal"), o.config.journal);
+    this.hasHostRouteProof = o.routeProof !== undefined;
+    this.routeProof = o.routeProof ?? (async (sessionKey) => ({ sessionKey, exists: false, onHost: false }));
+    this.candidates = new Candidates(o.root, o.config.binding, o.config.delivery.subscriptions, this.routeProof, o.oc0Host !== undefined, o.config.mainKey);
+    this.ambient = o.routeProof && o.oc0Host ? new AmbientSlots(o.root, o.config.binding, o.oc0Host, this.routeProof, o.config.mainKey) : null;
     const self = o.config.station?.keyId ?? null;
     this.receiver = new Receiver(
       {
         heard: (f, ctx) => this.onHeard(f, ctx.run, ctx.rec_seq, ctx.source),
         withdrawn: (r, ctx, held) => {
+          const keys = this.ambient?.keysForIdem(r.idem) ?? [];
+          this.candidates.retract(r.idem, this.clock());
+          this.queueAmbient(async () => {
+            for (const { session, key } of keys) await this.ambient?.retract(session, key, this.clock());
+            await this.syncAmbient();
+          });
           if (self !== null && r.target.key_id === self) {
             this.outbox?.retracted(r, this.clock());
           }
@@ -146,7 +174,24 @@ export class Binding {
             last_beacon_at: p.last_beacon_at,
           }),
         note: (n) => {
-          this.append({ kind: "note", note: n });
+          if (n.kind === "landing_changed") {
+            this.landingRevision++;
+            if (!this.ambientLanding(this.clock(), false).allowed) this.candidates.suppress(this.clock());
+          }
+          // A restored run is not a live rejoin: retain its candidates across Gateway restart.
+          if (n.kind === "joined" && n.join === "rejoin") {
+            if (this.joinedThisStart) this.candidates.rejoin(n.run, this.clock());
+            else this.preserveInitialRejoin = true;
+          }
+          if (n.kind === "records_lost" && !(n.why === "rejoin" && this.preserveInitialRejoin) && this.joinedThisStart) this.candidates.rejoin(this.state?.last_run ?? "", this.clock());
+          if (n.kind === "records_lost") this.preserveInitialRejoin = false;
+          if (n.kind === "disconnected") {
+            if (this.joinedThisStart && n.why !== "stopped") this.candidates.rejoin(this.state?.last_run ?? "", this.clock());
+            this.preserveInitialRejoin = false;
+          }
+          if (n.kind === "joined" || n.kind === "landing_changed" || n.kind === "records_lost" || n.kind === "disconnected") this.queueAmbient(() => this.syncAmbient());
+          if (n.kind !== "landing_changed") this.append({ kind: "note", note: n });
+          if (n.kind === "joined") this.joinedThisStart = true;
           if (n.kind === "joined" && this.state !== null && this.state.last_run !== n.run) {
             this.state.last_run = n.run;
             this.saveState();
@@ -155,7 +200,7 @@ export class Binding {
       },
       {
         clock: this.clock,
-        accepts: (f) => (self !== null && f.key_id === self) || tuned(o.config.listen.tune, f.station, f.stream),
+        accepts: (f) => (self !== null && f.key_id === self) || tuned(o.config.listen.tune, f.station, f.stream) || this.candidates.matchesAmbient(f),
         lastRun: null,
       },
     );
@@ -211,6 +256,25 @@ export class Binding {
       const now = this.clock();
       this.state = this.loadState(now);
       this.journal.load(this.state.carried_keys, now);
+      this.candidates.load(now);
+      this.candidates.setMutes(this.state.mutes
+        .filter((m) => m.until === null || m.until > now)
+        .map((m) => ({ station: m.station, stream: m.stream })), now);
+      await this.candidates.preflightRoutes();
+      this.provenPayloadRoutes.clear();
+      this.provenLocalRoutes.clear();
+      for (const key of new Set(this.cfg.listen.payloadSessions)) {
+        await this.provePayloadRoute({ sessionKey: key, sessionId: null, subagent: false, anonymous: false });
+      }
+      for (const key of new Set(this.cfg.listen.subscriptions.map((s) => s.sessionKey))) {
+        await this.proveLocalRoute({ sessionKey: key, sessionId: null, subagent: false, anonymous: false });
+      }
+      if (this.ambient) {
+        this.ambient.load();
+        await this.ambient.expire(now);
+        for (const session of this.ambient.sessions()) await this.ambient.reconcile(session, now);
+        await this.syncAmbient();
+      }
       if (this.journal.head < this.state.journal_head) {
         // Journal files are gone that held seqs a reader may have a cursor for. Rather than hand those seqs out
         // again, every earlier cursor and checkpoint becomes stale: a read with one is refused, never misread.
@@ -231,6 +295,8 @@ export class Binding {
       throw new BindingStartError("state_unreadable", (e as Error).message);
     }
     this.running = true;
+    this.joinedThisStart = false;
+    this.preserveInitialRejoin = false;
     this.link.start();
     this.timer = setInterval(() => {
       this.tick().catch((e: unknown) => this.log(`canticle: tick failed: ${(e as Error).message}`));
@@ -249,6 +315,8 @@ export class Binding {
     }
     this.link.stop();
     // A reconcile or sing in flight finishes while the lease is still held; nothing of this binding writes after.
+    await Promise.allSettled(this.candidateFlights);
+    await this.ambientFlight;
     await this.outbox?.close();
     this.journal.close();
     this.saveState();
@@ -261,8 +329,13 @@ export class Binding {
       return;
     }
     const now = this.clock();
-    this.receiver.tick(now);
     const st = this.state as StateFile;
+    const liveMutes = st.mutes.filter((m) => m.until === null || m.until > now);
+    this.candidates.setMutes(liveMutes.map((m) => ({ station: m.station, stream: m.stream })), now);
+    await this.ambient?.expire(now);
+    this.receiver.tick(now);
+    this.candidates.tick(now);
+    this.queueAmbient(() => this.syncAmbient());
     let dirty = false;
     if (this.journal.prune(now)) {
       st.carried_keys = this.journal.carried(now);
@@ -317,6 +390,9 @@ export class Binding {
     const st = raw as unknown as StateFile;
     st.journal_head = typeof st.journal_head === "number" ? st.journal_head : 0;
     st.taint_overflow = typeof st.taint_overflow === "number" ? st.taint_overflow : null;
+    if (st.taint_cleared !== undefined && (!isObj(st.taint_cleared) || Object.keys(st.taint_cleared).length > TAINT_MAX ||
+      Object.values(st.taint_cleared).some((v) => !Number.isSafeInteger(v))))
+      throw new BindingStartError("state_unreadable", "invalid taint reset marks");
     return st;
   }
 
@@ -348,7 +424,7 @@ export class Binding {
       return;
     }
     const mute = self ? null : this.muteFor(f.station, f.stream, now);
-    this.append({
+    const entry = this.append({
       kind: "heard",
       run,
       rec_seq: recSeq,
@@ -357,6 +433,57 @@ export class Binding {
       mute,
       frame: f,
     });
+    if (entry !== null) {
+      const flight = this.candidates.accept(f, run, now, self, mute !== null, () => this.ambientLanding(this.clock()).allowed)
+        .then(() => { this.queueAmbient(() => this.syncAmbient()); }, (e: unknown) => this.log(`canticle: candidate admission failed: ${(e as Error).message}`));
+      this.candidateFlights.add(flight);
+      void flight.finally(() => this.candidateFlights.delete(flight));
+    }
+  }
+
+  /** Serial host operations; the next sync reconciles an ambiguous prior call. */
+  private queueAmbient(work: () => Promise<void>): void {
+    if (!this.ambient) return;
+    this.ambientFlight = this.ambientFlight.then(work, work).catch((e: unknown) => {
+      this.log(`canticle: OC-0 ambient sync failed closed: ${(e as Error).message}`);
+    });
+  }
+
+  private async syncAmbient(): Promise<void> {
+    if (!this.ambient) return;
+    const now = this.clock();
+    await this.ambient.expire(now);
+    for (const session of new Set([...this.candidates.targetSessions(), ...this.ambient.sessions()])) {
+      const slots = await this.candidates.slots(session, now, (key) => this.ambient!.outcome(key));
+      for (const slot of ["canticle:digest", "canticle:alarm"] as const) {
+        const revision = this.landingRevision;
+        const landing = this.ambientLanding(this.clock());
+        const items = slots.find((s) => s.key === slot)?.items ?? [];
+        // The host record is authoritative at the moment of each host operation. An absent or
+        // unimplemented regulatory state closes admission, including during startup/rejoin.
+        const admitted = !landing.allowed ? [] : landing.breaker === "open"
+          ? slot === "canticle:digest" ? [...new Map(items.map((c) => [c.stream, c] as const)).values()] : []
+          : landing.breaker === "half_open" ? items.slice(0, Math.floor(items.length / 4)) : items;
+        await this.ambient.sync({ sessionKey: session, slot,
+          frames: [
+            ...(landing.allowed && slot === "canticle:digest" ? this.ambient.notes(session, now) : []),
+            ...admitted.map((c) => ({ key: c.key, expiresAt: c.expiresAt, line: c.line, station: c.station, stream: c.stream })),
+          ].slice(0, 5) }, now);
+        // A landing update may arrive while OC-0 is awaiting an enqueue response. Withdraw
+        // before this flight completes; the queued update will then rebuild from current state.
+        if (revision !== this.landingRevision || !this.ambientLanding(this.clock()).allowed)
+          await this.ambient.sync({ sessionKey: session, slot, frames: [] }, this.clock());
+      }
+    }
+  }
+
+  private ambientLanding(now: number, requireCurrent = true): { allowed: boolean; breaker: "closed" | "open" | "half_open" } {
+    const landing = this.receiver.status().landing;
+    if ((requireCurrent && !this.receiver.current()) || landing === null ||
+      (isObj(landing.mute) && (typeof landing.mute.until !== "number" || landing.mute.until > now)) ||
+      !Array.isArray(landing.modulation) || landing.modulation.length !== 0 ||
+      !["closed", "open", "half_open"].includes(landing.breaker ?? "")) return { allowed: false, breaker: "closed" };
+    return { allowed: true, breaker: landing.breaker as "closed" | "open" | "half_open" };
   }
 
   /** The mute that covers a station:stream now: the daemon's MUTE first, then this binding's most specific. */
@@ -418,16 +545,120 @@ export class Binding {
     return c.sessionId ?? `key:${c.sessionKey}`;
   }
 
-  /** Whether this session may read heard text: the binding's configuration lists such sessions in listen.payloadSessions. */
+  private exactLocalCaller(c: Caller): boolean {
+    return !c.anonymous && !c.subagent && isNonSharedSessionKey(c.sessionKey, this.cfg.mainKey);
+  }
+
+  /** Whether this exact session has both an exact payload grant and a current host-local-route proof. */
   mayReadText(c: Caller): boolean {
-    return !c.anonymous && sessionMatches(this.cfg.listen.payloadSessions, c.sessionKey);
+    return this.exactLocalCaller(c) && sessionMatches(this.cfg.listen.payloadSessions, c.sessionKey) && this.provenPayloadRoutes.has(c.sessionKey) && this.provenLocalRoutes.has(c.sessionKey);
+  }
+
+  /** Refresh the host-authoritative local route for an exact caller. */
+  async proveLocalRoute(c: Caller): Promise<boolean> {
+    if (!this.exactLocalCaller(c)) {
+      this.provenLocalRoutes.delete(c.sessionKey);
+      return false;
+    }
+    try {
+      const proof = await this.routeProof(c.sessionKey);
+      const valid = proof.sessionKey === c.sessionKey && proof.exists === true && proof.onHost === true;
+      if (valid) this.provenLocalRoutes.add(c.sessionKey); else this.provenLocalRoutes.delete(c.sessionKey);
+      return valid;
+    } catch {
+      this.provenLocalRoutes.delete(c.sessionKey);
+      return false;
+    }
+  }
+
+  /** Refresh the host-authoritative route at a payload-read side-effect boundary. */
+  async provePayloadRoute(c: Caller): Promise<boolean> {
+    if (!this.exactLocalCaller(c) || !sessionMatches(this.cfg.listen.payloadSessions, c.sessionKey)) {
+      this.provenPayloadRoutes.delete(c.sessionKey);
+      return false;
+    }
+    try {
+      const proof = await this.routeProof(c.sessionKey);
+      const valid = proof.sessionKey === c.sessionKey && proof.exists === true && proof.onHost === true;
+      if (valid) {
+        this.provenPayloadRoutes.add(c.sessionKey);
+        this.provenLocalRoutes.add(c.sessionKey);
+      } else {
+        this.provenPayloadRoutes.delete(c.sessionKey);
+        this.provenLocalRoutes.delete(c.sessionKey);
+      }
+      return valid;
+    } catch {
+      this.provenPayloadRoutes.delete(c.sessionKey);
+      this.provenLocalRoutes.delete(c.sessionKey);
+      return false;
+    }
+  }
+
+  private muteAuthorized(c: Caller): boolean {
+    return this.exactLocalCaller(c);
+  }
+
+  private subscribed(c: Caller, station: string, stream: string): boolean {
+    if (c.anonymous) return false;
+    const sub = this.cfg.listen.subscriptions.find((x) => x.sessionKey === c.sessionKey.toLowerCase());
+    return sub !== undefined && tuned(sub.tune, station, stream);
   }
 
   /** Whether this session has read heard text. Once the taint table has overflowed, a forgotten mark cannot be told
    * from no mark, so every session that may read heard text counts as tainted (§14.12: taint lasts until reset). */
   isTainted(c: Caller): boolean {
     const st = this.state;
-    return st !== null && (this.taintKeyOf(c) in st.taint || (st.taint_overflow !== null && this.mayReadText(c)));
+    const key = this.taintKeyOf(c);
+    return st !== null && (this.ambient?.isTainted(c.sessionKey, c.sessionId) === true || key in st.taint ||
+      (st.taint_overflow !== null && this.mayReadText(c) && (st.taint_cleared?.[key] ?? -1) < st.taint_overflow));
+  }
+  /** Called only after the host has cleared this session's pending injections on /new. */
+  async resetSession(sessionKey: string, sessionId: string | null, lifecycleRevision?: string): Promise<void> {
+    await this.ambientFlight;
+    const st = this.state;
+    if (!st) throw new Error("canticle binding is not running");
+    const now = this.clock();
+    if (lifecycleRevision) {
+      this.ambient?.reset(sessionKey, now, sessionId !== null, sessionId ?? undefined, lifecycleRevision);
+      this.candidates.resetSession(sessionKey, now, sessionId ?? undefined, lifecycleRevision);
+    } // An ID-only callback cannot distinguish a same-ID reset; leave ambient blocked.
+    // Shared explicit taint and checkpoint keys have no revision. Only the current
+    // exact generation can safely clear them; ID-only callbacks fail closed.
+    let currentIsEnded = false;
+    try {
+      const proof = await this.routeProof(sessionKey);
+      currentIsEnded = !!lifecycleRevision && proof.sessionKey === sessionKey && proof.sessionId === sessionId &&
+        proof.lifecycleRevision === lifecycleRevision && proof.exists === true && proof.onHost === true;
+    } catch { /* Unknown generation: preserve shared state. */ }
+    if (currentIsEnded) {
+      for (const key of [sessionId, `key:${sessionKey}`]) {
+        if (key === null) continue;
+        delete st.taint[key];
+        if (st.taint_overflow !== null && Object.keys(st.taint_cleared ?? {}).length < TAINT_MAX)
+          (st.taint_cleared ??= {})[key] = now;
+      }
+      delete st.checkpoints[sessionKey];
+    }
+    this.saveState();
+  }
+  /** Called after host session deletion; no slot outcome or taint history survives. */
+  async deleteSession(sessionKey: string, sessionId: string | null, lifecycleRevision?: string): Promise<void> {
+    await this.resetSession(sessionKey, sessionId, lifecycleRevision);
+    if (lifecycleRevision) {
+      this.ambient?.deleteSession(sessionKey, sessionId !== null, sessionId ?? undefined, lifecycleRevision);
+      this.candidates.deleteSession(sessionKey, sessionId ?? undefined, lifecycleRevision);
+    }
+    const st = this.state!;
+    // An old or ID-only delete cannot revoke a successor's overflow clearance.
+    let currentIsEnded = false;
+    try {
+      const proof = await this.routeProof(sessionKey);
+      currentIsEnded = !!lifecycleRevision && proof.sessionKey === sessionKey && proof.sessionId === sessionId &&
+        proof.lifecycleRevision === lifecycleRevision && proof.exists === true && proof.onHost === true;
+    } catch { /* Preserve shared state when route proof is unavailable. */ }
+    if (currentIsEnded) for (const key of [sessionId, `key:${sessionKey}`]) if (key !== null) delete st.taint_cleared?.[key];
+    this.saveState();
   }
 
   // ------------------------------------------------------------------ tools
@@ -450,7 +681,7 @@ export class Binding {
       return this.refuse(
         "canticle_listen",
         "no_session",
-        "this call names no session, and a new read's checkpoint and heard text's taint (§14.12) belong to one; read what journal or on_air as digests",
+        "this call names no exact session, and a new read's checkpoint and heard text's taint (§14.12) belong to one; journal and on_air digests are empty without a subscription",
       );
     }
     if (view === "items" && !this.mayReadText(c)) {
@@ -502,6 +733,10 @@ export class Binding {
     let heardShown = 0;
     let payloadShown = 0;
     for (const e of this.journal.scan(after)) {
+      if (!this.visible(c, e)) {
+        last = e.seq;
+        continue;
+      }
       if (!this.matches(e, station, stream, includeSelf)) {
         filtered += 1;
         last = e.seq;
@@ -618,9 +853,19 @@ export class Binding {
     }
   }
 
+  private visible(c: Caller, e: Entry): boolean {
+    switch (e.kind) {
+      case "heard": return this.subscribed(c, e.frame.station, e.frame.stream);
+      case "withdrawn": return e.station !== null && e.stream !== null && this.subscribed(c, e.station, e.stream);
+      case "presence": return this.cfg.listen.subscriptions.some((x) => x.sessionKey === c.sessionKey.toLowerCase() && x.tune.some((t) => t.station === "*" || t.station === e.station));
+      case "note": return true;
+    }
+  }
+
   private onAirResult(c: Caller, now: number, view: "items" | "digest", station: string | null, stream: string | null, limit: number, includeSelf: boolean): Result {
     const rx = this.receiver.status();
     const keep = (i: ViewItem): boolean =>
+      this.subscribed(c, i.frame.station, i.frame.stream) &&
       (includeSelf || this.cfg.station === null || i.frame.key_id !== this.cfg.station.keyId) &&
       (station === null || i.frame.station === station) &&
       (stream === null || i.frame.stream === stream);
@@ -711,19 +956,23 @@ export class Binding {
     }
     const now = this.clock();
     const rx = this.receiver.status();
-    const current = this.receiver.onAir(now).length;
-    const carried = this.receiver.carried(now).length;
+    const muteMetadataVisible = this.exactLocalCaller(c) && (!this.hasHostRouteProof || this.provenLocalRoutes.has(c.sessionKey));
+    const current = this.receiver.onAir(now).filter((i) => this.subscribed(c, i.frame.station, i.frame.stream)).length;
+    const carried = this.receiver.carried(now).filter((i) => this.subscribed(c, i.frame.station, i.frame.stream)).length;
     const presence = this.receiver
       .presence()
+      .filter(({ p }) => this.cfg.listen.subscriptions.some((x) => x.sessionKey === c.sessionKey.toLowerCase() && x.tune.some((t) => t.station === "*" || t.station === p.station)))
       .map(({ p, state, current: cur }) => ({ station: p.station, key_id: p.key_id, state, last_beacon_at: p.last_beacon_at, current: cur }));
     const checkpoint = st.checkpoints[this.sessionKeyOf(c)]?.seq ?? null;
     let waiting = 0;
     for (const e of this.journal.scan(checkpoint ?? this.firstNewAfter(now))) {
-      if (e.kind === "heard" && e.disposition !== "self") {
+      if (e.kind === "heard" && e.disposition !== "self" && this.visible(c, e)) {
         waiting += 1;
       }
     }
-    const mutes = st.mutes.filter((m) => m.until === null || m.until > now);
+    const allLiveMutes = st.mutes.filter((m) => m.until === null || m.until > now);
+    const mutes = muteMetadataVisible ? allLiveMutes : [];
+    const visibleEntries = [...this.journal.scan(this.journal.oldest - 1)].filter((e) => this.visible(c, e)).length;
     const landing = rx.landing;
     const daemonMute = landing !== null && isObj(landing.mute);
     const out = this.outbox;
@@ -743,19 +992,16 @@ export class Binding {
         last_record_at: rx.last_record_at,
         last_failure: rx.last_failure,
         daemon: rx.daemon === null ? null : { state: rx.daemon.state, reasons: rx.daemon.reasons },
-        landing: landing === null ? null : { muted: daemonMute, breaker: landing.breaker },
+        landing: landing === null ? null : { muted: muteMetadataVisible ? daemonMute : null, breaker: landing.breaker },
         counts: { ...this.receiver.counts, ...this.link.framing, ...this.counts },
       },
       on_air: { known: this.receiver.current(), current, carried },
       presence,
       journal: {
-        head: this.journal.head,
-        oldest: this.journal.oldest,
-        ...this.journal.size,
+        entries: visibleEntries,
         retention: this.cfg.journal,
         new_for_this_session: waiting,
         checkpoint: checkpoint === null ? null : this.cursor(checkpoint),
-        counts: this.journal.counts,
       },
       mutes,
       session: { anonymous: c.anonymous, tainted: this.isTainted(c), may_read_text: this.mayReadText(c) },
@@ -778,10 +1024,12 @@ export class Binding {
         ? `on air: ${current} item(s)${carried > 0 ? `, ${carried} carried from before a gap` : ""}`
         : `on air: unknown (no current view)${carried > 0 ? `; ${carried} carried item(s) from before the gap` : ""}`,
       `presence: ${presence.length === 0 ? "none known" : presence.map((x) => `${x.station ?? x.key_id}: ${presenceText(x.state, x.last_beacon_at)}`).join("; ")}`,
-      `journal: ${this.journal.size.entries} entries (seq ${this.journal.oldest}..${this.journal.head}); ${waiting} heard entr${waiting === 1 ? "y" : "ies"} new for this session`,
-      `mutes: ${daemonMute ? "daemon MUTE active; " : ""}${mutes.length === 0 ? "none" : mutes.map((m) => `${m.id} ${m.station ?? "*"}:${m.stream ?? "*"}${m.until !== null ? ` until ${iso(m.until)}` : ""}`).join(", ")}`,
+      `journal: ${visibleEntries} visible entries; ${waiting} heard entr${waiting === 1 ? "y" : "ies"} new for this session`,
+      muteMetadataVisible
+        ? `mutes: ${daemonMute ? "daemon MUTE active; " : ""}${mutes.length === 0 ? "none" : mutes.map((m) => `${m.id} ${m.station ?? "*"}:${m.stream ?? "*"}${m.until !== null ? ` until ${iso(m.until)}` : ""}`).join(", ")}`
+        : "mutes: hidden",
       c.anonymous
-        ? "this call names no session: status, mutes, and digests of the journal and on air only"
+        ? "this call names no exact session: operational status and mutes only; journal and on-air digests are empty"
         : `this session: ${this.isTainted(c) ? "tainted (has read heard text; cannot sing until reset)" : "not tainted"}; ${this.mayReadText(c) ? "may read heard text (view items)" : "reads digests only (not in listen.payloadSessions)"}`,
       out === null
         ? "publish: disabled"
@@ -790,17 +1038,32 @@ export class Binding {
     return { text: lines.join("\n"), details };
   }
 
-  mute(c: Caller, p: Obj): Result {
+  async mute(c: Caller, p: Obj): Promise<Result> {
     const st = this.state;
     if (st === null) {
       return this.refuse("canticle_mute", "not_running", "the canticle service is not running");
+    }
+    if (!this.muteAuthorized(c)) {
+      return this.refuse("canticle_mute", "not_authorized", "binding-wide muting requires an exact, non-anonymous, non-subagent session");
+    }
+    if (this.hasHostRouteProof) {
+      try {
+        const proof = await this.routeProof(c.sessionKey);
+        if (proof.sessionKey !== c.sessionKey || proof.exists !== true || proof.onHost !== true) {
+          return this.refuse("canticle_mute", "route_not_proven", "the caller's exact local session route is not proven");
+        }
+      } catch {
+        return this.refuse("canticle_mute", "route_not_proven", "the caller's exact local session route is not proven");
+      }
     }
     const now = this.clock();
     if (p.clear !== undefined) {
       if (p.clear === "all") {
         const n = st.mutes.length;
         st.mutes = [];
+        this.candidates.setMutes([], now);
         this.saveState();
+        this.queueAmbient(() => this.syncAmbient());
         return { text: `[canticle:mute] cleared ${n} mute(s)`, details: { ok: true, cleared: n, mutes: [] } };
       }
       const m = typeof p.clear === "string" ? MUTE_ID.exec(p.clear) : null;
@@ -815,7 +1078,11 @@ export class Binding {
       if (st.mutes.length === before) {
         return this.refuse("canticle_mute", "not_found", `no active mute ${p.clear}`);
       }
+      this.candidates.setMutes(st.mutes
+        .filter((m) => m.until === null || m.until > now)
+        .map((m) => ({ station: m.station, stream: m.stream })), now);
       this.saveState();
+      this.queueAmbient(() => this.syncAmbient());
       return { text: `[canticle:mute] cleared ${p.clear}`, details: { ok: true, cleared: 1, mutes: st.mutes } };
     }
     const station = p.station ?? null;
@@ -842,7 +1109,11 @@ export class Binding {
       by: c.sessionKey,
     };
     st.mutes = [...kept, mute];
+    this.candidates.setMutes(st.mutes
+      .filter((m) => m.until === null || m.until > now)
+      .map((m) => ({ station: m.station, stream: m.stream })), now);
     this.saveState();
+    this.queueAmbient(() => this.syncAmbient());
     return {
       text: `[canticle:mute] ${mute.id} mutes ${mute.station ?? "*"}:${mute.stream ?? "*"}${mute.until !== null ? ` until ${iso(mute.until)}` : " until cleared"}. Items heard under it are journaled as muted: canticle_listen still reads them, and no later push will carry them.`,
       details: { ok: true, mute, mutes: st.mutes },
@@ -860,11 +1131,19 @@ export class Binding {
     if (c.anonymous) {
       return this.refuse("canticle_sing", "no_session", "a call that names no session may not publish: taint and rate limits are per session");
     }
+    if (this.ambient) {
+      try {
+        await this.ambientFlight;
+        await this.ambient.reconcile(c.sessionKey, this.clock());
+      } catch {
+        return this.refuse("canticle_sing", "taint_unknown", "OC-0 outcome could not be checked; publishing is denied");
+      }
+    }
     if (this.isTainted(c)) {
       return this.refuse(
         "canticle_sing",
         "tainted",
-        "this session has read heard text; a session that heard canticle content cannot sing until it is reset",
+        "this session has heard canticle content; a tainted session cannot sing",
       );
     }
     for (const k of ["stream", "payload"] as const) {

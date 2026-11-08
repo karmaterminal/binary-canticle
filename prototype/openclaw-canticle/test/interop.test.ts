@@ -129,12 +129,12 @@ test("the binding against the real daemon and stations: hear, sing, hear back, p
       binding: "rune",
       daemon: { socket: join(run, "daemon.sock") },
       stateDir: join(dir, "state-rune"),
-      listen: { payloadSessions: ["agent:rune:reader"] },
+      listen: { payloadSessions: ["agent:rune:reader"], subscriptions: [{ sessionKey: "agent:rune:reader", tune: ["*:*" ] }] },
       station: { name: "rune", keyId: runeKey },
       publish: { enabled: true, socket: join(run, "rune.ctl") },
     });
     const up = async (): Promise<Binding> => {
-      const b = new Binding({ config: cfg, root: cfg.stateDir as string, tickMs: 200, link: { backoff: { firstMs: 100, maxMs: 500, jitter: 0 } } });
+      const b = new Binding({ config: cfg, root: cfg.stateDir as string, tickMs: 200, link: { backoff: { firstMs: 100, maxMs: 500, jitter: 0 } }, routeProof: async (sessionKey) => ({ sessionKey, exists: true, onHost: true }) });
       await b.start();
       await waitFor(() => b.receiver.current(), "the binding to join the daemon", 15_000);
       return b;

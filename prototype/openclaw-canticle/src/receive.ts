@@ -42,6 +42,7 @@ export type RecordContext = { run: string; rec_seq: number; at: number };
 export type HeardContext = RecordContext & { source: "live" | "snapshot" };
 
 export type Note =
+  | { kind: "landing_changed" }
   | { kind: "joined"; join: "first" | "rejoin" | "new_run"; run: string; baseline: number }
   | { kind: "records_lost"; missing: number | null; total: number; why: "gap" | "rejoin" }
   | { kind: "snapshot"; result: "complete" | "truncated" | "unsupported"; entries: number; omitted: number; watermark: number | null }
@@ -490,6 +491,7 @@ export class Receiver {
       }
       case "landing_state":
         this.landing = landingOf(rec);
+        this.events.note({ kind: "landing_changed" });
         return;
       case "bye":
         c.ended = "bye";
