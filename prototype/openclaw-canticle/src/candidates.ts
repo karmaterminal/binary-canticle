@@ -1,7 +1,7 @@
 // Durable ambient candidate ledger. The binding alone may hand bounded slots to OC-0.
 import { join } from "node:path";
 import { randomInt } from "node:crypto";
-import { TARGET_SESSION_KEY, type Subscription } from "./config.ts";
+import { isNonSharedSessionKey, type Subscription } from "./config.ts";
 import { type HeardFrame, isObj } from "./records.ts";
 import { readJson, writeJsonAtomic } from "./store.ts";
 
@@ -24,18 +24,20 @@ export class Candidates {
   private readonly subscriptions: Subscription[];
   private readonly route: RouteProof;
   private readonly ambientEnabled: boolean;
+  private readonly mainKey: string;
   private data: Ledger;
   private readonly proven = new Map<string, { sessionId: string; lifecycleRevision: string }>();
   private muteScopes: { station: string | null; stream: string | null }[] = [];
   private readonly retractedInFlight = new Set<string>();
   private readonly cancelledRuns = new Set<string>();
   private readonly resetEpoch = new Map<string, number>();
-  constructor(root: string, binding: string, subscriptions: Subscription[], route: RouteProof, ambientEnabled = true) {
+  constructor(root: string, binding: string, subscriptions: Subscription[], route: RouteProof, ambientEnabled = true, mainKey = "main") {
     this.path = join(root, "candidates.json");
     this.binding = binding;
     this.subscriptions = subscriptions;
     this.route = route;
     this.ambientEnabled = ambientEnabled;
+    this.mainKey = mainKey;
     this.data = { v: 1, binding, pending: {}, settled: {}, spend: {} };
   }
   load(now: number): void {
@@ -46,7 +48,7 @@ export class Candidates {
       if (Object.keys(d.pending).length > MAX_PENDING || Object.keys(d.settled).length > MAX_SETTLED || Object.keys(d.spend).length > 2048) throw new Error("candidate ledger exceeds bounds");
       for (const [key, c] of Object.entries(d.pending)) {
         if (!isObj(c) || c.key !== key || typeof c.sessionKey !== "string" ||
-          c.sessionKey !== c.sessionKey.toLowerCase() || !TARGET_SESSION_KEY.test(c.sessionKey) || c.sessionKey === "agent:main:main" ||
+          !isNonSharedSessionKey(c.sessionKey, this.mainKey) ||
           !Array.isArray(c.subscriptionIds) || c.subscriptionIds.length > 64 || c.subscriptionIds.some((id: unknown) => typeof id !== "string") ||
           typeof c.sessionId !== "string" || !c.sessionId || typeof c.lifecycleRevision !== "string" || !c.lifecycleRevision || typeof c.station !== "string" || typeof c.stream !== "string" || typeof c.class !== "string" ||
           (c.scope !== null && typeof c.scope !== "string") || (c.lens !== null && !Number.isSafeInteger(c.lens)) ||
@@ -65,7 +67,7 @@ export class Candidates {
       match(s.scopes, c.scope) && match(s.lenses, c.lens)));
   }
   private async validRoute(sessionKey: string): Promise<{ sessionId: string; lifecycleRevision: string } | null> {
-    if (sessionKey !== sessionKey.toLowerCase() || !TARGET_SESSION_KEY.test(sessionKey) || sessionKey === "agent:main:main") return null;
+    if (!isNonSharedSessionKey(sessionKey, this.mainKey)) return null;
     try {
       const proof = await this.route(sessionKey);
       const valid = proof !== null && proof.sessionKey === sessionKey && proof.exists === true && proof.onHost === true && typeof proof.sessionId === "string" && proof.sessionId.length > 0 && typeof proof.lifecycleRevision === "string" && proof.lifecycleRevision.length > 0;

@@ -12,7 +12,17 @@ export type Subscription = {
 };
 export const TARGET_SESSION_KEY = /^agent:[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*(?::[a-z0-9_-]+){0,5}$/;
 
+/** Exact, canonical session identity, excluding every agent's shared main session. */
+export function isNonSharedSessionKey(key: string, mainKey = "main"): boolean {
+  if (key !== key.toLowerCase() || !TARGET_SESSION_KEY.test(key)) return false;
+  const parts = key.split(":");
+  const canonicalMain = mainKey.trim().toLowerCase() || "main";
+  return parts.length !== 3 || (parts[2] !== "main" && parts[2] !== canonicalMain);
+}
+
 export type BindingConfig = {
+  /** Host session.mainKey, used only to reject shared main sessions from exact grants/targets. */
+  mainKey: string;
   /** This binding's name: unique among the bindings on one host, and part of every id it issues. */
   binding: string;
   daemon: { socket: string; uid: number | null };
@@ -45,7 +55,8 @@ const KEY_ID = /^[0-9a-f]{16}$/;
 const STREAM_PATTERN = /^(\*|[a-z][a-z0-9-]{0,30}(\.[a-z][a-z0-9-]{0,30}){0,3}(\.\*)?)$/;
 const DOMAIN = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
 
-export function parseConfig(raw: unknown): BindingConfig {
+export function parseConfig(raw: unknown, mainKey = "main"): BindingConfig {
+  const canonicalMainKey = mainKey.trim().toLowerCase() || "main";
   const c = obj(raw ?? {}, "config");
   const binding = str(c.binding, "binding");
   if (!STATION_NAME.test(binding)) {
@@ -69,7 +80,6 @@ export function parseConfig(raw: unknown): BindingConfig {
   const l = c.listen === undefined ? {} : obj(c.listen, "listen");
   onlyKeys(l, ["tune", "includeSelf", "payloadSessions", "subscriptions"], "listen");
   const tune = (l.tune === undefined ? ["*:*"] : strList(l.tune, "listen.tune")).map(parseTune);
-  const listenSubscriptions = subscriptionsOf(l.subscriptions);
   const j = c.journal === undefined ? {} : obj(c.journal, "journal");
   const p = c.publish === undefined ? {} : obj(c.publish, "publish");
   const enabled = p.enabled === undefined ? false : bool(p.enabled, "publish.enabled");
@@ -104,7 +114,7 @@ export function parseConfig(raw: unknown): BindingConfig {
       const t = obj(value, targetAt);
       onlyKeys(t, ["sessionKey"], targetAt);
       const sessionKey = str(t.sessionKey, `${targetAt}.sessionKey`);
-      if (!TARGET_SESSION_KEY.test(sessionKey) || sessionKey !== sessionKey.toLowerCase() || sessionKey === "agent:main:main") {
+      if (!isNonSharedSessionKey(sessionKey, canonicalMainKey)) {
         throw new ConfigError(`${targetAt}: canonical, exact, non-shared session key required`);
       }
       return { sessionKey };
@@ -143,6 +153,7 @@ export function parseConfig(raw: unknown): BindingConfig {
     throw new ConfigError("discovery: duplicate station or domain");
   }
   return {
+    mainKey: canonicalMainKey,
     binding,
     daemon: { socket, uid: d.uid === undefined ? null : int(d.uid, "daemon.uid", 0, 2 ** 31) },
     stateDir: c.stateDir === undefined ? null : absPath(c.stateDir, "stateDir"),
@@ -150,8 +161,8 @@ export function parseConfig(raw: unknown): BindingConfig {
     listen: {
       tune,
       includeSelf: l.includeSelf === undefined ? false : bool(l.includeSelf, "listen.includeSelf"),
-      payloadSessions: l.payloadSessions === undefined ? [] : payloadSessionsOf(l.payloadSessions),
-      subscriptions: listenSubscriptions,
+      payloadSessions: l.payloadSessions === undefined ? [] : payloadSessionsOf(l.payloadSessions, canonicalMainKey),
+      subscriptions: subscriptionsOf(l.subscriptions, canonicalMainKey),
     },
     journal: {
       maxEntries: j.maxEntries === undefined ? 5_000 : int(j.maxEntries, "journal.maxEntries", 100, 100_000),
@@ -193,7 +204,7 @@ export function sessionMatches(exactKeys: string[], sessionKey: string): boolean
   return exactKeys.some((p) => p === k);
 }
 
-function subscriptionsOf(v: unknown): BindingConfig["listen"]["subscriptions"] {
+function subscriptionsOf(v: unknown, mainKey: string): BindingConfig["listen"]["subscriptions"] {
   if (v === undefined) return [];
   if (!Array.isArray(v) || v.length > 64) throw new ConfigError("listen.subscriptions: expected at most 64 entries");
   const seen = new Set<string>();
@@ -202,7 +213,7 @@ function subscriptionsOf(v: unknown): BindingConfig["listen"]["subscriptions"] {
     const sub = obj(raw, at);
     onlyKeys(sub, ["sessionKey", "tune"], at);
     const sessionKey = str(sub.sessionKey, `${at}.sessionKey`);
-    if (sessionKey !== sessionKey.toLowerCase() || !TARGET_SESSION_KEY.test(sessionKey) || sessionKey === "agent:main:main" || seen.has(sessionKey)) {
+    if (!isNonSharedSessionKey(sessionKey, mainKey) || seen.has(sessionKey)) {
       throw new ConfigError(`${at}.sessionKey: expected a unique canonical, exact, non-shared session key (no wildcard)`);
     }
     seen.add(sessionKey);
@@ -212,12 +223,12 @@ function subscriptionsOf(v: unknown): BindingConfig["listen"]["subscriptions"] {
   });
 }
 
-function payloadSessionsOf(v: unknown): string[] {
+function payloadSessionsOf(v: unknown, mainKey: string): string[] {
   const list = strList(v, "listen.payloadSessions");
   if (list.length > 64) throw new ConfigError("listen.payloadSessions: at most 64 exact session keys");
   const exact = list;
   for (const p of exact) {
-    if (p !== p.toLowerCase() || !TARGET_SESSION_KEY.test(p) || p === "agent:main:main") {
+    if (!isNonSharedSessionKey(p, mainKey)) {
       throw new ConfigError(`listen.payloadSessions: ${JSON.stringify(p)} is not a canonical, exact, non-shared session key`);
     }
   }

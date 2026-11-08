@@ -161,6 +161,53 @@ test("ambient entry fails closed for every incomplete workflow or route seam", a
   }
 });
 
+test("production entry keeps mute available on an older host but denies payload text", async () => {
+  const key = "agent:rune:discord:channel:room";
+  const cfg = { binding: "rune", daemon: { socket: daemon.path }, listen: {
+    payloadSessions: [key], subscriptions: [{ sessionKey: key, tune: ["*:*" ] }],
+  } };
+  const ctx = { stateDir: dir };
+  const oldHost = load(cfg); // No resolveLocalSessionRoute API at all.
+  await oldHost.service.start(ctx);
+  try {
+    const caller = { sessionKey: key, sessionId: "s-1" };
+    const mute = tool(oldHost.tools, "canticle_mute", caller);
+    const set = await mute.execute("legacy-mute", { station: "cael" });
+    assert.equal(set.details.ok, true, "the off-switch remains available");
+    const status = await tool(oldHost.tools, "canticle_status", caller).execute("legacy-status", {});
+    assert.equal((status.details.canticle.mutes as unknown[]).length, 1);
+    await refused(tool(oldHost.tools, "canticle_listen", caller).execute("legacy-items", { view: "items" }),
+      "payload_not_allowed", /payload_not_allowed/);
+    await refused(tool(oldHost.tools, "canticle_mute", { sessionKey: "agent:rune:subagent:child", sessionId: "s-2" })
+      .execute("legacy-child", { clear: "all" }), "not_authorized", /non-subagent/);
+    const clear = await mute.execute("legacy-clear", { clear: "all" });
+    assert.equal(clear.details.ok, true);
+  } finally { await oldHost.service.stop?.(ctx); }
+
+  const failedRoute = load(cfg, { session: { state: { resolveLocalSessionRoute: async (sessionKey: string) =>
+    ({ sessionKey, exists: false, onHost: false, sessionId: null, lifecycleRevision: null }) } } });
+  await failedRoute.service.start(ctx);
+  try {
+    await refused(tool(failedRoute.tools, "canticle_mute", { sessionKey: key, sessionId: "s-1" })
+      .execute("unproven-mute", { station: "cael" }), "route_not_proven", /route is not proven/);
+  } finally { await failedRoute.service.stop?.(ctx); }
+});
+
+test("production entry rejects shared main callers for any agent and a configured main key", async () => {
+  const cfg = { binding: "rune", daemon: { socket: daemon.path } };
+  const ctx = { stateDir: dir, config: { session: { mainKey: "home" } } };
+  const { tools, service } = load(cfg);
+  await service.start(ctx);
+  try {
+    for (const sessionKey of ["agent:rune:home", "agent:ronan:home", "agent:rune:main", "agent:main:main"]) {
+      await refused(tool(tools, "canticle_mute", { sessionKey, sessionId: "s-1" })
+        .execute("shared-main", { station: "cael" }), "not_authorized", /non-subagent/);
+    }
+    assert.equal((await tool(tools, "canticle_mute", { sessionKey: "agent:rune:discord:channel:room", sessionId: "s-2" })
+      .execute("exact-room", { station: "cael" })).details.ok, true);
+  } finally { await service.stop?.(ctx); }
+});
+
 test("publish tools are offered only when publishing is enabled, never to a sub-agent or a call that names no session", () => {
   const readOnly = load({ binding: "rune", daemon: { socket: daemon.path } });
   for (const name of READ_TOOLS) {

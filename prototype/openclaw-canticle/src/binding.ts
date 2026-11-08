@@ -10,7 +10,7 @@ import { randomBytes } from "node:crypto";
 import { Candidates, type RouteProof } from "./candidates.ts";
 import { AmbientSlots, type Oc0Host } from "./ambient-slots.ts";
 import { join } from "node:path";
-import { type BindingConfig, TARGET_SESSION_KEY, sessionMatches, tuned } from "./config.ts";
+import { type BindingConfig, isNonSharedSessionKey, sessionMatches, tuned } from "./config.ts";
 import { DaemonLink } from "./daemon.ts";
 import { type Entry, type HeardEntry, Journal } from "./journal.ts";
 import { type HushOutcome, Outbox, OutboxClosed, type Row, type SingOutcome, isLive, shownState } from "./outbox.ts";
@@ -102,6 +102,7 @@ export class Binding {
   readonly candidates: Candidates;
   readonly ambient: AmbientSlots | null;
   private readonly routeProof: RouteProof;
+  private readonly hasHostRouteProof: boolean;
   private readonly provenPayloadRoutes = new Set<string>();
   private readonly provenLocalRoutes = new Set<string>();
   private ambientFlight: Promise<void> = Promise.resolve();
@@ -124,9 +125,10 @@ export class Binding {
     this.lease = new Lease(o.root);
     this.lease.onError = (e) => this.log(`canticle: state lease error: ${e.message}`);
     this.journal = new Journal(join(o.root, "journal"), o.config.journal);
+    this.hasHostRouteProof = o.routeProof !== undefined;
     this.routeProof = o.routeProof ?? (async (sessionKey) => ({ sessionKey, exists: false, onHost: false }));
-    this.candidates = new Candidates(o.root, o.config.binding, o.config.delivery.subscriptions, this.routeProof, o.oc0Host !== undefined);
-    this.ambient = o.routeProof && o.oc0Host ? new AmbientSlots(o.root, o.config.binding, o.oc0Host, this.routeProof) : null;
+    this.candidates = new Candidates(o.root, o.config.binding, o.config.delivery.subscriptions, this.routeProof, o.oc0Host !== undefined, o.config.mainKey);
+    this.ambient = o.routeProof && o.oc0Host ? new AmbientSlots(o.root, o.config.binding, o.oc0Host, this.routeProof, o.config.mainKey) : null;
     const self = o.config.station?.keyId ?? null;
     this.receiver = new Receiver(
       {
@@ -544,8 +546,7 @@ export class Binding {
   }
 
   private exactLocalCaller(c: Caller): boolean {
-    const key = c.sessionKey.toLowerCase();
-    return !c.anonymous && !c.subagent && key === c.sessionKey && TARGET_SESSION_KEY.test(key) && key !== "agent:main:main";
+    return !c.anonymous && !c.subagent && isNonSharedSessionKey(c.sessionKey, this.cfg.mainKey);
   }
 
   /** Whether this exact session has both an exact payload grant and a current host-local-route proof. */
@@ -955,7 +956,7 @@ export class Binding {
     }
     const now = this.clock();
     const rx = this.receiver.status();
-    const muteMetadataVisible = this.exactLocalCaller(c) && this.provenLocalRoutes.has(c.sessionKey);
+    const muteMetadataVisible = this.exactLocalCaller(c) && (!this.hasHostRouteProof || this.provenLocalRoutes.has(c.sessionKey));
     const current = this.receiver.onAir(now).filter((i) => this.subscribed(c, i.frame.station, i.frame.stream)).length;
     const carried = this.receiver.carried(now).filter((i) => this.subscribed(c, i.frame.station, i.frame.stream)).length;
     const presence = this.receiver
@@ -1045,13 +1046,15 @@ export class Binding {
     if (!this.muteAuthorized(c)) {
       return this.refuse("canticle_mute", "not_authorized", "binding-wide muting requires an exact, non-anonymous, non-subagent session");
     }
-    try {
-      const proof = await this.routeProof(c.sessionKey);
-      if (proof.sessionKey !== c.sessionKey || proof.exists !== true || proof.onHost !== true) {
+    if (this.hasHostRouteProof) {
+      try {
+        const proof = await this.routeProof(c.sessionKey);
+        if (proof.sessionKey !== c.sessionKey || proof.exists !== true || proof.onHost !== true) {
+          return this.refuse("canticle_mute", "route_not_proven", "the caller's exact local session route is not proven");
+        }
+      } catch {
         return this.refuse("canticle_mute", "route_not_proven", "the caller's exact local session route is not proven");
       }
-    } catch {
-      return this.refuse("canticle_mute", "route_not_proven", "the caller's exact local session route is not proven");
     }
     const now = this.clock();
     if (p.clear !== undefined) {

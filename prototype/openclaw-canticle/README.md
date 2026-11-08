@@ -201,9 +201,11 @@ never to a call that names no session.
   hand, marked, and never eligible for a later push, even after the mute lifts. A new mute for the same scope
   replaces the old one. Binding mutes also revoke matching queued ambient candidates and rebuild pending OC-0 slots
   without muted frames; clearing the mute allows future admissions but does not resurrect a revoked candidate.
-  Only an exact, non-anonymous, non-subagent caller with a current host-local-route proof may mutate binding-wide
-  mutes. Anonymous and unrelated sessions receive a refusal and cannot clear or add mutes. Status redacts binding
-  and daemon mute metadata for callers that do not meet the same visibility boundary.
+  Only an exact, non-anonymous, non-subagent caller may mutate binding-wide mutes. When the host supplies a
+  local-route resolver, a current matching host-local-route proof is also required; a failed or negative proof
+  refuses the mutation. On older hosts without that API, exact callers retain this off-switch and can see mute
+  metadata in status, but `view: items` remains unavailable even to configured payload sessions: heard text
+  requires a current host-local-route proof. Anonymous, shared-main and subagent callers cannot clear or add mutes.
 - **Own items.** Frames from this binding's own station (by key id) are journaled as `self`, confirm outbox rows,
   and are left out of reads unless `includeSelf` asks for them.
 - **No push, so no double delivery.** Explicit read is the only mode. A digest or a later push mode (frond-ear#65
@@ -329,7 +331,7 @@ Gateway boot. Write `enabled: false` explicitly until a prince opts the seat in 
         config: {
           binding: "rune",                                          // unique on the host; part of every id
           daemon: { socket: "/run/user/1000/canticle/daemon.sock" },
-          listen: { tune: ["*:chatter"], subscriptions: [{ sessionKey: "agent:main:main", tune: ["*:chatter"] }], payloadSessions: [] }, // digests for this exact session only
+          listen: { tune: ["*:chatter"], subscriptions: [{ sessionKey: "agent:rune:discord:channel:room", tune: ["*:chatter"] }], payloadSessions: [] }, // digests for this exact non-shared session only
           delivery: { mode: "explicit", subscriptions: [] }, // separate consent for ambient delivery
           // station: { name: "rune", keyId: "0123456789abcdef" },  // this prince's own station, when it has one
           // publish: { enabled: false },                           // P2: not until the princes decide it
@@ -349,7 +351,7 @@ Gateway boot. Write `enabled: false` explicitly until a prince opts the seat in 
 | `listen.tune` | `["*:*"]` | `station:stream` pairs; either side may be `*`, and a stream may end in `.*`. |
 | `listen.subscriptions` | `[]` | At most 64 unique exact `sessionKey` entries, each with 1–16 `tune` patterns using the `listen.tune` grammar. No wildcard session keys. Read scope is empty unless explicitly configured; binding-global ingestion is unchanged. |
 | `listen.includeSelf` | `false` | Show this binding's own subscribed items in reads by default. |
-| `listen.payloadSessions` | `[]` | Canonical exact session keys that may read heard text. Wildcards, prefixes, uppercase spelling and the shared `agent:main:main` key are refused (at most 64). |
+| `listen.payloadSessions` | `[]` | Canonical exact session keys that may read heard text when the host route resolver is available. Wildcards, prefixes, uppercase spelling and every agent's shared main key (`agent:<id>:<session.mainKey>`, default `main`) are refused (at most 64). |
 | `journal.maxEntries`, `maxBytes`, `maxAgeHours` | 5 000, 8 MiB, 24 | See [Bounds](#bounds). |
 | `publish.enabled` | `false` | Needs `station` and `publish.socket`. Not before P2, and where the Gateway shares a uid with another station's owner, not before each station runs as its own user (#95, #99). |
 | `publish.socket`, `publish.uid` | none, this process's uid | The station's control socket and the uid that must own it. |

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { readJson, writeJsonAtomic } from "./store.ts";
 import type { RouteProof } from "./candidates.ts";
-import { TARGET_SESSION_KEY } from "./config.ts";
+import { isNonSharedSessionKey } from "./config.ts";
 
 export type SlotKey = "canticle:digest" | "canticle:alarm";
 export type EntryOutcome = "pending" | "consumed" | "withdrawn" | "expired" | "discarded" | "unknown";
@@ -26,9 +26,10 @@ export class AmbientSlots {
   private readonly binding: string;
   private readonly host: Oc0Host;
   private readonly route: RouteProof | null;
+  private readonly mainKey: string;
   private data: Ledger;
-  constructor(root: string, binding: string, host: Oc0Host, route: RouteProof | null = null) {
-    this.path = join(root, "ambient-slots.json"); this.binding = binding; this.host = host; this.route = route;
+  constructor(root: string, binding: string, host: Oc0Host, route: RouteProof | null = null, mainKey = "main") {
+    this.path = join(root, "ambient-slots.json"); this.binding = binding; this.host = host; this.route = route; this.mainKey = mainKey;
     this.data = { v: 1, binding, entries: [], settled: {}, tainted: {}, notes: {} };
   }
   private save(): void { writeJsonAtomic(this.path, this.data); }
@@ -39,7 +40,7 @@ export class AmbientSlots {
       !Array.isArray((raw as Ledger).entries) || typeof (raw as Ledger).settled !== "object") throw new Error("invalid ambient slot ledger");
     const d = raw as Ledger;
     if (d.entries.length > 8192 || d.entries.some((e) => !e || typeof e.id !== "string" || e.id.length > 200 || !SLOTS.includes(e.slot) ||
-      typeof e.sessionKey !== "string" || e.sessionKey !== e.sessionKey.toLowerCase() || !TARGET_SESSION_KEY.test(e.sessionKey) || e.sessionKey === "agent:main:main" ||
+      typeof e.sessionKey !== "string" || !isNonSharedSessionKey(e.sessionKey, this.mainKey) ||
       (typeof e.sessionId !== "string" || !e.sessionId || typeof e.lifecycleRevision !== "string" || !e.lifecycleRevision) ||
       !Array.isArray(e.frames) || e.frames.length < 1 || e.frames.length > 5 ||
       !Number.isSafeInteger(e.deadline) || !Number.isSafeInteger(e.retention) ||
@@ -52,7 +53,7 @@ export class AmbientSlots {
     if (!d.settled || typeof d.settled !== "object" || Array.isArray(d.settled) || Object.keys(d.settled).length > 8192 ||
       Object.values(d.settled).some((n) => !Number.isSafeInteger(n))) throw new Error("invalid ambient settled tombstones");
     if (d.tainted !== undefined && (!d.tainted || typeof d.tainted !== "object" || Array.isArray(d.tainted) || Object.keys(d.tainted).length > 4096 ||
-      Object.entries(d.tainted).some(([key, n]) => { const [session = "", id, revision, extra] = key.split("\0"); return session !== session.toLowerCase() || !TARGET_SESSION_KEY.test(session) || session === "agent:main:main" || (id !== undefined && !id) || (revision !== undefined && !revision) || extra !== undefined || !Number.isSafeInteger(n); }))) throw new Error("invalid ambient taint");
+      Object.entries(d.tainted).some(([key, n]) => { const [session = "", id, revision, extra] = key.split("\0"); return !isNonSharedSessionKey(session, this.mainKey) || (id !== undefined && !id) || (revision !== undefined && !revision) || extra !== undefined || !Number.isSafeInteger(n); }))) throw new Error("invalid ambient taint");
     if (d.notes !== undefined && (!d.notes || typeof d.notes !== "object" || Array.isArray(d.notes) || Object.keys(d.notes).length > 8192 ||
       Object.values(d.notes).some((n) => !n || typeof n.key !== "string" || n.key.length > 300 || !Number.isSafeInteger(n.expiresAt) || typeof n.line !== "string" || Buffer.byteLength(n.line) > 300))) throw new Error("invalid ambient notes");
     d.tainted ??= {}; d.notes ??= {};
@@ -81,7 +82,7 @@ export class AmbientSlots {
     this.save();
   }
   private async validRoute(session: string): Promise<boolean> {
-    if (session !== session.toLowerCase() || !TARGET_SESSION_KEY.test(session) || session === "agent:main:main") return false;
+    if (!isNonSharedSessionKey(session, this.mainKey)) return false;
     if (this.route === null) return true;
     try {
       const proof = await this.route(session);

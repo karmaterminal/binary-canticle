@@ -4,7 +4,7 @@
 // (RFC-0001 §14.18.7), and the tools then answer that the service is not running.
 
 import { Binding } from "./src/binding.ts";
-import { TARGET_SESSION_KEY, parseConfig, stateRootOf } from "./src/config.ts";
+import { isNonSharedSessionKey, parseConfig, stateRootOf } from "./src/config.ts";
 import { TOOL_NAMES, type ToolContext, createTool } from "./src/tools.ts";
 import { Discoverer } from "./src/discover.ts";
 import { oc0HostFromWorkflow, type Oc0Workflow } from "./src/oc0-host.ts";
@@ -37,6 +37,11 @@ function configOf(ctx: ServiceContext, api: PluginApi): unknown {
   return c?.plugins?.entries?.[PLUGIN_ID]?.config ?? api.pluginConfig;
 }
 
+function mainKeyOf(ctx: ServiceContext): string {
+  const c = ctx.config as { session?: { mainKey?: unknown } } | undefined;
+  return typeof c?.session?.mainKey === "string" ? c.session.mainKey : "main";
+}
+
 function completeWorkflow(workflow: Partial<Oc0Workflow> | undefined): workflow is Oc0Workflow {
   return typeof workflow?.enqueueNextTurnInjection === "function" &&
     typeof workflow.getNextTurnInjectionState === "function" &&
@@ -53,6 +58,7 @@ export default {
     let publish = false;
     let discovery: Discoverer | null = null;
     let lifecycleHooksReady = false;
+    let hostMainKey = "main";
     try {
       publish = parseConfig(api.pluginConfig).publish.enabled;
     } catch {
@@ -62,8 +68,7 @@ export default {
     const onLifecycle = (kind: "reset" | "delete") => async (event: LifecycleEvent, context: LifecycleContext) => {
       // Reject mismatched or noncanonical metadata: never let one session clear another's state.
       if (!event || !context || event.sessionKey !== context.sessionKey || event.sessionId !== context.sessionId ||
-        !event.sessionId || !TARGET_SESSION_KEY.test(event.sessionKey) || event.sessionKey === "agent:main:main" ||
-        event.sessionKey !== event.sessionKey.toLowerCase() ||
+        !event.sessionId || !isNonSharedSessionKey(event.sessionKey, hostMainKey) ||
         !event.sessionKey.startsWith(`agent:${context.agentId}:`)) return;
       // ID-only callbacks cannot distinguish a reset that reuses the same ID. Preserve the old generation.
       if (typeof event.lifecycleRevision !== "string" || !event.lifecycleRevision) return;
@@ -90,7 +95,8 @@ export default {
         let b: Binding;
         let d: Discoverer;
         try {
-          const cfg = parseConfig(configOf(ctx, api));
+          hostMainKey = mainKeyOf(ctx);
+          const cfg = parseConfig(configOf(ctx, api), hostMainKey);
           publish = cfg.publish.enabled;
           if (cfg.delivery.subscriptions.some((s) => s.delivery === "ambient") && !lifecycleHooksReady) {
             throw new Error("ambient delivery requires OpenClaw session_reset/session_delete callbacks; configure ringbuffer_only until the host supports them");
@@ -104,11 +110,9 @@ export default {
           b = new Binding({
             config: cfg,
             root: stateRootOf(cfg, ctx.stateDir),
-            routeProof: async (sessionKey) => {
-              const resolve = api.session?.state?.resolveLocalSessionRoute;
-              if (!resolve) return { sessionKey, exists: false, onHost: false, sessionId: null, lifecycleRevision: null };
-              return resolve(sessionKey);
-            },
+            ...(api.session?.state?.resolveLocalSessionRoute
+              ? { routeProof: (sessionKey: string) => api.session!.state!.resolveLocalSessionRoute!(sessionKey) }
+              : {}),
             ...(ambientConfigured && lifecycleHooksReady && completeWorkflow(workflow) && api.session?.state?.resolveLocalSessionRoute
               ? { oc0Host: oc0HostFromWorkflow(workflow) } : {}),
             log: (msg) => ctx.logger?.info?.(msg),
