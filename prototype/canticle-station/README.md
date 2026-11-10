@@ -338,8 +338,10 @@ canticle grant --control "$CTL" --display frond-house@silas --pluck     # no, no
   its history and records nothing new. Because a pluck may have been lost, the next verified grant purges that history
   before recording resumes. So does a grant verified after any records were lost since its last verification (even
   when the regrant is the very record that reports the gap), and a grant first verified on a new connection. That
-  fails toward losing history, never toward showing it. A grant body the decoder refuses (a bad type, an unknown
-  field) is no grant; a signature authenticates the sender, not the body.
+  fails toward losing history, never toward showing it. Records lost on a connection put **every** granted station's
+  history at risk, so after any gap each one is purged at its next verification, by design (🌿 on #140). A grant
+  body the decoder refuses (a bad type, an unknown field) is no grant: a signature authenticates the sender, not the
+  body.
 - **What's already delivered can't be recalled.** A page should keep nothing beyond what it shows.
 
 ### Typed beacons (#142)

@@ -848,7 +848,7 @@ def main(argv=None) -> int:
 
     gr = sub.add_parser("grant", help="say yes (or no) to a shape display, from the station's own key (#137)",
                         description="Sings a display grant on the station's 'display' stream through its control "
-                        "socket: a keyed live-state item the station keeps on air by refresh for --days (24 h at "
+                        "socket: a keyed live-state item the station keeps on air by refresh for --hours (24 h at "
                         "most, the station's ceiling), or plucks it with --pluck. Run it where the station's key "
                         "lives: a grant means only what that key means.")
     gr.add_argument("--control", help="the station's control socket")
