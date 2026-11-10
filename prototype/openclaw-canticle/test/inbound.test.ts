@@ -365,6 +365,7 @@ test("a gap in rec_seq is records_lost, and what was heard before it is carried 
   const st = b.status(SESSION).details.receive as { health: string; reasons: string[]; records_lost: number };
   assert.equal(st.health, "degraded");
   assert.equal(st.records_lost, 3);
+  assert.match(b.status(SESSION).text, /records lost on this connection: 3/);
   // Only what was heard after the gap is on air; what was heard before is carried, and its presence unknown.
   const onAir = () => b.listen(SESSION, { what: "on_air", view: "digest" });
   assert.deepEqual([onAir().details.known, onAir().details.current, onAir().details.carried], [true, 1, 1]);
@@ -378,6 +379,7 @@ test("a gap in rec_seq is records_lost, and what was heard before it is carried 
   // A record after the gap confirms what it names, and nothing more: the gap itself stays records_lost.
   daemon.presence("cael", KEY_CAEL, "EQUIPPED_QUIET");
   await waitFor(() => b.receiver.presence()[0]?.current === true, "the presence record");
+  assert.match(b.status(SESSION).text, /records lost on this connection: 3/); // sticky, not a new gap
   assert.deepEqual(airs(), ["carried", "on_air"]);
   daemon.surface(cael(1, "heard before the gap", { ttl_ms: 600_000, dedup: "resurfaced" }));
   await waitFor(() => b.receiver.carried(clock.t).length === 0, "the resurfaced item");

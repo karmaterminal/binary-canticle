@@ -792,7 +792,7 @@ export class Binding {
     };
     const lines = [
       `[canticle:status] binding ${this.cfg.binding}; delivery: explicit read only (nothing is pushed to sessions)`,
-      `receive: ${rx.health}${rx.reasons.length > 0 ? ` (${rx.reasons.join(", ")})` : ""}; connection ${rx.connection}${rx.since !== null ? ` since ${iso(rx.since)}` : ""}; run ${rx.run ?? "none"}; join snapshot ${rx.snapshot}`,
+      `receive: ${rx.health}${rx.reasons.length > 0 ? ` (${rx.reasons.join(", ")})` : ""}; connection ${rx.connection}${rx.since !== null ? ` since ${iso(rx.since)}` : ""}; run ${rx.run ?? "none"}; join snapshot ${rx.snapshot}; records lost on this connection: ${rx.records_lost}`,
       this.receiver.current()
         ? `on air: ${current} item(s)${carried > 0 ? `, ${carried} carried from before a gap` : ""}`
         : `on air: unknown (no current view)${carried > 0 ? `; ${carried} carried item(s) from before the gap` : ""}`,
