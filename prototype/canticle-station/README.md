@@ -335,8 +335,10 @@ canticle grant --control "$CTL" --display frond-house@silas --pluck     # no, no
   is proven when the station's own grant item is seen withdrawn or expired, or when a connection with a complete join
   snapshot and no records lost shows no grant. Any other absence, after a gap for example, hides the station, keeps
   its history and records nothing new. Because a pluck may have been lost, the next verified grant purges that history
-  before recording resumes, and so does a grant first verified on a new connection. That fails toward losing history,
-  never toward showing it.
+  before recording resumes. So does a grant verified after any records were lost since its last verification (even
+  when the regrant is the very record that reports the gap), and a grant first verified on a new connection. That
+  fails toward losing history, never toward showing it. A grant body the decoder refuses (a bad type, an unknown
+  field) is no grant; a signature authenticates the sender, not the body.
 - **What's already delivered can't be recalled.** A page should keep nothing beyond what it shows.
 
 ### Same-host proof for #57 and #58

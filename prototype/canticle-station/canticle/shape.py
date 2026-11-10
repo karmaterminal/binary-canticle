@@ -196,6 +196,7 @@ class Flow:
         # history, never toward showing it.
         self._doubt: set = set()
         self._verified_on: dict = {}   # name -> the connection its grant was last verified on
+        self._lost_at: dict = {}       # name -> that connection's records_lost count when it was last verified
         self.started_at = clock()
         self.observed: set = set()
         self.minutes: dict = {name: {} for name in self.allowed}
@@ -235,16 +236,22 @@ class Flow:
                     self._purge(name, None)
                     self.held.pop(name, None)
                     self._doubt.discard(name)
+                    self._verified_on.pop(name, None)
+                    self._lost_at.pop(name, None)
                 else:
                     self._doubt.add(name)   # unverifiable now: hide and keep, but don't trust it again unpurged
                 continue
-            if old is not None and (name in self._doubt or self._verified_on.get(name) is not view):
+            # A gap since the last verification may hold a pluck, even when the record that reports the gap is
+            # itself the regrant (🌫 on #140): purge before trusting it.
+            gap = self._lost_at.get(name) != view.records_lost
+            if old is not None and (name in self._doubt or self._verified_on.get(name) is not view or gap):
                 self._purge(name, None)
             elif old is not None and grant.RANK[new["scope"]] < grant.RANK[old["scope"]]:
                 self._purge(name, new)
             self._doubt.discard(name)
             self.held[name] = new
             self._verified_on[name] = view
+            self._lost_at[name] = view.records_lost
         return grants
 
     def _expired(self, view: TapView, name: str, now_ms: int) -> bool:

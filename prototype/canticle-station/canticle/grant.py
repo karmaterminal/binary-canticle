@@ -68,11 +68,12 @@ def decode(raw: bytes) -> dict:
         body = cbor.decode(raw)
     except Exception as e:  # the codec's own errors are not part of this module's contract
         raise GrantError(f"not CBOR: {e}") from None
-    if not isinstance(body, dict) or not set(body) <= {"display", "scope", "withheld"}:
+    if not isinstance(body, dict) or not all(isinstance(k, str) for k in body) \
+            or not set(body) <= {"display", "scope", "withheld"}:
         raise GrantError("not a grant map")
     display, scope, withheld = body.get("display"), body.get("scope"), body.get("withheld", False)
     check_display(display)
-    if scope not in RANK:
+    if not isinstance(scope, str) or scope not in RANK:   # type first: a list or map is unhashable (🌫 on #140)
         raise GrantError("unknown scope")
     if withheld is not True and withheld is not False:
         raise GrantError("withheld is not a boolean")
@@ -95,7 +96,7 @@ def _from_record(r: dict, display: str) -> Optional[dict]:
         return None
     try:
         g = decode(base64.b64decode(body["base64"], validate=True))
-    except (GrantError, ValueError):
+    except (GrantError, ValueError, TypeError):   # a signature authenticates the sender, not this body
         return None
     return g if g["display"] == display else None
 

@@ -79,7 +79,10 @@ class CodecTest(unittest.TestCase):
                     cbor.encode({"display": DISPLAY, "scope": "river", "withheld": True}),
                     cbor.encode({"display": DISPLAY, "scope": "river", "text": "hi"}),
                     cbor.encode({"display": "Bad Name", "scope": "river"}),
-                    cbor.encode({"display": DISPLAY, "scope": "river", "withheld": 1})):
+                    cbor.encode({"display": DISPLAY, "scope": "river", "withheld": 1}),
+                    cbor.encode({"display": DISPLAY, "scope": []}), cbor.encode({"display": DISPLAY, "scope": {}}),
+                    cbor.encode({"display": DISPLAY, "scope": ["river"]}),
+                    cbor.encode({"display": DISPLAY, "scope": "river", 1: "x"})):
             with self.assertRaises(grant.GrantError):
                 grant.decode(bad)
         with self.assertRaises(grant.GrantError):
@@ -236,6 +239,21 @@ class PurgeTest(unittest.TestCase):
         tv.apply(grant_frame("g3", 10, scope="river"))
         self.assertEqual(self.history(sv), {"river": 0, "arrivals": 0, "drum_arrivals": 0})
 
+    def test_a_regrant_that_is_the_first_record_after_a_gap_does_not_resurrect(self):
+        """🌫's probe on #140: the record that reports the gap is itself the regrant, so no unverified absence is ever
+        observed; the gap since the last verification is enough to purge first."""
+        sv, tv = gateway(grant_frame("g1", 4), presence(5, "cael"), frame("c1", 6, heard=9_000))
+        tv.apply(grant_frame("g2", 9))   # 7, 8 lost; the first post-gap record is the regrant
+        self.assertEqual(tv.records_lost, 2)
+        self.assertEqual(self.history(sv), {"river": 0, "arrivals": 0, "drum_arrivals": 0})
+        tv.apply(frame("c2", 10, heard=9_500))
+        self.assertEqual(self.history(sv)["river"], 1, "recording resumes under the verified grant")
+
+    def test_a_malformed_signed_grant_is_refused_not_fatal(self):
+        sv, tv = gateway(grant_frame("g1", 4, body=__import__("canticle.cbor", fromlist=["x"]).encode(
+            {"display": DISPLAY, "scope": []})), presence(5, "cael"))
+        self.assertEqual(sv.project(10_000)["stations"], [])
+
     def test_a_new_connection_does_not_resurrect(self):
         """Anything may have happened while the gateway was away: a grant verified on a new connection starts clean."""
         sv, tv = gateway(grant_frame("g1", 4, scope="river"), presence(5, "cael"), frame("c1", 6, heard=9_000))
@@ -338,6 +356,42 @@ class GrantDaemonTest(SnapshotCase):
         self.assertEqual([s["stream"] for s in cael["streams"]], ["chatter"], "the grant's own carrier is not shown")
         self.assertEqual(json.loads(revoked[1])["stations"], [], "a pluck removes the row")
         self.assertNotIn(b"secret", revoked[1])
+
+    def test_a_malformed_signed_grant_does_not_end_the_gateway(self):
+        """🌫 on #140: a verified carrier with an unhashable scope is refused, and the gateway keeps serving."""
+        from canticle import cbor
+
+        async def scenario(d, port):
+            st = self.station()
+            now = runner.now_ms()
+            self.beacon(d, st, now)
+            now += 120_000
+            st.sing(now, "display", body=cbor.encode({"display": DISPLAY, "scope": []}), ctype=grant.CTYPE,
+                    cls=grant.CLASS, state_key=grant.state_key(DISPLAY), ttl_s=900)
+            self.feed(d, st.poll(now), now)
+            stop, ports = asyncio.Event(), []
+            task = asyncio.ensure_future(run_shape(d.cfg.socket_path, ["cael"], "127.0.0.1", 0, stop,
+                                                   ready=ports.append, display=DISPLAY))
+            out = None
+            for _ in range(100):
+                await asyncio.sleep(0.05)
+                if ports:
+                    out = json.loads((await http_get(ports[0]))[1])
+                    if out["connected"]:
+                        break
+            st.sing(now + 1, "chatter", text="after the bad grant", ttl_s=30)
+            self.feed(d, st.poll(now + 1), now + 1)
+            await asyncio.sleep(0.3)
+            alive = not task.done()
+            after = json.loads((await http_get(ports[0]))[1])
+            stop.set()
+            await asyncio.wait_for(task, 5)
+            return out, after, alive
+
+        (out, after, alive), _ = self.run_with(scenario)
+        self.assertTrue(alive, "the gateway task is still running")
+        self.assertTrue(out["connected"])
+        self.assertEqual((out["stations"], after["stations"]), ([], []))
 
 
 if __name__ == "__main__":
