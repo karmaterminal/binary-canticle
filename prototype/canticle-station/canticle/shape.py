@@ -191,6 +191,11 @@ class Flow:
         # recorded only while a grant is verified now; its history is purged down to a narrower grant, or entirely,
         # only when a complete view proves the narrowing.  An unverifiable moment hides it and keeps what it has.
         self.held: dict = {}
+        # A station whose grant could have been revoked unseen: its absence was not proven, or it was last verified
+        # on another connection.  Its history is purged before recording resumes (🌿 on #140): fail toward losing
+        # history, never toward showing it.
+        self._doubt: set = set()
+        self._verified_on: dict = {}   # name -> the connection its grant was last verified on
         self.started_at = clock()
         self.observed: set = set()
         self.minutes: dict = {name: {} for name in self.allowed}
@@ -209,22 +214,44 @@ class Flow:
     def _bucket(self, name: str, minute: int) -> dict:
         return self.minutes[name].setdefault(minute, {"beacon": False, "arrivals": {}, "state": None})
 
-    def _settle(self, view: TapView, now_ms: int) -> Optional[dict]:
-        """The grants verified on ``view`` now (None without a display), purging what a proven narrowing removed."""
+    def _settle(self, view: TapView, changes: list, now_ms: int) -> Optional[dict]:
+        """The grants verified on ``view`` now (None without a display), purging what a narrowing removed.
+
+        A narrowing is proven when a complete view with no records lost shows it, or when this station's own grant
+        item is seen withdrawn (a pluck) or has expired.  An absence without proof hides the station and keeps its
+        history, but leaves it in doubt: a pluck may have been lost, so the next verified grant purges first.  So
+        does a grant verified on a new connection, since anything may have happened while the gateway was away."""
         if self.display is None:
             return None
         grants, proof = grant.read(view, self.display, self.allowed, now_ms)
+        seen_gone = {fields["frame"]["station"].get("name") for kind, fields in changes
+                     if kind == "withdrawn" and grant.names(fields.get("frame") or {}, self.display)}
         for name in self.allowed:
             new, old = grants.get(name), self.held.get(name)
-            if new is None and not proof:
-                continue   # unverifiable now: hide (below) and keep
-            if old is not None and (new is None or grant.RANK[new["scope"]] < grant.RANK[old["scope"]]):
-                self._purge(name, new)
             if new is None:
-                self.held.pop(name, None)
-            else:
-                self.held[name] = new
+                if old is None:
+                    continue
+                if proof or name in seen_gone or self._expired(view, name, now_ms):
+                    self._purge(name, None)
+                    self.held.pop(name, None)
+                    self._doubt.discard(name)
+                else:
+                    self._doubt.add(name)   # unverifiable now: hide and keep, but don't trust it again unpurged
+                continue
+            if old is not None and (name in self._doubt or self._verified_on.get(name) is not view):
+                self._purge(name, None)
+            elif old is not None and grant.RANK[new["scope"]] < grant.RANK[old["scope"]]:
+                self._purge(name, new)
+            self._doubt.discard(name)
+            self.held[name] = new
+            self._verified_on[name] = view
         return grants
+
+    def _expired(self, view: TapView, name: str, now_ms: int) -> bool:
+        """Whether ``name``'s grant item is still held by ``view`` but past its local expiry: an expiry seen, not
+        inferred from silence."""
+        return any(grant.names(r, self.display) and (r.get("station") or {}).get("name") == name
+                   and r["times"]["local_expiry_at"] <= now_ms for r in view.frames.values())
 
     def _purge(self, name: str, keep: Optional[dict]) -> None:
         """Drop what ``name``'s history holds beyond ``keep`` (None: everything), so a later grant cannot bring it
@@ -244,7 +271,7 @@ class Flow:
             self.minutes[name] = {}
 
     def observe(self, view: TapView, changes: list, type_: Optional[str], now_ms: int) -> None:
-        grants = self._settle(view, now_ms)
+        grants = self._settle(view, changes, now_ms)
 
         def may(name: str, tier: str) -> bool:
             return grants is None or grant.at_least(grants.get(name), tier)

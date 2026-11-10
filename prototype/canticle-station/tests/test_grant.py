@@ -211,12 +211,51 @@ class PurgeTest(unittest.TestCase):
         self.assertEqual(sum(sum(b["arrivals"].values()) for b in sv.flow.minutes["cael"].values()), 1,
                          "c2 is not recorded while the grant is unverified")
 
-    def test_without_a_complete_snapshot_absence_proves_nothing(self):
+    def test_a_seen_pluck_purges_without_a_complete_snapshot(self):
+        """A withdrawal of the station's own grant item is proof for that station, whatever the snapshot."""
         sv, tv = gateway(grant_frame("g1", 4, scope="river"), presence(5, "cael"), frame("c1", 6, heard=9_000),
                          complete=False)
         tv.apply(rec("retract", 7, idem="g1", reason="plucked"))
         self.assertEqual(sv.project(10_000)["stations"], [])
-        self.assertEqual(len(sv.flow.river), 1)
+        self.assertEqual(len(sv.flow.river), 0)
+
+    def test_observed_pluck_after_a_gap_then_regrant(self):
+        """🌿's probe on #140: records_lost makes the view's absence unproven, but the seen pluck still purges."""
+        sv, tv = gateway(grant_frame("g1", 4, scope="river"), presence(5, "cael"), frame("c1", 6, heard=9_000))
+        tv.apply(frame("c2", 9, heard=9_500))                     # 7, 8 lost: records_lost > 0
+        tv.apply(rec("retract", 10, idem="g1", reason="plucked"))  # the pluck arrives and is seen
+        tv.apply(grant_frame("g2", 11, scope="river"))             # the station grants again
+        self.assertEqual(self.history(sv), {"river": 0, "arrivals": 0, "drum_arrivals": 0})
+
+    def test_a_pluck_lost_in_a_gap_then_regrant_does_not_resurrect(self):
+        """The grant was carried across a gap (its pluck may be among the lost records), so the next verified grant
+        purges before recording resumes."""
+        sv, tv = gateway(grant_frame("g1", 4, scope="river"), presence(5, "cael"), frame("c1", 6, heard=9_000))
+        tv.apply(frame("c2", 9, heard=9_500))                     # 7, 8 lost: g1 carried, absence unproven
+        self.assertEqual(len(sv.flow.river), 1, "hidden and kept while unproven")
+        tv.apply(grant_frame("g3", 10, scope="river"))
+        self.assertEqual(self.history(sv), {"river": 0, "arrivals": 0, "drum_arrivals": 0})
+
+    def test_a_new_connection_does_not_resurrect(self):
+        """Anything may have happened while the gateway was away: a grant verified on a new connection starts clean."""
+        sv, tv = gateway(grant_frame("g1", 4, scope="river"), presence(5, "cael"), frame("c1", 6, heard=9_000))
+        self.assertEqual(self.history(sv)["river"], 1)
+        tv2 = _StampedView([("*", "*")], sv.clock, sv.flow)
+        bootstrap(tv2, join=True)
+        entry = {k: v for k, v in grant_frame("g9", 3, scope="river").items() if k not in ("v", "type", "rec_seq", "run")}
+        tv2.apply(rec("snapshot", 3, snap_seq=1, entry={"frame": entry}))
+        tv2.apply(rec("snapshot_end", 3, watermark=3, count=1, truncated=False, omitted=0))
+        sv.tap = tv2
+        tv2.apply(health(4))
+        self.assertEqual(len(sv.project(10_000)["stations"]), 1)
+        self.assertEqual(self.history(sv), {"river": 0, "arrivals": 0, "drum_arrivals": 0})
+
+    def test_a_refresh_of_the_same_grant_keeps_history(self):
+        """The station re-sings its grant by refresh (a new seq, same scope): continuity on one connection, no purge."""
+        sv, tv = gateway(grant_frame("g1", 4, scope="river"), presence(5, "cael"), frame("c1", 6, heard=9_000))
+        tv.apply(grant_frame("g2", 7, scope="river"))
+        tv.apply(rec("retract", 8, idem="g1", reason="superseded"))
+        self.assertEqual(self.history(sv), {"river": 1, "arrivals": 1, "drum_arrivals": 1})
 
 
 class GrantCliTest(unittest.TestCase):

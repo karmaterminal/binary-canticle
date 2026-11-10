@@ -81,11 +81,17 @@ def decode(raw: bytes) -> dict:
     return {"display": display, "scope": scope, "withheld": withheld}
 
 
+def names(r: dict, display: str) -> bool:
+    """Whether frame record ``r`` is a grant item for ``display`` by its carrier: stream, class and state key."""
+    return r.get("stream") == STREAM and r.get("class") == CLASS and r.get("state_key") == state_key(display)
+
+
 def _from_record(r: dict, display: str) -> Optional[dict]:
-    if r.get("stream") != STREAM or r.get("class") != CLASS or r.get("state_key") != state_key(display):
+    if not names(r, display):
         return None
-    body = r.get("body") or {}
-    if body.get("ctype") not in (CTYPE, CTYPE_NAME) or not isinstance(body.get("base64"), str):
+    body = r.get("body")
+    if not isinstance(body, dict) or body.get("ctype") not in (CTYPE, CTYPE_NAME) \
+            or not isinstance(body.get("base64"), str):
         return None
     try:
         g = decode(base64.b64decode(body["base64"], validate=True))
