@@ -23,6 +23,7 @@ import hashlib
 import json
 import os
 import random
+import re
 import signal
 import sys
 import time
@@ -267,6 +268,64 @@ def cmd_grant(a) -> int:
         reqs = grant_requests(a, status)
     except (ValueError, GrantError) as e:
         print(f"canticle grant: {e}", file=sys.stderr)
+        return 2
+    ok = True
+    for req in reqs:
+        resp = runner.control_request(control, req)
+        print(json.dumps(resp))
+        ok = ok and bool(resp.get("ok"))
+    return 0 if ok else 1
+
+
+def parse_until(text: str, now_ms: int) -> int:
+    """``+90s``, ``+30m``, ``+2h`` from now, or a UTC time like ``2026-11-10T07:07Z`` (seconds optional), as epoch ms."""
+    import datetime
+    m = re.fullmatch(r"\+([1-9][0-9]{0,5})([smh])", text or "")
+    if m:
+        return now_ms + int(m.group(1)) * {"s": 1_000, "m": 60_000, "h": 3_600_000}[m.group(2)]
+    m = re.fullmatch(r"(\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?)Z", text or "")
+    if not m:
+        raise ValueError("--until takes +Ns, +Nm, +Nh or a UTC time like 2026-11-10T07:07Z")
+    fmt = "%Y-%m-%dT%H:%M:%S" if m.group(1).count(":") == 2 else "%Y-%m-%dT%H:%M"
+    t = datetime.datetime.strptime(m.group(1), fmt).replace(tzinfo=datetime.timezone.utc)
+    return int(t.timestamp() * 1000)
+
+
+def beacon_requests(a, status: Optional[dict] = None, now_ms: Optional[int] = None) -> list:
+    """The control requests ``canticle beacon`` sends, in order. For --pluck, ``status`` is the station's status
+    answer, read first, to find the beacon's sequence number. A ValueError names a usage mistake."""
+    from . import beacon as b
+    if a.pluck:
+        if a.state or a.asking or a.until or a.ref:
+            raise ValueError("--pluck takes no --state, --asking, --until or --ref")
+        on_air = ((status or {}).get("streams", {}).get(b.STREAM) or {}).get("on_air", [])
+        seqs = [r["seq"] for r in on_air if r.get("kind") == "item" and r.get("state_key") == b.STATE_KEY]
+        if not seqs:
+            raise ValueError("no beacon is on air at this station")
+        return [{"op": "hush", "stream": b.STREAM, "seq": s} for s in seqs]
+    if a.state is None:
+        raise ValueError("give --state (or --pluck)")
+    if not 0 < a.ttl <= b.MAX_TTL_S:
+        raise ValueError(f"--ttl must be in (0, {b.MAX_TTL_S}]")
+    if not 0 < a.hours <= 24:
+        raise ValueError("--hours must be in (0, 24]: the station keeps an item on air for 24 h at most")
+    now = runner.now_ms() if now_ms is None else now_ms
+    until = parse_until(a.until, now) if a.until else None
+    if until is not None and until <= now:
+        raise ValueError("--until is not in the future")
+    body = b.encode(a.state, a.asking or "none", until, a.ref or ())
+    return [{"op": "sing", "stream": b.STREAM, "class": b.CLASS, "state_key": b.STATE_KEY, "body_hex": body.hex(),
+             "ctype": b.CTYPE, "ttl": a.ttl, "keep_on_air": int(a.hours * 3600), "loop": "normal", "scope": "lan"}]
+
+
+def cmd_beacon(a) -> int:
+    from .beacon import BeaconError
+    control = _control(a)
+    try:
+        status = runner.control_request(control, {"op": "status"}) if a.pluck else None
+        reqs = beacon_requests(a, status)
+    except (ValueError, BeaconError) as e:
+        print(f"canticle beacon: {e}", file=sys.stderr)
         return 2
     ok = True
     for req in reqs:
@@ -799,6 +858,22 @@ def main(argv=None) -> int:
     gr.add_argument("--hours", type=float, default=24, help="keep it on air by refresh this long (at most 24)")
     gr.add_argument("--pluck", action="store_true", help="revoke: pluck the grant now")
     gr.set_defaults(fn=cmd_grant)
+
+    bc = sub.add_parser("beacon", help="say what this station is doing, as typed shape, not prose (#142)",
+                        description="Sings this station's beacon on its 'beacon' stream through its control socket: a "
+                        "keyed live-state item with enumerated fields (state, asking, optional until and refs), kept "
+                        "on air by refresh for --hours (24 h at most), or plucked with --pluck when it stops being "
+                        "true. A missing or expired beacon reads as unknown, never as fine.")
+    bc.add_argument("--control", help="the station's control socket")
+    bc.add_argument("--state", choices=["working", "resting", "blocked", "away"], help="what the station is doing")
+    bc.add_argument("--asking", choices=["none", "review", "peer", "human"],
+                    help="whether it wants something, and from whom (default none)")
+    bc.add_argument("--until", help="when the state should change: +30m, +2h, or a UTC time like 2026-11-10T07:07Z")
+    bc.add_argument("--ref", action="append", help="a pointer like binary-canticle#142 or #142 (repeatable, at most 4)")
+    bc.add_argument("--ttl", type=float, default=300, help="the lease in seconds (at most 900, the class maximum)")
+    bc.add_argument("--hours", type=float, default=12, help="keep it on air by refresh this long (at most 24)")
+    bc.add_argument("--pluck", action="store_true", help="withdraw the beacon now")
+    bc.set_defaults(fn=cmd_beacon)
 
     tp = sub.add_parser("tap", help="read what the host daemon hears: a read-only record v1 client (no bind, no state)",
                         description="Connects to the host daemon's socket as one more binding, asks for the join "
