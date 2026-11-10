@@ -331,9 +331,12 @@ canticle grant --control "$CTL" --display frond-house@silas --pluck     # no, no
 - **Revoking and narrowing.** A pluck revokes at once wherever it arrives. A narrower scope, a pluck or an expiry
   purges the history held under what was removed, and a later grant doesn't bring it back. The newest grant wins by
   (epoch, seq), and the listener's high-water mark stops an older one coming back.
-- **Fail closed.** Only a live connection verifies a grant. A stale or closed connection shows no station. Absence
-  proves a revoke only on a connection with a complete join snapshot and no records lost. Otherwise, after a gap for
-  example, the station is hidden and its history kept, and nothing new is recorded until the grant is verified again.
+- **Fail closed.** Only a live connection verifies a grant. A stale or closed connection shows no station. A revoke
+  is proven when the station's own grant item is seen withdrawn or expired, or when a connection with a complete join
+  snapshot and no records lost shows no grant. Any other absence, after a gap for example, hides the station, keeps
+  its history and records nothing new. Because a pluck may have been lost, the next verified grant purges that history
+  before recording resumes, and so does a grant first verified on a new connection. That fails toward losing history,
+  never toward showing it.
 - **What's already delivered can't be recalled.** A page should keep nothing beyond what it shows.
 
 ### Same-host proof for #57 and #58
