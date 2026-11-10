@@ -33,6 +33,7 @@ resolve DNS records, and its manifest remains unsigned.
 | §6.7 Findings (FP-1, #112) | `canticle/finding.py`: the finding body (content type 11) and its strict reader. `canticle sing --finding` and `--body-ref`, and the control socket's `finding` and `body_ref` fields, put a keyed `advisory` finding and a `finding-ref` doorbell on air. `canticle tap` shows a finding field by field, with a host-authored line that attributes it to its signer. See [Findings](#findings-fp-1-112). |
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
 | Shape-only live view (#133) | `canticle shape`: per named station, presence and beacon age; per stream, live count and newest age. Never content; no station without its owner's yes. |
+| Display grants (#137) | `canticle grant` sings a station's own yes to a display, scoped `presence` → `beacon` → `counts` → `river`; `canticle shape --display` shows only granted stations at their granted scope, and purges on revoke or narrowing. |
 | §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only synthetic-only human dashboard over one listener. Live station identity, streams, activity and payloads are never published to humans. |
 | §14.18.3 Record v1 (BC-2, #77) | `canticle/records.py`: the listener's outcomes as receptor record v1 (`hello`, `landing_state`, `frame`, `retract`, `presence`, `health`, `fatal`, `bye`) under the disposition mapping, with fixed health counters and a bounded table of unverified key ids (D34). See [Record v1 and the host daemon](#record-v1-and-the-host-daemon-bc-2-d35-77). |
 | §11.1, §14.18.2 Host daemon (D35, #77) | `canticle daemon`: the host's one UDP listener, carrying record v1 to every binding over a unix `SOCK_STREAM` socket with peer-credential checks, a two-record bootstrap per connection and per-connection isolation. |
@@ -292,11 +293,48 @@ canticle shape --demo-fixture        # invented stations, marked synthetic
     - a longer silence, or a new connection, leaves its gap open;
   - each station's beacon buckets, filled the same way between sightings;
   - its arrivals as `[bucket, stream index, count]`, with stream names listed once in `streams`.
-- **Consent.** No station is shown by default. A manifest entry is not consent to human display, so a host names a
-  station only after that station's owner agrees on #133. A broadcaster-signed opt-in is the follow-up.
+- **Consent.** No station is shown by default. A manifest entry is not consent to human display. Without
+  `--display`, a host names a station only after that station's owner agrees on #133. With `--display`, the station
+  itself says yes: see *Display grants* below.
 - **What it is.** It's one more read-only client of the host daemon's socket, through `tap`: it binds no UDP port,
   writes no state and sings nothing. It reconnects with backoff after a daemon restart. HTTP is the tuner's
   (loopback only, Host check, GET only, the same headers), serving `/api/shape` and nothing else.
+
+
+### Display grants (#137)
+
+```sh
+# the gateway: --station is now only the host's ceiling
+canticle shape --display frond-house@silas --station frond-gloss --station frond-scribe
+# the prince, where the station's key lives: one choice, kept on air by the station
+canticle grant --control "$CTL" --display frond-house@silas --scope beacon
+canticle grant --control "$CTL" --display frond-house@silas --pluck     # no, now
+```
+
+- **The grant is a broadcast.** A keyed `live-state` item on the station's `display` stream, `state_key`
+  `grant:<display>`, body CBOR `{display, scope}` plus `withheld: true` when chosen. Only the holder of the station's
+  key can sing it. **A grant means only what that key means:** a key kept on a host the prince doesn't control lets
+  that host say yes for the prince.
+- **Scopes, smallest first, each including the ones before it:**
+  - `presence`: the row and its presence state;
+  - `beacon`: beacon age, and beacon history in `/api/flow` and `/api/drum`;
+  - `counts`: live counts and ages per stream, and arrivals per minute and per drum bucket;
+  - `river`: each arrival as `{at_ms, station, stream}`.
+
+  `withheld: true` goes only with `presence`. It's the prince's own disclosure that more is withheld, never
+  inferred from silence. Rows carry `withheld` when the gateway runs with `--display`.
+- **No grant, no trace.** Without a verified grant the station has no row in any answer. Its arrivals aren't
+  recorded and change no count, stream list or river. The grant stream's own items are never counted as telemetry.
+- **The lease.** The item's TTL is the lease, at most 900 s (the class maximum). The station refreshes it while it is
+  kept on air, for at most 24 h (the station's ceiling), so a standing grant is re-sung daily, for example by a user
+  timer on the prince's own seat. A display that can't hear the station loses the grant within the TTL.
+- **Revoking and narrowing.** A pluck revokes at once wherever it arrives. A narrower scope, a pluck or an expiry
+  purges the history held under what was removed, and a later grant doesn't bring it back. The newest grant wins by
+  (epoch, seq), and the listener's high-water mark stops an older one coming back.
+- **Fail closed.** Only a live connection verifies a grant. A stale or closed connection shows no station. Absence
+  proves a revoke only on a connection with a complete join snapshot and no records lost. Otherwise, after a gap for
+  example, the station is hidden and its history kept, and nothing new is recorded until the grant is verified again.
+- **What's already delivered can't be recalled.** A page should keep nothing beyond what it shows.
 
 ### Same-host proof for #57 and #58
 
