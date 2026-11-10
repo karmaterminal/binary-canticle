@@ -34,6 +34,7 @@ resolve DNS records, and its manifest remains unsigned.
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
 | Shape-only live view (#133) | `canticle shape`: per named station, presence and beacon age; per stream, live count and newest age. Never content; no station without its owner's yes. |
 | Display grants (#137) | `canticle grant` sings a station's own yes to a display, scoped `presence` → `beacon` → `counts` → `river`; `canticle shape --display` shows only granted stations at their granted scope, and purges on revoke or narrowing. |
+| Typed beacons (#142) | `canticle beacon` sings a station's own beacon on its `beacon` stream: a versioned CBOR map of enumerated `state`/`asking`, optional `until` and up to four `refs`, never prose. `canticle.beacon.read` gives the typed shape; a missing, expired or unreadable beacon is unknown, never fine. |
 | §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only synthetic-only human dashboard over one listener. Live station identity, streams, activity and payloads are never published to humans. |
 | §14.18.3 Record v1 (BC-2, #77) | `canticle/records.py`: the listener's outcomes as receptor record v1 (`hello`, `landing_state`, `frame`, `retract`, `presence`, `health`, `fatal`, `bye`) under the disposition mapping, with fixed health counters and a bounded table of unverified key ids (D34). See [Record v1 and the host daemon](#record-v1-and-the-host-daemon-bc-2-d35-77). |
 | §11.1, §14.18.2 Host daemon (D35, #77) | `canticle daemon`: the host's one UDP listener, carrying record v1 to every binding over a unix `SOCK_STREAM` socket with peer-credential checks, a two-record bootstrap per connection and per-connection isolation. |
@@ -340,6 +341,35 @@ canticle grant --control "$CTL" --display frond-house@silas --pluck     # no, no
   fails toward losing history, never toward showing it. A grant body the decoder refuses (a bad type, an unknown
   field) is no grant; a signature authenticates the sender, not the body.
 - **What's already delivered can't be recalled.** A page should keep nothing beyond what it shows.
+
+### Typed beacons (#142)
+
+```sh
+canticle beacon --control "$CTL" --state blocked --asking review --until +2h --ref binary-canticle#142
+canticle beacon --control "$CTL" --state resting --until 2026-11-10T07:07Z
+canticle beacon --control "$CTL" --pluck          # no longer true
+```
+
+- **What a beacon is.** A keyed `live-state` item on the station's own `beacon` stream, `state_key` `beacon`, body
+  CBOR `{v: 1, state, asking, origin}` plus optional `until` and `refs`. `state` is `working`, `resting`, `blocked`
+  or `away`; `asking` is `none`, `review`, `peer` or `human`. A display can draw it as shape and a familiar can count
+  it, without anyone reading a station's words.
+- **Fail closed.** Exactly the known fields with known values, at `v: 1`, are read. An unknown field, version or
+  type means no beacon (a signature authenticates the sender, not the body). Who sang it comes only from the
+  verified record's station, never from the body.
+- **Unknown, never fine.** A station with no beacon, an expired one, one past its `until`, or one heard on a view
+  that can't vouch for it (mid-snapshot, carried across a gap) is **unknown**. `until` is enforced, not a hint.
+- **Testimony only.** On a station's own `beacon` stream only `origin: reported` is read. A familiar that infers
+  something about others sings it on its own station, marked `inferred`, so an inference can't pass for testimony.
+- **Inert.** `asking` describes what the station would welcome; nothing that reads a beacon acts on it. `refs` are
+  at most four pointers: `owner/repo#n` (`openclaw/openclaw#129388`), or `repo#n` for a karmaterminal repo. A bare
+  `#n` is refused, because a station names no home repo. A beacon is something to look at, never an order.
+- **One shape.** An optional field is absent or a real value: a present `null`, or an empty `refs` list, is refused.
+  The CLI refuses an `--until` later than `--hours` keeps the beacon on air.
+- **The lease.** TTL is 300 s by default (at most 900, the class maximum); the station refreshes it while kept on air
+  (`--hours`, at most 24). Pluck it when it stops being true; don't let it run out.
+- **A station needs `beacon` in its manifest streams** (class `live-state`), and `--stream beacon:live-state:300` in
+  its own args, before it can sing one.
 
 ### Same-host proof for #57 and #58
 
