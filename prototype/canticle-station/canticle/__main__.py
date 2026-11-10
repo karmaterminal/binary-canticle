@@ -235,6 +235,47 @@ def cmd_sing(a) -> int:
     return 0 if resp.get("ok") else 1
 
 
+def grant_requests(a, status: Optional[dict] = None) -> list:
+    """The control requests ``canticle grant`` sends, in order. For --pluck, ``status`` is the station's status
+    answer, read first, to find the grant's sequence number. A ValueError names a usage mistake."""
+    from . import grant as g
+    key = g.state_key(g.check_display(a.display))
+    if a.pluck:
+        if a.scope or a.withheld:
+            raise ValueError("--pluck takes no --scope or --withheld")
+        on_air = ((status or {}).get("streams", {}).get(g.STREAM) or {}).get("on_air", [])
+        seqs = [r["seq"] for r in on_air if r.get("kind") == "item" and r.get("state_key") == key]
+        if not seqs:
+            raise ValueError(f"no grant for {a.display} is on air at this station")
+        return [{"op": "hush", "stream": g.STREAM, "seq": s} for s in seqs]
+    if a.scope is None:
+        raise ValueError("give --scope (or --pluck)")
+    if not 0 < a.ttl <= g.MAX_TTL_S:
+        raise ValueError(f"--ttl must be in (0, {g.MAX_TTL_S}]")
+    if not 0 < a.hours <= 24:
+        raise ValueError("--hours must be in (0, 24]: the station keeps an item on air for 24 h at most")
+    body = g.encode(a.display, a.scope, a.withheld)
+    return [{"op": "sing", "stream": g.STREAM, "class": g.CLASS, "state_key": key, "body_hex": body.hex(),
+             "ctype": g.CTYPE, "ttl": a.ttl, "keep_on_air": int(a.hours * 3600), "loop": "normal", "scope": "lan"}]
+
+
+def cmd_grant(a) -> int:
+    from .grant import GrantError
+    control = _control(a)
+    try:
+        status = runner.control_request(control, {"op": "status"}) if a.pluck else None
+        reqs = grant_requests(a, status)
+    except (ValueError, GrantError) as e:
+        print(f"canticle grant: {e}", file=sys.stderr)
+        return 2
+    ok = True
+    for req in reqs:
+        resp = runner.control_request(control, req)
+        print(json.dumps(resp))
+        ok = ok and bool(resp.get("ok"))
+    return 0 if ok else 1
+
+
 def cmd_hush(a) -> int:
     resp = runner.control_request(_control(a), {"op": "hush", "stream": a.stream, "seq": a.seq})
     print(json.dumps(resp))
@@ -362,16 +403,25 @@ def cmd_shape(a) -> int:
         print("XDG_RUNTIME_DIR is not set: pass --socket (the daemon's socket path)", file=sys.stderr)
         return 1
 
+    if a.display is not None:
+        from .grant import GrantError, check_display
+        try:
+            check_display(a.display)
+        except GrantError as e:
+            print(f"--display: {e}", file=sys.stderr)
+            return 2
+
     def ready(port: int) -> None:
         print(json.dumps({"shape": f"http://{http_host}:{port}/api/shape", "stations": sorted(set(a.station or [])),
-                          "synthetic": a.demo_fixture}), file=sys.stderr, flush=True)
+                          "synthetic": a.demo_fixture, "display": a.display}), file=sys.stderr, flush=True)
 
     async def main():
         stop = asyncio.Event()
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, stop.set)
-        await run_shape(sock, a.station or [], http_host, http_port, stop, ready=ready, demo_fixture=a.demo_fixture)
+        await run_shape(sock, a.station or [], http_host, http_port, stop, ready=ready, demo_fixture=a.demo_fixture,
+                        display=a.display)
 
     asyncio.run(main())
     return 0
@@ -731,7 +781,24 @@ def main(argv=None) -> int:
     sh.add_argument("--station", action="append", help="a station to show (repeatable); none are shown by default")
     sh.add_argument("--http", default="127.0.0.1:8766", help="loopback host:port for /api/shape")
     sh.add_argument("--demo-fixture", action="store_true", help="serve invented, marked-synthetic stations only")
+    sh.add_argument("--display", help="this display's name (#137). With it, --station is only the host's ceiling: a "
+                    "station appears only while it holds a live grant for this display, and only at the scope granted")
     sh.set_defaults(fn=cmd_shape)
+
+    gr = sub.add_parser("grant", help="say yes (or no) to a shape display, from the station's own key (#137)",
+                        description="Sings a display grant on the station's 'display' stream through its control "
+                        "socket: a keyed live-state item the station keeps on air by refresh for --days (24 h at "
+                        "most, the station's ceiling), or plucks it with --pluck. Run it where the station's key "
+                        "lives: a grant means only what that key means.")
+    gr.add_argument("--control", help="the station's control socket")
+    gr.add_argument("--display", required=True, help="the display to say yes to, e.g. frond-house@silas")
+    gr.add_argument("--scope", choices=["presence", "beacon", "counts", "river"],
+                    help="what the display may show, smallest first; each includes the ones before it")
+    gr.add_argument("--withheld", action="store_true", help="with --scope presence: show that more is withheld")
+    gr.add_argument("--ttl", type=float, default=900, help="the lease in seconds (at most 900, the class maximum)")
+    gr.add_argument("--hours", type=float, default=24, help="keep it on air by refresh this long (at most 24)")
+    gr.add_argument("--pluck", action="store_true", help="revoke: pluck the grant now")
+    gr.set_defaults(fn=cmd_grant)
 
     tp = sub.add_parser("tap", help="read what the host daemon hears: a read-only record v1 client (no bind, no state)",
                         description="Connects to the host daemon's socket as one more binding, asks for the join "

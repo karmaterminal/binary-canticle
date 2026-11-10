@@ -30,6 +30,7 @@ import io
 from collections import deque
 from typing import Callable, Iterable, Optional
 
+from . import grant
 from .records import HEALTH_INTERVAL_MS
 from .tap import TapError, TapView, tap
 from .tuner import TunerHttp, _now_ms
@@ -81,11 +82,14 @@ class _StampedView(TapView):
 class ShapeView:
     """What the daemon connection last saw, reduced to shape for the named stations."""
 
-    def __init__(self, stations: Iterable[str], demo_fixture: bool = False, clock: Callable[[], int] = _now_ms):
+    def __init__(self, stations: Iterable[str], demo_fixture: bool = False, clock: Callable[[], int] = _now_ms,
+                 display: Optional[str] = None):
         self.allowed = sorted(set(stations))
         self.demo_fixture = demo_fixture
         self.clock = clock
-        self.flow = Flow(self.allowed, clock)
+        # With a display name, ``stations`` is only the host's ceiling and each station needs its own grant (#137).
+        self.display = grant.check_display(display) if display is not None else None
+        self.flow = Flow(self.allowed, clock, display=self.display)
         self.tap: Optional[_StampedView] = None
         self.connected = False
 
@@ -95,10 +99,13 @@ class ShapeView:
         if self.demo_fixture:
             return _demo(now_ms)
         view = self._live(now_ms)
+        grants = self.grants(now_ms, view)
         out = {"now_ms": now_ms, "synthetic": False, "connected": view is not None,
                "daemon": _closed((view.health or {}).get("state") if view else None, HEALTH_STATES),
                "receive": view.receive()["health"] if view else "unknown",
                "stations": []}
+        if self.display is not None:
+            out["display"] = self.display
         live = view.live(now_ms) if view else []
         presence = {}
         if view:
@@ -108,34 +115,51 @@ class ShapeView:
         # The daemon's ages were true when its health record arrived; age them by the time since.
         since_health = max(0, now_ms - view.health_at) if view and view.health_at is not None else 0
         for name in self.allowed:
+            g = _shown(grants, name)
+            if g is None:
+                continue   # no verified grant: no row, no trace (#137)
             p = presence.get(name)
             streams: dict = {}
             for r in live:
-                if r["station"].get("name") != name:
+                if r["station"].get("name") != name or (grants is not None and r.get("stream") == grant.STREAM):
                     continue
                 s = streams.setdefault(str(r.get("stream") or ""), {"live": 0, "newest_heard_at": 0})
                 s["live"] += 1
                 s["newest_heard_at"] = max(s["newest_heard_at"], int(r["times"].get("heard_at") or 0))
-            age = ages.get(p.get("key_id")) if p else None
-            out["stations"].append({
+            age = ages.get(p.get("key_id")) if p and grant.at_least(g, "beacon") else None
+            row = {
                 "name": name,
                 "state": _closed(view.presence_state(p) if p else None, PRESENCE_STATES, missing="not_heard"),
                 "beacon_age_ms": int(age) + since_health if isinstance(age, (int, float)) and age >= 0 else None,
                 "streams": [{"stream": s, "live": v["live"],
                              "newest_age_ms": max(0, now_ms - v["newest_heard_at"]) if v["newest_heard_at"] else None}
-                            for s, v in sorted(streams.items())],
-            })
+                            for s, v in sorted(streams.items())] if grant.at_least(g, "counts") else [],
+            }
+            if grants is not None:
+                row["withheld"] = g["withheld"]
+            out["stations"].append(row)
         return out
+
+    def grants(self, now_ms: int, view: Optional["_StampedView"] = None) -> Optional[dict]:
+        """The stations a live connection shows a verified grant for, or None without a display name (host-named
+        stations only).  A connection that is not live verifies nothing, so nothing is shown (fail closed)."""
+        if self.display is None:
+            return None
+        view = view if view is not None else self._live(now_ms)
+        return grant.read(view, self.display, self.allowed, now_ms)[0] if view is not None else {}
 
     def _live(self, now_ms: int) -> Optional[_StampedView]:
         """The connection this answer may call live: connected and not stale, else None."""
         return self.tap if self.connected and not self._stale(now_ms) else None
 
     def flow_project(self, now_ms: int) -> dict:
-        return _demo_flow(now_ms) if self.demo_fixture else self.flow.project(now_ms)
+        return _demo_flow(now_ms) if self.demo_fixture else self.flow.project(now_ms, self.grants(now_ms))
 
     def drum_project(self, now_ms: int) -> dict:
-        return _demo_drum(now_ms) if self.demo_fixture else self.flow.project_drum(now_ms, self._live(now_ms))
+        if self.demo_fixture:
+            return _demo_drum(now_ms)
+        live = self._live(now_ms)
+        return self.flow.project_drum(now_ms, live, self.grants(now_ms, live))
 
     def _stale(self, now_ms: int) -> bool:
         return self.tap is None or self.tap.stale(now_ms)
@@ -160,8 +184,19 @@ class Flow:
     It is placed at the daemon's ``heard_at``, not at the gateway's clock.  The join snapshot never counts.  The river
     keeps the last ``RIVER_MAX`` arrivals as a time, a station and a stream, nothing else."""
 
-    def __init__(self, stations: Iterable[str], clock: Callable[[], int] = _now_ms):
+    def __init__(self, stations: Iterable[str], clock: Callable[[], int] = _now_ms, display: Optional[str] = None):
         self.allowed = sorted(set(stations))
+        self.display = display
+        # With a display: the grant each station's history is kept under, as last verified (#137).  A station is
+        # recorded only while a grant is verified now; its history is purged down to a narrower grant, or entirely,
+        # only when a complete view proves the narrowing.  An unverifiable moment hides it and keeps what it has.
+        self.held: dict = {}
+        # A station whose grant could have been revoked unseen: its absence was not proven, or it was last verified
+        # on another connection.  Its history is purged before recording resumes (🌿 on #140): fail toward losing
+        # history, never toward showing it.
+        self._doubt: set = set()
+        self._verified_on: dict = {}   # name -> the connection its grant was last verified on
+        self._lost_at: dict = {}       # name -> that connection's records_lost count when it was last verified
         self.started_at = clock()
         self.observed: set = set()
         self.minutes: dict = {name: {} for name in self.allowed}
@@ -180,11 +215,78 @@ class Flow:
     def _bucket(self, name: str, minute: int) -> dict:
         return self.minutes[name].setdefault(minute, {"beacon": False, "arrivals": {}, "state": None})
 
+    def _settle(self, view: TapView, changes: list, now_ms: int) -> Optional[dict]:
+        """The grants verified on ``view`` now (None without a display), purging what a narrowing removed.
+
+        A narrowing is proven when a complete view with no records lost shows it, or when this station's own grant
+        item is seen withdrawn (a pluck) or has expired.  An absence without proof hides the station and keeps its
+        history, but leaves it in doubt: a pluck may have been lost, so the next verified grant purges first.  So
+        does a grant verified on a new connection, since anything may have happened while the gateway was away."""
+        if self.display is None:
+            return None
+        grants, proof = grant.read(view, self.display, self.allowed, now_ms)
+        seen_gone = {fields["frame"]["station"].get("name") for kind, fields in changes
+                     if kind == "withdrawn" and grant.names(fields.get("frame") or {}, self.display)}
+        for name in self.allowed:
+            new, old = grants.get(name), self.held.get(name)
+            if new is None:
+                if old is None:
+                    continue
+                if proof or name in seen_gone or self._expired(view, name, now_ms):
+                    self._purge(name, None)
+                    self.held.pop(name, None)
+                    self._doubt.discard(name)
+                    self._verified_on.pop(name, None)
+                    self._lost_at.pop(name, None)
+                else:
+                    self._doubt.add(name)   # unverifiable now: hide and keep, but don't trust it again unpurged
+                continue
+            # A gap since the last verification may hold a pluck, even when the record that reports the gap is
+            # itself the regrant (🌫 on #140): purge before trusting it.
+            gap = self._lost_at.get(name) != view.records_lost
+            if old is not None and (name in self._doubt or self._verified_on.get(name) is not view or gap):
+                self._purge(name, None)
+            elif old is not None and grant.RANK[new["scope"]] < grant.RANK[old["scope"]]:
+                self._purge(name, new)
+            self._doubt.discard(name)
+            self.held[name] = new
+            self._verified_on[name] = view
+            self._lost_at[name] = view.records_lost
+        return grants
+
+    def _expired(self, view: TapView, name: str, now_ms: int) -> bool:
+        """Whether ``name``'s grant item is still held by ``view`` but past its local expiry: an expiry seen, not
+        inferred from silence."""
+        return any(grant.names(r, self.display) and (r.get("station") or {}).get("name") == name
+                   and r["times"]["local_expiry_at"] <= now_ms for r in view.frames.values())
+
+    def _purge(self, name: str, keep: Optional[dict]) -> None:
+        """Drop what ``name``'s history holds beyond ``keep`` (None: everything), so a later grant cannot bring it
+        back (🌫 on #137)."""
+        if not grant.at_least(keep, "river"):
+            self.river = deque((r for r in self.river if r[1] != name), maxlen=RIVER_MAX)
+        if not grant.at_least(keep, "counts"):
+            for b in self.minutes[name].values():
+                b["arrivals"] = {}
+            self.drum_arrivals[name] = {}
+        if not grant.at_least(keep, "beacon"):
+            for b in self.minutes[name].values():
+                b["beacon"] = False
+            self.drum_beacons[name] = set()
+            self._last_beacon.pop(name, None)
+        if keep is None:
+            self.minutes[name] = {}
+
     def observe(self, view: TapView, changes: list, type_: Optional[str], now_ms: int) -> None:
+        grants = self._settle(view, changes, now_ms)
+
+        def may(name: str, tier: str) -> bool:
+            return grants is None or grant.at_least(grants.get(name), tier)
+
         names = {}
         for p in view.presence.values():
             name = p["station"].get("name")
-            if name in self.minutes:
+            if name in self.minutes and may(name, "presence"):
                 names[p.get("key_id")] = (name, p)
         if type_ == "health":
             minute = now_ms // MINUTE_MS
@@ -192,7 +294,8 @@ class Flow:
             self.drum_observed.update(self._span(self._last_health, view, now_ms))
             self._last_health = (view, now_ms)
             for key_id, age in ((view.health or {}).get("beacon_age_ms") or {}).items():
-                if key_id in names and isinstance(age, (int, float)) and 0 <= age <= MINUTE_MS:
+                if key_id in names and isinstance(age, (int, float)) and 0 <= age <= MINUTE_MS \
+                        and may(names[key_id][0], "beacon"):
                     name, p = names[key_id]
                     beacon_at = now_ms - int(age)
                     self._bucket(name, beacon_at // MINUTE_MS)["beacon"] = True
@@ -204,8 +307,10 @@ class Flow:
             if kind != "item":
                 continue
             name = fields["station"].get("name")
-            if name not in self.minutes:
+            if name not in self.minutes or not may(name, "counts"):
                 continue
+            if grants is not None and fields.get("stream") == grant.STREAM:
+                continue   # the grant's own carrier is not telemetry
             times = fields.get("times") or {}
             expiry, heard = times.get("local_expiry_at"), times.get("heard_at")
             idem = fields.get("idem")
@@ -219,7 +324,8 @@ class Flow:
             arrivals[stream] = arrivals.get(stream, 0) + 1
             drum = self.drum_arrivals[name].setdefault(at // DRUM_BUCKET_MS, {})
             drum[stream] = drum.get(stream, 0) + 1
-            self.river.append((at, name, stream))
+            if may(name, "river"):
+                self.river.append((at, name, stream))
         self._prune(now_ms)
 
     @staticmethod
@@ -247,9 +353,10 @@ class Flow:
             for m in [m for m in buckets if m < first]:
                 del buckets[m]
 
-    def project(self, now_ms: int) -> dict:
+    def project(self, now_ms: int, grants: Optional[dict] = None) -> dict:
         """The whole ``/api/flow`` answer: closed words, names the host named, stream names the manifest bounds,
-        counts, booleans and times in milliseconds."""
+        counts, booleans and times in milliseconds.  ``grants`` (with a display) narrows it to granted stations and
+        scopes; None shows every host-named station."""
         self._prune(now_ms)
         last = now_ms // MINUTE_MS
         minutes = list(range(last - WINDOW_MIN + 1, last + 1))
@@ -257,21 +364,26 @@ class Flow:
                "minutes": [{"t": m * MINUTE_MS, "observed": m in self.observed} for m in minutes],
                "stations": [], "river": []}
         for name in self.allowed:
+            g = _shown(grants, name)
+            if g is None:
+                continue
+            beacon, counts = grant.at_least(g, "beacon"), grant.at_least(g, "counts")
             row = []
             for m in minutes:
                 b = self.minutes[name].get(m)
-                row.append({"beacon": bool(b and b["beacon"]),
-                            "arrivals": [{"stream": s, "n": n} for s, n in sorted((b or {}).get("arrivals", {}).items())],
+                row.append({"beacon": bool(beacon and b and b["beacon"]),
+                            "arrivals": [{"stream": s, "n": n} for s, n in sorted((b or {}).get("arrivals", {}).items())]
+                            if counts else [],
                             "state": (b or {}).get("state")})
             out["stations"].append({"name": name, "minutes": row})
         # newest heard first: placing at heard_at can leave consumption order slightly out of time order (🌿)
         out["river"] = [{"at_ms": at, "station": name, "stream": stream}
                         for at, name, stream in sorted(self.river, key=lambda r: -r[0])
-                        if at > now_ms - WINDOW_MIN * MINUTE_MS]
+                        if at > now_ms - WINDOW_MIN * MINUTE_MS and grant.at_least(_shown(grants, name), "river")]
         return out
 
 
-    def project_drum(self, now_ms: int, live: Optional[_StampedView] = None) -> dict:
+    def project_drum(self, now_ms: int, live: Optional[_StampedView] = None, grants: Optional[dict] = None) -> dict:
         """The whole ``/api/drum`` answer: a day of 10 s buckets, as indices from ``start_ms`` (the first of 96 rows of
         15 minutes; the last row holds now).  Sparse: ``observed`` as [from, to) index ranges, each station's beacon
         buckets, and its arrivals as [bucket, stream index, count].  Closed words, host-named stations, manifest-bounded
@@ -297,17 +409,29 @@ class Flow:
                 ranges[-1][1] = i + 1
             else:
                 ranges.append([i, i + 1])
-        streams = sorted({s for name in self.allowed for per in self.drum_arrivals[name].values() for s in per})
+        shown = [(name, g) for name in self.allowed if (g := _shown(grants, name)) is not None]
+        counted = [name for name, g in shown if grant.at_least(g, "counts")]
+        streams = sorted({s for name in counted for per in self.drum_arrivals[name].values() for s in per})
         sid = {s: n for n, s in enumerate(streams)}
         stations = []
-        for name in self.allowed:
+        for name, g in shown:
             arrivals = [[i, sid[s], n] for b, per in sorted(self.drum_arrivals[name].items())
-                        if (i := index(b)) is not None for s, n in sorted(per.items())]
-            beacons = sorted(i for i in map(index, self.drum_beacons[name]) if i is not None)
+                        if (i := index(b)) is not None for s, n in sorted(per.items())] if name in counted else []
+            beacons = sorted(i for i in map(index, self.drum_beacons[name]) if i is not None) \
+                if grant.at_least(g, "beacon") else []
             stations.append({"name": name, "beacons": beacons, "arrivals": arrivals})
         return {"now_ms": now_ms, "since_ms": self.started_at, "synthetic": False, "start_ms": start,
                 "bucket_ms": DRUM_BUCKET_MS, "row_ms": DRUM_ROW_MS, "rows": DRUM_ROWS, "observed": ranges,
                 "streams": streams, "stations": stations}
+
+
+_ALL = {"scope": "river", "withheld": False, "generation": (0, 0)}
+
+
+def _shown(grants: Optional[dict], name: str) -> Optional[dict]:
+    """The grant ``name`` is shown under: every host-named station shows in full without a display (``grants`` is
+    None); with one, only a verified grant shows it."""
+    return _ALL if grants is None else grants.get(name)
 
 
 def _closed(value, allowed: set, missing: str = "unknown") -> str:
@@ -401,8 +525,8 @@ class _Discard(io.TextIOBase):
 
 async def run_shape(socket_path: str, stations: Iterable[str], http_host: str, http_port: int,
                     stop: Optional[asyncio.Event] = None, ready=None, demo_fixture: bool = False,
-                    clock: Callable[[], int] = _now_ms) -> None:
-    view = ShapeView(stations, demo_fixture=demo_fixture, clock=clock)
+                    clock: Callable[[], int] = _now_ms, display: Optional[str] = None) -> None:
+    view = ShapeView(stations, demo_fixture=demo_fixture, clock=clock, display=display)
     http = TunerHttp(view, http_host, http_port, clock=clock, api_path="/api/shape", static=False,
                      routes={"/api/flow": view.flow_project, "/api/drum": view.drum_project})
     port = await http.start()
