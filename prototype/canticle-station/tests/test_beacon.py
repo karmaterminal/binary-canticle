@@ -48,9 +48,9 @@ def view(*records, complete=True):
 
 class CodecTest(unittest.TestCase):
     def test_round_trip(self):
-        raw = beacon.encode("blocked", "review", until=NOW + 60_000, refs=["binary-canticle#142", "#140"])
+        raw = beacon.encode("blocked", "review", until=NOW + 60_000, refs=["binary-canticle#142", "openclaw/openclaw#129388"])
         self.assertEqual(beacon.decode(raw), {"v": 1, "state": "blocked", "asking": "review", "origin": "reported",
-                                              "until": NOW + 60_000, "refs": ("binary-canticle#142", "#140")})
+                                              "until": NOW + 60_000, "refs": ("binary-canticle#142", "openclaw/openclaw#129388")})
         self.assertEqual(beacon.decode(beacon.encode("resting")),
                          {"v": 1, "state": "resting", "asking": "none", "origin": "reported", "until": None,
                           "refs": ()})
@@ -59,9 +59,10 @@ class CodecTest(unittest.TestCase):
         for kw in ({"state": "fine"}, {"state": "working", "asking": "everyone"}, {"state": ["working"]},
                    {"state": "working", "origin": "rumour"}, {"state": "working", "until": 0},
                    {"state": "working", "until": True}, {"state": "working", "until": 1.5},
-                   {"state": "working", "refs": ["#1", "#2", "#3", "#4", "#5"]},
-                   {"state": "working", "refs": ["see my notes"]}, {"state": "working", "refs": ["#0"]},
-                   {"state": "working", "refs": ["#7", "#7"]}):
+                   {"state": "working", "refs": ["r#1", "r#2", "r#3", "r#4", "r#5"]},
+                   {"state": "working", "refs": ["see my notes"]}, {"state": "working", "refs": ["r#0"]},
+                   {"state": "working", "refs": ["r#7", "r#7"]}, {"state": "working", "refs": ["#7"]},
+                   {"state": "working", "refs": ["a/b/c#1"]}, {"state": "working", "refs": ["Openclaw/x#1"]}):
             with self.subTest(kw=kw), self.assertRaises(beacon.BeaconError):
                 beacon.encode(**kw)
 
@@ -80,8 +81,12 @@ class CodecTest(unittest.TestCase):
             cbor.encode({**good, "asking": {"x": 1}}),
             cbor.encode({**good, "until": -5}),
             cbor.encode({**good, "until": 2 ** 53}),
-            cbor.encode({**good, "refs": "#1"}),
+            cbor.encode({**good, "refs": "r#1"}),
             cbor.encode({**good, "refs": [1]}),
+            cbor.encode({**good, "refs": ["#1"]}),
+            cbor.encode({**good, "until": None}),                 # present but null is not "absent" (🪨 on #143)
+            cbor.encode({**good, "refs": None}),
+            cbor.encode({**good, "refs": []}),                    # encode never writes an empty list
         ]
         for raw in bad:
             with self.subTest(raw=raw), self.assertRaises(beacon.BeaconError):
@@ -90,10 +95,10 @@ class CodecTest(unittest.TestCase):
 
 class ReadTest(unittest.TestCase):
     def test_a_station_shows_its_own_beacon(self):
-        got = beacon.read(view(beacon_frame("c1", 4, asking="review", refs=["#142"])), ["cael", "rune"], NOW)
+        got = beacon.read(view(beacon_frame("c1", 4, asking="review", refs=["binary-canticle#142"])), ["cael", "rune"], NOW)
         self.assertEqual(set(got), {"cael"})
         self.assertEqual({k: got["cael"][k] for k in ("state", "asking", "refs", "generation")},
-                         {"state": "working", "asking": "review", "refs": ("#142",), "generation": (1, 4)})
+                         {"state": "working", "asking": "review", "refs": ("binary-canticle#142",), "generation": (1, 4)})
 
     def test_no_beacon_is_unknown_not_fine(self):
         self.assertEqual(beacon.read(view(), ["cael"], NOW), {})
@@ -143,13 +148,13 @@ class BeaconCliTest(unittest.TestCase):
         return argparse.Namespace(**{**base, **kw})
 
     def test_a_beacon_is_one_keyed_live_state_sing(self):
-        (req,) = beacon_requests(self.args(state="blocked", asking="review", until="+30m", ref=["#142"]), now_ms=NOW)
+        (req,) = beacon_requests(self.args(state="blocked", asking="review", until="+30m", ref=["openclaw/openclaw#129388"]), now_ms=NOW)
         self.assertEqual({k: req[k] for k in ("op", "stream", "class", "state_key", "ctype", "ttl", "keep_on_air")},
                          {"op": "sing", "stream": "beacon", "class": "live-state", "state_key": "beacon",
                           "ctype": 2, "ttl": 300, "keep_on_air": 43_200})
         self.assertEqual(beacon.decode(bytes.fromhex(req["body_hex"])),
                          {"v": 1, "state": "blocked", "asking": "review", "origin": "reported",
-                          "until": NOW + 1_800_000, "refs": ("#142",)})
+                          "until": NOW + 1_800_000, "refs": ("openclaw/openclaw#129388",)})
 
     def test_the_cli_cannot_sing_an_inference(self):
         (req,) = beacon_requests(self.args(state="working"), now_ms=NOW)
@@ -173,7 +178,9 @@ class BeaconCliTest(unittest.TestCase):
                            ({"state": "working", "hours": 25}, None), ({"pluck": True, "state": "working"}, {}),
                            ({"pluck": True}, {"streams": {}}), ({"state": "working", "until": "tomorrow"}, None),
                            ({"state": "working", "until": "2020-01-01T00:00Z"}, None),
-                           ({"state": "working", "ref": ["not a ref"]}, None)):
+                           ({"state": "working", "ref": ["not a ref"]}, None),
+                           ({"state": "working", "until": "+13h"}, None),            # past the default 12 h on air
+                           ({"state": "working", "until": "+2h", "hours": 1}, None)):
             with self.subTest(kw=kw), self.assertRaises(ValueError):
                 beacon_requests(self.args(**kw), status, now_ms=NOW)
 
@@ -202,7 +209,7 @@ class BeaconDaemonTest(SnapshotCase):
             now = runner.now_ms()
             self.beacon(d, st, now)
             now += 120_000   # past the live-state warm-up (one beacon, then a loop period)
-            res = st.sing(now, "beacon", body=beacon.encode("blocked", "human", refs=["#142"]), ctype=beacon.CTYPE,
+            res = st.sing(now, "beacon", body=beacon.encode("blocked", "human", refs=["binary-canticle#142"]), ctype=beacon.CTYPE,
                           cls=beacon.CLASS, state_key=beacon.STATE_KEY, ttl_s=300)
             self.feed(d, st.poll(now), now)
             sung = await read_now(d, now)
@@ -214,7 +221,7 @@ class BeaconDaemonTest(SnapshotCase):
         (sung, plucked), _ = self.run_with(scenario)
         self.assertEqual(set(sung), {"cael"})
         self.assertEqual((sung["cael"]["state"], sung["cael"]["asking"], sung["cael"]["refs"]),
-                         ("blocked", "human", ("#142",)))
+                         ("blocked", "human", ("binary-canticle#142",)))
         self.assertEqual(plucked, {}, "a pluck makes the station unknown")
 
 

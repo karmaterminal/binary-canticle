@@ -313,6 +313,8 @@ def beacon_requests(a, status: Optional[dict] = None, now_ms: Optional[int] = No
     until = parse_until(a.until, now) if a.until else None
     if until is not None and until <= now:
         raise ValueError("--until is not in the future")
+    if until is not None and until > now + int(a.hours * 3_600_000):
+        raise ValueError("--until is later than --hours keeps the beacon on air: it could not be true when it says")
     body = b.encode(a.state, a.asking or "none", until, a.ref or ())
     return [{"op": "sing", "stream": b.STREAM, "class": b.CLASS, "state_key": b.STATE_KEY, "body_hex": body.hex(),
              "ctype": b.CTYPE, "ttl": a.ttl, "keep_on_air": int(a.hours * 3600), "loop": "normal", "scope": "lan"}]
@@ -869,7 +871,8 @@ def main(argv=None) -> int:
     bc.add_argument("--asking", choices=["none", "review", "peer", "human"],
                     help="whether it wants something, and from whom (default none)")
     bc.add_argument("--until", help="when the state should change: +30m, +2h, or a UTC time like 2026-11-10T07:07Z")
-    bc.add_argument("--ref", action="append", help="a pointer like binary-canticle#142 or #142 (repeatable, at most 4)")
+    bc.add_argument("--ref", action="append", help="a pointer: owner/repo#n, or repo#n for a karmaterminal repo "
+                    "(repeatable, at most 4)")
     bc.add_argument("--ttl", type=float, default=300, help="the lease in seconds (at most 900, the class maximum)")
     bc.add_argument("--hours", type=float, default=12, help="keep it on air by refresh this long (at most 24)")
     bc.add_argument("--pluck", action="store_true", help="withdraw the beacon now")

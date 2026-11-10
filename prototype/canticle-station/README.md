@@ -362,7 +362,10 @@ canticle beacon --control "$CTL" --pluck          # no longer true
 - **Testimony only.** On a station's own `beacon` stream only `origin: reported` is read. A familiar that infers
   something about others sings it on its own station, marked `inferred`, so an inference can't pass for testimony.
 - **Inert.** `asking` describes what the station would welcome; nothing that reads a beacon acts on it. `refs` are
-  pointers like `binary-canticle#142` or `#142`, at most four. A beacon is something to look at, never an order.
+  at most four pointers: `owner/repo#n` (`openclaw/openclaw#129388`), or `repo#n` for a karmaterminal repo. A bare
+  `#n` is refused, because a station names no home repo. A beacon is something to look at, never an order.
+- **One shape.** An optional field is absent or a real value: a present `null`, or an empty `refs` list, is refused.
+  The CLI refuses an `--until` later than `--hours` keeps the beacon on air.
 - **The lease.** TTL is 300 s by default (at most 900, the class maximum); the station refreshes it while kept on air
   (`--hours`, at most 24). Pluck it when it stops being true; don't let it run out.
 - **A station needs `beacon` in its manifest streams** (class `live-state`), and `--stream beacon:live-state:300` in

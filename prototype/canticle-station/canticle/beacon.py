@@ -10,7 +10,9 @@ Its body is a versioned CBOR map of enumerated fields, never prose:
   own ``beacon`` stream only ``reported`` is read: an inference cannot pass for testimony (🩸 on #142);
 - ``until`` (optional): epoch milliseconds after which the beacon no longer stands. It is enforced: past it, a reader
   shows the station as unknown even while the item is still on air (🌫 on #142);
-- ``refs`` (optional): at most four pointers like ``binary-canticle#142`` or ``#142``, never text.
+- ``refs`` (optional): at most four pointers, never text: ``owner/repo#n`` (``openclaw/openclaw#129388``), or
+  ``repo#n``, which means ``karmaterminal/repo#n``. A bare ``#n`` is refused: a station names no home repo, so it
+  would point nowhere in particular (🌿 on #143). Lowercase only, one canonical spelling per pointer.
 
 Who sang a beacon comes only from the verified record's station, never from a field in the body. ``asking`` is
 descriptive: it says what the station would welcome, and nothing that reads a beacon acts on it. ``refs`` are inert
@@ -41,7 +43,7 @@ STATES = ("working", "resting", "blocked", "away")
 ASKING = ("none", "review", "peer", "human")
 ORIGINS = ("reported", "inferred")
 MAX_REFS = 4
-REF_RE = re.compile(r"^(?:[a-z0-9][a-z0-9._-]{0,39})?#[1-9][0-9]{0,6}$")
+REF_RE = re.compile(r"^(?:[a-z0-9-]{1,39}/)?[a-z0-9][a-z0-9._-]{0,99}#[1-9][0-9]{0,6}$")
 MAX_UNTIL_MS = 2 ** 53          # the largest integer a JSON reader keeps exactly
 FIELDS = frozenset({"v", "state", "asking", "origin", "until", "refs"})
 
@@ -102,6 +104,12 @@ def decode(raw: bytes) -> dict:
     for required in ("state", "asking", "origin"):
         if required not in body:
             raise BeaconError(f"{required} is missing")
+    # An optional field is either absent or a real value: a present null, or an empty refs list that encode never
+    # writes, is not another way to say "absent" (🪨 on #143). One shape per beacon.
+    if "until" in body and body["until"] is None:
+        raise BeaconError("until is present but null")
+    if "refs" in body and (body["refs"] is None or body["refs"] == []):
+        raise BeaconError("refs is present but empty")
     return {"v": VERSION, "state": _enum("state", body["state"], STATES),
             "asking": _enum("asking", body["asking"], ASKING), "origin": _enum("origin", body["origin"], ORIGINS),
             "until": _until(body.get("until")), "refs": _refs(body.get("refs"))}
