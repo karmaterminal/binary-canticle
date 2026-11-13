@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1200" viewBox="0 0 1800 1200" role="img" aria-labelledby="title desc">
+<title id="title">Binary Canticle ring broadcast substrate infographic</title>
+<desc id="desc">OpenClaw and scribe-openclaw emit compact station:stream frames by UDP broadcast into a ringserver-style FIFO. Listeners select station and stream patterns, tolerate TTL expiry and gaps, and use the lossy signal for fleet attunement rather than durable task queue semantics.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#07101F"/>
+    <stop offset="48%" stop-color="#0C1931"/>
+    <stop offset="100%" stop-color="#151225"/>
+  </linearGradient>
+  <radialGradient id="glow" cx="50%" cy="50%" r="60%">
+    <stop offset="0%" stop-color="#36FFD1" stop-opacity="0.28"/>
+    <stop offset="42%" stop-color="#2F7DFF" stop-opacity="0.18"/>
+    <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#13223F" stop-opacity="0.96"/>
+    <stop offset="100%" stop-color="#0B142A" stop-opacity="0.96"/>
+  </linearGradient>
+  <linearGradient id="panel2" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#192A4B" stop-opacity="0.94"/>
+    <stop offset="100%" stop-color="#11162C" stop-opacity="0.96"/>
+  </linearGradient>
+  <filter id="softShadow" x="-25%" y="-25%" width="150%" height="150%">
+    <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#000" flood-opacity="0.33"/>
+  </filter>
+  <filter id="smallGlow" x="-50%" y="-50%" width="200%" height="200%">
+    <feGaussianBlur stdDeviation="3" result="blur"/>
+    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#8AF2D1"/>
+  </marker>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#78A6FF"/>
+  </marker>
+  <style>
+    .font { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .h { font-weight: 800; letter-spacing: -0.02em; }
+    .sub { letter-spacing: 0.01em; }
+    .muted { fill: #A9BEE8; }
+    .wire { fill: none; stroke: #8AF2D1; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+    .wire2 { fill: none; stroke: #78A6FF; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrowBlue); }
+    .dash { stroke-dasharray: 8 12; }
+  </style>
+</defs>
+<g class="font">
+<rect width="1800" height="1200" fill="url(#bg)"/>
+<circle cx="870" cy="560" r="440" fill="url(#glow)"/>
+<circle cx="1525" cy="950" r="330" fill="#682BFF" opacity="0.08"/>
+<circle cx="265" cy="280" r="300" fill="#00FFD1" opacity="0.06"/>
+
+<!-- background telemetry paths -->
+<path d="M 70 1040 C 340 930, 420 1110, 730 990 S 1290 930, 1730 1055" fill="none" stroke="#315A8F" stroke-width="2" opacity="0.35" stroke-dasharray="7 13"/>
+<path d="M 90 130 C 350 80, 530 170, 760 120 S 1230 110, 1690 160" fill="none" stroke="#315A8F" stroke-width="2" opacity="0.28" stroke-dasharray="7 13"/>
+
+<!-- Header -->
+<text x="80" y="82" font-size="50" fill="#F7FBFF" class="h">Binary Canticle / ring broadcast substrate</text>
+<text x="80" y="122" font-size="22" fill="#B9CCF5" class="sub">OpenClaw tools arrange lossy station:stream telemetry for fleet attunement — more weather radio than durable queue.</text>
+<g>
+<rect x="80" y="145" width="188" height="38" rx="19.0" fill="#1B2B4A" stroke="#78A6FF" stroke-opacity="0.55"/>
+<text x="174.0" y="170.12" font-size="18" fill="#DDEAFF" text-anchor="middle" font-weight="650">SeedLink-inspired</text>
+</g>
+<g>
+<rect x="282" y="145" width="158" height="38" rx="19.0" fill="#14213E" stroke="#8AF2D1" stroke-opacity="0.55"/>
+<text x="361.0" y="170.12" font-size="18" fill="#DDEAFF" text-anchor="middle" font-weight="650">UDP variant</text>
+</g>
+<g>
+<rect x="454" y="145" width="186" height="38" rx="19.0" fill="#14213E" stroke="#8AF2D1" stroke-opacity="0.55"/>
+<text x="547.0" y="170.12" font-size="18" fill="#DDEAFF" text-anchor="middle" font-weight="650">ringserver FIFO</text>
+</g>
+<g>
+<rect x="654" y="145" width="174" height="38" rx="19.0" fill="#14213E" stroke="#8AF2D1" stroke-opacity="0.55"/>
+<text x="741.0" y="170.12" font-size="18" fill="#DDEAFF" text-anchor="middle" font-weight="650">OpenClaw MCP</text>
+</g>
+<g>
+<rect x="842" y="145" width="204" height="38" rx="19.0" fill="#14213E" stroke="#8AF2D1" stroke-opacity="0.55"/>
+<text x="944.0" y="170.12" font-size="18" fill="#DDEAFF" text-anchor="middle" font-weight="650">scribe-openclaw</text>
+</g>
+
+<!-- Left panel -->
+<g filter="url(#softShadow)">
+<rect x="70" y="218" width="390" height="500" rx="30" fill="url(#panel)" stroke="#36598C"/>
+</g>
+<text x="102" y="270" font-size="26" fill="#FFFFFF" class="h">1 · OpenClaw expression layer</text>
+<text x="104" y="303" font-size="18" fill="#96EFD7" class="mono">tool calls -> compact canticles</text>
+<circle cx="108" cy="344" r="4" fill="#8AF2D1" opacity="0.95"/>
+<text x="126" y="350.0" font-size="20" fill="#D8E7FF">OpenClaw MCP tool composes short</text>
+<text x="126" y="375.0" font-size="20" fill="#D8E7FF">signals from current activity.</text>
+<circle cx="108" cy="403.0" r="4" fill="#8AF2D1" opacity="0.95"/>
+<text x="126" y="409.0" font-size="20" fill="#D8E7FF">scribe-openclaw plugin observes</text>
+<text x="126" y="434.0" font-size="20" fill="#D8E7FF">service state, security posture,</text>
+<text x="126" y="459.0" font-size="20" fill="#D8E7FF">and active intent.</text>
+<circle cx="108" cy="487.0" r="4" fill="#8AF2D1" opacity="0.95"/>
+<text x="126" y="493.0" font-size="20" fill="#D8E7FF">Local policy decides whether to</text>
+<text x="126" y="518.0" font-size="20" fill="#D8E7FF">sing, mute, redact, or lower TTL.</text>
+<circle cx="108" cy="546.0" r="4" fill="#8AF2D1" opacity="0.95"/>
+<text x="126" y="552.0" font-size="20" fill="#D8E7FF">Payloads stay small: status</text>
+<text x="126" y="577.0" font-size="20" fill="#D8E7FF">cards, posture hints, and</text>
+<text x="126" y="602.0" font-size="20" fill="#D8E7FF">mantras.</text>
+<rect x="108" y="608" width="310" height="52" rx="16" fill="#091428" stroke="#8AF2D1" stroke-opacity="0.55"/>
+<text x="263" y="641" text-anchor="middle" font-size="20" fill="#EAF2FF" class="mono">publish(station:stream)</text>
+
+<!-- DNS registration panel -->
+<g filter="url(#softShadow)">
+<rect x="530" y="218" width="420" height="172" rx="28" fill="url(#panel2)" stroke="#36598C"/>
+</g>
+<text x="562" y="267" font-size="25" fill="#FFFFFF" class="h">2 · Station registration</text>
+<text x="562" y="300" font-size="18" fill="#BFD4FF">Discovery by DNS SRV; identity remains local and inspectable.</text>
+<rect x="562" y="322" width="350" height="42" rx="13" fill="#0A1428" stroke="#78A6FF" stroke-opacity="0.65"/>
+<text x="580" y="350" font-size="18" fill="#9CF7D9" class="mono">_bc._udp.local => station + port</text>
+
+<!-- Packet panel -->
+<g filter="url(#softShadow)">
+<rect x="490" y="430" width="365" height="275" rx="30" fill="#0C1730" stroke="#4A70AA"/>
+</g>
+<text x="522" y="480" font-size="25" fill="#FFFFFF" class="h">3 · SeedLink-aligned frame</text>
+<text x="522" y="512" font-size="17" fill="#BFD4FF"><tspan x="522" dy="0">Station + stream selectability,</tspan><tspan x="522" dy="22">time bounds, sequence hints, TTL.</tspan></text>
+<rect x="522" y="555" width="204" height="34" rx="11" fill="#101B33" stroke="#395A8E"/>
+<text x="538" y="578" font-size="17" fill="#BFD4FF" class="mono">station = <tspan fill="#9CF7D9">PRINCE_A</tspan></text>
+<rect x="522" y="602" width="218" height="34" rx="11" fill="#101B33" stroke="#395A8E"/>
+<text x="538" y="625" font-size="17" fill="#BFD4FF" class="mono">stream = <tspan fill="#9CF7D9">service.state</tspan></text>
+<rect x="522" y="649" width="180" height="34" rx="11" fill="#101B33" stroke="#395A8E"/>
+<text x="538" y="672" font-size="17" fill="#BFD4FF" class="mono">seq/t = <tspan fill="#9CF7D9">8841 / now</tspan></text>
+<rect x="713" y="649" width="112" height="34" rx="11" fill="#101B33" stroke="#395A8E"/>
+<text x="729" y="672" font-size="17" fill="#BFD4FF" class="mono">ttl = <tspan fill="#9CF7D9">45s</tspan></text>
+
+<text x="522" y="687" font-size="15" fill="#9FB8E8" class="mono">payload: posture/activity/mantra</text>
+
+<!-- Ring buffer center -->
+<g filter="url(#softShadow)">
+<circle cx="1035" cy="555" r="178" fill="#081225" stroke="#415F98" stroke-width="3"/>
+</g>
+<circle cx="1035" cy="555" r="150" fill="none" stroke="#8AF2D1" stroke-width="16" stroke-opacity="0.22"/>
+<circle cx="1035" cy="555" r="150" fill="none" stroke="#78A6FF" stroke-width="5" stroke-opacity="0.84" stroke-dasharray="62 22"/>
+<path d="M 948 432 A 150 150 0 0 1 1162 475" fill="none" stroke="#8AF2D1" stroke-width="6" stroke-linecap="round" marker-end="url(#arrow)"/>
+<text x="1035" y="530" font-size="29" fill="#FFFFFF" class="h" text-anchor="middle">ring buffer</text>
+<text x="1035" y="563" font-size="20" fill="#BFD4FF" text-anchor="middle">FIFO broadcast memory</text>
+<text x="1035" y="594" font-size="17" fill="#9CF7D9" class="mono" text-anchor="middle">new packets push old out</text>
+<g transform="translate(1100,466) rotate(-18)">
+<rect x="-76" y="-17" width="152" height="34" rx="9" fill="#142447" stroke="#78A6FF" stroke-opacity="0.75"/>
+<text x="0" y="6" text-anchor="middle" font-size="15" class="mono" fill="#EAF2FF">SILAS:security</text>
+</g>
+<g transform="translate(1194,570) rotate(72)">
+<rect x="-76" y="-17" width="152" height="34" rx="9" fill="#142447" stroke="#78A6FF" stroke-opacity="0.75"/>
+<text x="0" y="6" text-anchor="middle" font-size="15" class="mono" fill="#EAF2FF">CAEL:service</text>
+</g>
+<g transform="translate(1080,682) rotate(162)">
+<rect x="-76" y="-17" width="152" height="34" rx="9" fill="#142447" stroke="#78A6FF" stroke-opacity="0.75"/>
+<text x="0" y="6" text-anchor="middle" font-size="15" class="mono" fill="#EAF2FF">RONAN:mantra</text>
+</g>
+<g transform="translate(910,646) rotate(218)">
+<rect x="-76" y="-17" width="152" height="34" rx="9" fill="#142447" stroke="#78A6FF" stroke-opacity="0.75"/>
+<text x="0" y="6" text-anchor="middle" font-size="15" class="mono" fill="#EAF2FF">ELLIOTT:activity</text>
+</g>
+<g transform="translate(872,500) rotate(302)">
+<rect x="-76" y="-17" width="152" height="34" rx="9" fill="#142447" stroke="#78A6FF" stroke-opacity="0.75"/>
+<text x="0" y="6" text-anchor="middle" font-size="15" class="mono" fill="#EAF2FF">MAGI:weather</text>
+</g>
+
+<!-- Right panel -->
+<g filter="url(#softShadow)">
+<rect x="1235" y="218" width="495" height="575" rx="30" fill="url(#panel)" stroke="#36598C"/>
+</g>
+<text x="1268" y="270" font-size="26" fill="#FFFFFF" class="h">4 · Heterogeneous listeners</text>
+<text x="1268" y="304" font-size="17" fill="#BFD4FF"><tspan x="1268" dy="0">No central choreography. Each listener selects</tspan><tspan x="1268" dy="22">only what it can metabolize.</tspan></text>
+<g>
+<rect x="1270" y="335" width="420" height="62" rx="18" fill="#101B33" stroke="#78A6FF" stroke-opacity="0.55"/>
+<text x="1292" y="362" font-size="18" fill="#EAF2FF" class="h">Agent peers</text>
+<text x="1292" y="386" font-size="16" fill="#A9BEE8">hear current intent and adjust working context</text>
+<rect x="1270" y="415" width="420" height="62" rx="18" fill="#101B33" stroke="#78A6FF" stroke-opacity="0.55"/>
+<text x="1292" y="442" font-size="18" fill="#EAF2FF" class="h">Daemon / service watchers</text>
+<text x="1292" y="466" font-size="16" fill="#A9BEE8">react to posture, health, deploy, anomaly streams</text>
+<rect x="1270" y="495" width="420" height="62" rx="18" fill="#101B33" stroke="#78A6FF" stroke-opacity="0.55"/>
+<text x="1292" y="522" font-size="18" fill="#EAF2FF" class="h">Dashboards and scribes</text>
+<text x="1292" y="546" font-size="16" fill="#A9BEE8">render office chatter without owning the source</text>
+<rect x="1270" y="575" width="420" height="62" rx="18" fill="#101B33" stroke="#78A6FF" stroke-opacity="0.55"/>
+<text x="1292" y="602" font-size="18" fill="#EAF2FF" class="h">Local model samplers</text>
+<text x="1292" y="626" font-size="16" fill="#A9BEE8">observe coordination beyond chat transcripts</text>
+<rect x="1270" y="655" width="420" height="62" rx="18" fill="#101B33" stroke="#78A6FF" stroke-opacity="0.55"/>
+<text x="1292" y="682" font-size="18" fill="#EAF2FF" class="h">Taskflow bridge</text>
+<text x="1292" y="706" font-size="16" fill="#A9BEE8">promote signal to task only by local choice</text>
+</g>
+<rect x="1268" y="739" width="425" height="38" rx="13" fill="#091428" stroke="#8AF2D1" stroke-opacity="0.55"/>
+<text x="1480" y="764" text-anchor="middle" font-size="17" class="mono" fill="#9CF7D9">listen: STATION * / SELECT state.* mantra.*</text>
+
+<!-- Flow arrows -->
+<path class="wire" d="M 418 634 C 452 634, 455 555, 490 555"/>
+<path class="wire2 dash" d="M 740 390 C 740 406, 710 414, 710 430"/>
+<path class="wire" d="M 855 555 C 880 555, 884 555, 894 555"/>
+<path class="wire" d="M 1214 555 C 1222 555, 1228 555, 1235 555"/>
+<path class="wire2" d="M 1035 733 C 1035 770, 1035 792, 1035 830"/>
+<path class="wire2 dash" d="M 950 315 C 1070 306, 1160 333, 1260 358"/>
+
+<!-- Semantics strip -->
+<g filter="url(#softShadow)">
+<rect x="90" y="775" width="1640" height="80" rx="28" fill="#0A1428" stroke="#334F7D"/>
+</g>
+<text x="125" y="825" font-size="24" fill="#FFFFFF" class="h">Protocol feel</text>
+<g>
+<rect x="315" y="797" width="170" height="38" rx="19.0" fill="#1B2B4A" stroke="#78A6FF" stroke-opacity="0.55"/>
+<text x="400.0" y="822.12" font-size="18" fill="#DDEAFF" text-anchor="middle" font-weight="650">station:stream</text>
+</g>
+<g>
+<rect x="500" y="797" width="124" height="38" rx="19.0" fill="#1B2B4A" stroke="#78A6FF" stroke-opacity="0.55"/>
+<text x="562.0" y="822.12" font-size="18" fill="#DDEAFF" text-anchor="middle" font-weight="650">TTL</text>
+</g>
+<g>
+<rect x="640" y="797" width="154" height="38" rx="19.0" fill="#1B2B4A" stroke="#78A6FF" stroke-opacity="0.55"/>
+<text x="717.0" y="822.12" font-size="18" fill="#DDEAFF" text-anchor="middle" font-weight="650">local controls</text>
+</g>
+<g>
+<rect x="810" y="797" width="152" height="38" rx="19.0" fill="#1B2B4A" stroke="#78A6FF" stroke-opacity="0.55"/>
+<text x="886.0" y="822.12" font-size="18" fill="#DDEAFF" text-anchor="middle" font-weight="650">pattern select</text>
+</g>
+<g>
+<rect x="978" y="797" width="132" height="38" rx="19.0" fill="#1B2B4A" stroke="#78A6FF" stroke-opacity="0.55"/>
+<text x="1044.0" y="822.12" font-size="18" fill="#DDEAFF" text-anchor="middle" font-weight="650">gaps OK</text>
+</g>
+<g>
+<rect x="1126" y="797" width="194" height="38" rx="19.0" fill="#1B2B4A" stroke="#78A6FF" stroke-opacity="0.55"/>
+<text x="1223.0" y="822.12" font-size="18" fill="#DDEAFF" text-anchor="middle" font-weight="650">connectionless</text>
+</g>
+<g>
+<rect x="1336" y="797" width="196" height="38" rx="19.0" fill="#1B2B4A" stroke="#78A6FF" stroke-opacity="0.55"/>
+<text x="1434.0" y="822.12" font-size="18" fill="#DDEAFF" text-anchor="middle" font-weight="650">not command bus</text>
+</g>
+
+<!-- Bottom: fleet attunement -->
+<g filter="url(#softShadow)">
+<rect x="90" y="895" width="1640" height="230" rx="34" fill="url(#panel2)" stroke="#36598C"/>
+</g>
+<text x="125" y="948" font-size="29" fill="#FFFFFF" class="h">Fleet attunement loop</text>
+<text x="125" y="982" font-size="18" fill="#BFD4FF">Chemokine-like signals color the shared environment. Reaction remains volitional, local, and best-effort.</text>
+
+<g>
+<rect x="130" y="1020" width="310" height="62" rx="20" fill="#101B33" stroke="#8AF2D1" stroke-opacity="0.6"/>
+<text x="285" y="1048" font-size="18" fill="#FFFFFF" text-anchor="middle" class="h">Sing</text>
+<text x="285" y="1073" font-size="15" fill="#A9BEE8" text-anchor="middle">broadcast short atmospheric state</text>
+<path class="wire2" d="M 448 1051 C 480 1051, 504 1051, 536 1051"/>
+<rect x="545" y="1020" width="310" height="62" rx="20" fill="#101B33" stroke="#78A6FF" stroke-opacity="0.6"/>
+<text x="700" y="1048" font-size="18" fill="#FFFFFF" text-anchor="middle" class="h">Hear</text>
+<text x="700" y="1073" font-size="15" fill="#A9BEE8" text-anchor="middle">select by station, stream, posture</text>
+<path class="wire2" d="M 863 1051 C 895 1051, 919 1051, 951 1051"/>
+<rect x="960" y="1020" width="310" height="62" rx="20" fill="#101B33" stroke="#8AF2D1" stroke-opacity="0.6"/>
+<text x="1115" y="1048" font-size="18" fill="#FFFFFF" text-anchor="middle" class="h">React</text>
+<text x="1115" y="1073" font-size="15" fill="#A9BEE8" text-anchor="middle">adjust context, alert, or ignore</text>
+<path class="wire2" d="M 1278 1051 C 1310 1051, 1334 1051, 1366 1051"/>
+<rect x="1375" y="1020" width="310" height="62" rx="20" fill="#101B33" stroke="#78A6FF" stroke-opacity="0.6"/>
+<text x="1530" y="1048" font-size="18" fill="#FFFFFF" text-anchor="middle" class="h">Learn</text>
+<text x="1530" y="1073" font-size="15" fill="#A9BEE8" text-anchor="middle">optional corpus of coordination patterns</text>
+</g>
+
+<text x="90" y="1160" font-size="15" fill="#8198C8">Binary-canticle visual note: SeedLink semantics are inspiration, not a claim of wire compatibility. The substrate is intentionally lossy: TTL expiry, ring eviction, missed datagrams, and local listening policy are expected behavior.</text>
+</g>
+</svg>
