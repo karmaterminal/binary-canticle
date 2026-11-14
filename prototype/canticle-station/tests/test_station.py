@@ -65,6 +65,38 @@ class CarouselTest(unittest.TestCase):
         self.assertEqual(st.sing(T0, "chatter", text="x", ttl_s=10_000).ttl_s, 60.0)
         self.assertEqual(st.sing(T0, "chatter", text="x", ttl_s=5).ttl_s, 5.0)
 
+    def test_a_ttl_cut_is_named_in_the_sing_result(self):
+        st = station(StreamConfig("chatter"))  # chatter default 60 s
+        cut = st.sing(T0, "chatter", text="x", ttl_s=10_000)
+        self.assertEqual((cut.ttl_s, cut.clamp, cut.ttl_clamped_from), (60.0, "none", 10_000.0))
+        self.assertEqual(cut.to_json()["ttl_clamped_from"], 10_000.0)
+        for ttl in (5, 60, None):
+            r = st.sing(T0, "chatter", text="x", ttl_s=ttl)
+            self.assertIsNone(r.ttl_clamped_from)
+            self.assertNotIn("ttl_clamped_from", r.to_json())
+
+    def test_cli_stream_spec_sets_the_ttl_it_asks_for_within_the_class(self):
+        from canticle.__main__ import _stream_config
+        # A default above 300 s raises the stream max to it: live-state allows 900 s.
+        st = station(_stream_config("facts:live-state:900"))
+        self.assertEqual((st.streams["facts"].cfg.default_ttl_s, st.streams["facts"].cfg.max_ttl_s), (900, 900))
+        r = st.sing(T0, "facts", text="x", state_key="k", ttl_s=900)
+        self.assertEqual((r.ttl_s, r.ttl_clamped_from), (900.0, None))
+        self.assertEqual(st.ttl_notes, [])
+        # An explicit max below the default wins, and the cut is reported for the startup log.
+        st = station(_stream_config("facts:live-state:900:600"))
+        self.assertEqual(st.streams["facts"].cfg.default_ttl_s, 600)
+        self.assertEqual(len(st.ttl_notes), 1)
+        self.assertIn("default TTL 900 s cut to 600 s", st.ttl_notes[0])
+        # The class max still caps a default: chatter allows 300 s, so 900 is cut and named.
+        st = station(_stream_config("chatter:chatter:900"))
+        self.assertEqual(st.streams["chatter"].cfg.default_ttl_s, 300)
+        self.assertIn("class chatter max 300 s", st.ttl_notes[0])
+        # No default: unchanged (class default, stream max 300), nothing to report.
+        st = station(_stream_config("facts:live-state"))
+        self.assertEqual((st.streams["facts"].cfg.default_ttl_s, st.streams["facts"].cfg.max_ttl_s), (180, 300))
+        self.assertEqual(st.ttl_notes, [])
+
     def test_supersede_stops_the_old_loop(self):
         st = station()
         a = st.sing(T0, "lens.threat", text="threat: low", state_key="now")

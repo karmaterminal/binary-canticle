@@ -28,7 +28,18 @@ answers `{"op":"public_catalog"}` with its manifest station name, key-id, public
 only that explicit `public_streams` list. A revoked grant is refused. This operation is read-only
 and returns no live status or private stream names. It is the **station** control socket, not the
 host receptor-record daemon socket; the latter has no single local station identity. DNS remains
-a locator and cross-check hint, never an identity or trust source. This spike does not publish DNS records, and its manifest remains unsigned.
+a locator and cross-check hint, never an identity or trust source. This spike does not publish
+DNS records, and its manifest remains unsigned.
+| §6.7 Findings (FP-1, #112) | `canticle/finding.py`: the finding body (content type 11) and its strict reader. `canticle sing --finding` and `--body-ref`, and the control socket's `finding` and `body_ref` fields, put a keyed `advisory` finding and a `finding-ref` doorbell on air. `canticle tap` shows a finding field by field, with a host-authored line that attributes it to its signer. See [Findings](#findings-fp-1-112). |
+| §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
+| Shape-only live view (#133) | `canticle shape`: per named station, presence and beacon age; per stream, live count and newest age. Never content; no station without its owner's yes. |
+| Display grants (#137) | `canticle grant` sings a station's own yes to a display, scoped `presence` → `beacon` → `counts` → `river`; `canticle shape --display` shows only granted stations at their granted scope, and purges on revoke or narrowing. |
+| Typed beacons (#142) | `canticle beacon` sings a station's own beacon on its `beacon` stream: a versioned CBOR map of enumerated `state`/`asking`, optional `until` and up to four `refs`, never prose. `canticle.beacon.read` gives the typed shape; a missing, expired or unreadable beacon is unknown, never fine. |
+| §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only synthetic-only human dashboard over one listener. Live station identity, streams, activity and payloads are never published to humans. |
+| §14.18.3 Record v1 (BC-2, #77) | `canticle/records.py`: the listener's outcomes as receptor record v1 (`hello`, `landing_state`, `frame`, `retract`, `presence`, `health`, `fatal`, `bye`) under the disposition mapping, with fixed health counters and a bounded table of unverified key ids (D34). See [Record v1 and the host daemon](#record-v1-and-the-host-daemon-bc-2-d35-77). |
+| §11.1, §14.18.2 Host daemon (D35, #77) | `canticle daemon`: the host's one UDP listener, carrying record v1 to every binding over a unix `SOCK_STREAM` socket with peer-credential checks, a two-record bootstrap per connection and per-connection isolation. |
+| §14.18.3 Join snapshot (BC-1b, D36, #84) | `canticle daemon` serves the opt-in join snapshot: an atomic cut at watermark *W*, presence and deliverable frames as `snapshot` records (`snap_seq` 1..n, `rec_seq` *W*), `snapshot_end`, the `min(511, free − 513)` and 1 MiB bound, and the deferred cut of #86 (wait until the live state fits, 2 s bound). See [Join snapshot](#join-snapshot-bc-1b-d36-84). |
+
 ### Read-only DNS-SD browse slice (§13)
 
 `canticle dns-browse --domain example.org --manifest fleet.json` queries one explicit **unicast**
@@ -46,13 +57,6 @@ browse, multi-zone routing and daemon integration remain unimplemented. The host
 receptor-record socket has no local station identity, so the existing station-side
 `public_catalog` read operation is the safe local identity surface for future publication.
 The spike manifest is unsigned; operators must secure its local file themselves.
-
-| §6.7 Findings (FP-1, #112) | `canticle/finding.py`: the finding body (content type 11) and its strict reader. `canticle sing --finding` and `--body-ref`, and the control socket's `finding` and `body_ref` fields, put a keyed `advisory` finding and a `finding-ref` doorbell on air. `canticle tap` shows a finding field by field, with a host-authored line that attributes it to its signer. See [Findings](#findings-fp-1-112). |
-| §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
-| §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only gateway over one listener, and a read-only page to pick a station:stream and watch its live ring, with expiry and gaps shown honestly. |
-| §14.18.3 Record v1 (BC-2, #77) | `canticle/records.py`: the listener's outcomes as receptor record v1 (`hello`, `landing_state`, `frame`, `retract`, `presence`, `health`, `fatal`, `bye`) under the disposition mapping, with fixed health counters and a bounded table of unverified key ids (D34). See [Record v1 and the host daemon](#record-v1-and-the-host-daemon-bc-2-d35-77). |
-| §11.1, §14.18.2 Host daemon (D35, #77) | `canticle daemon`: the host's one UDP listener, carrying record v1 to every binding over a unix `SOCK_STREAM` socket with peer-credential checks, a two-record bootstrap per connection and per-connection isolation. |
-| §14.18.3 Join snapshot (BC-1b, D36, #84) | `canticle daemon` serves the opt-in join snapshot: an atomic cut at watermark *W*, presence and deliverable frames as `snapshot` records (`snap_seq` 1..n, `rec_seq` *W*), `snapshot_end`, the `min(511, free − 513)` and 1 MiB bound, and the deferred cut of #86 (wait until the live state fits, 2 s bound). See [Join snapshot](#join-snapshot-bc-1b-d36-84). |
 
 Not implemented here, and still open work (see RFC-0001 §23.3):
 - relay leases for internet listeners (§11.3)
@@ -240,32 +244,156 @@ canticle ambient --control ./room.sock --stream hymn --fixture proofs/web-lanes/
 - **Log.** Each tick writes one JSON line (`sing` with `seq`, `size`, `loop_ms` and the text; `breath`; `capped`; `refused`). The first and last lines record `model_calls: 0`.
 - **Sources.** Only a fixture file. A source derived from session logs would be a separate opt-in boundary (RFC §15.4, §15.8), and is not implemented.
 
-### Web tuner (#57, RFC §18.9)
+### Human-facing metadata dashboard (#57, RFC §18.9)
 
 ```sh
 canticle tuner --manifest fleet.json --multicast --http 127.0.0.1:8765
 # then open http://127.0.0.1:8765/
+# optional UI demonstration with invented data only:
+canticle tuner --manifest fleet.json --multicast --demo-fixture
 ```
 
-- **What it shows.** The gateway runs one listener, which hears and verifies every stream its manifest names. The page lists the stations whose beacons verified (key, epoch, presence, beacon age) and their streams (head, live count, loop). Tune a named stream to watch its live ring. Each item shows its text, `seq`, copies heard and a countdown to local expiry. Items that just left the air are listed for 60 s, labelled expired, withdrawn or superseded. Sequence numbers up to the head that this listener never heard are listed as gaps.
-- **What it is not.** Tuning is local to the gateway, and nothing is sent to a station. It is not a session tune: nothing lands anywhere. The gateway has no control socket and cannot sing or hush. A late page sees only what is on air now.
+- **What it shows.** The gateway runs one listener, but `/api/stations` returns an empty station list by default, regardless of verified traffic. `--demo-fixture` shows one explicitly synthetic station and stream, never derived from the manifest, beacons or listener state.
+- **What it does not show.** There is no live ring, item text, finding or summary, body digest, state key, sequence/history, tombstone, gap, journal or payload-bearing event in the server response or DOM. No `/api/ring`, `/api/tune`, `/api/leave`, `/api/journal`, `/api/sing` or `/api/hush` path exists. The gateway accepts GET only. A station's activity proves neither a human location nor that an agent session consumed anything.
+- **What it is not.** The dashboard is not the agent listener plane. It does not tune a station or a session, set subscriptions, send frames, sing or hush. Agent-only listener/daemon and exact session-read policy remain separately authorized capabilities under taint and untrusted-content framing.
 - **Trust boundary.**
   - It binds loopback only, and refuses any other address.
-  - It answers only requests whose `Host` is its own address, which blocks DNS rebinding, and refuses cross-origin POSTs and non-JSON bodies.
+  - It answers only requests whose `Host` is its own address, which blocks DNS rebinding.
   - It serves a strict CSP (`script-src 'self'`, no inline script), plus `nosniff`, `no-referrer` and `no-store`.
-  - Heard text is set with `textContent` only, never parsed as markup.
-  - Unverified datagrams are counted, never shown or attributed to a station.
-- **Budget.**
-  - Channels: at most 16 tuned at once; each lapses after 30 s without a poll.
-  - Polling: at most 4 ring polls a second per channel (the page polls every second).
-  - Responses: at most 64 items, with 512 characters of text each; up to 32 tombstones and 64 gap checks.
-  - Memory: per channel, the gateway keeps at most 128 heard `seq` values (the gap window, moving up with the head and reset at each epoch) and 32 tombstones. The listener's own per-key quotas bound the rest (RFC §7.4).
+  - Neither verified nor unverified datagram metadata is shown. A manifest entry is not broadcaster consent for human disclosure. A live view requires a separate broadcaster-controlled metadata opt-in design.
+  - The projection holds no listener reference, item text or payload-derived summary and has no tune/channel or tombstone state. The listener's own safety state and quotas remain separate.
 
-Unnamed streams (not in the manifest) are verified and listed, but can't be tuned (RFC §5.4). The beacons in this spike carry no `trail_seq`, so a gap can't be told apart from an item that is still looping.
+### Shape-only live view (#133)
+
+```sh
+canticle shape --station frond-gloss --station familiar --http 127.0.0.1:8766
+# GET http://127.0.0.1:8766/api/shape    now
+# GET http://127.0.0.1:8766/api/flow     the last hour (#135)
+# GET http://127.0.0.1:8766/api/drum     the last day, for a helicorder
+canticle shape --demo-fixture        # invented stations, marked synthetic
+```
+
+- **What it shows.** For each station named with `--station`: its presence state (the listener's closed words,
+  or `not_heard`) and beacon age. For each of its streams with something live: the live count and how long ago the
+  newest was heard. It also reports whether the daemon connection is up, and the daemon's and this connection's
+  health (`ok` / `degraded`). This is enough for a dashboard (the EWS concept, #12) to show that stations are on
+  air, that the carrier is fresh and that streams are moving.
+- **What it never shows.** No item text, purpose, body digest or reference, sequence, epoch, idem, state key,
+  lineage, key id or finding. The answer is built field by field from a closed list (`ShapeView.project`), not
+  filtered from a record, and any state word outside the closed sets reads `unknown`.
+- **Nothing old shown as current.** The daemon reports beacon ages in its `health` record, every 10 s. The gateway
+  notes when each record arrived, on its own clock, and adds the time since, so an age keeps counting between
+  records. A connection with no health for 30 s (three missed records), even one still open, is stale: the answer
+  reads disconnected (`connected: false`, every station `not_heard`), and the gateway drops it and joins again.
+- **Over time (`/api/flow`, #135).** The last 60 minutes, minute by minute:
+  - whether the gateway was observing: at least one health record arrived in that minute. That shows the gateway was
+    connected, not that it heard everything, so an observed zero is not proof of uninterrupted quiet;
+  - for each named station, whether its beacon was heard, its arrivals per stream, and its presence state at the
+    minute's last health record.
+
+  It also lists the last 50 arrivals, each only `{at_ms, station, stream}`. An arrival is a new emission heard
+  live:
+  - the daemon marks it `dedup: first`, so an item re-surfaced after a daemon restart doesn't count;
+  - this gateway hasn't counted it already. Identities are remembered in memory until the item expires, at most
+    4096 at once, and never served. Past that cap the oldest could be counted again;
+  - it hadn't expired before the gateway consumed it;
+  - it's placed at the daemon's `heard_at`.
+
+  The join snapshot never counts. The history is kept in memory, so it starts empty at each gateway start, and
+  `since_ms` says when that was.
+- **A day (`/api/drum`).** The same arrivals, beacons and observation, in 10-second buckets for 24 hours. It's laid
+  out for a seismograph-style helicorder: 96 rows of 15 minutes from `start_ms`, the last row holding now. It's
+  sparse:
+  - `observed` as `[from, to)` bucket ranges. Coverage is an interval, not the bucket a record lands in:
+    - two health records on the same connection at most 30 s apart cover the span between them;
+    - the span since the last record is served as observed while it's under 30 s old and its connection is still the
+      one `/api/shape` calls connected, and never stored. An EOF or a rejoin ends it at once, and the history up to
+      the last record stays;
+    - a longer silence, or a new connection, leaves its gap open;
+  - each station's beacon buckets, filled the same way between sightings;
+  - its arrivals as `[bucket, stream index, count]`, with stream names listed once in `streams`.
+- **Consent.** No station is shown by default. A manifest entry is not consent to human display. Without
+  `--display`, a host names a station only after that station's owner agrees on #133. With `--display`, the station
+  itself says yes: see *Display grants* below.
+- **What it is.** It's one more read-only client of the host daemon's socket, through `tap`: it binds no UDP port,
+  writes no state and sings nothing. It reconnects with backoff after a daemon restart. HTTP is the tuner's
+  (loopback only, Host check, GET only, the same headers), serving `/api/shape` and nothing else.
+
+
+### Display grants (#137)
+
+```sh
+# the gateway: --station is now only the host's ceiling
+canticle shape --display frond-house@silas --station frond-gloss --station frond-scribe
+# the prince, where the station's key lives: one choice, kept on air by the station
+canticle grant --control "$CTL" --display frond-house@silas --scope beacon
+canticle grant --control "$CTL" --display frond-house@silas --pluck     # no, now
+```
+
+- **The grant is a broadcast.** A keyed `live-state` item on the station's `display` stream, `state_key`
+  `grant:<display>`, body CBOR `{display, scope}` plus `withheld: true` when chosen. Only the holder of the station's
+  key can sing it. **A grant means only what that key means:** a key kept on a host the prince doesn't control lets
+  that host say yes for the prince.
+- **Scopes, smallest first, each including the ones before it:**
+  - `presence`: the row and its presence state;
+  - `beacon`: beacon age, and beacon history in `/api/flow` and `/api/drum`;
+  - `counts`: live counts and ages per stream, and arrivals per minute and per drum bucket;
+  - `river`: each arrival as `{at_ms, station, stream}`.
+
+  `withheld: true` goes only with `presence`. It's the prince's own disclosure that more is withheld, never
+  inferred from silence. Rows carry `withheld` when the gateway runs with `--display`.
+- **No grant, no trace.** Without a verified grant the station has no row in any answer. Its arrivals aren't
+  recorded and change no count, stream list or river. The grant stream's own items are never counted as telemetry.
+- **The lease.** The item's TTL is the lease, at most 900 s (the class maximum). The station refreshes it while it is
+  kept on air, for at most 24 h (the station's ceiling), so a standing grant is re-sung daily, for example by a user
+  timer on the prince's own seat. A display that can't hear the station loses the grant within the TTL.
+- **Revoking and narrowing.** A pluck revokes at once wherever it arrives. A narrower scope, a pluck or an expiry
+  purges the history held under what was removed, and a later grant doesn't bring it back. The newest grant wins by
+  (epoch, seq), and the listener's high-water mark stops an older one coming back.
+- **Fail closed.** Only a live connection verifies a grant. A stale or closed connection shows no station. A revoke
+  is proven when the station's own grant item is seen withdrawn or expired, or when a connection with a complete join
+  snapshot and no records lost shows no grant. Any other absence, after a gap for example, hides the station, keeps
+  its history and records nothing new. Because a pluck may have been lost, the next verified grant purges that history
+  before recording resumes. So does a grant verified after any records were lost since its last verification (even
+  when the regrant is the very record that reports the gap), and a grant first verified on a new connection. That
+  fails toward losing history, never toward showing it. Records lost on a connection put **every** granted station's
+  history at risk, so after any gap each one is purged at its next verification, by design (🌿 on #140). A grant
+  body the decoder refuses (a bad type, an unknown field) is no grant: a signature authenticates the sender, not the
+  body.
+- **What's already delivered can't be recalled.** A page should keep nothing beyond what it shows.
+
+### Typed beacons (#142)
+
+```sh
+canticle beacon --control "$CTL" --state blocked --asking review --until +2h --ref binary-canticle#142
+canticle beacon --control "$CTL" --state resting --until 2026-11-10T07:07Z
+canticle beacon --control "$CTL" --pluck          # no longer true
+```
+
+- **What a beacon is.** A keyed `live-state` item on the station's own `beacon` stream, `state_key` `beacon`, body
+  CBOR `{v: 1, state, asking, origin}` plus optional `until` and `refs`. `state` is `working`, `resting`, `blocked`
+  or `away`; `asking` is `none`, `review`, `peer` or `human`. A display can draw it as shape and a familiar can count
+  it, without anyone reading a station's words.
+- **Fail closed.** Exactly the known fields with known values, at `v: 1`, are read. An unknown field, version or
+  type means no beacon (a signature authenticates the sender, not the body). Who sang it comes only from the
+  verified record's station, never from the body.
+- **Unknown, never fine.** A station with no beacon, an expired one, one past its `until`, or one heard on a view
+  that can't vouch for it (mid-snapshot, carried across a gap) is **unknown**. `until` is enforced, not a hint.
+- **Testimony only.** On a station's own `beacon` stream only `origin: reported` is read. A familiar that infers
+  something about others sings it on its own station, marked `inferred`, so an inference can't pass for testimony.
+- **Inert.** `asking` describes what the station would welcome; nothing that reads a beacon acts on it. `refs` are
+  at most four pointers: `owner/repo#n` (`openclaw/openclaw#129388`), or `repo#n` for a karmaterminal repo. A bare
+  `#n` is refused, because a station names no home repo. A beacon is something to look at, never an order.
+- **One shape.** An optional field is absent or a real value: a present `null`, or an empty `refs` list, is refused.
+  The CLI refuses an `--until` later than `--hours` keeps the beacon on air.
+- **The lease.** TTL is 300 s by default (at most 900, the class maximum); the station refreshes it while kept on air
+  (`--hours`, at most 24). Pluck it when it stops being true; don't let it run out.
+- **A station needs `beacon` in its manifest streams** (class `live-state`), and `--stream beacon:live-state:300` in
+  its own args, before it can sing one.
 
 ### Same-host proof for #57 and #58
 
-[`proofs/web-lanes/`](proofs/web-lanes/) holds a bounded run as root (`run.sh`), its analysis (`analyze.py`) and the results. The station and emitters run in one network namespace; the listeners, tuner and headless Chromium run in another, joined by a veth pair over LAN multicast. That is **same-host** evidence, on one kernel and one clock. It is not a second host.
+[`proofs/web-lanes/`](proofs/web-lanes/) holds the bounded same-host web proof runner (`run.sh`) and analysis (`analyze.py`). The current assertions exercise the synthetic-only human view; older saved results are historical and do not prove this replacement. The station and emitters run in one network namespace; the listeners, tuner and headless Chromium run in another, joined by a veth pair over LAN multicast. That is **same-host** evidence, on one kernel and one clock. It is not a second host.
 
 ## Record v1 and the host daemon (BC-2, D35, #77)
 
@@ -361,7 +489,7 @@ key revoked or gone (`revoked`), key quarantined (`quarantined`), a sticky PLUCK
 supersession mark (`superseded`) or local expiry passed (`expired`). It is idempotent (#79 review).
 
 The listener change is opt-in: `Listener(receptor_mode=True)` reports the outcomes it was silent on and admits
-lower-epoch tuples as above. `canticle listen` and `canticle tuner` behave as before.
+lower-epoch tuples as above. `canticle listen` behaves as before; `canticle tuner` remains a separate synthetic-only human projection and does not expose live station metadata, listener payload records or agent-session reads.
 
 **Not emitted yet, or emitted differently** (each a known gap, not a silent one):
 
@@ -605,14 +733,12 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
     reading it back, and refusing two such tables as nft lists them (`NftTest`: it needs nft and root or
     unprivileged user namespaces, and skips without them);
   - the units, and the README's worked examples against the tested values.
-- `test_tuner.py` covers the tuner's view and gateway:
-  - verified stations with heads, and unnamed streams that can't be tuned;
-  - the live ring, then labelled expiry and withdrawal;
-  - a late view that sees only what is on air, with the missed `seq` as a gap;
-  - a lost burst repaired by the next loop copy;
-  - subscriptions (leave, retune, idle lapse, the cap);
-  - bounded memory on a long stream (600 items, at most 128 heard `seq` values kept, the one lost recent item still shown as the only gap), and a fresh window after an epoch change;
-  - the HTTP boundary: headers and CSP, tune, ring, leave and retune, the poll limit, `Host` and `Origin` checks, content type, methods, no write endpoints, loopback only.
+- `test_tuner.py` covers the human synthetic dashboard and privacy boundary:
+  - verified live traffic cannot enumerate a station, key, stream or activity through the view or HTTP;
+  - the optional fixture is explicitly synthetic and independent of listener state;
+  - distinctive item text absent from the view, JSON response, and static page;
+  - no `/api/ring`, `/api/tune`, `/api/leave`, journal or item path; mutations return 405;
+  - security headers/CSP, DNS rebinding, method and loopback-only boundaries.
 
 ## Vectors
 

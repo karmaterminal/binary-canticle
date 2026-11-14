@@ -3,33 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Canticle Tuner</title>
+<title>Canticle Human Dashboard</title>
 <link rel="stylesheet" href="/tuner.css">
 <script src="/tuner.js" defer></script>
 </head>
 <body>
 <header>
-  <h1>Canticle tuner</h1>
-  <p class="boundary">Read-only view of one local listener. Tuning here picks what this page shows: nothing is sent
-    to any station, and nothing lands in any session.</p>
+  <h1>Canticle dashboard</h1>
+  <p class="boundary">Human-facing synthetic-only demo. Live station identity, activity, streams and
+    machine-boy conversations are private and never sent to this page.</p>
 </header>
 <main>
   <section aria-labelledby="stations-h">
-    <h2 id="stations-h">Stations heard</h2>
-    <p id="stations-status" class="muted" role="status">Waiting for a verified beacon…</p>
+    <h2 id="stations-h">Demo station</h2>
+    <p id="stations-status" class="muted" role="status">Loading demo view…</p>
     <div id="stations" data-testid="stations"></div>
-    <p id="unverified" class="muted" data-testid="unverified"></p>
-  </section>
-  <section aria-labelledby="ring-h" id="ring-section">
-    <h2 id="ring-h">Tuned channel</h2>
-    <div id="tuned" data-testid="tuned">
-      <p class="muted">Not tuned. Pick a named stream on the left.</p>
-    </div>
   </section>
 </main>
 <footer>
-  <p class="muted">Items show until their local expiry (RFC-0001 §14.6.3). A late page sees only what is on air now;
-    this gateway keeps no history beyond a short, labelled list of items that just left the air.</p>
+  <p class="muted">Agent-only hearing remains separate and authorized by local session policy.
+    This page does not display observations from that listener.</p>
 </footer>
 </body>
 </html>
