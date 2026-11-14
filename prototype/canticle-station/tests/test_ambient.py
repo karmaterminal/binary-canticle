@@ -61,6 +61,17 @@ class AmbientScheduleTest(unittest.TestCase):
             self.assertEqual(set(req), {"op", "stream", "class", "text", "ttl"})
             self.assertEqual((req["op"], req["class"], req["ttl"]), ("sing", "ambient", 60))
 
+    def test_a_ttl_cut_reported_by_the_station_is_logged(self):
+        def respond(req):
+            return {"ok": True, "seq": 1, "size": 90, "ttl_s": 300.0, "loop_ms": 10_000, "clamp": "none",
+                    "ttl_clamped_from": float(req["ttl"])}
+        _, records, _ = simulate(AmbientConfig("hymn", LINES, ttl_s=900, breath=0, duration_s=30), respond=respond)
+        sings = [r for r in records if r["event"] == "sing"]
+        self.assertTrue(sings)
+        self.assertTrue(all((r["ttl_s"], r["ttl_clamped_from"]) == (300.0, 900.0) for r in sings))
+        _, records, _ = simulate(AmbientConfig("hymn", LINES, breath=0, duration_s=30))
+        self.assertTrue(all("ttl_clamped_from" not in r for r in records if r["event"] == "sing"))
+
     def test_per_minute_cap(self):
         cfg = AmbientConfig("hymn", LINES, min_gap_s=1, max_gap_s=1, breath=0, max_per_minute=5, duration_s=180)
         summary, _, sent = simulate(cfg)

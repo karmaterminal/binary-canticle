@@ -129,7 +129,7 @@ test("the binding against the real daemon and stations: hear, sing, hear back, p
       binding: "rune",
       daemon: { socket: join(run, "daemon.sock") },
       stateDir: join(dir, "state-rune"),
-      listen: { payloadSessions: ["agent:rune:reader"] },
+      listen: { payloadSessions: ["agent:rune:reader"], subscriptions: [{ sessionKey: "agent:rune:reader", tune: ["*:*" ] }] },
       station: { name: "rune", keyId: runeKey },
       publish: { enabled: true, socket: join(run, "rune.ctl") },
     });

@@ -133,7 +133,7 @@ def run(cfg: AmbientConfig, send: Callable[[dict], dict], log: Callable[[dict], 
                 resp = {"ok": False, "error": f"{type(e).__name__}: {e}"}
                 failures += 1
             if resp.get("ok"):
-                rec.update({k: resp[k] for k in ("seq", "size", "ttl_s", "loop_ms", "clamp") if k in resp})
+                rec.update({k: resp[k] for k in ("seq", "size", "ttl_s", "loop_ms", "clamp", "ttl_clamped_from") if k in resp})
                 rec["text"] = req["text"]
             else:   # a refusal (budget, grant) is logged and the run goes on
                 rec = {"event": "refused", "t_ms": rec["t_ms"], "error": resp.get("error")}

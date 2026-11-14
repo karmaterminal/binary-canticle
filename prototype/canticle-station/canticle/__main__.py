@@ -10,7 +10,7 @@
     python -m canticle doctor  [--json] [--probe|--no-probe]                 # check this host; exit 1 if a check fails
     python -m canticle manifest verify|show [fleet.json]
     python -m canticle ambient --control ... --stream hymn --fixture hymn.txt --duration 600   # background emitter
-    python -m canticle tuner   --manifest fleet.json --multicast --http 127.0.0.1:8765         # read-only web view
+    python -m canticle tuner   --manifest fleet.json --multicast --http 127.0.0.1:8765         # synthetic-only web view
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ import hashlib
 import json
 import os
 import random
+import re
 import signal
 import sys
 import time
@@ -34,7 +35,7 @@ from . import finding, runner, stations, wire
 from .ids import CLASS_BY_NAME, SCOPES, STATION_NAME_RE
 from .listener import Listener
 from .manifest import FORMAT, Manifest, StationEntry, verify_json
-from .station import Station, StreamConfig, next_epoch
+from .station import DEFAULT_STREAM_MAX_TTL_S, Station, StreamConfig, next_epoch
 
 
 def _load_key(path: str) -> Ed25519PrivateKey:
@@ -120,9 +121,19 @@ def cmd_keygen(a) -> int:
 
 
 def _stream_config(spec: str) -> StreamConfig:
+    """``name[:class[:default_ttl_s[:max_ttl_s]]]``. A default above the stream maximum raises the maximum to it
+    (the class maximum still caps both), so asking for a 900 s default on a live-state stream gets 900 s."""
     name, _, rest = spec.partition(":")
-    cls, _, ttl = rest.partition(":")
-    return StreamConfig(name=name, cls=cls or "chatter", default_ttl_s=int(ttl) if ttl else None)
+    cls, _, rest = rest.partition(":")
+    ttl, _, top = rest.partition(":")
+    default = int(ttl) if ttl else None
+    if top:
+        maximum = int(top)
+    elif default is not None:
+        maximum = max(DEFAULT_STREAM_MAX_TTL_S, default)
+    else:
+        maximum = DEFAULT_STREAM_MAX_TTL_S
+    return StreamConfig(name=name, cls=cls or "chatter", default_ttl_s=default, max_ttl_s=maximum)
 
 
 def cmd_station(a) -> int:
@@ -159,6 +170,8 @@ def cmd_station(a) -> int:
     log = (lambda s: print(s, file=sys.stderr, flush=True))
     log(json.dumps({"station": st.key_id.hex(), "epoch": st.epoch, "control": control,
                     "dests": [f"{h}:{p}" for h, p in dests], "streams": list(st.streams)}))
+    for note in st.ttl_notes:
+        log(json.dumps({"ttl_cut": note}))
 
     async def main():
         stop = asyncio.Event()
@@ -221,6 +234,107 @@ def cmd_sing(a) -> int:
     resp = runner.control_request(_control(a), req)
     print(json.dumps(resp))
     return 0 if resp.get("ok") else 1
+
+
+def grant_requests(a, status: Optional[dict] = None) -> list:
+    """The control requests ``canticle grant`` sends, in order. For --pluck, ``status`` is the station's status
+    answer, read first, to find the grant's sequence number. A ValueError names a usage mistake."""
+    from . import grant as g
+    key = g.state_key(g.check_display(a.display))
+    if a.pluck:
+        if a.scope or a.withheld:
+            raise ValueError("--pluck takes no --scope or --withheld")
+        on_air = ((status or {}).get("streams", {}).get(g.STREAM) or {}).get("on_air", [])
+        seqs = [r["seq"] for r in on_air if r.get("kind") == "item" and r.get("state_key") == key]
+        if not seqs:
+            raise ValueError(f"no grant for {a.display} is on air at this station")
+        return [{"op": "hush", "stream": g.STREAM, "seq": s} for s in seqs]
+    if a.scope is None:
+        raise ValueError("give --scope (or --pluck)")
+    if not 0 < a.ttl <= g.MAX_TTL_S:
+        raise ValueError(f"--ttl must be in (0, {g.MAX_TTL_S}]")
+    if not 0 < a.hours <= 24:
+        raise ValueError("--hours must be in (0, 24]: the station keeps an item on air for 24 h at most")
+    body = g.encode(a.display, a.scope, a.withheld)
+    return [{"op": "sing", "stream": g.STREAM, "class": g.CLASS, "state_key": key, "body_hex": body.hex(),
+             "ctype": g.CTYPE, "ttl": a.ttl, "keep_on_air": int(a.hours * 3600), "loop": "normal", "scope": "lan"}]
+
+
+def cmd_grant(a) -> int:
+    from .grant import GrantError
+    control = _control(a)
+    try:
+        status = runner.control_request(control, {"op": "status"}) if a.pluck else None
+        reqs = grant_requests(a, status)
+    except (ValueError, GrantError) as e:
+        print(f"canticle grant: {e}", file=sys.stderr)
+        return 2
+    ok = True
+    for req in reqs:
+        resp = runner.control_request(control, req)
+        print(json.dumps(resp))
+        ok = ok and bool(resp.get("ok"))
+    return 0 if ok else 1
+
+
+def parse_until(text: str, now_ms: int) -> int:
+    """``+90s``, ``+30m``, ``+2h`` from now, or a UTC time like ``2026-11-10T07:07Z`` (seconds optional), as epoch ms."""
+    import datetime
+    m = re.fullmatch(r"\+([1-9][0-9]{0,5})([smh])", text or "")
+    if m:
+        return now_ms + int(m.group(1)) * {"s": 1_000, "m": 60_000, "h": 3_600_000}[m.group(2)]
+    m = re.fullmatch(r"(\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?)Z", text or "")
+    if not m:
+        raise ValueError("--until takes +Ns, +Nm, +Nh or a UTC time like 2026-11-10T07:07Z")
+    fmt = "%Y-%m-%dT%H:%M:%S" if m.group(1).count(":") == 2 else "%Y-%m-%dT%H:%M"
+    t = datetime.datetime.strptime(m.group(1), fmt).replace(tzinfo=datetime.timezone.utc)
+    return int(t.timestamp() * 1000)
+
+
+def beacon_requests(a, status: Optional[dict] = None, now_ms: Optional[int] = None) -> list:
+    """The control requests ``canticle beacon`` sends, in order. For --pluck, ``status`` is the station's status
+    answer, read first, to find the beacon's sequence number. A ValueError names a usage mistake."""
+    from . import beacon as b
+    if a.pluck:
+        if a.state or a.asking or a.until or a.ref:
+            raise ValueError("--pluck takes no --state, --asking, --until or --ref")
+        on_air = ((status or {}).get("streams", {}).get(b.STREAM) or {}).get("on_air", [])
+        seqs = [r["seq"] for r in on_air if r.get("kind") == "item" and r.get("state_key") == b.STATE_KEY]
+        if not seqs:
+            raise ValueError("no beacon is on air at this station")
+        return [{"op": "hush", "stream": b.STREAM, "seq": s} for s in seqs]
+    if a.state is None:
+        raise ValueError("give --state (or --pluck)")
+    if not 0 < a.ttl <= b.MAX_TTL_S:
+        raise ValueError(f"--ttl must be in (0, {b.MAX_TTL_S}]")
+    if not 0 < a.hours <= 24:
+        raise ValueError("--hours must be in (0, 24]: the station keeps an item on air for 24 h at most")
+    now = runner.now_ms() if now_ms is None else now_ms
+    until = parse_until(a.until, now) if a.until else None
+    if until is not None and until <= now:
+        raise ValueError("--until is not in the future")
+    if until is not None and until > now + int(a.hours * 3_600_000):
+        raise ValueError("--until is later than --hours keeps the beacon on air: it could not be true when it says")
+    body = b.encode(a.state, a.asking or "none", until, a.ref or ())
+    return [{"op": "sing", "stream": b.STREAM, "class": b.CLASS, "state_key": b.STATE_KEY, "body_hex": body.hex(),
+             "ctype": b.CTYPE, "ttl": a.ttl, "keep_on_air": int(a.hours * 3600), "loop": "normal", "scope": "lan"}]
+
+
+def cmd_beacon(a) -> int:
+    from .beacon import BeaconError
+    control = _control(a)
+    try:
+        status = runner.control_request(control, {"op": "status"}) if a.pluck else None
+        reqs = beacon_requests(a, status)
+    except (ValueError, BeaconError) as e:
+        print(f"canticle beacon: {e}", file=sys.stderr)
+        return 2
+    ok = True
+    for req in reqs:
+        resp = runner.control_request(control, req)
+        print(json.dumps(resp))
+        ok = ok and bool(resp.get("ok"))
+    return 0 if ok else 1
 
 
 def cmd_hush(a) -> int:
@@ -337,6 +451,43 @@ def cmd_tap(a) -> int:
         return e.code
 
 
+def cmd_shape(a) -> int:
+    from .daemon import default_socket_path
+    from .shape import run_shape
+    from .tuner import is_loopback
+    http_host, http_port = runner.parse_addr(a.http, 8766)
+    if not is_loopback(http_host):
+        print(f"--http must be a loopback address, not {http_host} (RFC-0001 §18.9)", file=sys.stderr)
+        return 1
+    sock = a.socket or default_socket_path()
+    if sock is None and not a.demo_fixture:
+        print("XDG_RUNTIME_DIR is not set: pass --socket (the daemon's socket path)", file=sys.stderr)
+        return 1
+
+    if a.display is not None:
+        from .grant import GrantError, check_display
+        try:
+            check_display(a.display)
+        except GrantError as e:
+            print(f"--display: {e}", file=sys.stderr)
+            return 2
+
+    def ready(port: int) -> None:
+        print(json.dumps({"shape": f"http://{http_host}:{port}/api/shape", "stations": sorted(set(a.station or [])),
+                          "synthetic": a.demo_fixture, "display": a.display}), file=sys.stderr, flush=True)
+
+    async def main():
+        stop = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, stop.set)
+        await run_shape(sock, a.station or [], http_host, http_port, stop, ready=ready, demo_fixture=a.demo_fixture,
+                        display=a.display)
+
+    asyncio.run(main())
+    return 0
+
+
 def cmd_daemon(a) -> int:
     from .daemon import Daemon, DaemonConfig, default_socket_path, default_state_dir
     try:
@@ -430,12 +581,6 @@ def cmd_tuner(a) -> int:
         return 1
     state, _lease = _listener_state(a, role="tuner")
     lst = Listener(m, state_path=state, ephemeral=a.ephemeral)
-    log = open(a.log, "a") if a.log else None
-
-    def on_event(ev) -> None:
-        if log is not None:
-            log.write(json.dumps({"t_ms": runner.now_ms(), **ev.to_json()}) + "\n")
-            log.flush()
 
     def ready(port: int) -> None:
         print(json.dumps({"tuner": f"http://{http_host}:{port}/", "udp": a.bind,
@@ -447,7 +592,8 @@ def cmd_tuner(a) -> int:
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, stop.set)
         await run_tuner(lst, runner.parse_addr(a.bind), runner.MCAST_GROUP if a.multicast else None,
-                        http_host, http_port, stop, on_event=on_event, ready=ready)
+                        http_host, http_port, stop, ready=ready,
+                        demo_fixture=a.demo_fixture)
 
     asyncio.run(main())
     return 0
@@ -610,7 +756,7 @@ def main(argv=None) -> int:
     s.add_argument("--socket-class", action="append", help="class the control socket may request (repeatable); "
                    "default: every class the key is granted except regulatory, alarm and control, which the "
                    "socket never accepts in this spike")
-    s.add_argument("--stream", action="append", required=True, help="name[:class[:default_ttl_s]]")
+    s.add_argument("--stream", action="append", required=True, help="name[:class[:default_ttl_s[:max_ttl_s]]]; a default above 300 s raises the stream max to it, within the class max")
     s.add_argument("--to", action="append", help="host:port destination (repeatable)")
     s.add_argument("--multicast", action="store_true", help=f"also send to {runner.MCAST_GROUP}")
     s.add_argument("--port", type=int, default=runner.DEFAULT_PORT)
@@ -678,14 +824,14 @@ def main(argv=None) -> int:
     b.add_argument("--log", help="append JSON records here instead of stdout")
     b.set_defaults(fn=cmd_ambient)
 
-    u = sub.add_parser("tuner", help="read-only web tuner: a loopback gateway over one listener")
+    u = sub.add_parser("tuner", help="synthetic-only human dashboard: live station metadata is never published")
     u.add_argument("--manifest", required=True)
     u.add_argument("--bind", default=f"0.0.0.0:{runner.DEFAULT_PORT}", help="UDP address to hear on")
     u.add_argument("--multicast", action="store_true")
     u.add_argument("--http", default="127.0.0.1:8765", help="loopback host:port for the page")
+    u.add_argument("--demo-fixture", action="store_true", help="show an explicitly synthetic sample station")
     u.add_argument("--state", help="listener safety state file (as for listen)")
     u.add_argument("--ephemeral", action="store_true", help="UNSAFE: keep no listener state across restarts")
-    u.add_argument("--log", help="append every listener event, as JSON lines, here")
     u.set_defaults(fn=cmd_tuner)
 
     dm = sub.add_parser("daemon", help="the host daemon: one UDP listener, record v1 to every binding over a unix socket",
@@ -699,6 +845,53 @@ def main(argv=None) -> int:
     dm.add_argument("--allow-uid", type=int, action="append", help="uid allowed to connect (repeatable; default: own uid)")
     dm.add_argument("--health-interval", type=float, default=10.0, help="seconds between health records")
     dm.set_defaults(fn=cmd_daemon)
+
+    sh = sub.add_parser("shape", help="shape-only human view of what the host daemon hears: presence, carrier age, "
+                        "live counts; never content (#133)",
+                        description="A read-only client of the host daemon's socket, like tap, serving one loopback "
+                        "JSON endpoint (/api/shape) built from a closed list of fields: per named station its presence "
+                        "state and beacon age, per stream its live count and newest age. No item text, purpose, "
+                        "digest, sequence or key material. Only stations named with --station appear; name one only "
+                        "after its owner agrees (#133). Binds no UDP port, writes no state, sings nothing.")
+    sh.add_argument("--socket", help="the daemon's unix socket (default $XDG_RUNTIME_DIR/canticle/daemon.sock)")
+    sh.add_argument("--station", action="append", help="a station to show (repeatable); none are shown by default")
+    sh.add_argument("--http", default="127.0.0.1:8766", help="loopback host:port for /api/shape")
+    sh.add_argument("--demo-fixture", action="store_true", help="serve invented, marked-synthetic stations only")
+    sh.add_argument("--display", help="this display's name (#137). With it, --station is only the host's ceiling: a "
+                    "station appears only while it holds a live grant for this display, and only at the scope granted")
+    sh.set_defaults(fn=cmd_shape)
+
+    gr = sub.add_parser("grant", help="say yes (or no) to a shape display, from the station's own key (#137)",
+                        description="Sings a display grant on the station's 'display' stream through its control "
+                        "socket: a keyed live-state item the station keeps on air by refresh for --hours (24 h at "
+                        "most, the station's ceiling), or plucks it with --pluck. Run it where the station's key "
+                        "lives: a grant means only what that key means.")
+    gr.add_argument("--control", help="the station's control socket")
+    gr.add_argument("--display", required=True, help="the display to say yes to, e.g. frond-house@silas")
+    gr.add_argument("--scope", choices=["presence", "beacon", "counts", "river"],
+                    help="what the display may show, smallest first; each includes the ones before it")
+    gr.add_argument("--withheld", action="store_true", help="with --scope presence: show that more is withheld")
+    gr.add_argument("--ttl", type=float, default=900, help="the lease in seconds (at most 900, the class maximum)")
+    gr.add_argument("--hours", type=float, default=24, help="keep it on air by refresh this long (at most 24)")
+    gr.add_argument("--pluck", action="store_true", help="revoke: pluck the grant now")
+    gr.set_defaults(fn=cmd_grant)
+
+    bc = sub.add_parser("beacon", help="say what this station is doing, as typed shape, not prose (#142)",
+                        description="Sings this station's beacon on its 'beacon' stream through its control socket: a "
+                        "keyed live-state item with enumerated fields (state, asking, optional until and refs), kept "
+                        "on air by refresh for --hours (24 h at most), or plucked with --pluck when it stops being "
+                        "true. A missing or expired beacon reads as unknown, never as fine.")
+    bc.add_argument("--control", help="the station's control socket")
+    bc.add_argument("--state", choices=["working", "resting", "blocked", "away"], help="what the station is doing")
+    bc.add_argument("--asking", choices=["none", "review", "peer", "human"],
+                    help="whether it wants something, and from whom (default none)")
+    bc.add_argument("--until", help="when the state should change: +30m, +2h, or a UTC time like 2026-11-10T07:07Z")
+    bc.add_argument("--ref", action="append", help="a pointer: owner/repo#n, or repo#n for a karmaterminal repo "
+                    "(repeatable, at most 4)")
+    bc.add_argument("--ttl", type=float, default=300, help="the lease in seconds (at most 900, the class maximum)")
+    bc.add_argument("--hours", type=float, default=12, help="keep it on air by refresh this long (at most 24)")
+    bc.add_argument("--pluck", action="store_true", help="withdraw the beacon now")
+    bc.set_defaults(fn=cmd_beacon)
 
     tp = sub.add_parser("tap", help="read what the host daemon hears: a read-only record v1 client (no bind, no state)",
                         description="Connects to the host daemon's socket as one more binding, asks for the join "

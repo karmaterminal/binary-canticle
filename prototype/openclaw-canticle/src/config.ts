@@ -16,7 +16,7 @@ export type BindingConfig = {
   station: { name: string; keyId: string } | null;
   /** payloadSessions: the session keys that may read heard text (patterns: "*", an exact key, or a prefix ending in
    * "*"). Every other session reads digests only. */
-  listen: { tune: Tune[]; includeSelf: boolean; payloadSessions: string[] };
+  listen: { tune: Tune[]; includeSelf: boolean; payloadSessions: string[]; subscriptions: { sessionKey: string; tune: Tune[] }[] };
   journal: { maxEntries: number; maxBytes: number; maxAgeMs: number };
   publish: {
     enabled: boolean;
@@ -61,6 +61,7 @@ export function parseConfig(raw: unknown): BindingConfig {
   }
   const l = c.listen === undefined ? {} : obj(c.listen, "listen");
   const tune = (l.tune === undefined ? ["*:*"] : strList(l.tune, "listen.tune")).map(parseTune);
+  const subscriptions = subscriptionsOf(l.subscriptions);
   const j = c.journal === undefined ? {} : obj(c.journal, "journal");
   const p = c.publish === undefined ? {} : obj(c.publish, "publish");
   const enabled = p.enabled === undefined ? false : bool(p.enabled, "publish.enabled");
@@ -86,6 +87,7 @@ export function parseConfig(raw: unknown): BindingConfig {
       tune,
       includeSelf: l.includeSelf === undefined ? false : bool(l.includeSelf, "listen.includeSelf"),
       payloadSessions: l.payloadSessions === undefined ? [] : sessionPatterns(l.payloadSessions, "listen.payloadSessions"),
+      subscriptions,
     },
     journal: {
       maxEntries: j.maxEntries === undefined ? 5_000 : int(j.maxEntries, "journal.maxEntries", 100, 100_000),
@@ -124,6 +126,24 @@ export function parseTune(text: string): Tune {
 export function sessionMatches(patterns: string[], sessionKey: string): boolean {
   const k = sessionKey.toLowerCase();
   return patterns.some((p) => p === "*" || p === k || (p.endsWith("*") && k.startsWith(p.slice(0, -1))));
+}
+
+function subscriptionsOf(v: unknown): BindingConfig["listen"]["subscriptions"] {
+  if (v === undefined) return [];
+  if (!Array.isArray(v) || v.length > 64) throw new ConfigError("listen.subscriptions: expected at most 64 entries");
+  const seen = new Set<string>();
+  return v.map((raw, i) => {
+    const at = `listen.subscriptions[${i}]`;
+    const sub = obj(raw, at);
+    const sessionKey = str(sub.sessionKey, `${at}.sessionKey`).toLowerCase();
+    if (!/^[^\s*]{1,200}$/.test(sessionKey) || seen.has(sessionKey)) {
+      throw new ConfigError(`${at}.sessionKey: expected a unique exact session key (no wildcard)`);
+    }
+    seen.add(sessionKey);
+    const names = strList(sub.tune, `${at}.tune`);
+    if (names.length < 1 || names.length > 16) throw new ConfigError(`${at}.tune: expected 1 to 16 station:stream patterns`);
+    return { sessionKey, tune: names.map(parseTune) };
+  });
 }
 
 function sessionPatterns(v: unknown, at: string): string[] {

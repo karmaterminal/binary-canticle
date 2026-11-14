@@ -287,20 +287,20 @@ test("a call that names no session reads digests of the journal and on air, neve
   const digest = b.listen(anonymous, { what: "journal" });
   assert.equal(digest.details.ok, true);
   assert.equal(digest.text.includes("for named sessions only"), false);
-  assert.match(digest.text, /heard text is not shown to this session/);
+  assert.doesNotMatch(digest.text, /for named sessions only|\[canticle:heard\]/);
   assert.equal(b.listen(anonymous, { what: "on_air" }).details.ok, true);
-  assert.match(b.status(anonymous).text, /this call names no session/);
+  assert.match(b.status(anonymous).text, /this call names no exact session/);
   await b.stop(); // nothing was kept for it under a shared name: no checkpoint, no taint mark
   const st = JSON.parse(readFileSync(join(dir, "state-rune", "state.json"), "utf8")) as Obj;
   assert.deepEqual(st.checkpoints, {});
   assert.deepEqual(st.taint, {});
-  // An agent id alone names that agent's session; blank strings name nothing.
-  assert.deepEqual(callerOf({ agentId: "main" }), { sessionKey: "agent:main", sessionId: null, subagent: false, anonymous: false });
+  // An agent id alone does not identify an exact session; blank strings name nothing.
+  assert.deepEqual(callerOf({ agentId: "main" }), anonymous);
   assert.equal(callerOf({ sessionKey: "", agentId: " ", sessionId: "s-1" }).anonymous, true);
 });
 
 test("a taint table that overflows fails closed: every session that may read heard text counts as tainted", async () => {
-  const cfg = { listen: { payloadSessions: ["agent:main:*"] } };
+  const cfg = { listen: { payloadSessions: ["agent:main:*"], subscriptions: [{ sessionKey: SESSION.sessionKey, tune: ["*:*"] }, { sessionKey: OTHER_SESSION.sessionKey, tune: ["*:*"] }] } };
   b = await up(cfg);
   daemon.surface(cael(1));
   await waitFor(() => heardCount(b) === 1, "the item");
