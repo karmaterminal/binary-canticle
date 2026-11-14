@@ -6,6 +6,7 @@
 import { Binding } from "./src/binding.ts";
 import { parseConfig, stateRootOf } from "./src/config.ts";
 import { TOOL_NAMES, type ToolContext, createTool } from "./src/tools.ts";
+import { Discoverer } from "./src/discover.ts";
 
 const PLUGIN_ID = "canticle";
 
@@ -36,12 +37,13 @@ export default {
     let binding: Binding | null = null;
     let failure: string | null = "not started";
     let publish = false;
+    let discovery: Discoverer | null = null;
     try {
       publish = parseConfig(api.pluginConfig).publish.enabled;
     } catch {
       publish = false; // the service reports the config error when it starts
     }
-    const state = () => ({ binding, failure, publish });
+    const state = () => ({ binding, failure, publish, discovery });
     for (const name of TOOL_NAMES) {
       api.registerTool((ctx) => createTool(name, ctx ?? {}, state), { name, optional: true });
     }
@@ -50,9 +52,11 @@ export default {
       reload: { configPrefixes: [`plugins.entries.${PLUGIN_ID}`] },
       async start(ctx) {
         let b: Binding;
+        let d: Discoverer;
         try {
           const cfg = parseConfig(configOf(ctx, api));
           publish = cfg.publish.enabled;
+          d = new Discoverer(cfg.discovery);
           b = new Binding({
             config: cfg,
             root: stateRootOf(cfg, ctx.stateDir),
@@ -64,11 +68,13 @@ export default {
           throw e;
         }
         binding = b;
+        discovery = d;
         failure = null;
       },
       async stop() {
         const b = binding;
         binding = null;
+        discovery = null;
         failure = "stopped";
         await b?.stop();
       },
