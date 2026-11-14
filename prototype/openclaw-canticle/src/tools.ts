@@ -207,13 +207,17 @@ export function createTool(
       let r: Result;
       switch (name) {
         case "canticle_listen":
+          await binding.provePayloadRoute(caller);
+          await binding.proveLocalRoute(caller);
           r = binding.listen(caller, p);
           break;
         case "canticle_status":
+          await binding.provePayloadRoute(caller);
+          await binding.proveLocalRoute(caller);
           r = binding.status(caller);
           break;
         case "canticle_mute":
-          r = binding.mute(caller, p);
+          r = await binding.mute(caller, p);
           break;
         case "canticle_sing":
           r = await binding.sing(caller, p);
