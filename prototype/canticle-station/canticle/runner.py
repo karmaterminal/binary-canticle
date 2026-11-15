@@ -83,6 +83,8 @@ def _dispatch(station: Station, req: dict, socket_classes: frozenset) -> dict:
     op = req.get("op")
     now = now_ms()
     if op == "sing":
+        if "expected_key_id" in req and req["expected_key_id"] != station.key_id.hex():
+            return {"ok": False, "error": "station key_id differs from requested station"}
         stream = station.streams.get(req.get("stream"))
         cls = req.get("class") or (stream.cfg.cls if stream else None)
         if cls is not None and cls not in socket_classes:

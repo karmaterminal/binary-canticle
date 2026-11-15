@@ -1,0 +1,190 @@
+"""Operator-started, one-actor Mirari's Wake fixture worker. No model or transcript access."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import socket
+import stat
+import tempfile
+import time
+from pathlib import Path
+
+MAX_LINE = 4096
+MAX_ROWS = 16
+MAX_ITEM = 800
+KINDS = {"event", "tool", "file", "summary"}
+SAFE_TOPIC = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9 _.,:/#-]{0,63}$")
+SECRET = re.compile(r"(?i)(?:api[_-]?key|token|password|secret|authorization|bearer|private[_-]?key|sk-[a-z0-9]|gh[pousr]_[a-z0-9]|AKIA[0-9A-Z]{16})")
+HEARD = re.compile(r"(?i)(?:canticle|heard|receiver|receptor|wake|beacon)")
+ID = re.compile(r"^[a-zA-Z0-9_-]{1,48}$")
+KEY_ID = re.compile(r"^[0-9a-f]{16}$")
+
+
+def _check_file(path: Path) -> None:
+    info = path.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
+        raise ValueError(f"{path} must be a regular, owner-owned mode 0600 file (no symlinks)")
+
+
+def _load_json(path: Path) -> dict:
+    _check_file(path)
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _save(path: Path, obj: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as out:
+            json.dump(obj, out, sort_keys=True)
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(name, path)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def authorization(path: Path, source: Path, actor: str) -> dict:
+    cfg = _load_json(path)
+    if cfg.get("enabled") is not True or cfg.get("actor") != actor:
+        raise ValueError("source authorization disabled or actor mismatch")
+    if not ID.fullmatch(actor) or not ID.fullmatch(cfg.get("station", "")):
+        raise ValueError("invalid actor/station")
+    if not KEY_ID.fullmatch(cfg.get("station_key_id", "")):
+        raise ValueError("authorized station key_id must be 16 lowercase hex digits")
+    if cfg.get("source") != str(source.resolve()) or cfg.get("audience") != "lan":
+        raise ValueError("source and LAN audience must be explicit")
+    if cfg.get("stream") != "wake" or not 1 <= cfg.get("ttl_s", 0) <= 300:
+        raise ValueError("wake stream and TTL <=300 required")
+    if not 30 <= cfg.get("cadence_s", 0) <= 3600 or not 30 <= cfg.get("inactive_s", 0) <= 86400:
+        raise ValueError("cadence/inactivity outside bounded range")
+    return cfg
+
+
+def read_rows(source: Path, actor: str, after: int, seen: set[str],
+              prefix_sha256: str | None) -> tuple[list[dict], int, str, str]:
+    _check_file(source)
+    snapshot = source.read_bytes()
+    if len(snapshot) > 1_048_576:
+        raise ValueError("source exceeds 1 MiB fixture bound")
+    lineage = hashlib.sha256(snapshot).hexdigest()[:16]
+    lines = snapshot.splitlines(keepends=True)
+    if after > len(lines):
+        raise ValueError("source shrank; operator must inspect before resetting state")
+    if after and (prefix_sha256 is None or
+                  hashlib.sha256(b"".join(lines[:after])).hexdigest() != prefix_sha256):
+        raise ValueError("source changed before checkpoint; operator must inspect before resetting state")
+    rows = []
+    batch_seen: set[str] = set()
+    for n, raw in enumerate(lines, 1):
+        if n <= after:
+            continue
+        if len(raw) > MAX_LINE:
+            raise ValueError("oversized source row")
+        row = json.loads(raw)
+        if row.get("actor") != actor or row.get("kind") not in KINDS:
+            continue
+        # Only actor-authored, explicitly shareable metadata; no tool result or log body.
+        if row.get("origin") != "actor" or row.get("shareable") is not True:
+            continue
+        if row.get("lineage") != "local" or row.get("from_canticle"):
+            continue
+        topic = row.get("topic")
+        if not isinstance(topic, str) or not SAFE_TOPIC.fullmatch(topic) or SECRET.search(topic) or HEARD.search(topic):
+            continue
+        event_id = row.get("id")
+        if not isinstance(event_id, str) or not ID.fullmatch(event_id):
+            continue
+        if event_id in seen or event_id in batch_seen:
+            raise ValueError("duplicate source row id")
+        batch_seen.add(event_id)
+        rows.append({"id": event_id, "kind": row["kind"], "topic": topic})
+        if len(rows) >= MAX_ROWS:
+            return rows, n, lineage, hashlib.sha256(b"".join(lines[:n])).hexdigest()
+    return rows, len(lines), lineage, hashlib.sha256(snapshot).hexdigest()
+
+
+def summarize(actor: str, rows: list[dict], lineage: str) -> tuple[str, str]:
+    identity = hashlib.sha256(json.dumps([actor, lineage, sorted(r["id"] for r in rows)]).encode()).hexdigest()[:16]
+    labels = list(dict.fromkeys(r["topic"] for r in rows))[:5]
+    text = f"actor {actor}; observed {len(rows)} shareable actions: {', '.join(labels)}; source sha256:{lineage}; row:{identity}"
+    if SECRET.search(text) or len(text.encode()) > MAX_ITEM:
+        raise ValueError("unsafe or oversized beacon")
+    return text, identity
+
+
+def station_sink(path: str, req: dict) -> dict:
+    # This is the station control socket, not the receptor-only host daemon socket.
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+        sock.settimeout(5)
+        sock.connect(path)
+        sock.sendall((json.dumps(req) + "\n").encode())
+        response = b""
+        while not response.endswith(b"\n"):
+            part = sock.recv(4096)
+            if not part or len(response) + len(part) > 4096:
+                raise RuntimeError("invalid station response")
+            response += part
+    result = json.loads(response)
+    if result.get("ok") is not True:
+        raise RuntimeError("station refused publish")
+    return result
+
+
+def tick(*, auth: Path, source: Path, state: Path, actor: str, socket_path: str, sink=station_sink, now=None) -> str:
+    now = time.time() if now is None else now
+    cfg = authorization(auth, source, actor)  # re-check revocation every cadence
+    old = _load_json(state) if state.exists() else {}
+    if old and (old.get("actor") != actor or old.get("source") != str(source.resolve())):
+        raise ValueError("state bound to a different source")
+    seen = set(old.get("seen", []))
+    rows, end, lineage, prefix_sha256 = read_rows(
+        source, actor, old.get("offset", 0), seen, old.get("prefix_sha256"))
+    if not rows:
+        if now - old.get("last_activity", now) >= cfg["inactive_s"]:
+            return "inactive-stop"
+        _save(state, {**old, "actor": actor, "source": str(source.resolve()),
+                      "offset": end, "prefix_sha256": prefix_sha256,
+                      "last_activity": old.get("last_activity", now)})
+        return "idle"
+    text, identity = summarize(actor, rows, lineage)
+    if identity != old.get("identity"):
+        # The station control socket speaks for a key, not a station name. Bind
+        # authorization to that key before submitting anything to a socket.
+        status = sink(socket_path, {"op": "status"})
+        if not isinstance(status, dict) or status.get("key_id") != cfg["station_key_id"]:
+            raise ValueError("station socket key_id differs from authorized station")
+        req = {"op": "sing", "stream": "wake", "class": "chatter", "scope": "lan",
+               "ttl": cfg["ttl_s"], "text": text, "state_key": f"wake-{identity}",
+               "expected_key_id": cfg["station_key_id"]}
+        sink(socket_path, req)
+    seen.update(r["id"] for r in rows)
+    _save(state, {"actor": actor, "source": str(source.resolve()), "offset": end,
+                  "prefix_sha256": prefix_sha256, "identity": identity,
+                  "last_activity": now, "seen": sorted(seen)})
+    return "published"
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--auth", type=Path, required=True)
+    p.add_argument("--source", type=Path, required=True)
+    p.add_argument("--state", type=Path, required=True)
+    p.add_argument("--actor", required=True)
+    p.add_argument("--station-socket", required=True)
+    a = p.parse_args()
+    while True:
+        cfg = authorization(a.auth, a.source, a.actor)
+        result = tick(auth=a.auth, source=a.source, state=a.state, actor=a.actor,
+                      socket_path=a.station_socket)
+        if result == "inactive-stop":
+            return
+        time.sleep(cfg["cadence_s"])
+
+
+if __name__ == "__main__":
+    main()

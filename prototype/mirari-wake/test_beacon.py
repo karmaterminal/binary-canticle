@@ -1,0 +1,194 @@
+import importlib.util
+import hashlib
+import json
+import os
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+spec = importlib.util.spec_from_file_location("beacon", Path(__file__).with_name("beacon.py"))
+beacon = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(beacon)
+
+
+class BeaconTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.source, self.auth, self.state = (root / name for name in ("fixture.jsonl", "auth.json", "state.json"))
+        self.cfg = {"enabled": True, "actor": "alice", "station": "familiar",
+                    "station_key_id": "0123456789abcdef",
+                    "source": str(self.source), "audience": "lan", "stream": "wake",
+                    "ttl_s": 60, "cadence_s": 30, "inactive_s": 60}
+        self.auth.write_text(json.dumps(self.cfg))
+        self.sent = []
+        self.auth.chmod(0o600)
+        self.station_key_id = self.cfg["station_key_id"]
+
+    def sink(self, _path, req):
+        if req["op"] == "status":
+            return {"ok": True, "key_id": self.station_key_id}
+        self.sent.append(req)
+        return {"ok": True}
+
+    def add(self, **kw):
+        row = {"actor": "alice", "origin": "actor", "shareable": True,
+               "lineage": "local", "kind": "tool", "id": "step1", "topic": "checked tests"}
+        row.update(kw)
+        with self.source.open("a") as f:
+            f.write(json.dumps(row) + "\n")
+        self.source.chmod(0o600)
+
+    def tick(self, now=100):
+        return beacon.tick(auth=self.auth, source=self.source, state=self.state,
+                           actor="alice", socket_path="fake", now=now,
+                           sink=self.sink)
+
+    def test_dedupe_restart_and_provenance(self):
+        self.add()
+        self.assertEqual(self.tick(), "published")
+        self.assertEqual(len(self.sent), 1)
+        self.assertEqual(self.tick(), "idle")
+        self.assertEqual(len(self.sent), 1)
+        self.add(id="step2", topic="changed label")
+        self.assertEqual(self.tick(now=110), "published")
+        self.assertEqual(len(self.sent), 2)
+        req = self.sent[0]
+        self.assertEqual((req["stream"], req["class"], req["scope"], req["ttl"]),
+                         ("wake", "chatter", "lan", 60))
+        self.assertEqual(req["expected_key_id"], self.cfg["station_key_id"])
+        self.assertIn("source sha256:", req["text"])
+        self.assertIn("row:", req["text"])
+        self.assertLessEqual(len(req["text"].encode()), 800)
+        self.assertNotIn("fixture.jsonl", req["text"])
+
+    def test_duplicate_ids_in_batch_refuse_without_submission_or_checkpoint(self):
+        self.add()
+        self.add(topic="changed label")
+        with self.assertRaisesRegex(ValueError, "duplicate source row id"):
+            self.tick()
+        self.assertEqual(self.sent, [])
+        self.assertFalse(self.state.exists())
+
+    def test_duplicate_id_across_batches_refuses_without_checkpoint_advance(self):
+        for n in range(beacon.MAX_ROWS):
+            self.add(id=f"step{n}")
+        self.assertEqual(self.tick(), "published")
+        checkpoint = self.state.read_bytes()
+        self.add(id="step0", topic="different label")
+        with self.assertRaisesRegex(ValueError, "duplicate source row id"):
+            self.tick(now=110)
+        self.assertEqual(len(self.sent), 1)
+        self.assertEqual(self.state.read_bytes(), checkpoint)
+
+    def test_same_length_fixture_replacement_refuses_without_checkpoint_advance(self):
+        self.add(id="step1", topic="first label")
+        self.assertEqual(self.tick(), "published")
+        checkpoint = self.state.read_bytes()
+        original = self.source.read_bytes()
+        replacement = original.replace(b"first label", b"other label")
+        self.assertEqual(len(original), len(replacement))
+        self.source.write_bytes(replacement)
+        self.source.chmod(0o600)
+        with self.assertRaisesRegex(ValueError, "source changed before checkpoint"):
+            self.tick(now=110)
+        self.assertEqual(len(self.sent), 1)
+        self.assertEqual(self.state.read_bytes(), checkpoint)
+
+    def test_predictable_checkpoint_tmp_path_is_not_touched(self):
+        self.add()
+        sentinel = self.state.with_name(self.state.name + ".tmp")
+        sentinel.write_text("keep")
+        self.assertEqual(self.tick(), "published")
+        self.assertEqual(sentinel.read_text(), "keep")
+        self.assertEqual(self.state.stat().st_mode & 0o777, 0o600)
+
+    def test_consent_and_source_must_be_owner_private(self):
+        self.add()
+        for path in (self.auth, self.source):
+            path.chmod(0o666)
+            with self.assertRaisesRegex(ValueError, "mode 0600"):
+                self.tick()
+            self.assertEqual(self.sent, [])
+            self.assertFalse(self.state.exists())
+            path.chmod(0o600)
+        with patch.object(beacon.os, "getuid", return_value=os.getuid() + 1):
+            with self.assertRaisesRegex(ValueError, "owner-owned"):
+                self.tick()
+
+    def test_digest_is_from_the_parsed_snapshot(self):
+        self.add()
+        original = self.source.read_bytes()
+        real_read = Path.read_bytes
+        def append_after_read(path):
+            data = real_read(path)
+            if path == self.source:
+                with path.open("a") as out:
+                    out.write(json.dumps({"actor": "alice", "origin": "actor", "shareable": True,
+                        "lineage": "local", "kind": "event", "id": "later", "topic": "later action"}) + "\n")
+            return data
+        with patch.object(Path, "read_bytes", append_after_read):
+            self.assertEqual(self.tick(), "published")
+        self.assertIn("source sha256:" + hashlib.sha256(original).hexdigest()[:16], self.sent[0]["text"])
+        self.assertNotIn("later action", self.sent[0]["text"])
+
+    def test_redaction_and_no_echo(self):
+        self.add(id="safe", topic="reviewed code")
+        self.add(id="secret", topic="token sk-abcdef123456")
+        self.add(id="heard", topic="canticle heard text")
+        self.add(id="raw", topic="safe label", lineage="canticle")
+        for kind in ("summary", "event", "tool", "file"):
+            self.add(id=f"echo-{kind}", kind=kind, topic=f"echo {kind}", from_canticle=True)
+        self.add(id="other", actor="bob", topic="other work")
+        self.tick()
+        self.assertIn("reviewed code", self.sent[0]["text"])
+        for forbidden in ("sk-abcdef", "canticle heard", "other work", "safe label"):
+            self.assertNotIn(forbidden, self.sent[0]["text"])
+        self.assertIn("observed 1 shareable actions", self.sent[0]["text"])
+
+    def test_mistargeted_station_socket_refuses_before_publish_or_checkpoint(self):
+        self.add()
+        self.station_key_id = "fedcba9876543210"
+        with self.assertRaisesRegex(ValueError, "station socket key_id"):
+            self.tick()
+        self.assertEqual(self.sent, [])
+        self.assertFalse(self.state.exists())
+
+    def test_bounds_inactivity_and_revocation(self):
+        self.add()
+        self.tick()
+        self.assertEqual(self.tick(now=161), "inactive-stop")
+        self.cfg["enabled"] = False
+        self.auth.write_text(json.dumps(self.cfg))
+        with self.assertRaises(ValueError):
+            self.tick(now=162)
+
+    def test_oversize_and_sink_failure_preserve_checkpoint(self):
+        self.add(topic="A" * 65)
+        self.assertEqual(self.tick(), "idle")
+        self.add(id="a", topic="safe")
+        with self.assertRaises(RuntimeError):
+            beacon.tick(auth=self.auth, source=self.source, state=self.state,
+                        actor="alice", socket_path="fake", now=100,
+                        sink=lambda *_: (_ for _ in ()).throw(RuntimeError("refused")))
+        self.assertEqual(json.loads(self.state.read_text())["offset"], 1)
+
+    def test_accepted_publish_then_checkpoint_failure_retries_same_batch(self):
+        self.add(raw_body="private log body")
+        with patch.object(beacon, "_save", side_effect=OSError("checkpoint failed")):
+            with self.assertRaises(OSError):
+                self.tick()
+        self.assertEqual(len(self.sent), 1)  # acceptance occurred; local state did not advance
+        self.assertFalse(self.state.exists())
+        self.assertEqual(self.tick(now=101), "published")
+        self.assertEqual(len(self.sent), 2)
+        self.assertEqual(self.sent[0], self.sent[1])  # state_key is audit identity, not station dedupe
+        self.assertNotIn("private log body", self.sent[1]["text"])
+        self.assertEqual(self.tick(now=102), "idle")
+        self.assertEqual(len(self.sent), 2)  # checkpointed restart is deduped
+
+
+if __name__ == "__main__":
+    unittest.main()
