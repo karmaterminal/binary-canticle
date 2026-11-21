@@ -10,6 +10,7 @@
     python -m canticle doctor  [--json] [--probe|--no-probe]                 # check this host; exit 1 if a check fails
     python -m canticle manifest verify|show [fleet.json]
     python -m canticle ambient --control ... --stream hymn --fixture hymn.txt --duration 600   # background emitter
+    python -m canticle cue add --control ... --id evening-rain --stream hymn --text "rain on the roof" --in 120 --for 600
     python -m canticle tuner   --manifest fleet.json --multicast --http 127.0.0.1:8765         # synthetic-only web view
 """
 
@@ -173,14 +174,33 @@ def cmd_station(a) -> int:
     for note in st.ttl_notes:
         log(json.dumps({"ttl_cut": note}))
 
+    cue_store = None
+    if a.cue_db:
+        from .cues import CueStore
+        try:
+            cue_store = CueStore(a.cue_db, st, now_ms=runner.now_ms())
+        except (OSError, ValueError) as e:
+            print(f"cue database: {e}; station not started", file=sys.stderr)
+            return 1
+
+    def current_grant():
+        # Unlike the normal socket's startup ceiling, cue authority is read again
+        # at admission, dispatch and while this worker's items remain on air.
+        return Manifest.load(a.manifest).entry(kid)
+
     async def main():
         stop = asyncio.Event()
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, stop.set)
-        await runner.run_station(st, dests, control, stop, log, socket_classes=a.socket_class)
+        await runner.run_station(st, dests, control, stop, log, socket_classes=a.socket_class,
+                                 cue_store=cue_store, grant_loader=current_grant)
 
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    finally:
+        if cue_store is not None:
+            cue_store.close()
     return 0
 
 
@@ -231,6 +251,20 @@ def cmd_sing(a) -> int:
     except ValueError as e:
         print(f"canticle sing: {e}", file=sys.stderr)
         return 2
+    resp = runner.control_request(_control(a), req)
+    print(json.dumps(resp))
+    return 0 if resp.get("ok") else 1
+
+
+def cmd_cue(a) -> int:
+    req = {"op": "cue_" + a.cue_op}
+    if a.cue_op == "add":
+        req.update(id=a.id, stream=a.stream, text=a.text, loop=a.loop)
+        req.update({"in": a.delay, "for": a.duration})
+    elif a.cue_op == "list":
+        req.update(limit=a.limit, after=a.after)
+    else:
+        req["id"] = a.id
     resp = runner.control_request(_control(a), req)
     print(json.dumps(resp))
     return 0 if resp.get("ok") else 1
@@ -764,6 +798,8 @@ def main(argv=None) -> int:
     s.add_argument("--epoch-file", help="persisted epoch counter (default: <key>.epoch); "
                    "each start takes the next epoch, so a restart never reuses seq numbers (§5.2)")
     s.add_argument("--beacon-ms", type=int, default=1000)
+    s.add_argument("--cue-db", help="opt in to a durable operator-authored cue table in an owner-only directory; "
+                   "disabled by default; current manifest grants are rechecked before cue publication")
     s.set_defaults(fn=cmd_station)
 
     g = sub.add_parser("sing", help="put an item on air")
@@ -796,6 +832,28 @@ def main(argv=None) -> int:
     t = sub.add_parser("status", help="show what a station has on air")
     t.add_argument("--control")
     t.set_defaults(fn=cmd_status)
+
+    c = sub.add_parser("cue", help="schedule, inspect or cancel station-owned ambient/chatter cues (#147)")
+    cs = c.add_subparsers(dest="cue_op", required=True)
+    ca = cs.add_parser("add", help="bind an immutable id to one future cue; same request retries return its original times")
+    ca.add_argument("--control", required=True)
+    ca.add_argument("--id", required=True)
+    ca.add_argument("--stream", required=True)
+    ca.add_argument("--text", required=True, help="elected original text, at most 800 UTF-8 bytes; no heard-content re-singing")
+    ca.add_argument("--in", dest="delay", type=int, required=True, help="start after 0-86400 seconds on the station clock")
+    ca.add_argument("--for", dest="duration", type=int, required=True, help="duration 1-3600 seconds, within stream default TTL")
+    ca.add_argument("--loop", choices=["fast", "normal", "slow"], default="normal")
+    ca.set_defaults(fn=cmd_cue)
+    cl = cs.add_parser("list", help="metadata only; payload text is never echoed")
+    cl.add_argument("--control", required=True)
+    cl.add_argument("--limit", type=int, default=32, help="1-32 cues per page")
+    cl.add_argument("--after", default="", help="resume after the id from next_after")
+    cl.set_defaults(fn=cmd_cue)
+    for name in ("show", "cancel"):
+        cc = cs.add_parser(name, help="inspect cue metadata" if name == "show" else "cancel pending or locally stop an accepted cue")
+        cc.add_argument("--control", required=True)
+        cc.add_argument("--id", required=True)
+        cc.set_defaults(fn=cmd_cue)
 
     l = sub.add_parser("listen", help="listen and print one JSON event per line")
     _locator_args(l)
