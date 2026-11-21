@@ -22,7 +22,7 @@ import { Lease, LeaseHeld, ensureDir, readJson, writeJsonAtomic } from "./store.
 
 /** Who called a tool. A call without an exact session key is anonymous, even when an agent id is present.
  * It has no checkpoint, taint mark or rate limit of its own and receives only operational status. */
-export type Caller = { sessionKey: string; sessionId: string | null; subagent: boolean; anonymous: boolean };
+export type Caller = { sessionKey: string; sessionId: string | null; subagent: boolean; anonymous: boolean; sandboxed?: boolean; assertInvocationCurrent?: () => void };
 export type Result = { text: string; details: Obj };
 
 export type Mute = {
@@ -546,7 +546,18 @@ export class Binding {
   }
 
   private exactLocalCaller(c: Caller): boolean {
-    return !c.anonymous && !c.subagent && isNonSharedSessionKey(c.sessionKey, this.cfg.mainKey);
+    if (c.anonymous || !isNonSharedSessionKey(c.sessionKey, this.cfg.mainKey)) return false;
+    const reader = this.cfg.listen.localReader;
+    if (!reader) return !c.subagent;
+    if (!c.subagent || c.sessionKey !== reader.sessionKey || c.sessionId !== reader.sessionId ||
+        c.sandboxed !== true || typeof c.assertInvocationCurrent !== "function") return false;
+    try { c.assertInvocationCurrent(); return true; } catch { return false; }
+  }
+
+  private validLocalProof(c: Caller, proof: Awaited<ReturnType<RouteProof>>): boolean {
+    if (!this.exactLocalCaller(c) || proof.sessionKey !== c.sessionKey || proof.exists !== true || proof.onHost !== true) return false;
+    const reader = this.cfg.listen.localReader;
+    return !reader || (proof.sessionId === reader.sessionId && proof.lifecycleRevision === reader.lifecycleRevision);
   }
 
   /** Whether this exact session has both an exact payload grant and a current host-local-route proof. */
@@ -562,7 +573,7 @@ export class Binding {
     }
     try {
       const proof = await this.routeProof(c.sessionKey);
-      const valid = proof.sessionKey === c.sessionKey && proof.exists === true && proof.onHost === true;
+      const valid = this.validLocalProof(c, proof);
       if (valid) this.provenLocalRoutes.add(c.sessionKey); else this.provenLocalRoutes.delete(c.sessionKey);
       return valid;
     } catch {
@@ -579,7 +590,7 @@ export class Binding {
     }
     try {
       const proof = await this.routeProof(c.sessionKey);
-      const valid = proof.sessionKey === c.sessionKey && proof.exists === true && proof.onHost === true;
+      const valid = this.validLocalProof(c, proof);
       if (valid) {
         this.provenPayloadRoutes.add(c.sessionKey);
         this.provenLocalRoutes.add(c.sessionKey);
@@ -1044,12 +1055,14 @@ export class Binding {
       return this.refuse("canticle_mute", "not_running", "the canticle service is not running");
     }
     if (!this.muteAuthorized(c)) {
-      return this.refuse("canticle_mute", "not_authorized", "binding-wide muting requires an exact, non-anonymous, non-subagent session");
+      return this.refuse("canticle_mute", "not_authorized", this.cfg.listen.localReader
+        ? "muting this isolated binding requires its exact current local reader"
+        : "binding-wide muting requires an exact, non-anonymous, non-subagent session");
     }
     if (this.hasHostRouteProof) {
       try {
         const proof = await this.routeProof(c.sessionKey);
-        if (proof.sessionKey !== c.sessionKey || proof.exists !== true || proof.onHost !== true) {
+        if (!this.validLocalProof(c, proof)) {
           return this.refuse("canticle_mute", "route_not_proven", "the caller's exact local session route is not proven");
         }
       } catch {
