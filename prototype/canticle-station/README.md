@@ -19,6 +19,7 @@ them loop until they expire.
 | §11.2, §13.6, §15.7 Onboarding (#73) | `canticle doctor` checks Python, `cryptography` (with an RFC 8032 known answer), `stations.toml`, the manifest and the listener's UDP address, and only reports multicast. `stations.toml` locates the manifest and the listener's address. `canticle manifest verify` and `show` read the unsigned spike-0 manifest; manifests refuse small-order keys (§9.3) and key-ids that do not match their keys (§10.3). |
 | §6.7 Findings (FP-1, #112) | `canticle/finding.py`: the finding body (content type 11) and its strict reader. `canticle sing --finding` and `--body-ref`, and the control socket's `finding` and `body_ref` fields, put a keyed `advisory` finding and a `finding-ref` doorbell on air. `canticle tap` shows a finding field by field, with a host-authored line that attributes it to its signer. See [Findings](#findings-fp-1-112). |
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
+| Local cue control extension (#147, parent #120) | Opt-in `station --cue-db` and `cue add/list/show/cancel`: a private, bounded SQLite table schedules one original ambient/chatter item per elected window. Claims precede signing; uncertain results are never replayed. This local API is a prototype extension beyond the RFC §15.7–15.8 interfaces, with no new wire format. |
 | Shape-only live view (#133) | `canticle shape`: per named station, presence and beacon age; per stream, live count and newest age. Never content; no station without its owner's yes. |
 | Display grants (#137) | `canticle grant` sings a station's own yes to a display, scoped `presence` → `beacon` → `counts` → `river`; `canticle shape --display` shows only granted stations at their granted scope, and purges on revoke or narrowing. |
 | Typed beacons (#142) | `canticle beacon` sings a station's own beacon on its `beacon` stream: a versioned CBOR map of enumerated `state`/`asking`, optional `until` and up to four `refs`, never prose. `canticle.beacon.read` gives the typed shape; a missing, expired or unreadable beacon is unknown, never fine. |
@@ -243,6 +244,94 @@ canticle ambient --control ./room.sock --stream hymn --fixture proofs/web-lanes/
 - **Stopping.** Items already on air are not plucked; they loop until they expire naturally. The emitter also gives up after three consecutive failures to reach the station.
 - **Log.** Each tick writes one JSON line (`sing` with `seq`, `size`, `loop_ms` and the text; `breath`; `capped`; `refused`). The first and last lines record `model_calls: 0`.
 - **Sources.** Only a fixture file. A source derived from session logs would be a separate opt-in boundary (RFC §15.4, §15.8), and is not implemented.
+
+### Station-owned future cues (#147, parent #120)
+
+This optional local control extension gives an operator's original text a finite future window:
+“start in two minutes, for ten minutes.” It is disabled unless the station is started with `--cue-db`.
+The station owns the wait after the submitting client exits. There is no extra daemon, inference
+session, listener, recipient state, automatic wake or new broadcast frame. This is a publication
+scheduler; a game's durable world clock and event ledger remain separate authorities.
+
+For an already elected station key and manifest granting a `weather` ambient stream, an example
+uses loopback only and an owner-only directory. Paths below are placeholders for operator-owned
+files; the commands do not provision a host or grant publication authority:
+
+```sh
+install -d -m 700 /path/to/private-cue-run
+canticle station --key /path/to/room.key --manifest /path/to/fleet.json \
+  --stream weather:ambient:600:600 --to 127.0.0.1:9999 \
+  --control /path/to/private-cue-run/station.sock \
+  --cue-db /path/to/private-cue-run/cues.sqlite
+```
+
+From another terminal while that station runs:
+
+```sh
+canticle cue add --control /path/to/private-cue-run/station.sock \
+  --id afternoon-rain --stream weather --text "Rain begins on the workshop roof." \
+  --in 120 --for 600 --loop normal
+canticle cue list --control /path/to/private-cue-run/station.sock
+canticle cue show --control /path/to/private-cue-run/station.sock --id afternoon-rain
+canticle cue cancel --control /path/to/private-cue-run/station.sock --id afternoon-rain
+```
+
+- **Authority and scope.** The same UID-restricted Unix control socket is used. Cues accept original
+  elected text only, on a configured `ambient` or `chatter` stream with LAN scope. Unsupported fields
+  are refused. The fresh manifest entry, stream, class, LAN grant and startup socket ceiling are checked
+  at creation and dispatch. Active cues are checked again on worker ticks; a missing/revoked/unreadable
+  grant stops that cue's local loop. This does not change the ordinary `sing` path's startup grant.
+  No OpenClaw/Claude publication tool, derived-speech permission, source capture, trust enrollment or
+  prince election is added. Do not pipe heard material into this operator API.
+- **Time and TTL.** The station converts `--in` and `--for` to absolute Unix milliseconds once. The
+  same ID plus the same request returns that original window; changing its text, stream, timing or loop
+  under the ID is refused. Use cancel plus a new ID to revise. A delayed valid start has less remaining
+  TTL and reports `late_start_ms`; it keeps the exact original `ends_at`. A missed window (or at most
+  100 ms remaining, the carousel's expiry margin) is never played. The full requested duration must fit
+  the effective **stream default TTL**, stream maximum and class maximum both at admission and dispatch.
+  There is no silent shortening to a smaller configured TTL. A ten-minute cue therefore uses ambient
+  with an adequate default, as above; chatter's class maximum is only 300 seconds.
+- **One identity.** A cue attempts one `Station.sing`. Its existing carousel repeats are byte-identical
+  and keep the original epoch, sequence, issue time and expiry. The queue does not use `keep_on_air`
+  refresh or mint new evidence on each repeat. `accepted` means the local carousel accepted it; UDP
+  transmission, receipt, encounter, assent and emotional intensity are not established by that state.
+- **Recovery.** The SQLite claim is committed before signing. State is `pending → claimed → accepted`,
+  or a visible `refused`/`unknown` outcome. An exception after the claim is conservatively `unknown`,
+  even if the adapter might have accepted it. Neither ambiguous claims nor past acceptances are sung
+  again. On restart, pending future windows remain eligible; claimed outcomes become `unknown` and
+  past acceptances become `interrupted`, because the old carousel was volatile. Their stored receipts
+  remain available. A failure to persist the tick's result terminates the worker/station rather than
+  continuing to poll an unrecorded acceptance. This trades possible missed cues for avoiding blind
+  duplicate publication; it is not an exactly-once delivery claim.
+- **Cancellation.** Before claim, cancel persists `never_submitted`: zero ITEM transmissions for that
+  cue, while ordinary station carrier beacons may continue. An active cancel records intent before
+  asking `hush` to remove the exact station epoch/stream/sequence/state-key item. Success stops the
+  local ITEM and accepts a PLUCK for its remaining original lifetime. If `hush` refuses or its outcome
+  is uncertain, the guarded owned ITEM is still removed locally and that uncertainty is reported;
+  no automatic PLUCK retry occurs. Receivers can miss the PLUCK and retain already received content
+  until their own expiry rules apply. A cancellation cannot erase context or prove remote erasure.
+  A new epoch's matching sequence is never mistaken for the earlier cue.
+- **Bounds and storage.** Delay is 0–86,400 seconds, duration 1–3,600 seconds within the TTL ceiling,
+  text at most 800 UTF-8 bytes, and the table at most 1,024 rows including completed receipts. Each
+  tick attempts at most one new cue, with at least one second between claims (at most 60 per minute).
+  There are no sleeping per-cue tasks or network waits in the tick; bounded local SQLite/manifest work
+  is serialized with station mutation. The database is bound to the full station public key, must
+  reside in an owned mode-0700 directory, is mode 0600, and is exclusively leased to one process.
+  It contains the queued text; inspection responses expose only metadata, byte count and digest.
+  `cue list --limit 1..32 --after ID` paginates; use its `next_after` value. IDs are never automatically
+  recycled. Retain completed receipts and elect a fresh run database at capacity. Key rotation also
+  needs a fresh database. The text argument is visible to local process inspection; sensitive content
+  should not be put in a command line, and this is not a secret store.
+- **Clock regression.** A recorded high-water wall time holds new cue creation/dispatch if the wall
+  clock steps backwards. Active owned cues stop locally instead of extending their playback during
+  the regression. Pending windows may resume after the clock catches up if their original end has
+  not passed. The watermark is persisted at claims/creation/cancellation and at most once per second
+  on ticks; already accepted cues are never resumed after a process restart.
+
+This deliberately small slice has no recurring rules, mutable cue edits, log-reading beacon,
+model-generated event selection or continuity repair. Those can submit independently authorized,
+bounded original cues later. The local `cue_*` API and SQLite format are an explicitly documented
+prototype extension to RFC §15.7–15.8, not new standardized agent tools or a stable product interface.
 
 ### Human-facing metadata dashboard (#57, RFC §18.9)
 
@@ -646,6 +735,13 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
 - `test_doctor.py` covers each check's pass and fail paths: Python and `cryptography` versions, the RFC 8032 known answer, the manifest, and the address (free, held by another socket, held by this listener or tuner through its lease, or by a listener with its own `--state`). Multicast stays a report whatever the probe finds, the probe datagram has IP TTL 0, the probe joins the group only when multicast is configured or `--probe` is given (`--no-probe` always wins; a socket spy records the join and never makes it), doctor writes nothing, its bind probe never shares a listener's port, and a listener starting during its lease probe waits instead of refusing.
 - `test_onboarding.py` runs the onboarding above end to end: `keygen`, `stations.toml`, `doctor`, then `canticle listen` with no flags in a subprocess hearing a station's item over loopback UDP while doctor sees it holding the address.
 - `test_ambient.py` runs the emitter on a virtual clock: tick gaps, breaths and repeats, exact requests, the per-minute cap, stop by signal and by duration, refusals, an unreachable station, bounds and fixture loading.
+- `test_cues.py` checks durable future windows and claims, real-carousel byte-identical repetition,
+  late/missed starts, effective TTL refusal, manifest replacement/revocation, cancellation, uncertain
+  acceptance and disk-result failure, restart/epoch safety, clock regression, bounds and private
+  storage. A real Unix-control/loopback-UDP test proves the submitting client can exit before the cue
+  plays and that pre-start cancellation sends no cue ITEM. That test explicitly skips in workspaces
+  denying AF_UNIX outside CI; with `CI` set that condition fails. A skipped run is not a receipt for
+  the control-socket boundary.
 - `test_records.py` covers record v1 row by row: the envelope (`hello` then `landing_state`, `rec_seq`, `run`,
   framing limits), every mapping row above including the BC-2 "New" rows (surface, `unnamed_stream`,
   `warmup_hold` and its release under the same `idem`, the three `held_*` retractions, lower epochs, local
