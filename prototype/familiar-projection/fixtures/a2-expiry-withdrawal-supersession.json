@@ -1,0 +1,257 @@
+{
+  "v": "familiar-projection-fixture/1",
+  "name": "a2-expiry-withdrawal-supersession",
+  "case": "AC2",
+  "synthetic": true,
+  "about": "Three claims from one projection leave the current view, search and pending presentation on three different events: a source lapses, a source is withdrawn (stated under another projection key), and a source gets a newer revision. A fourth claim leaves when its item is plucked.",
+  "defaults": {"key_id": "f00d000000000001", "station": "familiar", "stream": "wake", "scope": "lan", "epoch": 1},
+  "receivers": {"r1": {"topics": ["build", "deploy", "test"], "window_ms": 60000}},
+  "bodies": {
+    "team1": {
+      "v": "familiar-projection/1",
+      "key": "wake-team",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        },
+        {
+          "id": "s2",
+          "actor": "bob",
+          "ref": "row:bob:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        },
+        {
+          "id": "s3",
+          "actor": "carol",
+          "ref": "row:carol:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 30000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        },
+        {
+          "id": "c2",
+          "basis": "report",
+          "about": "bob",
+          "topics": ["deploy"],
+          "src": ["s2"],
+          "text": "bob started a deploy"
+        },
+        {
+          "id": "c3",
+          "basis": "report",
+          "about": "carol",
+          "topics": ["test"],
+          "src": ["s3"],
+          "text": "carol ran the tests"
+        }
+      ]
+    },
+    "alice-w": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 39000],
+      "generated_at": 40000,
+      "valid_until": 340000,
+      "sources": [],
+      "claims": [],
+      "withdrawn": [{"actor": "alice", "ref": "row:alice:0001", "rev": 1, "reason": "withdrawn"}]
+    },
+    "team2": {
+      "v": "familiar-projection/1",
+      "key": "wake-team",
+      "standing": "current",
+      "window": [0, 40000],
+      "generated_at": 41000,
+      "valid_until": 341000,
+      "sources": [
+        {
+          "id": "s2",
+          "actor": "bob",
+          "ref": "row:bob:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c2",
+          "basis": "report",
+          "about": "bob",
+          "topics": ["deploy"],
+          "src": ["s2"],
+          "text": "bob started a deploy"
+        }
+      ],
+      "withdrawn": [{"actor": "alice", "ref": "row:alice:0001", "rev": 1, "reason": "withdrawn"}]
+    },
+    "bob2": {
+      "v": "familiar-projection/1",
+      "key": "wake-bob",
+      "standing": "current",
+      "window": [0, 44000],
+      "generated_at": 45000,
+      "valid_until": 345000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "bob",
+          "ref": "row:bob:0001",
+          "rev": 2,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "d1",
+          "basis": "report",
+          "about": "bob",
+          "topics": ["deploy"],
+          "src": ["s1"],
+          "text": "bob restarted the deploy"
+        }
+      ]
+    },
+    "carol2": {
+      "v": "familiar-projection/1",
+      "key": "wake-carol",
+      "standing": "current",
+      "window": [0, 49000],
+      "generated_at": 50000,
+      "valid_until": 350000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "carol",
+          "ref": "row:carol:0002",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "e1",
+          "basis": "report",
+          "about": "carol",
+          "topics": ["test"],
+          "src": ["s1"],
+          "text": "carol reran the tests"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {"t": 10000, "op": "frame", "body": "team1", "seq": 1, "expires_at": 130000, "expect": {"admit": "admitted"}},
+    {
+      "t": 20000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {"claims": ["team1#c1", "team1#c2", "team1#c3"]}
+    },
+    {"t": 20000, "op": "read", "at": "r1", "view": "search", "q": "deploy", "expect": {"claims": ["team1#c2"]}},
+    {
+      "t": 20000,
+      "op": "read",
+      "at": "r1",
+      "view": "pending",
+      "expect": {"claims": ["team1#c1", "team1#c2", "team1#c3"]}
+    },
+    {
+      "t": 31000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {"claims": ["team1#c1", "team1#c2"], "status": {"team1#c3": "source-lapsed"}}
+    },
+    {"t": 31000, "op": "read", "at": "r1", "view": "search", "q": "test", "expect": {"claims": []}},
+    {"t": 31000, "op": "read", "at": "r1", "view": "pending", "expect": {"claims": ["team1#c1", "team1#c2"]}},
+    {"t": 40000, "op": "frame", "body": "alice-w", "seq": 2, "expires_at": 160000, "expect": {"admit": "admitted"}},
+    {
+      "t": 40500,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {"claims": ["team1#c2"], "status": {"team1#c1": "withdrawn"}}
+    },
+    {"t": 40500, "op": "read", "at": "r1", "view": "search", "q": "build", "expect": {"claims": []}},
+    {"t": 40500, "op": "read", "at": "r1", "view": "pending", "expect": {"claims": ["team1#c2"]}},
+    {"t": 41000, "op": "frame", "body": "team2", "seq": 3, "expires_at": 161000, "expect": {"admit": "admitted"}},
+    {
+      "t": 41500,
+      "op": "read",
+      "at": "r1",
+      "view": "pending",
+      "expect": {"claims": ["team2#c2"], "status": {"team1#c2": "superseded", "team2#c2": "current"}}
+    },
+    {"t": 45000, "op": "frame", "body": "bob2", "seq": 4, "expires_at": 165000, "expect": {"admit": "admitted"}},
+    {
+      "t": 45500,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {"claims": ["bob2#d1"], "status": {"team2#c2": "source-superseded"}}
+    },
+    {"t": 45500, "op": "read", "at": "r1", "view": "pending", "expect": {"claims": ["bob2#d1"]}},
+    {"t": 50000, "op": "frame", "body": "carol2", "seq": 5, "expires_at": 170000, "expect": {"admit": "admitted"}},
+    {"t": 50500, "op": "read", "at": "r1", "view": "pending", "expect": {"claims": ["bob2#d1", "carol2#e1"]}},
+    {"t": 60000, "op": "retract", "seq": 5, "reason": "plucked", "expect": "applied"},
+    {
+      "t": 60500,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {"claims": ["bob2#d1"], "status": {"carol2#e1": "retracted"}}
+    },
+    {"t": 60500, "op": "read", "at": "r1", "view": "search", "q": "tests", "expect": {"claims": []}},
+    {"t": 60500, "op": "read", "at": "r1", "view": "pending", "expect": {"claims": ["bob2#d1"]}},
+    {
+      "t": 120000,
+      "op": "present",
+      "at": "r1",
+      "expect": {"presented": ["bob2#d1"], "settled": ["team1#c1", "team1#c2", "team1#c3", "carol2#e1"]}
+    }
+  ],
+  "expect_end": {
+    "producers": {
+      "f00d000000000001": {"synthesis": 3, "no_new_evidence": 0, "mechanical": 2, "repeats": 0, "refused": 0}
+    },
+    "receivers": {"r1": {"model_calls": 0}}
+  }
+}

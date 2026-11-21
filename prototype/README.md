@@ -22,3 +22,9 @@ claiming protocol or production status.
   an explicit-read heard journal and current view over the host daemon's
   receptor record v1, and an outbound aging table over the prince's own
   station. No seat runs it.
+- [`familiar-projection/`](./familiar-projection/) is a design note and an
+  offline checker for a familiar's projections
+  ([#148](https://github.com/karmaterminal/binary-canticle/issues/148), for
+  #119 and #120): when a derived claim stops being current, why a re-sing or
+  a rephrase adds no weight, and what a receiver shows across a gap. Synthetic
+  fixtures and the standard library only; proposed, not in the RFC.

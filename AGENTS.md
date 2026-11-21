@@ -33,6 +33,7 @@ Which document wins, highest first:
 | `prototype/canticle-station/docs/` | Where a host keeps its files, the `stations.toml` schema, example systemd user units, and `pilot-host/`: the LAN pilot-host kit (an nft table, the daemon's start guard, units). |
 | `prototype/canticle-station/proofs/` | `web-lanes/`: attested same-host evidence. `pilot/`: run cards for pilot rounds on prince hosts; a card is a plan, never a receipt. |
 | `prototype/openclaw-canticle/` | The OpenClaw prince plugin spike (#97), TypeScript that Node runs as written. `src/framing.ts`, `daemon.ts`, `receive.ts`: a receptor record v1 client of `canticle daemon`. `journal.ts`: the heard journal. `outbox.ts`, `station.ts`: the outbound aging table, through the prince's own station's control socket. `binding.ts`, `tools.ts`, `index.ts`: one binding, six tools, the OpenClaw entry. Tests in `test/`. No seat runs it. |
+| `prototype/familiar-projection/` | A proposed descriptor for a familiar's projections (#148, for #119 and #120). `README.md`: the design note. `projection.py`: the reader, a reference receiver and the fixture runner, standard library only. `fixtures/`: synthetic cases. Nothing in the RFC or any binding uses it. |
 | `prototype/protocol-dynamics/` | UDP versus TCP measurement harness, with committed results. |
 | `prototype/ringserver-proofs/`, `prototype/ringserver-udp-cue/` | Ringserver evidence, and an earlier receptor kept as a donor. |
 | `reports/` | Dated assessments the RFC cites. |
@@ -55,6 +56,7 @@ From the repository root:
 ```sh
 # Everything CI's station-tests job runs (about a minute).
 PYTHONPATH=prototype/canticle-station python -m unittest discover -s prototype/canticle-station/tests
+PYTHONPATH=prototype/canticle-station python -m unittest discover -s prototype/familiar-projection
 
 # One module, or tests whose names match a pattern.
 PYTHONPATH=prototype/canticle-station python -m unittest discover -s prototype/canticle-station/tests -p 'test_wire.py'
@@ -69,6 +71,8 @@ git status --porcelain
 - The tests use loopback UDP, unix sockets and temporary directories. They need no network, no root and no
   keys of yours. `test_pilot_host.py`'s `NftTest` runs the real `nft` only inside a throwaway network
   namespace, and skips without nft and root or unprivileged user namespaces; CI runs it as root in its own step.
+- `prototype/familiar-projection/`'s tests take under a second. Its two station-agreement tests skip when
+  `canticle` cannot be imported. `python prototype/familiar-projection/projection.py` runs every fixture alone.
 - CI's second job runs the measurement harness's own tests: install `.github/ci/requirements-harness.txt`,
   then `PYTHONPATH=prototype/canticle-station python -m unittest discover -s prototype/protocol-dynamics/tests`.
 - CI's third job runs the OpenClaw plugin spike's tests on Node 24 and 26, its interop test against the real

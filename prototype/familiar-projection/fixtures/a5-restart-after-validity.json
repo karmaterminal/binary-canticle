@@ -1,0 +1,187 @@
+{
+  "v": "familiar-projection-fixture/1",
+  "name": "a5-restart-after-validity",
+  "case": "AC5",
+  "synthetic": true,
+  "about": "r1 is down from 20 s to 90 s while its only pending claim lapses (source at 45 s, lease at 50 s). After the restart nothing is presented, late or otherwise. The restarted producer's copies cannot revive it: the same body is a repeat, a re-stamp citing the lapsed source is refused, a restated validity is capped by the ledger, and an older body is refused as stale. r2 stayed up, presented the claim, and gets one note.",
+  "defaults": {"key_id": "f00d000000000001", "station": "familiar", "stream": "wake", "scope": "lan", "epoch": 1},
+  "receivers": {"r1": {"topics": ["build"], "window_ms": 60000}, "r2": {"topics": ["build"], "window_ms": 20000}},
+  "bodies": {
+    "p1": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 50000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 45000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice started a long build"
+        }
+      ]
+    },
+    "p2": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 92000],
+      "generated_at": 93000,
+      "valid_until": 393000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 45000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice started a long build"
+        }
+      ]
+    },
+    "p3": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 93000],
+      "generated_at": 94000,
+      "valid_until": 394000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice started a long build"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {"t": 10000, "op": "frame", "body": "p1", "seq": 1, "expires_at": 130000, "expect": {"admit": "admitted"}},
+    {"t": 31000, "op": "present", "at": "r2", "expect": {"presented": ["p1#c1"]}},
+    {"t": 90000, "op": "restart", "at": "r1", "expect": {"settled": ["p1#c1"]}},
+    {
+      "t": 90500,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {
+        "claims": [],
+        "coverage": "unknown",
+        "status": {"p1#c1": "lapsed"},
+        "render_includes": ["coverage unknown since 90s (restart)"]
+      }
+    },
+    {
+      "t": 91000,
+      "op": "snapshot",
+      "at": "r1",
+      "complete": true,
+      "frames": [{"body": "p1", "seq": 1, "expires_at": 130000}],
+      "expect": ["duplicate"]
+    },
+    {"t": 91500, "op": "read", "at": "r1", "view": "current", "expect": {"claims": [], "coverage": "complete"}},
+    {
+      "t": 92000,
+      "op": "frame",
+      "body": "p1",
+      "seq": 1,
+      "expires_at": 212000,
+      "epoch": 2,
+      "expect": {"admit": "repeat"}
+    },
+    {
+      "t": 93000,
+      "op": "frame",
+      "body": "p2",
+      "seq": 2,
+      "expires_at": 213000,
+      "epoch": 2,
+      "expect": {"admit": "lapsed-source"}
+    },
+    {
+      "t": 94000,
+      "op": "frame",
+      "body": "p3",
+      "seq": 3,
+      "expires_at": 214000,
+      "epoch": 2,
+      "expect": {"admit": "admitted"}
+    },
+    {
+      "t": 95000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {"claims": [], "status": {"p3#c1": "source-lapsed"}, "until": {"p3#c1": 45000}}
+    },
+    {"t": 95000, "op": "present", "at": "r1", "expect": {"presented": [], "settled": [], "notes": []}},
+    {
+      "t": 95000,
+      "op": "present",
+      "at": "r2",
+      "expect": {"presented": [], "notes": ["p1#c1: no longer current (source-lapsed)"]}
+    },
+    {
+      "t": 96000,
+      "op": "frame",
+      "body": "p1",
+      "seq": 4,
+      "expires_at": 216000,
+      "epoch": 2,
+      "expect": {"admit": "stale"}
+    },
+    {"t": 160000, "op": "present", "at": "r1", "expect": {"presented": [], "settled": [], "notes": []}}
+  ],
+  "expect_end": {
+    "producers": {
+      "f00d000000000001": {"synthesis": 1, "no_new_evidence": 0, "mechanical": 2, "repeats": 1, "refused": 1}
+    },
+    "receivers": {
+      "r1": {"model_calls": 0, "refused": [["p2", "lapsed-source"], ["p1", "stale"]]},
+      "r2": {"refused": [["p2", "lapsed-source"], ["p1", "stale"]]}
+    }
+  }
+}

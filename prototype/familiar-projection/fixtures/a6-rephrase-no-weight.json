@@ -1,0 +1,224 @@
+{
+  "v": "familiar-projection-fixture/1",
+  "name": "a6-rephrase-no-weight",
+  "case": "AC6",
+  "synthetic": true,
+  "about": "Refreshes, retries, a rephrase and a second familiar over the same source keep support at 1 and are presented once. Only a source from a second actor raises support.",
+  "defaults": {"key_id": "f00d000000000001", "station": "familiar", "stream": "wake", "scope": "lan", "epoch": 1},
+  "receivers": {
+    "r1": {"topics": ["build"], "window_ms": 5000},
+    "r2": {"topics": ["build"], "window_ms": 5000, "min_support": 2}
+  },
+  "bodies": {
+    "a1": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0007",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice's build failed twice"
+        }
+      ]
+    },
+    "a2": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 19000],
+      "generated_at": 20000,
+      "valid_until": 320000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0007",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "the build broke two times for alice"
+        }
+      ]
+    },
+    "b1": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 24000],
+      "generated_at": 25000,
+      "valid_until": 325000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0007",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice hit two failed builds"
+        }
+      ]
+    },
+    "b2": {
+      "v": "familiar-projection/1",
+      "key": "wake-build",
+      "standing": "current",
+      "window": [0, 29000],
+      "generated_at": 30000,
+      "valid_until": 330000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0007",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        },
+        {
+          "id": "s2",
+          "actor": "bob",
+          "ref": "row:bob:0003",
+          "rev": 1,
+          "origin": "observed",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s2"],
+          "text": "bob saw alice's build fail"
+        },
+        {
+          "id": "c2",
+          "basis": "interpretation",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1", "s2"],
+          "text": "two actors saw alice's build fail"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {"t": 10000, "op": "frame", "body": "a1", "seq": 1, "expires_at": 130000, "expect": {"admit": "admitted"}},
+    {
+      "t": 11000,
+      "op": "frame",
+      "body": "a1",
+      "seq": 2,
+      "expires_at": 131000,
+      "refresh": true,
+      "expect": {"admit": "repeat"}
+    },
+    {"t": 12000, "op": "frame", "body": "a1", "seq": 3, "expires_at": 132000, "expect": {"admit": "repeat"}},
+    {"t": 12000, "op": "frame", "body": "a1", "seq": 3, "expires_at": 132000, "expect": {"admit": "duplicate"}},
+    {"t": 16000, "op": "present", "at": "r1", "expect": {"presented": ["a1#c1"]}},
+    {"t": 16000, "op": "present", "at": "r2", "expect": {"presented": [], "settled": []}},
+    {"t": 20000, "op": "frame", "body": "a2", "seq": 4, "expires_at": 140000, "expect": {"admit": "admitted"}},
+    {"t": 21000, "op": "present", "at": "r1", "expect": {"presented": []}},
+    {
+      "t": 25000,
+      "op": "frame",
+      "body": "b1",
+      "seq": 1,
+      "expires_at": 145000,
+      "key_id": "f00d000000000002",
+      "station": "familiar-2",
+      "expect": {"admit": "admitted"}
+    },
+    {
+      "t": 26000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {
+        "claims": ["a2#c1", "b1#c1"],
+        "support": {"a2#c1": 1, "b1#c1": 1},
+        "same_evidence": [["a1#c1", "a2#c1", "b1#c1"]],
+        "topic_support": {"build": 1}
+      }
+    },
+    {"t": 26000, "op": "present", "at": "r1", "expect": {"presented": []}},
+    {
+      "t": 30000,
+      "op": "frame",
+      "body": "b2",
+      "seq": 2,
+      "expires_at": 150000,
+      "key_id": "f00d000000000002",
+      "station": "familiar-2",
+      "expect": {"admit": "admitted"}
+    },
+    {
+      "t": 31000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {
+        "claims": ["a2#c1", "b1#c1", "b2#c1", "b2#c2"],
+        "labels": {"b1#c1": "self-report", "b2#c1": "observation", "b2#c2": "interpretation"},
+        "support": {"b2#c1": 1, "b2#c2": 2},
+        "topic_support": {"build": 2}
+      }
+    },
+    {"t": 36000, "op": "present", "at": "r1", "expect": {"presented": ["b2#c1", "b2#c2"]}},
+    {"t": 36000, "op": "present", "at": "r2", "expect": {"presented": ["b2#c2"]}}
+  ],
+  "expect_end": {
+    "producers": {
+      "f00d000000000001": {"synthesis": 2, "no_new_evidence": 1, "mechanical": 0, "repeats": 2, "refused": 0},
+      "f00d000000000002": {"synthesis": 2, "no_new_evidence": 0, "mechanical": 0, "repeats": 0, "refused": 0}
+    },
+    "receivers": {"r1": {"model_calls": 0, "repeats": 2}, "r2": {"model_calls": 0, "repeats": 2}}
+  }
+}

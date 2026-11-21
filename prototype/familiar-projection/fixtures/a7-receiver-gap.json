@@ -1,0 +1,123 @@
+{
+  "v": "familiar-projection-fixture/1",
+  "name": "a7-receiver-gap",
+  "case": "AC7",
+  "synthetic": true,
+  "about": "Lost records and a stretch with no datagrams make coverage unknown: live claims are carried, not current, presentation waits, and nothing renders as quiet, idle or healthy. An actor the producer could not read is unknown. A complete snapshot restores coverage.",
+  "defaults": {"key_id": "f00d000000000001", "station": "familiar", "stream": "wake", "scope": "lan", "epoch": 1},
+  "receivers": {"r1": {"topics": ["build"], "window_ms": 20000}, "r2": {"topics": ["build"], "window_ms": 20000}},
+  "bodies": {
+    "p1": {
+      "v": "familiar-projection/1",
+      "key": "wake-team",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice is running a build"
+        }
+      ],
+      "unread": ["bob"]
+    }
+  },
+  "steps": [
+    {"t": 5000, "op": "health", "at": "r2", "no_datagrams": true},
+    {
+      "t": 6000,
+      "op": "read",
+      "at": "r2",
+      "view": "current",
+      "expect": {
+        "claims": [],
+        "coverage": "unknown",
+        "render_includes": ["coverage unknown since 5s (no datagrams heard)", "that says nothing about any source"],
+        "render_excludes": ["idle", "healthy", "nothing happened"]
+      }
+    },
+    {
+      "t": 10000,
+      "op": "frame",
+      "body": "p1",
+      "seq": 1,
+      "expires_at": 130000,
+      "to": ["r1"],
+      "expect": {"admit": "admitted"}
+    },
+    {
+      "t": 11000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {
+        "claims": ["p1#c1"],
+        "status": {"p1#c1": "current"},
+        "unknown": ["bob"],
+        "render_includes": ["bob: unknown"]
+      }
+    },
+    {"t": 15000, "op": "health", "at": "r1", "records_lost": 3},
+    {
+      "t": 16000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {
+        "claims": ["p1#c1"],
+        "status": {"p1#c1": "carried"},
+        "coverage": "unknown",
+        "render_includes": ["coverage unknown since 15s (3 records lost)", "carried", "bob: unknown"],
+        "render_excludes": ["idle", "healthy", "stopped"]
+      }
+    },
+    {"t": 31000, "op": "present", "at": "r1", "expect": {"presented": [], "settled": []}},
+    {"t": 32000, "op": "read", "at": "r1", "view": "pending", "expect": {"claims": ["p1#c1"]}},
+    {
+      "t": 40000,
+      "op": "snapshot",
+      "at": "r1",
+      "complete": true,
+      "frames": [{"body": "p1", "seq": 1, "expires_at": 130000}],
+      "expect": ["duplicate"]
+    },
+    {
+      "t": 41000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {"status": {"p1#c1": "current"}, "coverage": "complete"}
+    },
+    {"t": 41000, "op": "present", "at": "r1", "expect": {"presented": ["p1#c1"]}},
+    {"t": 50000, "op": "health", "at": "r1", "no_datagrams": true},
+    {
+      "t": 51000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {
+        "status": {"p1#c1": "carried"},
+        "render_includes": ["no datagrams heard"],
+        "topic_support": {"build": 0}
+      }
+    }
+  ],
+  "expect_end": {"receivers": {"r1": {"model_calls": 0}, "r2": {"model_calls": 0}}}
+}
