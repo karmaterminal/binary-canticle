@@ -54,10 +54,15 @@ proof can be supplied until it is implemented. A successful source inventory can
 | Boundary | Small concrete implementation needed | Acceptance at that boundary |
 |---|---|---|
 | Payload enters a session | Connect the permitted read/delivery to a durable host-owned exposure ledger. Fence possible exposure before returning bytes, then record the exact successful host handoff and source identity/generation. Cover every enabled input path. | Concurrent input changes the snapshot; ambiguous handoff remains fenced after restart. Metadata-only preview adds no payload exposure. Existing unknown history is refused rather than initialized as clean. |
-| Child returns to a parent | Carry the child's complete causal exposure into the exact parent incarnation **before** the child material can enter its prompt, result or automatic completion. Keep an ambiguous transfer closed. | Parent exposure precedes parent payload visibility; stale/replaced parents and cancelled ownership receive nothing. Ordinary singing cannot make the inherited material independent. |
+| If the chosen path returns child material to a parent | Carry the child's complete causal exposure into the exact parent incarnation **before** the child material can enter its prompt, result or automatic completion. Keep an ambiguous transfer closed. | Parent exposure precedes parent payload visibility; stale/replaced parents and cancelled ownership receive nothing. Ordinary singing cannot make the inherited material independent. |
 | Elected rendition reaches the station | Register the reviewed host-only capability producer/verifier and a dedicated authenticated derived-publication operation. Bind exact elected bytes, reader and publisher authority, full station public key, audience, deadline and immutable complete history. | One durable claim precedes any station effect; recovery queries the same claim. The model cannot select lineage fields or route the bytes through ordinary `canticle_sing`. |
 | Ordinary room output | Implement the separately adopted room rule at the actual final delivery boundary, including normal reply, message tool, child announcement and durable replay. | Approved bound destination succeeds; unrelated destination/session/tool refuses; revoked or changed identity fails even after a policy/approval wait. |
 | Claude/frond-ear participant | Add/document an authorized elected publication boundary tied to its real source receipts and identity. Its existing `hear` and push delivery alone are not that boundary. | One disposable Claude-homed participant can receive, choose quiet or author an election, and produce the same distinguishable lineage/acceptance/reception outcomes under its own stated host contract. |
+
+Implement the paths the selected mode actually enables. A route that explicitly forbids payload-bearing
+child handoff may prove that denial instead of implementing a new child-return subsystem for the lesson.
+The same principle applies to unused ambient and outbound surfaces: keep them closed and test that they
+stay closed; do not turn this outing into a requirement to support every host route.
 
 Do not broaden the local reader's key regexp, copy heard text into an apparently clean singer, clear a
 taint flag, reset an existing prince, or claim that `sandboxed: true` demonstrates all of the above.
@@ -126,7 +131,7 @@ existing automated negative matrix rather than asking every prince to perform it
 | Withdrawn source, applicable expiry, receiver mute | Follow the adopted source-use rule and stop disallowed future delivery. Do not claim to erase already encountered content. Existing explicit `canticle_listen` can inspect journal entries marked muted where independently permitted; test that distinction. |
 | Heard instruction asks for a different tool, target, class or scope | Payload remains data; no authority change or side effect. |
 | Crash/lost acknowledgment after claim or after actual station effect | Same claim is queried after restart; no fresh-ID retry and no duplicate effect. Unknown remains unknown. |
-| Child return and ordinary completion replay | Exposure inheritance precedes visibility, and every final room destination receives its current permission check. |
+| Child return and ordinary completion replay | Enabled child paths inherit exposure before visibility; a disabled path refuses the attempted handoff. Every enabled final room destination receives its current permission check. |
 
 Preserve a compact machine receipt plus the test command, code/configuration hashes, named host harness,
 policy revision and outcome. Include missing/unknown fields explicitly. A self-written JSON assertion
