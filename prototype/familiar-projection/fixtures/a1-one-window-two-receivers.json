@@ -1,0 +1,200 @@
+{
+  "v": "familiar-projection-fixture/1",
+  "name": "a1-one-window-two-receivers",
+  "case": "AC1",
+  "synthetic": true,
+  "about": "One producer window serves two receivers with different interests. Repeated reads, search, a refresh re-issue, two temporary retunes and a mechanical re-stamp cost one synthesis in all and no receiver model call.",
+  "defaults": {"key_id": "f00d000000000001", "station": "familiar", "stream": "wake", "scope": "lan", "epoch": 1},
+  "receivers": {"r1": {"topics": ["build"], "window_ms": 20000}, "r2": {"topics": ["deploy"], "window_ms": 20000}},
+  "bodies": {
+    "p1": {
+      "v": "familiar-projection/1",
+      "key": "wake-team",
+      "standing": "current",
+      "window": [0, 60000],
+      "generated_at": 61000,
+      "valid_until": 361000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        },
+        {
+          "id": "s2",
+          "actor": "bob",
+          "ref": "row:bob:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build twice"
+        },
+        {
+          "id": "c2",
+          "basis": "report",
+          "about": "bob",
+          "topics": ["deploy"],
+          "src": ["s2"],
+          "text": "bob started a deploy"
+        }
+      ]
+    },
+    "p2": {
+      "v": "familiar-projection/1",
+      "key": "wake-team",
+      "standing": "current",
+      "window": [0, 120000],
+      "generated_at": 121000,
+      "valid_until": 421000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        },
+        {
+          "id": "s2",
+          "actor": "bob",
+          "ref": "row:bob:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build twice"
+        },
+        {
+          "id": "c2",
+          "basis": "report",
+          "about": "bob",
+          "topics": ["deploy"],
+          "src": ["s2"],
+          "text": "bob started a deploy"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {"t": 61000, "op": "frame", "body": "p1", "seq": 1, "expires_at": 181000, "expect": {"admit": "admitted"}},
+    {
+      "t": 62000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {
+        "claims": ["p1#c1", "p1#c2"],
+        "coverage": "complete",
+        "labels": {"p1#c1": "self-report", "p1#c2": "self-report"},
+        "support": {"p1#c1": 1, "p1#c2": 1}
+      }
+    },
+    {
+      "t": 62000,
+      "op": "read",
+      "at": "r2",
+      "view": "current",
+      "expect": {"claims": ["p1#c1", "p1#c2"], "render_includes": ["> alice ran the build twice"]}
+    },
+    {
+      "t": 62500,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "interest": true,
+      "expect": {"claims": ["p1#c1"], "why": {"p1#c1": "topic build"}}
+    },
+    {
+      "t": 62500,
+      "op": "read",
+      "at": "r2",
+      "view": "current",
+      "interest": true,
+      "expect": {"claims": ["p1#c2"], "why": {"p1#c2": "topic deploy"}}
+    },
+    {"t": 70000, "op": "read", "at": "r1", "view": "search", "q": "deploy", "expect": {"claims": ["p1#c2"]}},
+    {"t": 70000, "op": "read", "at": "r2", "view": "search", "q": "alice", "expect": {"claims": ["p1#c1"]}},
+    {
+      "t": 80000,
+      "op": "frame",
+      "body": "p1",
+      "seq": 2,
+      "expires_at": 200000,
+      "refresh": true,
+      "expect": {"admit": "repeat"}
+    },
+    {"t": 82000, "op": "present", "at": "r1", "expect": {"presented": ["p1#c1"], "settled": []}},
+    {"t": 82000, "op": "present", "at": "r2", "expect": {"presented": ["p1#c2"], "settled": []}},
+    {"t": 85000, "op": "retune", "at": "r2", "topics": ["build"], "until": 115000},
+    {
+      "t": 86000,
+      "op": "read",
+      "at": "r2",
+      "view": "current",
+      "interest": true,
+      "expect": {"claims": ["p1#c1"], "why": {"p1#c1": "topic build, retune until 115s"}}
+    },
+    {
+      "t": 86000,
+      "op": "read",
+      "at": "r2",
+      "view": "pending",
+      "expect": {"claims": ["p1#c1"], "why": {"p1#c1": "topic build, retune until 115s"}}
+    },
+    {"t": 91000, "op": "retune", "at": "r1", "topics": ["deploy"], "until": 100000},
+    {"t": 92000, "op": "read", "at": "r1", "view": "pending", "expect": {"claims": ["p1#c2"]}},
+    {"t": 106000, "op": "present", "at": "r2", "expect": {"presented": ["p1#c1"], "settled": []}},
+    {"t": 112000, "op": "present", "at": "r1", "expect": {"presented": [], "settled": ["p1#c2"]}},
+    {"t": 120000, "op": "read", "at": "r2", "view": "current", "interest": true, "expect": {"claims": ["p1#c2"]}},
+    {"t": 121000, "op": "frame", "body": "p2", "seq": 3, "expires_at": 241000, "expect": {"admit": "admitted"}},
+    {
+      "t": 122000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {
+        "claims": ["p2#c1", "p2#c2"],
+        "status": {"p1#c1": "superseded"},
+        "same_evidence": [["p1#c1", "p2#c1"]],
+        "until": {"p2#c1": 241000}
+      }
+    },
+    {"t": 123000, "op": "present", "at": "r1", "expect": {"presented": [], "settled": [], "notes": []}},
+    {"t": 123000, "op": "present", "at": "r2", "expect": {"presented": [], "settled": [], "notes": []}}
+  ],
+  "expect_end": {
+    "producers": {
+      "f00d000000000001": {"synthesis": 1, "no_new_evidence": 0, "mechanical": 1, "repeats": 1, "refused": 0}
+    },
+    "receivers": {"r1": {"model_calls": 0}, "r2": {"model_calls": 0}}
+  }
+}

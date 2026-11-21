@@ -1,0 +1,132 @@
+{
+  "v": "familiar-projection-fixture/1",
+  "name": "n1-notice-versus-record",
+  "case": "notice vs record",
+  "synthetic": true,
+  "about": "A crier's rain notice and a ledger's rain record arrive in one projection. When the notice expires only the claim that cites it goes: the record's claim stays current, and nothing says the rain stopped. A state claim that cites only a notice is refused.",
+  "defaults": {"key_id": "f00d000000000001", "station": "familiar", "stream": "wake", "scope": "lan", "epoch": 1},
+  "receivers": {"r1": {"topics": ["rain"], "window_ms": 5000}},
+  "bodies": {
+    "w1": {
+      "v": "familiar-projection/1",
+      "key": "weather-1500",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 610000,
+      "sources": [
+        {
+          "id": "n1",
+          "actor": "crier",
+          "ref": "row:crier:0042",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 70000
+        },
+        {
+          "id": "l1",
+          "actor": "ledger",
+          "ref": "entry:rain-1500",
+          "rev": 1,
+          "origin": "self",
+          "authority": "record",
+          "audience": "lan",
+          "valid_until": 7200000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "crier",
+          "topics": ["rain"],
+          "src": ["n1"],
+          "text": "the crier announced rain from 15:00"
+        },
+        {
+          "id": "c2",
+          "basis": "state",
+          "about": "town",
+          "topics": ["rain"],
+          "src": ["l1"],
+          "text": "rain is committed for 15:00 to 17:00"
+        }
+      ]
+    },
+    "bad": {
+      "v": "familiar-projection/1",
+      "key": "weather-bad",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 610000,
+      "sources": [
+        {
+          "id": "n1",
+          "actor": "crier",
+          "ref": "row:crier:0042",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 70000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c2",
+          "basis": "state",
+          "about": "town",
+          "topics": ["rain"],
+          "src": ["n1"],
+          "text": "rain is committed for 15:00 to 17:00"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {"op": "descriptor", "body": "bad", "expect": "state-needs-record"},
+    {"t": 10000, "op": "frame", "body": "w1", "seq": 1, "expires_at": 130000, "expect": {"admit": "admitted"}},
+    {
+      "t": 20000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {
+        "claims": ["w1#c1", "w1#c2"],
+        "labels": {"w1#c1": "self-report", "w1#c2": "record"},
+        "topic_support": {"rain": 2}
+      }
+    },
+    {"t": 20000, "op": "present", "at": "r1", "expect": {"presented": ["w1#c1", "w1#c2"]}},
+    {
+      "t": 71000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {
+        "claims": ["w1#c2"],
+        "status": {"w1#c1": "source-lapsed", "w1#c2": "current"},
+        "topic_support": {"rain": 1},
+        "until": {"w1#c2": 130000},
+        "render_includes": ["> rain is committed for 15:00 to 17:00"],
+        "render_excludes": ["stopped", "cancelled", "ended", "no rain", "over"]
+      }
+    },
+    {"t": 71000, "op": "read", "at": "r1", "view": "search", "q": "rain", "expect": {"claims": ["w1#c2"]}},
+    {
+      "t": 71000,
+      "op": "present",
+      "at": "r1",
+      "expect": {"presented": [], "notes": ["w1#c1: no longer current (source-lapsed)"]}
+    }
+  ],
+  "expect_end": {
+    "producers": {
+      "f00d000000000001": {"synthesis": 1, "no_new_evidence": 0, "mechanical": 0, "repeats": 0, "refused": 0}
+    },
+    "receivers": {"r1": {"model_calls": 0}}
+  }
+}

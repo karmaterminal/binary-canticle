@@ -1,0 +1,756 @@
+{
+  "v": "familiar-projection-fixture/1",
+  "name": "d1-descriptor-rules",
+  "case": "descriptor",
+  "synthetic": true,
+  "about": "One body per rule of the familiar-projection/1 reader. Every refusal fails closed: the body is dropped and counted, and it never supersedes anything.",
+  "defaults": {"key_id": "f00d000000000001", "station": "familiar", "stream": "wake", "scope": "lan", "epoch": 1},
+  "receivers": {},
+  "bodies": {
+    "ok": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "unknown-field": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ],
+      "extra": 1
+    },
+    "too-large": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "actor1",
+          "ref": "row:actor1:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        },
+        {
+          "id": "s2",
+          "actor": "actor2",
+          "ref": "row:actor2:0002",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        },
+        {
+          "id": "s3",
+          "actor": "actor3",
+          "ref": "row:actor3:0003",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        },
+        {
+          "id": "s4",
+          "actor": "actor4",
+          "ref": "row:actor4:0004",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        },
+        {
+          "id": "s5",
+          "actor": "actor5",
+          "ref": "row:actor5:0005",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        },
+        {
+          "id": "s6",
+          "actor": "actor6",
+          "ref": "row:actor6:0006",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "actor1",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "actor1 ran a long build ran a long build ran a long build ran a long build ran a long build again"
+        },
+        {
+          "id": "c2",
+          "basis": "report",
+          "about": "actor2",
+          "topics": ["build"],
+          "src": ["s2"],
+          "text": "actor2 ran a long build ran a long build ran a long build ran a long build ran a long build again"
+        },
+        {
+          "id": "c3",
+          "basis": "report",
+          "about": "actor3",
+          "topics": ["build"],
+          "src": ["s3"],
+          "text": "actor3 ran a long build ran a long build ran a long build ran a long build ran a long build again"
+        },
+        {
+          "id": "c4",
+          "basis": "report",
+          "about": "actor4",
+          "topics": ["build"],
+          "src": ["s4"],
+          "text": "actor4 ran a long build ran a long build ran a long build ran a long build ran a long build again"
+        },
+        {
+          "id": "c5",
+          "basis": "report",
+          "about": "actor5",
+          "topics": ["build"],
+          "src": ["s5"],
+          "text": "actor5 ran a long build ran a long build ran a long build ran a long build ran a long build again"
+        },
+        {
+          "id": "c6",
+          "basis": "report",
+          "about": "actor6",
+          "topics": ["build"],
+          "src": ["s6"],
+          "text": "actor6 ran a long build ran a long build ran a long build ran a long build ran a long build again"
+        }
+      ]
+    },
+    "text-newline": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran\nthe build"
+        }
+      ]
+    },
+    "text-bidi": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the ‮build"
+        }
+      ]
+    },
+    "unknown-source": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s9"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "echo-source": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "canticle:f00d000000000001:1:00c0ffee:7",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "state-notice": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "state",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "lapsed-source": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 10000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "history-lapsed-source": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "history",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 10000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "lease-too-long": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 910001,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "before-window": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 20000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "audience-host": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "host",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "float": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1.0,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "bool": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": true,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "uncited": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        },
+        {
+          "id": "s2",
+          "actor": "bob",
+          "ref": "row:bob:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "cites-withdrawn": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ],
+      "withdrawn": [{"actor": "alice", "ref": "row:alice:0001", "rev": 1, "reason": "withdrawn"}]
+    },
+    "empty": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [],
+      "claims": []
+    },
+    "version": {
+      "v": "familiar-projection/2",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "duplicate-claim": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        },
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    },
+    "bad-topic": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["Build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {"op": "descriptor", "body": "ok", "expect": "ok"},
+    {"op": "descriptor", "body": "unknown-field", "expect": "unknown-field"},
+    {"op": "descriptor", "body": "too-large", "expect": "too-large"},
+    {"op": "descriptor", "body": "text-newline", "expect": "bad-text"},
+    {"op": "descriptor", "body": "text-bidi", "expect": "bad-text"},
+    {"op": "descriptor", "body": "unknown-source", "expect": "unknown-source"},
+    {"op": "descriptor", "body": "echo-source", "expect": "echo-source"},
+    {"op": "descriptor", "body": "state-notice", "expect": "state-needs-record"},
+    {"op": "descriptor", "body": "lapsed-source", "expect": "lapsed-source"},
+    {"op": "descriptor", "body": "history-lapsed-source", "expect": "ok"},
+    {"op": "descriptor", "body": "lease-too-long", "expect": "lease-too-long"},
+    {"op": "descriptor", "body": "before-window", "expect": "before-window"},
+    {"op": "descriptor", "body": "audience-host", "expect": "audience"},
+    {"op": "descriptor", "body": "float", "expect": "not-integer"},
+    {"op": "descriptor", "body": "bool", "expect": "not-integer"},
+    {"op": "descriptor", "body": "uncited", "expect": "uncited-source"},
+    {"op": "descriptor", "body": "cites-withdrawn", "expect": "cites-withdrawn"},
+    {"op": "descriptor", "body": "empty", "expect": "empty"},
+    {"op": "descriptor", "body": "version", "expect": "version"},
+    {"op": "descriptor", "body": "duplicate-claim", "expect": "duplicate-id"},
+    {"op": "descriptor", "body": "bad-topic", "expect": "bad-token"},
+    {"op": "descriptor", "body": "ok", "scope": "fleet", "expect": "audience"}
+  ],
+  "expect_end": {}
+}

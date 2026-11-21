@@ -6,11 +6,13 @@ this file repeats the essentials in brief and adds a checklist for reviews. Keep
 
 - RFC-0001 (`rfc/0001-binary-canticle.md`) is the authority. `prototype/canticle-station/` is a Python 3.11
   spike of it, and its README lists where the code departs from the RFC. `prototype/openclaw-canticle/` is a
-  TypeScript spike of the OpenClaw prince plugin (#97), with its own departures table. `proto/`, `spike/` and
-  `scratch/` are lineage that the RFC supersedes.
+  TypeScript spike of the OpenClaw prince plugin (#97), with its own departures table.
+  `prototype/familiar-projection/` is a proposed familiar projection descriptor and checker (#148), not in the
+  RFC. `proto/`, `spike/` and `scratch/` are lineage that the RFC supersedes.
 - Tests, from the repository root:
   `PYTHONPATH=prototype/canticle-station python -m unittest discover -s prototype/canticle-station/tests`
-  (add `-p 'test_<module>.py'` for one module). The plugin's, with Node 24 or 26: `node --test 'test/*.test.ts'`
+  (add `-p 'test_<module>.py'` for one module), and the same with `-s prototype/familiar-projection`. The
+  plugin's, with Node 24 or 26: `node --test 'test/*.test.ts'`
   in `prototype/openclaw-canticle/`. Afterwards `git status --porcelain` must print nothing.
 - Never run `prototype/protocol-dynamics/run_all.sh` or `prototype/canticle-station/proofs/web-lanes/run.sh`:
   they need root and network namespaces, and their results are attested evidence.

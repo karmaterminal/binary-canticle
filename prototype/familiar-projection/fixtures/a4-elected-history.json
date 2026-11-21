@@ -1,0 +1,166 @@
+{
+  "v": "familiar-projection-fixture/1",
+  "name": "a4-elected-history",
+  "case": "AC4",
+  "synthetic": true,
+  "about": "A principal elects to keep one claim. It stays attributed and marked historical after its source is withdrawn, never returns to the current view or default search, and never counts as support. A session cannot keep heard content. A producer's history-standing projection is shown only as history.",
+  "defaults": {"key_id": "f00d000000000001", "station": "familiar", "stream": "wake", "scope": "lan", "epoch": 1},
+  "receivers": {"r1": {"topics": ["merge"], "window_ms": 10000}},
+  "bodies": {
+    "p1": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["merge"],
+          "src": ["s1"],
+          "text": "alice merged the fix"
+        }
+      ]
+    },
+    "w1": {
+      "v": "familiar-projection/1",
+      "key": "wake-alice",
+      "standing": "current",
+      "window": [0, 29000],
+      "generated_at": 30000,
+      "valid_until": 330000,
+      "sources": [],
+      "claims": [],
+      "withdrawn": [{"actor": "alice", "ref": "row:alice:0001", "rev": 1, "reason": "withdrawn"}]
+    },
+    "h1": {
+      "v": "familiar-projection/1",
+      "key": "day-alice",
+      "standing": "history",
+      "window": [0, 5000],
+      "generated_at": 40000,
+      "valid_until": 340000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0000",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 5000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["merge"],
+          "src": ["s1"],
+          "text": "alice merged the first fix"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {"t": 10000, "op": "frame", "body": "p1", "seq": 1, "expires_at": 130000, "expect": {"admit": "admitted"}},
+    {"t": 20000, "op": "retain", "at": "r1", "claim": "p1#c1", "by": "principal", "expect": "kept"},
+    {"t": 21000, "op": "retain", "at": "r1", "claim": "p1#c1", "by": "session", "expect": "refused"},
+    {
+      "t": 22000,
+      "op": "read",
+      "at": "r1",
+      "view": "history",
+      "expect": {
+        "claims": ["kept:p1#c1"],
+        "render_includes": [
+          "[history] about alice, from familiar f00d000000000001",
+          "kept at 20s by principal",
+          "> alice merged the fix"
+        ]
+      }
+    },
+    {
+      "t": 22000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {"claims": ["p1#c1"], "topic_support": {"merge": 1}}
+    },
+    {"t": 25000, "op": "present", "at": "r1", "expect": {"presented": ["p1#c1"]}},
+    {"t": 30000, "op": "frame", "body": "w1", "seq": 2, "expires_at": 150000, "expect": {"admit": "admitted"}},
+    {
+      "t": 31000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {"claims": [], "status": {"p1#c1": "withdrawn"}, "topic_support": {"merge": 0}}
+    },
+    {
+      "t": 31000,
+      "op": "read",
+      "at": "r1",
+      "view": "history",
+      "expect": {"claims": ["kept:p1#c1"], "render_includes": ["source withdrawn at 30s"]}
+    },
+    {"t": 31000, "op": "read", "at": "r1", "view": "search", "q": "merge", "expect": {"claims": []}},
+    {
+      "t": 31000,
+      "op": "read",
+      "at": "r1",
+      "view": "search",
+      "q": "merge",
+      "history": true,
+      "expect": {"claims": ["kept:p1#c1"]}
+    },
+    {"t": 40000, "op": "frame", "body": "h1", "seq": 3, "expires_at": 160000, "expect": {"admit": "admitted"}},
+    {"t": 41000, "op": "read", "at": "r1", "view": "current", "expect": {"claims": [], "topic_support": {"merge": 0}}},
+    {
+      "t": 41000,
+      "op": "read",
+      "at": "r1",
+      "view": "history",
+      "expect": {
+        "claims": ["h1#c1", "kept:p1#c1"],
+        "status": {"h1#c1": "history"},
+        "render_includes": ["window 0s-5s, generated 40s, history, historical"]
+      }
+    },
+    {
+      "t": 41000,
+      "op": "present",
+      "at": "r1",
+      "expect": {"presented": [], "notes": ["p1#c1: no longer current (withdrawn)"]}
+    },
+    {
+      "t": 400000,
+      "op": "read",
+      "at": "r1",
+      "view": "history",
+      "expect": {"claims": ["kept:p1#c1"], "status": {"h1#c1": "lapsed"}}
+    }
+  ],
+  "expect_end": {
+    "producers": {
+      "f00d000000000001": {"synthesis": 2, "no_new_evidence": 0, "mechanical": 1, "repeats": 0, "refused": 0}
+    },
+    "receivers": {"r1": {"model_calls": 0}}
+  }
+}

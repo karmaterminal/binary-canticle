@@ -1,0 +1,287 @@
+{
+  "v": "familiar-projection-fixture/1",
+  "name": "a3-partial-invalidation",
+  "case": "AC3",
+  "synthetic": true,
+  "about": "alice withdraws one source. Only the claims that cite it go, and a later synthesis that cites it again under a fresh generated_at does not bring them back. Restating a source's validity cannot extend it, and a body that cites a source already lapsed at generated_at is refused.",
+  "defaults": {"key_id": "f00d000000000001", "station": "familiar", "stream": "wake", "scope": "lan", "epoch": 1},
+  "receivers": {"r1": {"topics": ["build", "review"], "window_ms": 30000}},
+  "bodies": {
+    "p1": {
+      "v": "familiar-projection/1",
+      "key": "wake-team",
+      "standing": "current",
+      "window": [0, 9000],
+      "generated_at": 10000,
+      "valid_until": 310000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        },
+        {
+          "id": "s2",
+          "actor": "bob",
+          "ref": "row:bob:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 240000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        },
+        {
+          "id": "c2",
+          "basis": "report",
+          "about": "bob",
+          "topics": ["review"],
+          "src": ["s2"],
+          "text": "bob reviewed the fix"
+        },
+        {
+          "id": "c3",
+          "basis": "interpretation",
+          "about": "alice",
+          "topics": ["build", "review"],
+          "src": ["s1", "s2"],
+          "text": "alice's build is waiting on bob's review"
+        }
+      ]
+    },
+    "p2": {
+      "v": "familiar-projection/1",
+      "key": "wake-team",
+      "standing": "current",
+      "window": [0, 59000],
+      "generated_at": 60000,
+      "valid_until": 360000,
+      "sources": [
+        {
+          "id": "s2",
+          "actor": "bob",
+          "ref": "row:bob:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 240000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c2",
+          "basis": "report",
+          "about": "bob",
+          "topics": ["review"],
+          "src": ["s2"],
+          "text": "bob reviewed the fix"
+        }
+      ],
+      "withdrawn": [{"actor": "alice", "ref": "row:alice:0001", "rev": 1, "reason": "withdrawn"}]
+    },
+    "p3": {
+      "v": "familiar-projection/1",
+      "key": "wake-team",
+      "standing": "current",
+      "window": [0, 119000],
+      "generated_at": 120000,
+      "valid_until": 420000,
+      "sources": [
+        {
+          "id": "s1",
+          "actor": "alice",
+          "ref": "row:alice:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 600000
+        },
+        {
+          "id": "s2",
+          "actor": "bob",
+          "ref": "row:bob:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 240000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "basis": "report",
+          "about": "alice",
+          "topics": ["build"],
+          "src": ["s1"],
+          "text": "alice ran the build"
+        },
+        {
+          "id": "c2",
+          "basis": "report",
+          "about": "bob",
+          "topics": ["review"],
+          "src": ["s2"],
+          "text": "bob reviewed the fix"
+        },
+        {
+          "id": "c3",
+          "basis": "interpretation",
+          "about": "alice",
+          "topics": ["build", "review"],
+          "src": ["s1", "s2"],
+          "text": "bob's review is what alice's build waits for"
+        }
+      ]
+    },
+    "p4": {
+      "v": "familiar-projection/1",
+      "key": "wake-team",
+      "standing": "current",
+      "window": [0, 179000],
+      "generated_at": 180000,
+      "valid_until": 480000,
+      "sources": [
+        {
+          "id": "s2",
+          "actor": "bob",
+          "ref": "row:bob:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 900000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c2",
+          "basis": "report",
+          "about": "bob",
+          "topics": ["review"],
+          "src": ["s2"],
+          "text": "bob reviewed the fix"
+        }
+      ]
+    },
+    "p5": {
+      "v": "familiar-projection/1",
+      "key": "wake-team",
+      "standing": "current",
+      "window": [0, 299000],
+      "generated_at": 300000,
+      "valid_until": 600000,
+      "sources": [
+        {
+          "id": "s2",
+          "actor": "bob",
+          "ref": "row:bob:0001",
+          "rev": 1,
+          "origin": "self",
+          "authority": "notice",
+          "audience": "lan",
+          "valid_until": 240000
+        }
+      ],
+      "claims": [
+        {
+          "id": "c2",
+          "basis": "report",
+          "about": "bob",
+          "topics": ["review"],
+          "src": ["s2"],
+          "text": "bob reviewed the fix"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {"t": 10000, "op": "frame", "body": "p1", "seq": 1, "expires_at": 130000, "expect": {"admit": "admitted"}},
+    {
+      "t": 11000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {
+        "claims": ["p1#c1", "p1#c2", "p1#c3"],
+        "labels": {"p1#c1": "self-report", "p1#c3": "interpretation"},
+        "support": {"p1#c1": 1, "p1#c3": 2}
+      }
+    },
+    {"t": 41000, "op": "present", "at": "r1", "expect": {"presented": ["p1#c1", "p1#c2", "p1#c3"]}},
+    {"t": 60000, "op": "frame", "body": "p2", "seq": 2, "expires_at": 180000, "expect": {"admit": "admitted"}},
+    {
+      "t": 61000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {"claims": ["p2#c2"], "status": {"p1#c1": "withdrawn", "p1#c3": "withdrawn", "p1#c2": "superseded"}}
+    },
+    {
+      "t": 61000,
+      "op": "present",
+      "at": "r1",
+      "expect": {
+        "presented": [],
+        "notes": ["p1#c1: no longer current (withdrawn)", "p1#c3: no longer current (withdrawn)"]
+      }
+    },
+    {"t": 120000, "op": "frame", "body": "p3", "seq": 3, "expires_at": 240000, "expect": {"admit": "admitted"}},
+    {
+      "t": 121000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {
+        "claims": ["p3#c2"],
+        "status": {"p3#c1": "withdrawn", "p3#c3": "withdrawn"},
+        "render_includes": ["> bob reviewed the fix"]
+      }
+    },
+    {"t": 121000, "op": "present", "at": "r1", "expect": {"presented": [], "settled": [], "notes": []}},
+    {"t": 180000, "op": "frame", "body": "p4", "seq": 4, "expires_at": 300000, "expect": {"admit": "admitted"}},
+    {
+      "t": 200000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {"claims": ["p4#c2"], "until": {"p4#c2": 240000}}
+    },
+    {
+      "t": 250000,
+      "op": "read",
+      "at": "r1",
+      "view": "current",
+      "expect": {"claims": [], "status": {"p4#c2": "source-lapsed"}}
+    },
+    {
+      "t": 251000,
+      "op": "present",
+      "at": "r1",
+      "expect": {"presented": [], "notes": ["p1#c2: no longer current (source-lapsed)"]}
+    },
+    {"t": 300000, "op": "frame", "body": "p5", "seq": 5, "expires_at": 420000, "expect": {"admit": "lapsed-source"}}
+  ],
+  "expect_end": {
+    "producers": {
+      "f00d000000000001": {"synthesis": 2, "no_new_evidence": 1, "mechanical": 2, "repeats": 0, "refused": 1}
+    },
+    "receivers": {"r1": {"model_calls": 0, "refused": [["p5", "lapsed-source"]]}}
+  }
+}
