@@ -78,18 +78,24 @@ Keep-on-air is looser than the RFC: the station lets any keyed item be kept on a
 
 ### Elected derived-publication proposal (#146; not connected)
 
-[canticle/derived_reply_proposal.py](canticle/derived_reply_proposal.py) is an inert, default-closed review
+[canticle/derived_reply_proposal.py](canticle/derived_reply_proposal.py) is a default-closed review
 primitive for Cael/Ronan's #146 lane. It tests complete-history/exposure fences, exact generations,
 explicit election, durable one-use claims and a candidate authenticated capability with full-ledger
-lineage. It is not imported by the CLI or station control dispatcher and never calls Station.sing.
-Ordinary OpenClaw taint and subagent publication refusals remain unchanged.
-The fixture accepts subagent session keys only; it is not a continuing main/Discord-session adapter.
-Its station-name/key-ID intent is not a production full-public-key signer check.
+lineage and a full-public-key signer binding. Version 2 refuses older version-1 fixture capsules.
 
+The separate [derived_station_proposal.py](canticle/derived_station_proposal.py) now proves the actual
+Station signing/carousel effect, an immutable acceptance receipt and query-only recovery. Both its
+adapter and the Station admission flag are disabled by default. **No CLI, control dispatcher or agent
+tool registers or enables them.** It never calls ordinary Station.sing; OpenClaw's existing taint and
+subagent publication refusals remain unchanged. Synthetic tests include a real signature-verifying
+Listener and loopback UDP. Station acceptance, host reception and session exposure remain different
+receipts, and ambiguous claims never retry an effect.
+
+The fixture accepts subagent session keys only; it is not a continuing main/Discord-session adapter.
+Its same-process host/station database composition is not an authenticated production IPC bridge.
 The [proposal and production seam inventory](../../rfc/0001-notes/derived-reply-capability-proposal.md)
-identify the unadopted choices and remaining actual-host, station and room-egress proofs. Focused
-tests use temporary SQLite state and synthetic data. A codec fixture is not an on-air or session
-encounter receipt. Neither #145 nor #146/#156 closes on these tests.
+identify the unadopted source-freshness/mixed-class policy and remaining actual host, bridge and
+room-egress work. Neither #145 nor #146/#156 closes on these component tests.
 
 ## Install and onboard
 

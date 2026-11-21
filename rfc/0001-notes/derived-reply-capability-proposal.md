@@ -1,4 +1,4 @@
-# Elected derived publication: an inert capability proposal for #146
+# Elected derived publication: a default-closed capability proposal for #146
 
 **2026-11-21 — proposed review contribution, not adopted, deployed or connected.**
 
@@ -27,7 +27,7 @@ operations; none is a model-callable permission or a way to bypass ordinary cant
 | Exposure | A durable pending fence is written **before** payload handoff. Only a host-confirmed actual delivery receipt appends the source and clears that exact fence, in one transaction. An unconfirmed or failed append remains fenced across instances and restart. |
 | Election | Explicit author choice binds exact new bytes by digest, independent publisher intent, audience, one cited exposure and the immutable complete-history snapshot. Silence calls nothing. Sender text is never interpreted as policy. |
 | Claim | SQLite serializes the claim, generations, ledger, policy, rates and cancellation. A one-use claim is durable before its authenticated capsule is returned for any prospective send. A lost result remains unknown; a fresh idempotency key cannot create another operation for the same generation/bytes/intent. |
-| Candidate station admission | An authenticated envelope must match the stored claim and current policy. It is consumed once. The result is an **admitted permission**, not station acceptance, on-air state, host reception or session exposure. |
+| Candidate station admission | An authenticated envelope must match the stored claim, full signer public key and current policy. It is consumed once. The primitive returns an **admitted permission**. The separate disabled station adapter can then sign and queue it, recording an immutable acceptance receipt. Neither result proves host reception or session exposure. |
 | Lineage | Maximum hop comes from the full drained ledger. The final four drained identities become parents; the root follows the first of those four. Unknown upstream wake provenance is conservative. The model supplies none of these fields. |
 | Expiry and withdrawal | Election validity and item expiry are absolute. Lock/policy delays, claim and admission do not restart either window. An observed deadline is terminal across restart and clock rollback. Withdrawal/mute is retained even during a pending exposure and prevents use while retaining the causal record. |
 | Observations | Station acceptance, host reception, exact-session exposure and elected response have separate receipt records. One does not fabricate another. |
@@ -63,7 +63,7 @@ route. This is preparation for the owners' storage design, not a prince's quota 
 
 ### Candidate host-to-station representation
 
-The temporary namespace is **canticle-derived-reply-proposal/1**. A host-held capsule contains an envelope
+The temporary namespace is **canticle-derived-reply-proposal/2**. A host-held capsule contains an envelope
 and a domain-separated HMAC-SHA256 over canonical ASCII JSON. It binds issuer, random claim nonce,
 election, exact reader generation, publisher/stream/class/scope, exact intended audience generations,
 payload SHA-256, complete-ledger digest/count/maximum hop/final four receipts, cited exposure, wake
@@ -74,23 +74,58 @@ This is a candidate representation for Cael, Ronan and the station owner to revi
 wire type or an adopted authentication protocol. The fixture secret is distinct from a real station's
 signing key. No key provisioning or peer-credential transport is implemented here.
 
-`Intent` and `Grant` currently bind the fixture station name and 64-bit `key_id`, not a full public key.
-That is not authentication of a complete real station identity. A production operation must separately
-pin the expected full 32-byte station public key and compare it to the actual signer at the mutation
-boundary, alongside current manifest authority. A previous catalog/name/key-ID check is insufficient;
-the cue-control fix in [#157](https://github.com/karmaterminal/binary-canticle/pull/157) for
-[#155](https://github.com/karmaterminal/binary-canticle/issues/155) demonstrates that separate boundary.
+`Intent` and `Grant` bind the complete 32-byte station public key as canonical hex, in addition to
+station name and its derived 64-bit `key_id`. The authenticated version-2 envelope includes that key;
+version-1 fixture capsules are refused. The new station adapter compares it to the actual signing key
+both at durable admission and at the final mutation, alongside the current manifest grant. A previous
+catalog/name/key-ID check cannot replace the second check. The cue-control fix in
+[#157](https://github.com/karmaterminal/binary-canticle/pull/157) addresses that same distinct boundary
+for original world cues; this proposal does not depend on its implementation.
 
 Independent policy is represented by a trusted fixture **Grant** and a required content-policy callback.
 Policy changes and the publication off-switch are stored in the authority database, so a stale instance
 cannot ignore durable revocation. Before real use, those inputs must come from the station manifest,
 owner authority, receiver policy, content controls and budgets. A passing fixture callback is not proof.
 
-The pure **proposed_item** helper projects a fixture permission into existing frame-v2 lineage fields
-for codec tests. It does not sign, allocate a real sequence, enqueue a carousel item or authorize
-Station.sing. Its Admission is a local library value, not an externally trustworthy bearer object.
-A real station must accept only the new authenticated operation and perform the fresh checks at its
-actual mutation boundary. Falling through to ordinary sing remains prohibited.
+The pure **proposed_item** helper projects a permission into existing frame-v2 lineage fields.
+Its Admission is a local library value, not an externally trustworthy bearer object. The real effect
+proof uses the separate adapter below; falling through to ordinary sing remains prohibited.
+
+### Actual Station effect, still unregistered and default closed
+
+[derived_station_proposal.py](../../prototype/canticle-station/canticle/derived_station_proposal.py)
+adds **DerivedStationProposal.publish** and a read-only **query**. No CLI, socket dispatcher or agent
+tool imports this module. Both the adapter's `enabled=True` and the Station's `derived_proposals=True`
+are required; normal station startup passes neither. They are explicit library construction choices
+for isolated tests, not an operator rollout command.
+
+1. Under the station adapter lock, authenticate and consume the host capsule, binding the exact bytes,
+   generations, complete source history and full actual signer. Commit an `admitted_unknown` election
+   and a durable `claimed_unknown` station-effect row **before** mutation is possible.
+2. Acquire the same SQLite writer lock used by history, generation and policy changes. Recheck all
+   those inputs and the deadline. A new receipt, withdrawal, changed generation or revoked grant
+   between the durable claim and this stage refuses before mutation. Current per-turn/hour budgets
+   are checked again: a tightened grant can refuse an already-spent reservation, which stays spent.
+3. Call Station's private `_accept_derived_proposal` effect boundary. It independently rechecks the
+   full public key and manifest grant, class/scope/stream, lineage, current epoch and next sequence.
+   It signs existing frame-v2 bytes and schedules the actual carousel, without calling ordinary sing.
+   Absolute expiry can only shorten under station limits. No derived refresh is supported.
+4. Commit an immutable station-acceptance receipt before returning it. It identifies the election,
+   exact reader generation, history digest/count and cited exposure, payload digest, complete station
+   key, frame digest, epoch/sequence, expiry and derived flags. Acceptance means **signed and queued**,
+   not emitted, heard or exposed to a session.
+
+If the process dies before the effect, the durable claim stays unknown and is never retried. If the
+station mutates but the receipt write fails, it also stays unknown; the lost receipt does not justify
+a second enqueue. If only the reply is lost after the receipt commits, `query(election_id)` recovers
+that same immutable acceptance without re-enqueueing. A restart may lose the in-memory carousel even
+when acceptance is known; query does not claim the item is currently on air or restore it.
+
+The proposal remains single-host library composition: host and station checks share one SQLite
+authority database, and the adapter owns one Station. Its lock serializes competing candidate calls;
+the station's normal owner must serialize **all** ordinary mutations and polling too. This is not a
+cross-process station protocol or an authenticated IPC provisioning design. The existing unsigned
+spike manifest is still not a signed fleet trust source.
 
 ## Narrow policy choices for owner review
 
@@ -123,7 +158,7 @@ These are **attachment points and an API proposal**, not claims that the integra
 | Invocation identity | Core [tool-types.ts](https://github.com/karmaterminal/openclaw/blob/21660b2182062a9a98eb28d46341283100c082e6/src/plugins/tool-types.ts) supplies sessionId, runId, assertInvocationCurrent, sandbox and delivery context. [local-session-route.ts](https://github.com/karmaterminal/openclaw/blob/21660b2182062a9a98eb28d46341283100c082e6/src/plugins/local-session-route.ts) supplies the exact row ID/revision. Their existence does not prove exposure, host policy or a return route. |
 | Tool restrictions | Core [agent-tools.before-tool-call.policy.ts](https://github.com/karmaterminal/openclaw/blob/21660b2182062a9a98eb28d46341283100c082e6/src/agents/agent-tools.before-tool-call.policy.ts) invokes runTrustedToolPolicies with host session/run identity; [agent-tools.caller.ts](https://github.com/karmaterminal/openclaw/blob/21660b2182062a9a98eb28d46341283100c082e6/src/agents/agent-tools.caller.ts) carries assertToolAllowed and final-I/O receipt authority. These are generic seams; this proposal registers no Canticle policy there. |
 | Non-tool egress and handoff | Core [reply-dispatch-before-deliver.ts](https://github.com/karmaterminal/openclaw/blob/21660b2182062a9a98eb28d46341283100c082e6/src/auto-reply/reply/reply-dispatch-before-deliver.ts), [completion-delivery-policy.ts](https://github.com/karmaterminal/openclaw/blob/21660b2182062a9a98eb28d46341283100c082e6/src/auto-reply/reply/completion-delivery-policy.ts) and [agent-runner-subagent.ts](https://github.com/karmaterminal/openclaw/blob/21660b2182062a9a98eb28d46341283100c082e6/src/auto-reply/reply/agent-runner-subagent.ts) show separate reply/completion/continuation paths. Prove derived taint reaches a parent before content arrives, and no automatic announce, ordinary sing or other egress escapes it. This Python reference enforces none of those paths. |
-| Actual station mutation | BC [runner.py](https://github.com/karmaterminal/binary-canticle/blob/08c11127d4e11ed00f307a7006d85581c8674a28/prototype/canticle-station/canticle/runner.py)'s dispatcher has no derived capability operation. [station.py](https://github.com/karmaterminal/binary-canticle/blob/08c11127d4e11ed00f307a7006d85581c8674a28/prototype/canticle-station/canticle/station.py)'s Station.sing does not accept parent/root parameters. The wire codec can represent them; that is not a control-path implementation. |
+| Production station bridge | BC [runner.py](https://github.com/karmaterminal/binary-canticle/blob/08c11127d4e11ed00f307a7006d85581c8674a28/prototype/canticle-station/canticle/runner.py)'s dispatcher still has no derived capability operation. [station.py](https://github.com/karmaterminal/binary-canticle/blob/08c11127d4e11ed00f307a7006d85581c8674a28/prototype/canticle-station/canticle/station.py)'s ordinary Station.sing remains unchanged. The unregistered proposed adapter now exercises its separate private lineage admission method. Production still needs owner-approved capability transport/provisioning and trusted host integration; this library proof does not supply them. |
 
 Generic trusted tool-policy machinery exists in this inspected core revision. Repeating the older
 README's broad “no tool-policy seam” description as a current fact would be inaccurate. The missing
@@ -150,7 +185,7 @@ callback and called commissioned. Existing continuing sessions are not reset by 
 
 From the repository root:
 
-    PYTHONPATH=prototype/canticle-station python -m unittest discover -s prototype/canticle-station/tests -p test_derived_reply_proposal.py -v
+    PYTHONPATH=prototype/canticle-station python -m unittest discover -s prototype/canticle-station/tests -p 'test_derived_*proposal.py' -v
 
 The focused suite tests default-off operation; unknown/pending/lost history; the complete source set;
 generation/key reuse; publisher/audience/content restrictions; revoked policy; real SQLite races;
@@ -165,9 +200,29 @@ restart. Claim/admission deadline refusals commit a terminal `expired` state whi
 SQLite writer lock; a savepoint discards the attempted operation before that marker is committed. A
 clock earlier than the election's issue time still refuses without inventing an expired deadline.
 
-One test encodes and parses a synthetic item with the real frame-v2 codec and its existing TEST1 fixture
-key. That proves the projected bytes carry lineage. It proves **no live station write, UDP reception,
-actual prince exposure, human approval or permission to converse off host**. #145's actual core reader
-and #146/#156's production host/station/room proofs remain owner-reviewed gates.
+The station suite adds real signing/carousel/Listener and bounded loopback UDP proofs. It checks a
+non-chosen high-hop source, the final-four parent set, wake provenance, quiet/no operation, racing
+redemptions, a full signer replacement with the same 64-bit ID, manifest revocation, expiry and
+new exposure between claim and effect, restart before mutation, lost result after mutation, and an
+SQLite receipt-write failure after an actual mutation. It asserts ordinary sing is never called.
+Loopback sockets are temporary; no multicast, fleet station or prince session is used. CI treats a
+socket permission failure as a failed transport proof, rather than skipping it.
+
+These tests prove an actual Station effect and a signature-verifying Listener encounter under a
+**synthetic host authority**. They prove no live host wrapper, complete continuing-prince history,
+parent handoff, exact prince exposure, human approval or permission to converse off host. #145's
+actual core reader and #146/#156's production host/bridge/room proofs remain owner-reviewed gates.
 
 The [independent review and exact-head rechecks](derived-reply-capability-review-20261121.md) retain the reproduced failures, repairs and proof limits.
+
+
+### Minimal next integration, for the owners
+
+There is no `canticle derived-publish` CLI or configured host route to run yet. After the representation
+and source-use policy are adopted, the implementation owner must wire the host's exposure fences and
+complete ledger to the actual wrapper, inherit that ledger before a parent receives any child result,
+and add an authenticated trusted IPC operation that calls this adapter with a host-selected station.
+Do not expose `Admission`, raw lineage fields, a permissive fixture callback or an arbitrary database
+path as model inputs. Then run one disposable host encounter through the real bridge and exact
+recipient; all adversarial cases above already belong to automated tests. Normal bound-room egress
+and the Claude/frond-ear route still require their separately specified host contracts.

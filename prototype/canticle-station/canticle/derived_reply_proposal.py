@@ -1,8 +1,9 @@
-"""Inert #146 review primitive. Not registered with the CLI, control socket or any agent tool.
+"""Default-closed #146 review primitive. Not registered with the CLI, control socket or any agent tool.
 
 The default is closed. All mutators below are trusted-host operations, not model-callable APIs.
 This exercises a candidate capability representation; it does not authorize deployment, implement
-the host's exposure/egress controls, or claim station acceptance. See the accompanying review note.
+the host's exposure/egress controls. The separate unregistered station adapter proves an effect boundary.
+This primitive alone does not claim station acceptance. See the accompanying review note.
 """
 
 from __future__ import annotations
@@ -21,9 +22,9 @@ from pathlib import Path
 from typing import Callable, Iterator
 
 from . import wire
-from .ids import CLASS_BY_NAME, CTYPES, SCOPES, check_stream_name, stream_id
+from .ids import CLASS_BY_NAME, CTYPES, SCOPES, check_stream_name, key_id, stream_id
 
-VERSION = "canticle-derived-reply-proposal/1"
+VERSION = "canticle-derived-reply-proposal/2"
 DOMAIN = b"canticle-derived-reply-proposal\x00"
 MAX_EXPOSURES = 256  # overflow refuses; never truncate the causal ledger to make a reply fit
 MAX_CAPSULE_BYTES = 8192
@@ -140,6 +141,7 @@ class Intent:
     key_id: str
     stream: str
     audience: tuple[Reader, ...]
+    public_key: str
     ttl_ms: int = 60_000
     cls: str = "chatter"
     scope: str = "lan"
@@ -147,6 +149,8 @@ class Intent:
     def __post_init__(self):
         _require(_name(self.publisher) and _name(self.station, 31), "publisher_identity")
         _require(re.fullmatch(r"[0-9a-f]{16}", self.key_id or "") is not None, "publisher_identity")
+        _require(re.fullmatch(r"[0-9a-f]{64}", self.public_key or "") is not None
+                 and key_id(bytes.fromhex(self.public_key)).hex() == self.key_id, "publisher_identity")
         check_stream_name(self.stream)
         _require(type(self.audience) is tuple and 1 <= len(self.audience) <= 16
                  and all(isinstance(x, Reader) for x in self.audience)
@@ -163,6 +167,7 @@ class Grant:
     stream: str
     authors: tuple[str, ...]
     audience_principals: tuple[str, ...]
+    public_key: str
     scope: str = "lan"
     max_ttl_ms: int = 60_000
     max_bytes: int = 600
@@ -171,6 +176,8 @@ class Grant:
     capability_ms: int = 30_000
 
     def __post_init__(self):
+        _require(re.fullmatch(r"[0-9a-f]{64}", self.public_key or "") is not None
+                 and key_id(bytes.fromhex(self.public_key)).hex() == self.key_id, "grant")
         _require(self.scope in ("host", "lan") and self.authors and self.audience_principals, "grant")
         _require(all(_name(x) and "*" not in x for x in (*self.authors, *self.audience_principals)), "grant")
         _require(_uint(self.max_ttl_ms, 300_000) and self.max_ttl_ms > 100
@@ -229,6 +236,8 @@ class ReplyProposal:
                     issued_at INTEGER NOT NULL, valid_until INTEGER NOT NULL, item_expires_at INTEGER NOT NULL,
                     state TEXT NOT NULL, claimed_at INTEGER, envelope TEXT,
                     UNIQUE(generation, choice_id));
+                CREATE TABLE IF NOT EXISTS station_effects (
+                    election_id TEXT PRIMARY KEY, state TEXT NOT NULL, receipt TEXT);
                 CREATE TABLE IF NOT EXISTS outcomes (
                     election_id TEXT NOT NULL, kind TEXT NOT NULL, receipt TEXT NOT NULL,
                     PRIMARY KEY(election_id, kind, receipt));
@@ -417,8 +426,8 @@ class ReplyProposal:
         grant = Grant(**json.loads(db.execute("SELECT grant_json FROM policy WHERE id=1").fetchone()[0]))
         _require(grant is not None and callable(self.content_allowed), "authority_missing")
         _require(reader.principal in grant.authors and
-                 (intent["publisher"], intent["station"], intent["key_id"], intent["stream"])
-                 == (grant.publisher, grant.station, grant.key_id, grant.stream), "publisher_not_allowed")
+                 (intent["publisher"], intent["station"], intent["key_id"], intent["stream"], intent["public_key"])
+                 == (grant.publisher, grant.station, grant.key_id, grant.stream, grant.public_key), "publisher_not_allowed")
         _require(intent["cls"] == "chatter" and snapshot["source_classes"] == ["chatter"]
                  and intent["scope"] == grant.scope and intent["scope"] in ("host", "lan"), "class_scope")
         _require(1 + snapshot["max_hop"] <= CLASS_BY_NAME["chatter"].hop_limit, "hop_limit")
@@ -513,7 +522,15 @@ class ReplyProposal:
                        (now, encoded.decode(), election_id))
         return capsule  # a crash/lost result after the commit never permits another claim
 
-    def station_admit(self, capsule: bytes, payload: bytes, *, station: str, key_id: str) -> Admission:
+    @staticmethod
+    def _redemption_budget(db: sqlite3.Connection, row: sqlite3.Row, grant: Grant, now: int) -> None:
+        """A claimed reservation remains spent; a tighter current grant can still refuse its effect."""
+        used = db.execute("SELECT turn_id,claimed_at FROM elections WHERE claimed_at IS NOT NULL AND generation=?",
+                          (row["generation"],)).fetchall()
+        _require(sum(x["turn_id"] == row["turn_id"] for x in used) <= grant.per_turn
+                 and sum(x["claimed_at"] > now - 3_600_000 for x in used) <= grant.per_hour, "budget")
+
+    def station_admit(self, capsule: bytes, payload: bytes, *, station: str, key_id: str, public_key: str) -> Admission:
         """Authenticate and consume the candidate permission; does not call Station.sing or emit a frame."""
         _require(self.enabled, "disabled")
         _require(type(capsule) is bytes and len(capsule) <= MAX_CAPSULE_BYTES, "capability_format")
@@ -534,10 +551,12 @@ class ReplyProposal:
             row = db.execute("SELECT * FROM elections WHERE id=?", (envelope["election_id"],)).fetchone()
             _require(row is not None and row["state"] == "claimed_unknown", "claim_consumed")
             _require(row["envelope"] == encoded.decode(), "capability_mismatch")
-            _, intent, _, _ = self._check_election(db, row, payload, now)
-            _require((station, key_id) == (intent["station"], intent["key_id"]), "wrong_station")
+            _, intent, _, grant = self._check_election(db, row, payload, now)
+            self._redemption_budget(db, row, grant, self._now())
+            _require((station, key_id, public_key) == (intent["station"], intent["key_id"], intent["public_key"]), "wrong_station")
             self._window(row, self._now())
             db.execute("UPDATE elections SET state='admitted_unknown' WHERE id=?", (row["id"],))
+            db.execute("INSERT INTO station_effects VALUES (?,'claimed_unknown',NULL)", (row["id"],))
         return Admission(row["id"], encoded)
 
     def cancel(self, election_id: str) -> None:

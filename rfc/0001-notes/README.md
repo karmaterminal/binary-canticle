@@ -19,7 +19,7 @@ landed as [`prototype/ringserver-proofs/`](../../prototype/ringserver-proofs/).
 
 | Note | Status |
 |---|---|
-| [derived-reply-capability-proposal.md](derived-reply-capability-proposal.md) | 2026-11-21 review contribution for Cael/Ronan's #146 lane: an inert exposure/election/capability primitive and exact remaining host/station/room proof boundaries. No RFC amendment or runtime activation. |
+| [derived-reply-capability-proposal.md](derived-reply-capability-proposal.md) | 2026-11-21 review contribution for Cael/Ronan's #146 lane: a default-closed exposure/election/capability primitive, actual Station/Listener effect proof, and exact remaining host/bridge/room boundaries. No RFC amendment or runtime activation. |
 
 ## Profiles (maintained)
 

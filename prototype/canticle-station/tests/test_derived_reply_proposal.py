@@ -18,6 +18,7 @@ from canticle.derived_reply_proposal import (
 )
 
 SECRET = b"synthetic-capability-key-for-tests"  # memory-only fixture; never a deployed host/station key
+PUBLIC_KEY = wire.public_key_bytes(Ed25519PrivateKey.from_private_bytes(bytes.fromhex(vectors.TEST1))).hex()
 KEY_ID = "21fe31dfa154a261"  # existing TEST1 conformance-vector identity
 
 
@@ -33,8 +34,8 @@ class ProposalTest(unittest.TestCase):
         self.now = 1_790_000_000_000
         self.reader = Reader("rune", "agent:rune:subagent:reader", "reader-id", "revision-1")
         self.recipient = Reader("silas", "agent:silas:subagent:reader", "recipient-id", "revision-1")
-        self.grant = Grant("rune", "rune", KEY_ID, "town.reply", ("rune",), ("silas",))
-        self.intent = Intent("rune", "rune", KEY_ID, "town.reply", (self.recipient,))
+        self.grant = Grant("rune", "rune", KEY_ID, "town.reply", ("rune",), ("silas",), PUBLIC_KEY)
+        self.intent = Intent("rune", "rune", KEY_ID, "town.reply", (self.recipient,), PUBLIC_KEY)
         self.body = b"The parcel arrived, but now it hums."
         self.b = self.reopen()
         self.b.set_current_reader(self.reader)
@@ -65,7 +66,7 @@ class ProposalTest(unittest.TestCase):
 
     def admit(self, capsule, body=None, broker=None):
         return (broker or self.b).station_admit(capsule, self.body if body is None else body,
-                                               station="rune", key_id=KEY_ID)
+                                               station="rune", key_id=KEY_ID, public_key=PUBLIC_KEY)
 
     def refused(self, reason, fn):
         with self.assertRaises(Refused) as cm:
@@ -328,7 +329,7 @@ class ProposalTest(unittest.TestCase):
         other = self.reopen()
         def admit(broker):
             try:
-                return broker.station_admit(capsule, self.body, station="rune", key_id=KEY_ID)
+                return broker.station_admit(capsule, self.body, station="rune", key_id=KEY_ID, public_key=PUBLIC_KEY)
             except Refused as error:
                 return error.reason
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -425,7 +426,7 @@ class ProposalTest(unittest.TestCase):
         altered["envelope"]["intent"]["scope"] = "public"
         self.refused("capability_auth", lambda: self.admit(canonical(altered)))
         self.refused("capability_auth", lambda: self.admit(capsule, broker=self.reopen(secret=b"x" * 32)))
-        self.refused("wrong_station", lambda: self.b.station_admit(capsule, self.body, station="cael", key_id=KEY_ID))
+        self.refused("wrong_station", lambda: self.b.station_admit(capsule, self.body, station="cael", key_id=KEY_ID, public_key=PUBLIC_KEY))
         self.refused("capability_format", lambda: self.admit(capsule + b" "))
         self.assertEqual(self.b.inspect(eid)["state"], "claimed_unknown")
 
