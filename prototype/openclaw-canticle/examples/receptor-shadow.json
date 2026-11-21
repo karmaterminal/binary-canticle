@@ -1,0 +1,397 @@
+{
+  "v": "canticle-receptor-shadow/1",
+  "policy": {
+    "v": "canticle-receptor-shadow/1",
+    "ceiling": {
+      "revision": 1,
+      "sources": [
+        {
+          "keyId": "1111111111111111",
+          "station": "weather-desk",
+          "streams": [
+            "town.*"
+          ],
+          "classes": [
+            "chatter"
+          ],
+          "scopes": [
+            "lan"
+          ]
+        }
+      ],
+      "ambient": true,
+      "wakePreview": false,
+      "freshnessMs": 15000
+    },
+    "profile": {
+      "id": "town-weather-offline",
+      "revision": 1,
+      "tune": [
+        "weather-desk:town.weather"
+      ],
+      "mode": "ambient",
+      "batch": {
+        "count": 64,
+        "quietMs": 5000,
+        "maxWaitMs": 10000,
+        "perSource": 5
+      }
+    }
+  },
+  "events": [
+    {
+      "at": 1000000,
+      "op": "health",
+      "health": "ok"
+    },
+    {
+      "at": 1000000,
+      "op": "record",
+      "record": {
+        "v": "canticle-receptor-record/1",
+        "type": "frame",
+        "run": "synthetic-shadow",
+        "rec_seq": 1,
+        "frame": {
+          "key_id": "1111111111111111",
+          "epoch": 1,
+          "stream_id": 550609972,
+          "seq": 1,
+          "kind": "item",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "bytes": 200
+        },
+        "idem": "canticle:1111111111111111:1:20d1a434:1",
+        "station": {
+          "name": "weather-desk",
+          "principal": null
+        },
+        "stream": "town.weather",
+        "class": "chatter",
+        "scope": "lan",
+        "hop": 0,
+        "state_key": null,
+        "flags": {
+          "refresh": false,
+          "wake_derived": false,
+          "exercise": false
+        },
+        "lineage": {
+          "root": null
+        },
+        "times": {
+          "issued_at": 999999,
+          "expires_at": 1179999,
+          "heard_at": 1000000,
+          "received_at": 1000000,
+          "offset_ms": 0,
+          "local_expiry_at": 1179999
+        },
+        "admission": "verified",
+        "disposition": "surface",
+        "dedup": "first",
+        "body": {
+          "ctype": "text/plain; charset=utf-8",
+          "text": "Rain over the workshop. This is invented fixture text.",
+          "size": 54,
+          "sha256": "9a930599c7df6967bb1ad0c438d18f1f68710ec68cbd90ed4e2c483f23a94e9d"
+        },
+        "body_ref": null
+      }
+    },
+    {
+      "at": 1002000,
+      "op": "record",
+      "record": {
+        "v": "canticle-receptor-record/1",
+        "type": "frame",
+        "run": "synthetic-shadow",
+        "rec_seq": 1,
+        "frame": {
+          "key_id": "1111111111111111",
+          "epoch": 1,
+          "stream_id": 550609972,
+          "seq": 1,
+          "kind": "item",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "bytes": 200
+        },
+        "idem": "canticle:1111111111111111:1:20d1a434:1",
+        "station": {
+          "name": "weather-desk",
+          "principal": null
+        },
+        "stream": "town.weather",
+        "class": "chatter",
+        "scope": "lan",
+        "hop": 0,
+        "state_key": null,
+        "flags": {
+          "refresh": false,
+          "wake_derived": false,
+          "exercise": false
+        },
+        "lineage": {
+          "root": null
+        },
+        "times": {
+          "issued_at": 999999,
+          "expires_at": 1179999,
+          "heard_at": 1000000,
+          "received_at": 1000000,
+          "offset_ms": 0,
+          "local_expiry_at": 1179999
+        },
+        "admission": "verified",
+        "disposition": "surface",
+        "dedup": "first",
+        "body": {
+          "ctype": "text/plain; charset=utf-8",
+          "text": "Rain over the workshop. This is invented fixture text.",
+          "size": 54,
+          "sha256": "9a930599c7df6967bb1ad0c438d18f1f68710ec68cbd90ed4e2c483f23a94e9d"
+        },
+        "body_ref": null
+      }
+    },
+    {
+      "at": 1004000,
+      "op": "record",
+      "record": {
+        "v": "canticle-receptor-record/1",
+        "type": "frame",
+        "run": "synthetic-shadow",
+        "rec_seq": 2,
+        "frame": {
+          "key_id": "1111111111111111",
+          "epoch": 1,
+          "stream_id": 550609972,
+          "seq": 2,
+          "kind": "item",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "bytes": 200
+        },
+        "idem": "canticle:1111111111111111:1:20d1a434:2",
+        "station": {
+          "name": "weather-desk",
+          "principal": null
+        },
+        "stream": "town.weather",
+        "class": "chatter",
+        "scope": "lan",
+        "hop": 0,
+        "state_key": null,
+        "flags": {
+          "refresh": false,
+          "wake_derived": false,
+          "exercise": false
+        },
+        "lineage": {
+          "root": null
+        },
+        "times": {
+          "issued_at": 1003999,
+          "expires_at": 1183999,
+          "heard_at": 1004000,
+          "received_at": 1004000,
+          "offset_ms": 0,
+          "local_expiry_at": 1183999
+        },
+        "admission": "verified",
+        "disposition": "surface",
+        "dedup": "first",
+        "body": {
+          "ctype": "text/plain; charset=utf-8",
+          "text": "An awning is rattling. This is invented fixture text.",
+          "size": 53,
+          "sha256": "76d0223b846abe97e02bfc23a3a06801423415940bce8b5db27297704817c202"
+        },
+        "body_ref": null
+      }
+    },
+    {
+      "at": 1008000,
+      "op": "record",
+      "record": {
+        "v": "canticle-receptor-record/1",
+        "type": "frame",
+        "run": "synthetic-shadow",
+        "rec_seq": 3,
+        "frame": {
+          "key_id": "1111111111111111",
+          "epoch": 1,
+          "stream_id": 550609972,
+          "seq": 3,
+          "kind": "item",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "bytes": 200
+        },
+        "idem": "canticle:1111111111111111:1:20d1a434:3",
+        "station": {
+          "name": "weather-desk",
+          "principal": null
+        },
+        "stream": "town.weather",
+        "class": "chatter",
+        "scope": "lan",
+        "hop": 0,
+        "state_key": null,
+        "flags": {
+          "refresh": false,
+          "wake_derived": false,
+          "exercise": false
+        },
+        "lineage": {
+          "root": null
+        },
+        "times": {
+          "issued_at": 1007999,
+          "expires_at": 1187999,
+          "heard_at": 1008000,
+          "received_at": 1008000,
+          "offset_ms": 0,
+          "local_expiry_at": 1187999
+        },
+        "admission": "verified",
+        "disposition": "surface",
+        "dedup": "first",
+        "body": {
+          "ctype": "text/plain; charset=utf-8",
+          "text": "A gull has borrowed the conductor baton. This is invented fixture text.",
+          "size": 71,
+          "sha256": "eae91b1962e185e3db94d8c618ebff1f694fd673838dee283073aa0d7425efae"
+        },
+        "body_ref": null
+      }
+    },
+    {
+      "at": 1010000,
+      "op": "record",
+      "record": {
+        "v": "canticle-receptor-record/1",
+        "type": "frame",
+        "run": "synthetic-shadow",
+        "rec_seq": 4,
+        "frame": {
+          "key_id": "1111111111111111",
+          "epoch": 1,
+          "stream_id": 550609972,
+          "seq": 4,
+          "kind": "item",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "bytes": 200
+        },
+        "idem": "canticle:1111111111111111:1:20d1a434:4",
+        "station": {
+          "name": "weather-desk",
+          "principal": null
+        },
+        "stream": "town.weather",
+        "class": "chatter",
+        "scope": "lan",
+        "hop": 0,
+        "state_key": null,
+        "flags": {
+          "refresh": false,
+          "wake_derived": false,
+          "exercise": false
+        },
+        "lineage": {
+          "root": null
+        },
+        "times": {
+          "issued_at": 1009999,
+          "expires_at": 1189999,
+          "heard_at": 1010000,
+          "received_at": 1010000,
+          "offset_ms": 0,
+          "local_expiry_at": 1189999
+        },
+        "admission": "verified",
+        "disposition": "surface",
+        "dedup": "first",
+        "body": {
+          "ctype": "text/plain; charset=utf-8",
+          "text": "The evening is clearing. This is invented fixture text.",
+          "size": 55,
+          "sha256": "742265da12b079fa09179a29782621ec15b2c6e7e556ae22e7af10778194ada9"
+        },
+        "body_ref": null
+      }
+    },
+    {
+      "at": 1012000,
+      "op": "mute",
+      "keyId": "1111111111111111"
+    },
+    {
+      "at": 1013000,
+      "op": "unmute",
+      "keyId": "1111111111111111"
+    },
+    {
+      "at": 1014000,
+      "op": "record",
+      "record": {
+        "v": "canticle-receptor-record/1",
+        "type": "frame",
+        "run": "synthetic-shadow",
+        "rec_seq": 4,
+        "frame": {
+          "key_id": "1111111111111111",
+          "epoch": 1,
+          "stream_id": 550609972,
+          "seq": 4,
+          "kind": "item",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "bytes": 200
+        },
+        "idem": "canticle:1111111111111111:1:20d1a434:4",
+        "station": {
+          "name": "weather-desk",
+          "principal": null
+        },
+        "stream": "town.weather",
+        "class": "chatter",
+        "scope": "lan",
+        "hop": 0,
+        "state_key": null,
+        "flags": {
+          "refresh": false,
+          "wake_derived": false,
+          "exercise": false
+        },
+        "lineage": {
+          "root": null
+        },
+        "times": {
+          "issued_at": 1009999,
+          "expires_at": 1189999,
+          "heard_at": 1010000,
+          "received_at": 1010000,
+          "offset_ms": 0,
+          "local_expiry_at": 1189999
+        },
+        "admission": "verified",
+        "disposition": "surface",
+        "dedup": "first",
+        "body": {
+          "ctype": "text/plain; charset=utf-8",
+          "text": "The evening is clearing. This is invented fixture text.",
+          "size": 55,
+          "sha256": "742265da12b079fa09179a29782621ec15b2c6e7e556ae22e7af10778194ada9"
+        },
+        "body_ref": null
+      }
+    },
+    {
+      "at": 1015000,
+      "op": "health",
+      "health": "gap"
+    },
+    {
+      "at": 1030000,
+      "op": "tick"
+    }
+  ]
+}

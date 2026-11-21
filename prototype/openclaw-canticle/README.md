@@ -318,6 +318,14 @@ heard-back time, any withdrawal, and the last event. The payload itself is kept 
 
 ## Configuration
 
+An independent [receiver-policy shadow preview](docs/receptor-shadow.md) (#120) can evaluate synthetic,
+already-admitted receptor fixtures against explicit operator ceilings and a narrowing receiver profile.
+It previews count/quiet/max-wait batching, suppression reasons, and a separately labelled hypothetical
+alarm request. It is **offline only**: no profile installation, live reads, session injection, wake or
+publication, and no alternative path around exact-session route proofs. It does not change the plugin
+configuration below. Run `node src/receptor-shadow-cli.ts < examples/receptor-shadow.json` from this
+directory; the output has metadata and `dispatch: "none"` throughout.
+
 `plugins.entries.canticle.config` in the OpenClaw configuration. The manifest's JSON Schema checks shape and
 bounds; everything else is checked when the service starts, so a bad value fails the canticle service and never
 Gateway boot. Write `enabled: false` explicitly until a prince opts the seat in (§14.18.7, D30).
@@ -471,6 +479,7 @@ CANTICLE_INTEROP=require node --test 'test/*.test.ts'   # fail, rather than skip
 
 | Where | RFC | This spike | Why |
 |---|---|---|---|
+| #120 offline shadow experiment; §§14.6, 14.10, 16.6 | Shared receiver-policy semantics; complete wake conjunction; AGC and host dose bounds | Fixture-only count/quiet/max-wait evaluation, bounded round-robin batch selection among retained signers, source-body byte caps and hypothetical alarm requests; no dispatcher or installed profile | A donor for both harnesses. Admission fairness, full AGC, host wrapper size, live scheduling/authority and all S3 proofs remain unimplemented; see [the contract and limits](docs/receptor-shadow.md). |
 | §15.1, D20 | `canticle_sing`, `canticle_hush`, `canticle_tune`, `canticle_listen` | Adds `canticle_status`, `canticle_mute` and `canticle_outbox`; no `canticle_tune` | #97 asks for status, mute and outbox tools. Under a binding, subscriptions are configuration (D27, §14.18.4); whether `canticle_tune` is offered there is question 24. |
 | §15.1 `canticle_listen` | `stream`, `since`, `limit`, `view` (`digest`, `items`, `raw`) | Adds `what`, `station` and `includeSelf`; no `raw`; `digest` by default; `items` only for listed sessions | `raw` is for operators (§15.1) and question 24 leans to leaving it to the CLI. The payload gate is for §14.12 ([Authority and taint](#authority-and-taint)). |
 | §15.1 `canticle_sing` | `payload` text or a reference; `mode`, `audience`, `scope`, `keepOnAir`, `intensity`, `contentType`, `exercise` | Text `payload` only, `lan` scope only; adds `idempotencyKey` | The prototype station's control socket speaks UDP only (no `host` scope) and this spike does no addressed mode (§15.6). The key is #97's idempotency rule. |
