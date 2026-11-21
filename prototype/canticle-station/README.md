@@ -19,7 +19,7 @@ them loop until they expire.
 | §11.2, §13.6, §15.7 Onboarding (#73) | `canticle doctor` checks Python, `cryptography` (with an RFC 8032 known answer), `stations.toml`, the manifest and the listener's UDP address, and only reports multicast. `stations.toml` locates the manifest and the listener's address. `canticle manifest verify` and `show` read the unsigned spike-0 manifest; manifests refuse small-order keys (§9.3) and key-ids that do not match their keys (§10.3). |
 | §6.7 Findings (FP-1, #112) | `canticle/finding.py`: the finding body (content type 11) and its strict reader. `canticle sing --finding` and `--body-ref`, and the control socket's `finding` and `body_ref` fields, put a keyed `advisory` finding and a `finding-ref` doorbell on air. `canticle tap` shows a finding field by field, with a host-authored line that attributes it to its signer. See [Findings](#findings-fp-1-112). |
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
-| Local cue control extension (#147, parent #120) | Opt-in `station --cue-db` and `cue add/list/show/cancel`: a private, bounded SQLite table schedules one original ambient/chatter item per elected window. Claims precede signing; uncertain results are never replayed. This local API is a prototype extension beyond the RFC §15.7–15.8 interfaces, with no new wire format. |
+| Local cue control extension (#147, parent #120; #152) | Opt-in `station --cue-db` and `cue add/list/show/cancel/capabilities`: a private, bounded SQLite table schedules one original ambient/chatter item per elected window. An optional immutable `not_after` bounds first acceptance by the originator's absolute expiry. Claims precede signing; uncertain results are never replayed. This local API is a prototype extension beyond the RFC §15.7–15.8 interfaces, with no new wire format. |
 | Shape-only live view (#133) | `canticle shape`: per named station, presence and beacon age; per stream, live count and newest age. Never content; no station without its owner's yes. |
 | Display grants (#137) | `canticle grant` sings a station's own yes to a display, scoped `presence` → `beacon` → `counts` → `river`; `canticle shape --display` shows only granted stations at their granted scope, and purges on revoke or narrowing. |
 | Typed beacons (#142) | `canticle beacon` sings a station's own beacon on its `beacon` stream: a versioned CBOR map of enumerated `state`/`asking`, optional `until` and up to four `refs`, never prose. `canticle.beacon.read` gives the typed shape; a missing, expired or unreadable beacon is unknown, never fine. |
@@ -275,6 +275,70 @@ canticle cue list --control /path/to/private-cue-run/station.sock
 canticle cue show --control /path/to/private-cue-run/station.sock --id afternoon-rain
 canticle cue cancel --control /path/to/private-cue-run/station.sock --id afternoon-rain
 ```
+
+#### Originator expiry and delayed first acceptance (#152)
+
+For an independently committed event, the originator may already have an absolute freshness end.
+Submit the same immutable request on every transport retry; do not recompute a new relative `--for`.
+The optional `--not-after-ms` / control field `not_after` is **Unix UTC milliseconds**, an integer from
+0 through 9,007,199,254,740,991 (the largest exactly representable JSON integer for JavaScript clients).
+Booleans, floats, strings and null are refused. Existing `--in` and `--for` remain required integer
+seconds with their existing bounds. Without `not_after`, the relative API and persisted request identity
+are unchanged.
+
+The station binds `id`, text, stream, `in`, `for`, loop and the original `not_after` together. On first
+acceptance it sets `starts_at = now + in * 1000` and
+`ends_at = min(starts_at + for * 1000, not_after)`. If the bound is absent, `ends_at` is the relative end.
+A replay of the identical request returns that same row, even after its deadline, cancellation or
+restart. Adding, removing or changing the bound under an existing ID is refused. The full requested
+`for` must still fit current TTL ceilings at creation and dispatch; the cap cannot bypass that check.
+The signed ITEM expires exactly at the stored `ends_at`; delay never extends the originator's bound.
+
+A first request received after its end, with at most the 100 ms expiry margin remaining, or whose
+deadline leaves no playable interval after its requested start, is durably recorded as `missed`
+without claiming or singing. Its receipt can therefore have `ends_at <= starts_at`: that records an
+impossible/elapsed window, not permission to play late. A normal pending request can also become
+`missed` on a later worker tick. Query metadata includes `not_after` (null for the relative form).
+All existing claim, cancellation, clock-regression, restart and unknown-outcome rules below apply.
+
+The optional field is part of this documented **local prototype control extension**, not a frame-v2
+or receptor-record amendment. It narrows publication lifetime under RFC I-3 and §7.3; it creates no
+receiver wake, grant or delivery promise. Compare UTC clocks before using an off-host originator;
+an absolute timestamp does not establish clock synchronization. Commit a game's world event first,
+then project it: do not schedule future world assertions in the station while that world may pause.
+
+An adapter can fail closed before submitting any text by querying the elected station's control socket:
+
+```json
+{"op":"cue_capabilities"}
+```
+
+The response is:
+
+```json
+{"ok":true,"capabilities":{"schema":"canticle-cue-control/1","absolute_not_after":true,"timestamp_unit":"unix_ms","max_not_after":9007199254740991}}
+```
+
+`canticle cue capabilities --control /path/to/private-cue-run/station.sock` provides the same probe.
+An older scheduler returns an unknown-operation error; a station without `--cue-db` returns scheduling
+disabled. Neither response authorizes dropping the bound or falling back to an ordinary `sing`.
+For submission, use `cue_add` with `in: 0`, the original bounded `for`, and `not_after` copied unchanged
+from the originating event. CLI example (the number is deliberately a historical fixture, not a live
+deadline):
+
+```sh
+canticle cue add --control /path/to/private-cue-run/station.sock \
+  --id town-fixture-event-7 --stream weather --text "Fixture: the committed weather is rain." \
+  --in 0 --for 60 --not-after-ms 1790000060000
+```
+
+`ok: true` means the cue row was stored or recovered. Check its `state`: `pending` is queued;
+`accepted` is local carousel acceptance; `missed` is never submitted because its window ended;
+`refused` failed authority before claim; `unknown` retains an uncertain claim; `interrupted` records
+an acceptance whose carousel is no longer running; `cancelled` and `ended` retain their existing
+receipts. A connection failure is an unknown control outcome until the same ID can be inspected or
+the identical request recovered. No state proves reception by a prince. IDs remain retained at the
+existing table bound; clients must not recycle them into new announcements.
 
 - **Authority and scope.** The same UID-restricted Unix control socket is used. Cues accept original
   elected text only, on a configured `ambient` or `chatter` stream with LAN scope. Unsupported fields

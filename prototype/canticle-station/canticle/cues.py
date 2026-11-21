@@ -26,6 +26,7 @@ MAX_ROWS = 1024
 MAX_TEXT_BYTES = 800
 MAX_DELAY_S = 86_400
 MAX_DURATION_S = 3600
+MAX_NOT_AFTER_MS = (1 << 53) - 1  # exact integer across JSON/JavaScript clients
 MAX_LIST = 32
 MIN_DISPATCH_MS = 1000
 _ID = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}\Z")
@@ -185,6 +186,8 @@ class CueStore:
         cue_id = _cue_id(req.get("id"))
         delay = _integer(req.get("in"), "in", 0, MAX_DELAY_S)
         duration = _integer(req.get("for"), "for", 1, MAX_DURATION_S)
+        not_after = (_integer(req["not_after"], "not_after", 0, MAX_NOT_AFTER_MS)
+                     if "not_after" in req else None)
         stream, text, loop = req.get("stream"), req.get("text"), req.get("loop", "normal")
         if not isinstance(stream, str) or stream not in self.station.streams:
             raise ValueError("cue needs a configured stream")
@@ -192,7 +195,11 @@ class CueStore:
             raise ValueError(f"cue text must be 1-{MAX_TEXT_BYTES} UTF-8 bytes")
         if loop not in {"fast", "normal", "slow"}:
             raise ValueError("cue loop must be fast, normal or slow")
-        request = json.dumps([stream, text, delay, duration, loop], ensure_ascii=True, separators=(",", ":"))
+        binding = [stream, text, delay, duration, loop]
+        if not_after is not None:
+            binding.append(not_after)
+        # Preserve the exact original relative-form identity in existing tables.
+        request = json.dumps(binding, ensure_ascii=True, separators=(",", ":"))
         old = self.db.execute("SELECT * FROM cues WHERE id=?", (cue_id,)).fetchone()
         if old is not None:
             if old["request"] != request:
@@ -205,18 +212,28 @@ class CueStore:
         if self.db.execute("SELECT count(*) FROM cues").fetchone()[0] >= MAX_ROWS:
             raise ValueError(f"cue table full ({MAX_ROWS} rows); retain receipts and use a fresh run database")
         start = now + delay * 1000
+        end = start + duration * 1000
+        if not_after is not None:
+            end = min(end, not_after)
+        # A first request can already have missed its originator's deadline.
+        # Persist the same immutable request/receipt, but never make it eligible
+        # for a claim, even if the station clock subsequently moves backwards.
+        state = "missed" if end <= start + STOP_BEFORE_EXPIRY_MS else "pending"
+        detail = "originator deadline left no playable window before acceptance" if state == "missed" else None
         with self.db:
-            self.db.execute("INSERT INTO cues (id,request,stream,cls,text,loop,created_at,starts_at,ends_at,state,updated_at) "
-                            "VALUES (?,?,?,?,?,?,?,?,?,'pending',?)",
-                            (cue_id, request, stream, cls, text, loop, now, start, start + duration * 1000, now))
+            self.db.execute("INSERT INTO cues (id,request,stream,cls,text,loop,created_at,starts_at,ends_at,state,detail,updated_at) "
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                            (cue_id, request, stream, cls, text, loop, now, start, end, state, detail, now))
         return self.show(cue_id)
 
     def _public(self, row):
         text = row["text"].encode("utf-8")
         result = json.loads(row["result"]) if row["result"] else None
+        binding = json.loads(row["request"])
         return {"id": row["id"], "station_key_id": self.station.key_id.hex(), "stream": row["stream"],
                 "class": row["cls"], "scope": "lan", "state": row["state"], "loop": row["loop"],
                 "created_at": row["created_at"], "starts_at": row["starts_at"], "ends_at": row["ends_at"],
+                "not_after": binding[5] if len(binding) == 6 else None,
                 "updated_at": row["updated_at"], "text_bytes": len(text), "text_sha256": hashlib.sha256(text).hexdigest(),
                 "claimed_epoch": row["claimed_epoch"], "candidate_seq": row["candidate_seq"],
                 "detail": row["detail"], "acceptance": result,
@@ -321,7 +338,7 @@ class CueStore:
             if grant_error:
                 raise ValueError(grant_error)
             # Preserve the admitted full window's TTL contract even after delay.
-            self._authority(due["stream"], due["cls"], (due["ends_at"] - due["starts_at"]) / 1000,
+            self._authority(due["stream"], due["cls"], json.loads(due["request"])[3],
                             socket_classes, grant)
         except ValueError as e:
             self._update(due["id"], now, state="refused", detail=str(e))
@@ -350,8 +367,9 @@ class CueStore:
 
     def dispatch(self, req, now, socket_classes, grant_loader):
         op = req.get("op")
-        fields = {"cue_add": {"op", "id", "stream", "text", "loop", "in", "for"},
-                  "cue_list": {"op", "limit", "after"}, "cue_show": {"op", "id"}, "cue_cancel": {"op", "id"}}
+        fields = {"cue_add": {"op", "id", "stream", "text", "loop", "in", "for", "not_after"},
+                  "cue_list": {"op", "limit", "after"}, "cue_show": {"op", "id"}, "cue_cancel": {"op", "id"},
+                  "cue_capabilities": {"op"}}
         if op in fields and set(req) - fields[op]:
             raise ValueError("unsupported cue request field; cues only support original text and bounded LAN ambient/chatter")
         if op == "cue_add":
@@ -362,4 +380,7 @@ class CueStore:
             return {"ok": True, **self.listing(req.get("limit", MAX_LIST), req.get("after", ""))}
         if op == "cue_cancel":
             return {"ok": True, "cue": self.cancel(req.get("id"), now)}
+        if op == "cue_capabilities":
+            return {"ok": True, "capabilities": {"schema": "canticle-cue-control/1", "absolute_not_after": True,
+                                                   "timestamp_unit": "unix_ms", "max_not_after": MAX_NOT_AFTER_MS}}
         return {"ok": False, "error": "unknown cue operation"}
