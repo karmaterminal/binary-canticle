@@ -13,7 +13,7 @@ export const TOOL_NAMES = [...READ_TOOLS, ...PUBLISH_TOOLS] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
 
 /** What a tool factory receives from OpenClaw (the fields this plugin reads). */
-export type ToolContext = { sessionKey?: string; sessionId?: string; agentId?: string };
+export type ToolContext = { sessionKey?: string; sessionId?: string; agentId?: string; sandboxed?: boolean; assertInvocationCurrent?: () => void };
 
 export type Tool = {
   name: ToolName;
@@ -160,7 +160,10 @@ export function callerOf(ctx: ToolContext): Caller {
   if (key === null) {
     return { sessionKey: "(no session)", sessionId: null, subagent: false, anonymous: true };
   }
-  return { sessionKey: key, sessionId: named(ctx.sessionId), subagent: isSubagent(key), anonymous: false };
+  return { sessionKey: key, sessionId: named(ctx.sessionId), subagent: isSubagent(key), anonymous: false,
+    ...(ctx.sandboxed !== undefined ? { sandboxed: ctx.sandboxed } : {}),
+    ...(typeof ctx.assertInvocationCurrent === "function" ? { assertInvocationCurrent: ctx.assertInvocationCurrent } : {}),
+  };
 }
 
 function named(v: unknown): string | null {
