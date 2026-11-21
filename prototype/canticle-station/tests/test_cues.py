@@ -270,7 +270,8 @@ class CueTest(unittest.TestCase):
         watermark = self.store.watermark
         resp = self.store.dispatch({"op": "cue_capabilities"}, T0 + 5000, ALLOWED, self.load)
         self.assertEqual(resp, {"ok": True, "capabilities": {"schema": "canticle-cue-control/1",
-                         "absolute_not_after": True, "timestamp_unit": "unix_ms", "max_not_after": (1 << 53) - 1}})
+                         "absolute_not_after": True, "exact_station_public_key": True,
+                         "timestamp_unit": "unix_ms", "max_not_after": (1 << 53) - 1}})
         self.assertEqual(self.store.watermark, watermark)
         self.assertEqual(self.store.listing()["cues"], [])
         with self.assertRaisesRegex(ValueError, "unsupported"):
@@ -282,6 +283,65 @@ class CueTest(unittest.TestCase):
             self.assertEqual(main(["cue", "add", "--control", "fixture.sock", "--id", "rain", "--stream", "weather",
                                    "--text", "Fixture", "--in", "0", "--for", "60", "--not-after-ms", str(T0 + 60_000)]), 0)
             self.assertEqual(control.call_args.args[1], request(text="Fixture", **{"in": 0, "for": 60, "not_after": T0 + 60_000}))
+
+    def test_wrong_expected_public_key_has_no_cue_or_real_station_effect(self):
+        before = list(self.store.db.iterdump())
+        refused = None
+        try:
+            # Exercise the real station and cue table, without mocking signing.
+            self.add(now=T0 + 5000, expected_public_key="00" * 32, **{"in": 0})
+        except ValueError as error:
+            refused = str(error)
+        after_add = list(self.store.db.iterdump())
+        self.tick(T0 + 5000)
+        self.assertEqual(self.st.streams["weather"].head_seq, 0,
+                         "A request for another full public key reached real signing")
+        self.assertFalse(any(f[3] == wire.KIND_ITEM for f in self.st.poll(T0 + 5000)))
+        self.assertIsNotNone(refused)
+        self.assertIn("expected_public_key does not match", refused)
+        self.assertEqual(after_add, before, "A refused identity changed the cue database or watermark")
+
+    def test_expected_public_key_is_checked_before_existing_id_lookup(self):
+        first = self.add()
+        before = list(self.store.db.iterdump())
+        with self.assertRaisesRegex(ValueError, "expected_public_key does not match"):
+            self.add(now=T0 + 5000, expected_public_key="00" * 32)
+        self.assertEqual(list(self.store.db.iterdump()), before)
+        self.assertEqual(self.store.show("rain"), first)
+
+    def test_expected_public_key_strict_shape_rejection_is_state_neutral(self):
+        pub = GRANT.public_key.hex()
+        for invalid in (None, False, 0, [], {}, "", pub[:-1], pub + "0", "g" * 64,
+                        " " + pub, pub + "\n", "0x" + pub, "０" * 64):
+            with self.subTest(value=invalid):
+                before = list(self.store.db.iterdump())
+                with self.assertRaisesRegex(ValueError, "expected_public_key must be 64 ASCII hex characters"):
+                    self.store.add(request(expected_public_key=invalid), T0 + 5000, ALLOWED, self.load)
+                self.assertEqual(list(self.store.db.iterdump()), before)
+
+    def test_matching_expected_public_key_preserves_legacy_identity_and_restart(self):
+        pub = GRANT.public_key.hex()
+        req = request(**{"in": 10, "for": 60, "not_after": T0 + 30_000})
+        first = self.store.dispatch(req, T0, ALLOWED, self.load)["cue"]
+        saved = self.store._row("rain")["request"]
+        for expected in (pub, pub.upper()):
+            self.assertEqual(self.store.dispatch({**req, "expected_public_key": expected}, T0 + 1,
+                                                ALLOWED, self.load)["cue"], first)
+            self.assertEqual(self.store._row("rain")["request"], saved)
+        self.restart(T0 + 2000)
+        self.tick(T0 + 10_000)
+        accepted = self.store.dispatch({**req, "expected_public_key": pub}, T0 + 10_001, ALLOWED, self.load)["cue"]
+        self.assertEqual(accepted["state"], "accepted")
+        self.assertEqual(accepted["acceptance"]["expires_at"], T0 + 30_000)
+        self.assertEqual(self.st.streams["weather"].head_seq, 1)
+
+    def test_cli_carries_exact_public_key_expectation(self):
+        pub = GRANT.public_key.hex()
+        with patch.object(runner, "control_request", return_value={"ok": True}) as control, redirect_stdout(io.StringIO()):
+            self.assertEqual(main(["cue", "add", "--control", "fixture.sock", "--id", "rain", "--stream", "weather",
+                                   "--text", "Fixture", "--in", "0", "--for", "60", "--expected-public-key", pub]), 0)
+            self.assertEqual(control.call_args.args[1], request(text="Fixture", expected_public_key=pub,
+                                                               **{"in": 0, "for": 60}))
 
     def test_duration_is_not_silently_clamped(self):
         with self.assertRaisesRegex(ValueError, "effective stream default TTL"):
@@ -506,6 +566,88 @@ class CueTest(unittest.TestCase):
 
 
 class ControlIntegrationTest(unittest.IsolatedAsyncioTestCase):
+    async def test_replaced_control_socket_refuses_wrong_expected_signer_before_effect(self):
+        try:
+            probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        except PermissionError:
+            if os.environ.get("CI"):
+                raise
+            self.skipTest("workspace denies AF_UNIX; exact-signer control proof must run in CI")
+        else:
+            probe.close()
+        with tempfile.TemporaryDirectory() as tmp:
+            control = str(Path(tmp) / "control.sock")
+            received = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            received.bind(("127.0.0.1", 0))
+            received.setblocking(False)
+            st = station(now=runner.now_ms())
+            db = cues.CueStore(Path(tmp) / "first.sqlite", st, now_ms=runner.now_ms())
+            stop = asyncio.Event()
+            task = asyncio.create_task(runner.run_station(st, [received.getsockname()], control, stop,
+                                       cue_store=db, grant_loader=lambda: GRANT))
+            send = lambda req: asyncio.to_thread(runner.control_request, control, req)
+
+            async def ready():
+                for _ in range(100):
+                    if Path(control).exists():
+                        return
+                    await asyncio.sleep(0.01)
+                self.fail("Real station did not create its control socket")
+
+            try:
+                await ready()
+                catalog = await send({"op": "public_catalog"})
+                elected = catalog["public_key"]
+                self.assertEqual(elected, GRANT.public_key.hex())
+                # A different real signing station now owns the same pathname.
+                stop.set()
+                await task
+                db.close()
+                other_sk = Ed25519PrivateKey.generate()
+                other_grant = replace(GRANT, public_key=wire.public_key_bytes(other_sk))
+                st = Station(other_sk, [StreamConfig("weather", cls="ambient", default_ttl_s=600, max_ttl_s=600)],
+                             epoch=8, now_ms=runner.now_ms(), grant=other_grant)
+                db = cues.CueStore(Path(tmp) / "replacement.sqlite", st, now_ms=runner.now_ms())
+                stop = asyncio.Event()
+                task = asyncio.create_task(runner.run_station(st, [received.getsockname()], control, stop,
+                                           cue_store=db, grant_loader=lambda: other_grant))
+                await ready()
+                capability = await send({"op": "cue_capabilities"})
+                self.assertTrue(capability["capabilities"]["exact_station_public_key"])
+                refused = await send(request("wrong-station", expected_public_key=elected, **{"in": 0, "for": 5}))
+                self.assertFalse(refused["ok"])
+                self.assertIn("expected_public_key does not match", refused["error"])
+                self.assertEqual((await send({"op": "cue_list"}))["cues"], [])
+                self.assertEqual(st.streams["weather"].head_seq, 0)
+                self.assertFalse(any(o.kind == wire.KIND_ITEM for o in st.streams["weather"].ring.values()))
+
+                # A correctly pinned request proves that the real replacement
+                # socket, signing path and loopback receiver are operational.
+                accepted = await send(request("right-station", text="Exact signer fixture",
+                                             expected_public_key=other_grant.public_key.hex(), **{"in": 0, "for": 5}))
+                self.assertTrue(accepted["ok"])
+                deadline = asyncio.get_running_loop().time() + 2
+                items = []
+                while asyncio.get_running_loop().time() < deadline and not items:
+                    try:
+                        frame = await asyncio.wait_for(asyncio.get_running_loop().sock_recv(received, 1200), 0.2)
+                    except asyncio.TimeoutError:
+                        continue
+                    if frame[3] == wire.KIND_ITEM:
+                        items.append(wire.parse(frame, lambda _: other_sk.public_key()).body)
+                self.assertEqual(len(items), 1)
+                self.assertEqual(items[0].body, b"Exact signer fixture")
+                self.assertEqual(items[0].epoch, 8)
+                self.assertEqual(st.streams["weather"].head_seq, 1)
+                self.assertEqual([r["id"] for r in (await send({"op": "cue_list"}))["cues"]], ["right-station"])
+            finally:
+                stop.set()
+                try:
+                    await task
+                finally:
+                    received.close()
+                    db.close()
+
     async def test_absolute_expiry_over_real_control_and_udp_with_unread_ack(self):
         try:
             probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
