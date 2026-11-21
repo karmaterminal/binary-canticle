@@ -76,6 +76,21 @@ The decoder is stricter than the RFC in two places: it rejects floats, tags and 
 
 Keep-on-air is looser than the RFC: the station lets any keyed item be kept on air up to its 24 h hard cap (D3), where §7.9 holds classes other than root and aspect items to one TTL unless the stream configuration raises it. Streams have no such setting here.
 
+### Elected derived-publication proposal (#146; not connected)
+
+[canticle/derived_reply_proposal.py](canticle/derived_reply_proposal.py) is an inert, default-closed review
+primitive for Cael/Ronan's #146 lane. It tests complete-history/exposure fences, exact generations,
+explicit election, durable one-use claims and a candidate authenticated capability with full-ledger
+lineage. It is not imported by the CLI or station control dispatcher and never calls Station.sing.
+Ordinary OpenClaw taint and subagent publication refusals remain unchanged.
+The fixture accepts subagent session keys only; it is not a continuing main/Discord-session adapter.
+Its station-name/key-ID intent is not a production full-public-key signer check.
+
+The [proposal and production seam inventory](../../rfc/0001-notes/derived-reply-capability-proposal.md)
+identify the unadopted choices and remaining actual-host, station and room-egress proofs. Focused
+tests use temporary SQLite state and synthetic data. A codec fixture is not an on-air or session
+encounter receipt. Neither #145 nor #146/#156 closes on these tests.
+
 ## Install and onboard
 
 Requires Python 3.11+ and `cryptography>=45`. Run these from the repository root.
