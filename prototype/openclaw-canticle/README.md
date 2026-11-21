@@ -286,8 +286,10 @@ heard-back time, any withdrawal, and the last event. The payload itself is kept 
   and are never tainted.
 - **What the host must enforce.** §14.12 tells the host to deny a tainted session, among other things, command
   execution outside a sandbox, writes to its bootstrap, configuration and memory files, plugin installation and
-  outbound messages to off-host targets (items 1–7). Those are other tools, and a plugin cannot gate them: that
-  needs a Gateway tool-policy seam OpenClaw does not have (§23.2 question 5, §16). Until it exists, list in
+  outbound messages to off-host targets (items 1–7). Those other tools need host enforcement. OpenClaw
+  `21660b2182062a9a98eb28d46341283100c082e6` has generic trusted tool-policy and final-I/O authority seams;
+  this Canticle binding has not integrated and proved its taint policy through them or through the separate
+  reply/completion/child-announce paths (#156). Until that complete path is proved, list in
   `payloadSessions` only sessions with no off-host channel route (BC-1's interim rule, §14.12) whose own tool
   policy is already that narrow. Leave it empty and subscribed sessions read digests only.
 
@@ -330,8 +332,16 @@ seats keep their existing configuration and digest-only posture until their own 
 Payload still persists taint; mute and expiry do not clear it. The isolated reader receives no publish tools,
 and neither a fresh signer nor a parent session is a publication escape. Authorized attributed reply
 publication remains #146's separate owner-reviewed contract. The [source-pinned composed regression](test/fixtures/SOURCE.md)
-proves the gate intersection with actual resolver code and explicit fixtures, not live storage, transport,
-host isolation, fleet installation or a session encounter.
+proves the gate intersection through the actual plugin registration, unchanged core factory/context/callback
+and lifecycle code, real resolver decision and explicit environmental fixtures. Its offline receipt command is:
+
+```sh
+node prototype/openclaw-canticle/proofs/core-reader.mjs --output /tmp/canticle-reader-receipt.json
+```
+
+This requires Node 24 or 26, takes no model turn, binds no socket, and has a 60-second subprocess limit.
+It writes the exact source hashes, test counts and unproved boundaries beside its TAP log outside the checkout.
+It does not prove live storage, transport, host isolation, fleet installation or a session encounter.
 
 ## Two bindings on one host (#95)
 
