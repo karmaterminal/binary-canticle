@@ -43,7 +43,7 @@ const run = spawnSync(process.execPath, ["--test", "--test-reporter=tap", ...fil
 const tap = run.stdout ?? "";
 const count = (field) => Number(tap.match(new RegExp(`^# ${field} (\\d+)$`, "m"))?.[1] ?? NaN);
 const counts = { tests: count("tests"), pass: count("pass"), fail: count("fail"), cancelled: count("cancelled"), skipped: count("skipped"), todo: count("todo") };
-const passed = run.status === 0 && counts.tests >= 19 && counts.pass === counts.tests &&
+const passed = run.status === 0 && counts.tests >= 20 && counts.pass === counts.tests &&
   counts.fail === 0 && counts.cancelled === 0 && counts.skipped === 0 && counts.todo === 0;
 const receipt = {
   version: "canticle-core-reader-source-proof/1", result: passed ? "pass" : "fail",

@@ -771,12 +771,15 @@ export class Binding {
         break;
       }
       const air = e.kind === "heard" ? this.airOf(e, now) : null;
-      const text = renderEntry(e, now, view, air);
-      const size = Buffer.byteLength(text);
+      const rendered = renderEntry(e, now, view, air);
+      const size = Buffer.byteLength(rendered);
       if (ids.length > 0 && bytes + size > READ_BYTES_MAX) {
         more = true;
         break;
       }
+      // Preserve the existing pre-normalization pagination budget, but capture the same
+      // blank-line-normalized entry bytes that the journal/new result returns below.
+      const text = rendered.replace(/\n{3,}/g, "\n\n");
       out.push(text);
       ids.push(entrySummary(e, air));
       bytes += size;

@@ -261,6 +261,49 @@ test("on-air payloads use the same fence while metadata previews create no expos
   } finally { host.close(); await s.close(); }
 });
 
+test("multiline exposure receipts hash the exact returned entries after journal normalization", async () => {
+  const s = await setup();
+  const host = exposureFixture();
+  const bodies = [payload, "first\n\n\nsecond", "\n\n\nfirst α\n\n\n\nsecond 🍂\n\n\n"];
+  try {
+    for (let i = 1; i < bodies.length; i++) {
+      s.binding.receiver.apply({ v: RECORD_V, type: "frame", run: "wrapper-fixture-run", rec_seq: i + 3,
+        ...frameFields({ station: "cael", key_id: KEY_CAEL, stream: "chatter", seq: i + 1,
+          issued_at: Date.now(), text: bodies[i]! }) });
+    }
+    const tool = s.tool("canticle_listen", { context: exposureContext(host.port) })!;
+    for (const what of ["journal", "new", "on_air"] as const) {
+      const result = await tool.execute(`multiline-${what}`, { what, view: "items" });
+      assert.equal(result.details.ok, true);
+      const text = result.content[0]!.text;
+      const record = host.rows().at(-1)!;
+      assert.equal(record.toolCallId, `multiline-${what}`);
+      assert.equal(record.resultSha256, sha256(text));
+      assert.equal(record.resultBytes, Buffer.byteLength(text));
+      // Inspect the actual tool result; production receipt capture never parses these banners.
+      const entries = Array.from(text.matchAll(/^\[canticle:heard\][\s\S]*?^<<<END_EXTERNAL_UNTRUSTED_CONTENT id="[0-9a-f]+">>>/gm),
+        (match) => match[0]);
+      assert.equal(entries.length, 3);
+      assert.deepEqual(record.sources.map((source) => source.item.seq), what === "on_air" ? [3, 2, 1] : [1, 2, 3]);
+      for (const [i, entry] of entries.entries()) {
+        const source = record.sources[i]!;
+        assert.equal(entry.match(/^item=\d+\/(\d+) hop=/m)?.[1], String(source.item.seq), "receipt follows returned order");
+        assert.equal(source.renderedBytes, Buffer.byteLength(entry), `${what} entry ${i} returned bytes`);
+        assert.equal(source.renderedSha256, sha256(entry), `${what} entry ${i} returned hash`);
+        assert.equal(source.sourceBody!.textSha256, sha256(bodies[Number(source.item.seq) - 1]!), "source hash retains original body");
+      }
+      const utf8Entry = entries[record.sources.findIndex((source) => source.item.seq === 3)]!;
+      assert.ok(Buffer.byteLength(utf8Entry) > utf8Entry.length, "UTF-8 bytes differ from character count");
+      if (what === "on_air") {
+        assert.ok(text.includes("first\n\n\nsecond"), "on-air retains its existing payload whitespace");
+      } else {
+        assert.ok(text.includes("first\n\nsecond"));
+        assert.doesNotMatch(text, /\n{3,}/, "journal and new retain their existing blank-line normalization");
+      }
+    }
+  } finally { host.close(); await s.close(); }
+});
+
 test("failed durable begin or wrong host incarnation withholds every payload byte", async () => {
   const s = await setup();
   const host = exposureFixture();
