@@ -20,6 +20,7 @@ import time
 from typing import Callable, Optional
 
 from . import finding
+from .derived_control import DerivedControlBridge, OPERATIONS as DERIVED_OPERATIONS
 from .listener import Event, Listener
 from .ids import CLASSES
 from .station import Station
@@ -79,8 +80,17 @@ def _finding_body(req: dict, cls: Optional[str], kwargs: dict) -> None:
     kwargs["body"], kwargs["ctype"] = finding.encode(f), finding.CTYPE
 
 
-def _dispatch(station: Station, req: dict, socket_classes: frozenset) -> dict:
+def _dispatch(station: Station, req: dict, socket_classes: frozenset, *,
+              derived_bridge: Optional[DerivedControlBridge] = None, peer_uid: Optional[int] = None) -> dict:
+    if not isinstance(req, dict):
+        raise ValueError("control request must be an object")
     op = req.get("op")
+    if op in DERIVED_OPERATIONS:
+        if derived_bridge is None:
+            return {"ok": False, "error": "derived publication is not configured"}
+        if op == "derived_publish" and "chatter" not in socket_classes:
+            return {"ok": False, "error": "class chatter is not granted to this control socket (§15.4)"}
+        return derived_bridge.dispatch(station, req, peer_uid)
     now = now_ms()
     if op == "sing":
         stream = station.streams.get(req.get("stream"))
@@ -133,12 +143,14 @@ def socket_grant(station: Station, requested=None) -> frozenset:
 
 async def run_station(station: Station, dests: list[tuple[str, int]], control_path: Optional[str] = None,
                       stop: Optional[asyncio.Event] = None, log: Callable[[str], None] = lambda s: None,
-                      socket_classes=None) -> None:
+                      socket_classes=None, derived_bridge: Optional[DerivedControlBridge] = None) -> None:
     if station.grant is None:
         raise ValueError("a station behind a control socket needs its manifest grant (§10.4)")
     if station.host_binding:
         raise ValueError("run_station only sends UDP; it cannot carry host-scoped frames (§4.3)")
     allowed = socket_grant(station, socket_classes)
+    if derived_bridge is not None:
+        derived_bridge.check_station(station)
     stop = stop or asyncio.Event()
     wake = asyncio.Event()
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -156,11 +168,14 @@ async def run_station(station: Station, dests: list[tuple[str, int]], control_pa
             else:
                 line = await reader.readline()
                 try:
-                    resp = _dispatch(station, json.loads(line), allowed)
+                    resp = _dispatch(station, json.loads(line), allowed, derived_bridge=derived_bridge, peer_uid=uid)
                 except (ValueError, KeyError, TypeError) as e:
                     resp = {"ok": False, "error": str(e)}
-            writer.write((json.dumps(resp) + "\n").encode())
-            await writer.drain()
+            try:
+                writer.write((json.dumps(resp) + "\n").encode())
+                await writer.drain()
+            except ConnectionError:
+                pass  # the result can be lost after an effect; never dispatch it again
         finally:
             writer.close()
             wake.set()
@@ -172,6 +187,9 @@ async def run_station(station: Station, dests: list[tuple[str, int]], control_pa
         old = os.umask(0o177)
         try:
             server = await asyncio.start_unix_server(handle, path=control_path, limit=CONTROL_LINE_LIMIT)
+        except BaseException:
+            sock.close()
+            raise
         finally:
             os.umask(old)
         log(f"control socket {control_path}")

@@ -76,7 +76,7 @@ The decoder is stricter than the RFC in two places: it rejects floats, tags and 
 
 Keep-on-air is looser than the RFC: the station lets any keyed item be kept on air up to its 24 h hard cap (D3), where §7.9 holds classes other than root and aspect items to one TTL unless the stream configuration raises it. Streams have no such setting here.
 
-### Elected derived-publication proposal (#146; not connected)
+### Elected derived-publication proposal (#146; host integration pending)
 
 [canticle/derived_reply_proposal.py](canticle/derived_reply_proposal.py) is a default-closed review
 primitive for Cael/Ronan's #146 lane. It tests complete-history/exposure fences, exact generations,
@@ -85,16 +85,20 @@ lineage and a full-public-key signer binding. Version 2 refuses older version-1 
 
 The separate [derived_station_proposal.py](canticle/derived_station_proposal.py) now proves the actual
 Station signing/carousel effect, an immutable acceptance receipt and query-only recovery. Both its
-adapter and the Station admission flag are disabled by default. **No CLI, control dispatcher or agent
-tool registers or enables them.** It never calls ordinary Station.sing; OpenClaw's existing taint and
+adapter and the Station admission flag are disabled by default. The owner-configured
+[derived control bridge](docs/derived-control-bridge.md) adds authenticated `derived_publish` and
+read-only `derived_query` operations to `run_station` when explicitly supplied by a trusted host.
+Normal CLI startup and agent tools do not enable it. It never calls ordinary Station.sing; OpenClaw's existing taint and
 subagent publication refusals remain unchanged. Synthetic tests include a real signature-verifying
 Listener and loopback UDP. Station acceptance, host reception and session exposure remain different
 receipts, and ambiguous claims never retry an effect.
 
 The fixture accepts subagent session keys only; it is not a continuing main/Discord-session adapter.
-Its same-process host/station database composition is not an authenticated production IPC bridge.
+The new Unix control transport checks the kernel peer UID, the existing HMAC capability and exact
+station identity, and applies the same credential/high-entropy scan as the OpenClaw publisher.
+The host still owns capability provisioning, exposure receipts and source-use authorization.
 The [proposal and production seam inventory](../../rfc/0001-notes/derived-reply-capability-proposal.md)
-identify the unadopted source-freshness/mixed-class policy and remaining actual host, bridge and
+identify the unadopted source-freshness/mixed-class policy and remaining actual host and
 room-egress work. Neither #145 nor #146/#156 closes on these component tests.
 
 ## Install and onboard
