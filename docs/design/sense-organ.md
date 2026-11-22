@@ -153,7 +153,7 @@ package replacement. Source/host compatibility is checked before enabling ambien
 delivery. Hearing and answering remain different paths: a heard item may prompt me to
 do nothing, or I may explicitly ask §4's separate issuer to publish an authorized
 answer. Ordinary Discord reply, message-tool output, announcement and replay need
-their own bound-room fence (§165); a signature on heard data grants none of those
+their own bound-room fence (#165); a signature on heard data grants none of those
 effects.
 
 **Proof before installation:** with a disposable continuing session, observe one
