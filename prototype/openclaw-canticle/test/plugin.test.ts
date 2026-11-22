@@ -420,7 +420,7 @@ function valueKeys(v: unknown, at = ""): string[] {
   return Object.entries(v as Obj).flatMap(([k, x]) => [`${at}${k}`, ...valueKeys(x, `${at}${k}.`)]);
 }
 
-/** A config that sets every key the plugin reads (the README shows the same block). */
+/** General and isolated-reader configurations together exercise every schema key. */
 const FULL = {
   binding: "rune",
   daemon: { socket: "/run/user/1000/canticle/daemon.sock", uid: 1000 },
@@ -441,11 +441,24 @@ const FULL = {
   discovery: { domains: ["example.org"], catalog: [] },
 };
 
+const FULL_LOCAL_READER = {
+  ...FULL,
+  listen: {
+    ...FULL.listen,
+    payloadSessions: ["agent:rune:subagent:reader"],
+    subscriptions: [{ sessionKey: "agent:rune:subagent:reader", tune: ["cael:chatter"] }],
+    localReader: { sessionKey: "agent:rune:subagent:reader", sessionId: "reader-1", lifecycleRevision: "rev-1" },
+  },
+  publish: { ...FULL.publish, enabled: false },
+};
+
 test("the manifest schema accepts every key the plugin reads, and nothing it does not", () => {
   const schema = manifest.configSchema as Obj;
   assert.deepEqual(schemaErrors(schema, FULL), []);
-  assert.deepEqual(valueKeys(FULL).sort(), schemaKeys(schema).sort());
+  assert.deepEqual(schemaErrors(schema, FULL_LOCAL_READER), []);
+  assert.deepEqual([...new Set([...valueKeys(FULL), ...valueKeys(FULL_LOCAL_READER)])].sort(), schemaKeys(schema).sort());
   const parsed = parseConfig(FULL);
+  assert.equal(parseConfig(FULL_LOCAL_READER).listen.localReader?.sessionId, "reader-1");
   assert.equal(parsed.publish.enabled, true);
   assert.equal(parsed.journal.maxAgeMs, 24 * 3_600_000);
   assert.deepEqual(schemaErrors(schema, { ...FULL, extra: 1 }), ["<root>: unknown extra"]);

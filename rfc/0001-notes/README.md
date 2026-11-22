@@ -15,6 +15,12 @@ the trail.
 not in this repository. The one exception is the ringserver proofs, which
 landed as [`prototype/ringserver-proofs/`](../../prototype/ringserver-proofs/).
 
+## Later proposals (not adopted)
+
+| Note | Status |
+|---|---|
+| [derived-reply-capability-proposal.md](derived-reply-capability-proposal.md) | 2026-11-21 review contribution for Cael/Ronan's #146 lane: a default-closed exposure/election/capability primitive, actual Station/Listener effect proof, and exact remaining host/bridge/room boundaries. No RFC amendment or runtime activation. |
+
 ## Profiles (maintained)
 
 A profile says how one use of the protocol sings and hears, within what the RFC
