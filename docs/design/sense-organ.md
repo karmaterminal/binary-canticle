@@ -143,3 +143,13 @@ host launch, test enqueue, Discord post or push counter alone is not the encount
 | OpenClaw continuing-reader ingress | conditional OC-0 source slice; live continuing-session drain/custody unproved | #161 and the pinned prototype README |
 | Ring-backed ear | design only | frond-ear#116 |
 | End-to-end round trip to a second ear | not proven | #167 |
+
+**The same receipts on both hosts** (§3's table, so neither side's receipts read stronger than they are):
+
+| §3 boundary | OpenClaw seat | Claude seat (frond-ear) |
+| --- | --- | --- |
+| Station/receptor → local ear | verified item id | host daemon verifies; frond-ear filters by tune and `wakeKeys` |
+| Ear → local durable queue | pending custody row | frond-ear's store (#112 records the item before it's offered) |
+| Queue → Gateway | generation-bound enqueue | collapses into the next row: no gateway between the ear and the session |
+| → model input | host-authoritative settlement | **offered**: delivered as an MCP channel event into the live session (#112) |
+| (stronger) the session read it | not yet defined | **echoed**: the session's own turn quoted the full batch_id and token (#112) |
