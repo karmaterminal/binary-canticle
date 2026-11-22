@@ -19,6 +19,7 @@ import { type HeardFrame, type Obj, STATION_NAME, STREAM_NAME, isObj } from "./r
 import { type Air, heardMarks, iso, presenceText, renderEntry, renderViewItem } from "./render.ts";
 import { type StationClient, stationClient } from "./station.ts";
 import { Lease, LeaseHeld, ensureDir, readJson, writeJsonAtomic } from "./store.ts";
+import { payloadSource, type PayloadSource } from "./exposure.ts";
 
 /** Who called a tool. A call without an exact session key is anonymous, even when an agent id is present.
  * It has no checkpoint, taint mark or rate limit of its own and receives only operational status. */
@@ -105,6 +106,7 @@ export class Binding {
   private readonly hasHostRouteProof: boolean;
   private readonly provenPayloadRoutes = new Set<string>();
   private readonly provenLocalRoutes = new Set<string>();
+  private readonly payloadSources = new WeakMap<Result, readonly PayloadSource[]>();
   private ambientFlight: Promise<void> = Promise.resolve();
   private landingRevision = 0;
   private readonly candidateFlights = new Set<Promise<void>>();
@@ -674,6 +676,16 @@ export class Binding {
 
   // ------------------------------------------------------------------ tools
 
+  /** Host-only provenance selected with the payload; never reconstructed from a model-visible banner. */
+  payloadSourcesOf(result: Result): readonly PayloadSource[] {
+    return this.payloadSources.get(result) ?? [];
+  }
+
+  private withPayloadSources(result: Result, sources: readonly PayloadSource[]): Result {
+    if (sources.length > 0) this.payloadSources.set(result, sources);
+    return result;
+  }
+
   listen(c: Caller, p: Obj): Result {
     const st = this.state;
     if (st === null) {
@@ -743,6 +755,7 @@ export class Binding {
     let filtered = 0;
     let heardShown = 0;
     let payloadShown = 0;
+    const sources: PayloadSource[] = [];
     for (const e of this.journal.scan(after)) {
       if (!this.visible(c, e)) {
         last = e.seq;
@@ -772,6 +785,9 @@ export class Binding {
         heardShown += 1;
         if (view === "items") {
           payloadShown += 1;
+          sources.push(payloadSource(e.frame, text, {
+            run: e.run, source: e.source, journalSequence: e.seq, recordSequence: e.rec_seq,
+          }));
         }
       }
     }
@@ -804,7 +820,7 @@ export class Binding {
           : "heard text is not shown to this session (it is not listed in listen.payloadSessions)",
       );
     }
-    return {
+    return this.withPayloadSources({
       text: [...head, "", ...out].join("\n\n").replace(/\n{3,}/g, "\n\n"),
       details: {
         ok: true,
@@ -819,7 +835,7 @@ export class Binding {
         entries: ids,
         receive: { health: rx.health, reasons: rx.reasons },
       },
-    };
+    }, sources);
   }
 
   /** Where a journaled item stands now: withdrawn or expired by what the journal holds, whichever page holds it;
@@ -887,6 +903,7 @@ export class Binding {
     let bytes = 0;
     let payloadShown = 0;
     let more = false;
+    const sources: PayloadSource[] = [];
     for (const [i, isCurrent] of [...current.map((x) => [x, true] as const), ...carried.map((x) => [x, false] as const)]) {
       if (ids.length >= limit) {
         more = true;
@@ -914,6 +931,9 @@ export class Binding {
       ids.push({ idem: i.frame.idem, station: i.frame.station, stream: i.frame.stream, current: isCurrent, expires_at: i.frame.times.local_expiry_at });
       if (view === "items") {
         payloadShown += 1;
+        sources.push(payloadSource(i.frame, text, {
+          run: i.run, source: i.source, journalSequence: null, recordSequence: null,
+        }));
       }
     }
     if (payloadShown > 0) {
@@ -935,7 +955,7 @@ export class Binding {
           : "heard text is not shown to this session (it is not listed in listen.payloadSessions)",
       );
     }
-    return {
+    return this.withPayloadSources({
       text: [...lines, ...out].join("\n\n"),
       details: {
         ok: true,
@@ -949,7 +969,7 @@ export class Binding {
         entries: ids,
         receive: { health: rx.health, reasons: rx.reasons },
       },
-    };
+    }, sources);
   }
 
   private markTainted(c: Caller, now: number): void {

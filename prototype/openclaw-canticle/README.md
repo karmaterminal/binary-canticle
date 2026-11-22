@@ -85,7 +85,7 @@ never to a call that names no session.
 
 - **Ids name their binding**, so a binding can tell its own from another's: cursors `j:BINDING:JOURNAL:SEQ`,
   mutes `mute:BINDING:N`, outbox rows `out:BINDING:N`.
-- **A refusal changes nothing, and says so.** It is a failed tool result, returned rather than thrown:
+- **A precondition refusal changes nothing, and says so.** It is a failed tool result, returned rather than thrown:
   `details.ok` is `false`, `details.error` is the reason, and the text is
   `[canticle:refused] TOOL: REASON: DETAIL. Nothing changed.` The reasons are `not_running` (also for a call
   that reaches a binding while it stops), `bad_param`, `bad_cursor`, `not_this_binding`, `stale_cursor`,
@@ -93,6 +93,8 @@ never to a call that names no session.
   and `tainted`. (OpenClaw shows a returned failure's text to the model and to a Gateway `tools.invoke` caller; a
   thrown error reaches a `tools.invoke` caller only as "tool execution failed".) A sing the outbox weighs and
   turns down is a result instead: `status: "rejected"` or `"budget_exhausted"` with a `reason`.
+  The host exposure port has a separate `exposure_unavailable` outcome: payload is withheld, but an already
+  advanced read checkpoint, conservative taint, or durable pending exposure is retained for reconciliation.
 - **A call that names no exact session** (OpenClaw passed no `sessionKey`, even if it passed an `agentId`) is not given a shared
   identity. An agent ID is not a substitute for an exact session key. It gets `canticle_status`, `canticle_mute`, and operational notes in `journal` digests, but no subscribed
   heard items or on-air items; a `new` read and heard text are refused (`no_session`), because a checkpoint and a
@@ -342,6 +344,47 @@ node prototype/openclaw-canticle/proofs/core-reader.mjs --output /tmp/canticle-r
 This requires Node 24 or 26, takes no model turn, binds no socket, and has a 60-second subprocess limit.
 It writes the exact source hashes, test counts and unproved boundaries beside its TAP log outside the checkout.
 It does not prove live storage, transport, host isolation, fleet installation or a session encounter.
+
+### Host-owned exposure fence (#156)
+
+The selected host can attach `toolBindings["canticle.exposure"]` to the trusted tool factory context.
+`src/exposure.ts` defines version `canticle-exposure-port/1`: the exact reader key, session ID and lifecycle
+revision, a current-authority assertion, and an asynchronous `begin(PayloadExposure)` operation returning a
+nonempty `pendingId`. This is an out-of-band host capability, not configuration accepted from a model or an
+argument to `canticle_listen`. No reader-key or publication permission changes accompany it.
+
+For both journal and on-air payload reads, `Binding` captures metadata from the actual verified frames
+selected for the returned text. The batch preserves output order, item/root/hop, class/scope, wake and
+exercise flags, original source/local expiry, body and displayed-text hashes, and available receptor cursor
+identity. On-air state does not retain an exact record cursor, so those cursor fields remain `null`.
+The batch hashes the complete plugin result before any core wrapping. It neither parses banners nor
+reduces history to one elected parent, and no raw body text is copied into this metadata channel.
+
+Before releasing bytes, the tool awaits `begin` and rechecks both invocation and port authority. The host
+implementation must durably fence every source before acknowledging. An invalid/mismatched port, failed
+write, missing acknowledgement or expired authority withholds payload with `exposure_unavailable`.
+Already-written pending fences and taint remain; they are never silently cleared by this failure.
+Metadata-only reads produce no exposure batch. Pending custody is not permission to publish.
+
+The port deliberately has **no confirmation method**. Actual host-result custody, model-input admission,
+provider receipt and interpretation are different observations. The selected host owns any confirmation,
+after verifying the exact identity and returned bytes at its real handoff boundary. Core may still withhold
+the tool result after `begin` succeeds. Missing or ambiguous confirmation leaves the durable fence pending
+through restart. A passive `llm_input` observation can describe the prompt it actually sees; it cannot by
+itself prove provider receipt or replace the required pre-return fence.
+
+Absent this optional port, the pre-existing isolated reader retains its taint-only behavior. That path
+does not attest complete history and cannot be used to initialize a clean derived publisher. A host mode
+requiring the exposure ledger must refuse to prepare its reader without the port. The actual production
+ledger producer, origin attestation/migration, host model boundary, child inheritance and ordinary room
+egress remain host integration work; this component does not claim them installed. Existing #159's ledger
+must consume scope and content identity from the authoritative source receipt, rather than ignoring those
+fields when checking the elected publication.
+
+The composed reader test now uses real SQLite persistence behind a declared host-port fixture. It proves
+ordering, full selected metadata, digest non-exposure, malformed/stale authority refusal, and persistence
+after the actual core callback withholds a result. It does not substitute that fixture for a live Gateway,
+model, station or recipient encounter.
 
 ## Two bindings on one host (#95)
 

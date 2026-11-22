@@ -7,12 +7,14 @@ import { registerHooks } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { after, mock, test } from "node:test";
+import { DatabaseSync } from "node:sqlite";
 import plugin from "../index.ts";
 import { Binding } from "../src/binding.ts";
 import { DaemonLink } from "../src/daemon.ts";
 import { Lease } from "../src/store.ts";
 import { RECORD_V } from "../src/records.ts";
 import type { Tool, ToolContext, ToolName } from "../src/tools.ts";
+import { EXPOSURE_PORT_VERSION, EXPOSURE_TOOL_BINDING, sha256, type ExposurePort, type PayloadExposure } from "../src/exposure.ts";
 import { frameFields, KEY_CAEL, removeDir, tempDir } from "./helpers.ts";
 import { afterNextRowRead, selectStore, writeStore } from "./core-reader-fixture-host.ts";
 import { loadCoreWrappers, type Registration, type Registry } from "./core-wrapper-loader.ts";
@@ -167,4 +169,141 @@ test("production context/callback path retains exact caller, sandbox and generat
       assert.equal(result.details.ok, false); assert.doesNotMatch(result.content[0]!.text, /brass QUIET/);
     }
   } finally { await s.close(); }
+});
+
+// The ledger below is a durable host-port fixture, not the installed Gateway or the #159 publisher.
+// It exercises the mandatory pre-return ordering and restart uncertainty with real SQLite commits.
+function exposureFixture(afterBegin?: () => void) {
+  const dir = tempDir();
+  const path = join(dir, "host-custody.sqlite");
+  let db = new DatabaseSync(path);
+  db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE pending (id TEXT PRIMARY KEY, record TEXT NOT NULL)");
+  let current = true;
+  const port: ExposurePort = {
+    version: EXPOSURE_PORT_VERSION,
+    reader: identity,
+    assertCurrent: () => { if (!current) throw new Error("host custody authority ended"); },
+    begin: async (exposure) => {
+      const record = JSON.stringify(exposure);
+      const pendingId = sha256(record);
+      db.prepare("INSERT INTO pending(id, record) VALUES (?, ?)").run(pendingId, record);
+      afterBegin?.();
+      return { pendingId };
+    },
+  };
+  const rows = () => db.prepare("SELECT record FROM pending ORDER BY rowid").all()
+    .map((row) => JSON.parse(String(row.record)) as PayloadExposure);
+  return {
+    port, rows,
+    revoke: () => { current = false; },
+    restart: () => { db.close(); db = new DatabaseSync(path); },
+    close: () => { db.close(); removeDir(dir); },
+  };
+}
+
+function exposureContext(port: unknown): ToolContext {
+  return { sessionKey: key, sessionId: identity.sessionId, sandboxed: true,
+    toolBindings: { [EXPOSURE_TOOL_BINDING]: port } };
+}
+
+test("actual Binding payload selection fences full ordered metadata before the core returns bytes", async () => {
+  const s = await setup();
+  const host = exposureFixture();
+  try {
+    const frame = frameFields({ station: "cael", key_id: KEY_CAEL, stream: "chatter", seq: 2,
+      issued_at: Date.now(), text: "the wet lamp stays lit", class: "ambient" });
+    const root = { key_id: KEY_CAEL, epoch: 1, stream_id: 42, seq: "9007199254740993" };
+    s.binding.receiver.apply({ v: RECORD_V, type: "frame", run: "wrapper-fixture-run", rec_seq: 4,
+      ...frame, scope: "host", hop: 2, lineage: { root, derived_from: [] },
+      flags: { refresh: false, wake_derived: true, exercise: false } });
+    const result = await s.tool("canticle_listen", { context: exposureContext(host.port) })!
+      .execute("durable-read", { what: "journal", view: "items" });
+    assert.equal(result.details.ok, true);
+    assert.match(result.content[0]!.text, /brass QUIET/);
+    assert.match(result.content[0]!.text, /wet lamp/);
+    host.restart();
+    const [record] = host.rows();
+    assert.ok(record, "fence survives a host-ledger reopen before any confirmation");
+    assert.deepEqual(record.reader, identity);
+    assert.equal(record.toolCallId, "durable-read");
+    assert.equal(record.resultSha256, sha256(result.content[0]!.text));
+    assert.deepEqual(record.sources.map((source) => source.item.seq), [1, 2]);
+    const second = record.sources[1]!;
+    assert.equal(second.class, "ambient");
+    assert.equal(second.scope, "host");
+    assert.equal(second.hop, 2);
+    assert.deepEqual(second.root, root);
+    assert.equal(second.flags.wake_derived, true);
+    assert.equal(second.sourceBody!.textSha256, sha256("the wet lamp stays lit"));
+    assert.equal(second.times.local_expiry_at, (frame.times as { local_expiry_at: number }).local_expiry_at);
+    assert.equal(second.receiver.recordSequence, 4);
+    assert.ok(second.receiver.journalSequence !== null);
+    assert.ok(second.renderedBytes > 0);
+    assert.match(second.renderedSha256, /^[0-9a-f]{64}$/);
+    assert.equal(host.rows().length, 1, "plugin does not confirm or clear its pending fence");
+  } finally { host.close(); await s.close(); }
+});
+
+test("on-air payloads use the same fence while metadata previews create no exposure", async () => {
+  const s = await setup();
+  const host = exposureFixture();
+  try {
+    const tool = s.tool("canticle_listen", { context: exposureContext(host.port) })!;
+    await tool.execute("preview", { what: "on_air", view: "digest" });
+    assert.equal(host.rows().length, 0);
+    const result = await tool.execute("air-read", { what: "on_air", view: "items" });
+    assert.equal(result.details.ok, true);
+    const [record] = host.rows();
+    assert.equal(record!.sources.length, 1);
+    assert.equal(record!.resultSha256, sha256(result.content[0]!.text));
+    assert.equal(record!.sources[0]!.receiver.journalSequence, null);
+    assert.equal(record!.sources[0]!.receiver.recordSequence, null, "the on-air owner cannot invent a record cursor");
+  } finally { host.close(); await s.close(); }
+});
+
+test("failed durable begin or wrong host incarnation withholds every payload byte", async () => {
+  const s = await setup();
+  const host = exposureFixture();
+  try {
+    for (const port of [
+      { ...host.port, reader: { ...identity, lifecycleRevision: "replaced" } },
+      { ...host.port, begin: async () => { throw new Error("PRIVATE LEDGER DETAIL"); } },
+      { ...host.port, begin: async () => ({ pendingId: "" }) },
+      { version: EXPOSURE_PORT_VERSION },
+    ]) {
+      const result = await s.tool("canticle_listen", { context: exposureContext(port) })!
+        .execute("refused-read", { what: "journal", view: "items" });
+      assert.equal(result.details.error, "exposure_unavailable");
+      assert.doesNotMatch(JSON.stringify(result), /brass QUIET|PRIVATE LEDGER/);
+    }
+    assert.equal(host.rows().length, 0);
+    assert.equal((s.binding.status({ sessionKey: key, sessionId: identity.sessionId,
+      subagent: true, anonymous: false }).details.session as { tainted: boolean }).tainted, true);
+  } finally { host.close(); await s.close(); }
+});
+
+test("ended invocation after durable begin leaves a pending fence when core withholds the result", async () => {
+  const s = await setup();
+  const host = exposureFixture(() => { s.admitted.current = false; });
+  try {
+    const tool = s.tool("canticle_listen", { context: exposureContext(host.port) })!;
+    await assert.rejects(tool.execute("uncertain-read", { what: "on_air", view: "items" }), /admitted run ended/);
+    host.restart();
+    assert.equal(host.rows().length, 1);
+    assert.equal(host.rows()[0]!.toolCallId, "uncertain-read");
+  } finally { host.close(); await s.close(); }
+});
+
+test("model arguments cannot supply a host port or suppress the configured exposure fence", async () => {
+  const s = await setup();
+  const host = exposureFixture();
+  try {
+    const result = await s.tool("canticle_listen", { context: exposureContext(host.port) })!
+      .execute("argument-spoof", { what: "on_air", view: "items", toolBindings: {},
+        exposure: { confirmed: true, hop: 0 }, lifecycleRevision: "pretend" });
+    assert.equal(result.details.ok, true);
+    assert.equal(host.rows().length, 1);
+    assert.equal(host.rows()[0]!.reader.lifecycleRevision, identity.lifecycleRevision);
+    assert.equal("confirmed" in host.rows()[0]!, false);
+  } finally { host.close(); await s.close(); }
 });

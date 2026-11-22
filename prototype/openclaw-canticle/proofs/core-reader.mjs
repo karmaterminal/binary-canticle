@@ -43,7 +43,7 @@ const run = spawnSync(process.execPath, ["--test", "--test-reporter=tap", ...fil
 const tap = run.stdout ?? "";
 const count = (field) => Number(tap.match(new RegExp(`^# ${field} (\\d+)$`, "m"))?.[1] ?? NaN);
 const counts = { tests: count("tests"), pass: count("pass"), fail: count("fail"), cancelled: count("cancelled"), skipped: count("skipped"), todo: count("todo") };
-const passed = run.status === 0 && counts.tests >= 14 && counts.pass === counts.tests &&
+const passed = run.status === 0 && counts.tests >= 19 && counts.pass === counts.tests &&
   counts.fail === 0 && counts.cancelled === 0 && counts.skipped === 0 && counts.todo === 0;
 const receipt = {
   version: "canticle-core-reader-source-proof/1", result: passed ? "pass" : "fail",
@@ -53,8 +53,8 @@ const receipt = {
   openclaw_source: "21660b2182062a9a98eb28d46341283100c082e6",
   input_sha256: source, tests: counts, tap_sha256: sha(tap),
   synthetic_payload_sha256: sha("the brass QUIET sign is bolted to a bell"),
-  exercised: ["production plugin registration", "core factory context and factory resolver", "core callback wrapper before and after await", "core registry and plugin-instance ownership checks", "core exact local route decision", "plugin callerOf, Binding, Receiver, persisted taint and mute"],
-  fixtures: ["session row, placement and binding storage adapters", "admitted-run producer and sandbox selection", "plugin runtime scope and non-policy environmental services", "lease acquisition and daemon startup", "synthetic receptor records"],
+  exercised: ["production plugin registration", "core factory context and factory resolver", "core callback wrapper before and after await", "core registry and plugin-instance ownership checks", "core exact local route decision", "plugin callerOf, Binding, Receiver, persisted taint and mute", "host-bound pre-return exposure fence and exact selected source metadata", "pending exposure surviving SQLite reopen after withheld result"],
+  fixtures: ["session row, placement and binding storage adapters", "admitted-run producer and sandbox selection", "plugin runtime scope and non-policy environmental services", "lease acquisition and daemon startup", "synthetic receptor records", "host exposure port backed by a disposable SQLite ledger; no production history origin or confirmation"],
   not_proved: ["installed Gateway or fleet configuration", "host tool-policy allowlist and sandbox enforcement", "parent-result or non-tool egress containment", "live station signature or transport", "model encounter", "derived publication", "room egress", "launch readiness"],
   exit_status: run.status, signal: run.signal ?? null, error: run.error?.message ?? null,
 };
