@@ -59,6 +59,7 @@ Music can be live and lossy; an alert can be ordered and recovered. Nothing abou
 - **Live, loss-tolerated, latest-state** → the existing signed UDP carousel. It stays radio: no acks, no listener tracking, and a late listener hears now, not the past.
 - **Ordered and/or replayable** → a ring. The candidate is [ringserver](https://github.com/karmaterminal/ringserver) over DataLink (pattern selection at the server, retention ring, many readers). It runs **one ring per retention class**, so a chatty stream never sets everyone's history.
   - Measured facts to respect: the defaults at the pinned fork are a 1 GiB ring, a 512-byte packet payload and 600 clients. At 10 Gb/s, 1 GiB is under a second of history. The payload default is below today's ~1.1 KB frame, so it needs reconfiguring or fragmentation.
+- **Open: live, ordered, loss-tolerated** (live talk, music). The carousel is latest-state, so it's the wrong shape; a TCP ring adds head-of-line waiting that a lossy stream doesn't want. The candidates are a sequenced UDP stream with no carousel and gaps reported, or a ring read live with a skip-ahead policy. Measure both.
 - **Bulk** (audio, long readings, telemetry chunks) → content-addressed objects (e.g. MinIO + sha256). The wire carries a small signed descriptor that points at them.
 - **Multicast** is a measurement, not a commitment. It saves sender copies, but receivers join groups, not `station:stream` names, so a shared group still brings the whole group onto the host.
 
@@ -89,7 +90,7 @@ A downstream ring can't recover loss on the first hop (station → UDP → daemo
 | publisher → ring | spool ack (named event) | the ring accepted or retained the item | that anyone heard it |
 | ring → ear | transport cursor advance | the ear read past this position | that the item was valid or admitted |
 | ear admission | verify + dedupe record | a valid, unexpired, unseen item passed the caps | that a model saw it |
-| ear → session | frond-ear custody: offered → echoed (#112), boundary-stamped | the item reached this session's context, and the session acted on its batch id | that it was obeyed (it never is: external content) |
+| ear → session | frond-ear custody: offered → echoed (#112), boundary-stamped | offered: the item was delivered into this session's context. echoed: the session's own turn quoted its full batch id and token | that it was obeyed (it never is: external content) |
 
 ### 2.7 The controls a prince uses
 `find(query)` searches the guide (paginated; never dumped into context). `tune(stream|pattern, live|digest|silent, budget)`. `peek(stream, n)` samples without subscribing; it is labelled a preview, it still counts as exposure, and it says when it's metadata only. `now()` shows what's tuned, lag, gaps, budget left and listener health (silence is distinguishable from "the listener died"). `mute(...)`. `cast(stream, item)` goes through §4's issuer, never as a direct ring write. Saved presets make tuning several streams one action.
