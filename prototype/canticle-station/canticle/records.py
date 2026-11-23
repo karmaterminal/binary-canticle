@@ -24,7 +24,8 @@ import hashlib
 import json
 import os
 import secrets
-from typing import Callable, Optional
+from dataclasses import dataclass
+from typing import Callable, Iterable, Optional
 
 from . import wire
 from .ids import CLASSES, CTYPES, SCOPES
@@ -38,6 +39,7 @@ RECEPTOR_STATE_VERSION = 1
 HEALTH_INTERVAL_MS = 10_000   # §14.18.3 [PROPOSED DEFAULT]
 NO_DATAGRAMS_MS = 30_000      # §14.18.3 [PROPOSED DEFAULT]
 KEY_TABLE_SIZE = 16           # unverified key ids kept by count (D34)
+BEACON_REPEAT_MS = 86_400_000 # a beacon has no expiry: its copies are no-ops for the run, so only the intake's count ends this
 CLOCK_SKEW_MS = SKEW_MS       # a station offset beyond this marks health `clock_skew`
 
 # Records that a full queue may drop (their rec_seq is then a gap); the rest are never dropped (§14.18.2).
@@ -165,6 +167,17 @@ class StateNotDurable(Exception):
     and its run must end with `fatal` (reason ``state_not_durable``) and a non-zero exit (§14.18.2)."""
 
 
+@dataclass(frozen=True)
+class Heard:
+    """What became of one datagram, for the transport that queued it (``intake.py``)."""
+
+    verified: bool = False           # its signature verified against a manifest key
+    fresh: bool = False              # and it was accepted for the first time, at its key's current epoch
+    kept: bool = False               # and an identical copy is a no-op from now ...
+    until: int = 0                   # ... until this time
+    ident: Optional[tuple] = None    # the identity tuple, None for a beacon
+
+
 class Receptor:
     """The listener's outcomes as record v1 (§14.18.3). Not thread-safe; one event loop drives it."""
 
@@ -199,7 +212,9 @@ class Receptor:
         self.records_dropped = 0      # set by the transport: records it dropped for some connection
         self.peers_closed = 0         # set by the transport: connections closed for a non-droppable record
         self.snapshots: Optional[dict] = None   # set by a transport that serves join snapshots: its counters
+        self.intake = None            # set by a transport that queues datagrams before they are heard (intake.py)
         self._dropped_at_health = 0
+        self._lost_at_health = (0, 0)
         self._dirty = False
         # One state file, one atomic write per datagram: the listener's guards and this receptor's surfaced
         # set and quarantines are saved together (self._save_if_dirty), so a crash cannot persist a PLUCK
@@ -308,7 +323,14 @@ class Receptor:
     def hear(self, datagram: bytes, now_ms: int) -> None:
         self._batch(lambda: self._hear(datagram, now_ms))
 
-    def _hear(self, datagram: bytes, now_ms: int) -> None:
+    def hear_all(self, datagrams: Iterable[bytes], now_ms: int) -> list:
+        """Several datagrams as one write-ahead batch (group commit, #171): one save covers them, and nothing any of
+        them implies is sent before it lands. Returns a ``Heard`` for each, once it has."""
+        out: list = []
+        self._batch(lambda: out.extend(self._hear(d, now_ms) for d in datagrams))
+        return out
+
+    def _hear(self, datagram: bytes, now_ms: int) -> Heard:
         self.last_datagram_at = now_ms
         try:
             events = self.lst.hear(datagram, now_ms)
@@ -324,6 +346,29 @@ class Receptor:
             self._presence_events(events)
         else:
             self._item_or_pluck(f, dedup, events, now_ms)
+        return self._heard(f, dedup, now_ms)
+
+    def _heard(self, f: Optional[wire.Frame], dedup: Optional[str], now_ms: int) -> Heard:
+        if f is None:
+            return Heard()
+        current = f.body.epoch == self.lst.stations[f.key_id].epoch_hwm if f.key_id in self.lst.stations else False
+        if f.kind == wire.KIND_BEACON:
+            return Heard(True, current and dedup == "first", current, now_ms + BEACON_REPEAT_MS)
+        row = self.lst.dedup.get(f.identity)
+        if row is None or row[0] != hashlib.sha256(f.raw).digest():
+            return Heard(True)         # refused at steps 3-4: a copy is judged again, and may be admitted then
+        return Heard(True, current and dedup in ("first", "resurfaced"), True, row[1] - SKEW_MS, f.identity)
+
+    def note_repeats(self) -> None:
+        """Account for the copies the intake dropped before they were heard: each is a benign no-op (§7.4), counted
+        as the repeat it is and noted for presence (§8.6)."""
+        for ident, copies, last_ms in self.intake.copies():
+            if ident is None:
+                self.counters["beacon"]["duplicate"] += copies
+            else:
+                self.counters["admission"]["duplicate"] += copies
+                self.counters["disposition"]["no_op"] += copies
+                self.lst.repeated(ident, copies, last_ms)
 
     def _unverified(self, datagram: bytes, reason: str) -> None:
         """Steps 1-2 of §14.1 failed: counters only, never a record, never attributed (D34)."""
@@ -510,6 +555,8 @@ class Receptor:
         self._batch(lambda: self._tick(now_ms))
 
     def _tick(self, now_ms: int) -> None:
+        if self.intake is not None:
+            self.note_repeats()
         for ev in self.lst.tick(now_ms):
             if ev.kind == "expired" and ev.ident in self.surfaced:
                 self._retract(ev.ident, "expired")
@@ -531,6 +578,7 @@ class Receptor:
         if self.failed is not None:
             raise StateNotDurable(self.failed)
         reasons = []
+        receive = self._receive_health(reasons)
         since = self.last_datagram_at if self.last_datagram_at is not None else self.started_at
         if now_ms - since >= NO_DATAGRAMS_MS:
             reasons.append("no_datagrams")
@@ -549,8 +597,28 @@ class Receptor:
             counters=self.counters, unverified=self.keys.to_json(),
             dedup={"entries": len(self.lst.dedup), "capacity": self.lst.dedup_capacity},
             beacon_age_ms=ages, surfaced=len(self.surfaced), quarantined=sorted(k.hex() for k in self.quarantined),
-            records={"emitted": self.em.rec_seq, "dropped": self.records_dropped, "peers_closed": self.peers_closed},
-            **({"snapshots": dict(self.snapshots)} if self.snapshots is not None else {}))
+            records={"emitted": self.em.rec_seq, "dropped": self.records_dropped, "peers_closed": self.peers_closed,
+                     **receive.pop("records", {})},
+            **receive, **({"snapshots": dict(self.snapshots)} if self.snapshots is not None else {}))
+
+    def _receive_health(self, reasons: list) -> dict:
+        """What was lost before it was heard, in optional fields beside the frozen ones (§14.18.3, #171): the kernel's
+        drops at the socket as ``records.socket_dropped``, and what the intake refused, by reason, in ``receive``.
+        ``records.dropped`` keeps its meaning: records dropped for a connection. A loss since the last health marks
+        it degraded; refusing what claims no listed key loses nothing a station sang, so it does not."""
+        if self.intake is None:
+            return {}
+        self.note_repeats()
+        at, stats, dropped = self.intake.last_datagram_at, self.intake.stats(), self.intake.socket_drops()
+        if at is not None and (self.last_datagram_at is None or at > self.last_datagram_at):
+            self.last_datagram_at = at
+        refused = sum(n for reason, n in stats["refused"].items() if reason != "unlisted")
+        if dropped > self._lost_at_health[0]:
+            reasons.append("socket_drops")
+        if refused > self._lost_at_health[1]:
+            reasons.append("datagrams_refused")
+        self._lost_at_health = (dropped, refused)
+        return {"records": {"socket_dropped": dropped}, "receive": stats}
 
     # ------------------------------------------------------------ join snapshot (amendment BC-1b, D36)
 

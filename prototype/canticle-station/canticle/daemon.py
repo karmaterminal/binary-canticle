@@ -55,6 +55,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from . import runner
+from .intake import RCVBUF, Intake
 from .listener import Listener
 from .manifest import Manifest
 from .records import (DROPPABLE, HEALTH_INTERVAL_MS, MAX_DEPTH, MAX_LINE, RECORD_V, Emitter, Receptor,
@@ -66,6 +67,9 @@ WRITE_BOUND_S = 2.0       # a non-droppable record unwritten this long closes it
 WATCH_S = 0.05            # how often the write bound is checked
 TICK_MS = 250
 SHUTDOWN_FLUSH_S = 2.0    # how long a clean stop waits for `bye` to reach each connection
+HEAR_BATCH = 32           # datagrams heard per write-ahead batch, and per turn of the event loop
+RETRY_S = 0.02            # how soon what waits for a budget is looked at again
+SWITCH_S = 0.0005         # the interpreter's thread switch interval: how long a busy event loop may hold up the reader
 LOG_TYPES = ("hello", "fatal", "bye")   # records copied to stderr (no item text in any of them)
 SNAPSHOT_ENTRIES_MAX = 511          # entries per join snapshot (§14.18.3 BC-1b [PROPOSED DEFAULT])
 SNAPSHOT_BYTES_MAX = 1 << 20        # bytes of entry lines per join snapshot ([PROPOSED DEFAULT])
@@ -101,6 +105,7 @@ class DaemonConfig:
     snapshot_defer_s: float = SNAPSHOT_DEFER_S
     health_interval_ms: Optional[int] = HEALTH_INTERVAL_MS   # None: no periodic health (tests)
     tick_ms: Optional[int] = TICK_MS                         # None: no periodic tick (tests)
+    rcvbuf: int = RCVBUF
     log: Callable[[str], None] = field(default=lambda s: print(s, file=sys.stderr, flush=True))
 
 
@@ -221,6 +226,8 @@ class Daemon:
         self.emitter = Emitter(self.publish)
         self.receptor: Optional[Receptor] = None
         self.udp: Optional[socket.socket] = None
+        self.intake: Optional[Intake] = None
+        self._hear_at: Optional[asyncio.Handle] = None   # when the queued datagrams are heard next
         self.server: Optional[asyncio.base_events.Server] = None
         self._lease = None
         self._stop: Optional[asyncio.Event] = None
@@ -423,7 +430,6 @@ class Daemon:
         except OSError as e:
             sock.close()
             raise StartError("bind_failed", f"{self.cfg.bind}: {e.strerror or e}") from None
-        sock.setblocking(False)
         return sock
 
     def _prepare_socket_path(self) -> None:
@@ -484,16 +490,16 @@ class Daemon:
             self._cleanup_files()
             return 1
 
-        daemon = self
-
-        class Proto(asyncio.DatagramProtocol):
-            def datagram_received(self, data, addr):
-                daemon._call(daemon.receptor.hear, data, runner.now_ms())
-
-        transport, _ = await loop.create_datagram_endpoint(Proto, sock=self.udp)
+        switch = sys.getswitchinterval()
+        sys.setswitchinterval(min(switch, SWITCH_S))
+        self.intake = self.receptor.intake = Intake(
+            self.udp, self.receptor.lst.manifest, now_ms=runner.now_ms, rcvbuf=self.cfg.rcvbuf,
+            wake=lambda: self._from_reader(loop, self._hear_queued),
+            failed=lambda e: self._from_reader(loop, self._fail, "internal", type(e).__name__))
+        self.intake.start()
         tasks.append(asyncio.create_task(self._watch()))
         if self.cfg.tick_ms:
-            tasks.append(asyncio.create_task(self._every(self.cfg.tick_ms, self.receptor.tick)))
+            tasks.append(asyncio.create_task(self._every(self.cfg.tick_ms, self._tick)))
         if self.cfg.health_interval_ms:
             tasks.append(asyncio.create_task(self._every(self.cfg.health_interval_ms, self.receptor.health)))
         self._stop = stop
@@ -504,7 +510,10 @@ class Daemon:
         finally:
             for t in tasks:
                 t.cancel()
-            transport.close()
+            self.intake.stop()
+            if self._hear_at is not None:
+                self._hear_at.cancel()
+            sys.setswitchinterval(switch)
             self.server.close()
             if self.failed is None:
                 try:
@@ -514,6 +523,35 @@ class Daemon:
             await self._flush_peers()
             self._cleanup_files()
         return 1 if self.failed else 0
+
+    @staticmethod
+    def _from_reader(loop, fn, *args) -> None:
+        try:
+            loop.call_soon_threadsafe(fn, *args)
+        except RuntimeError:
+            pass    # the loop has closed: the run is over
+
+    def _hear_queued(self) -> None:
+        """Hear one batch of what the intake has waiting, in its order, as one durable save. The loop gets its turn
+        between batches, however much waits."""
+        if self._hear_at is not None:
+            self._hear_at.cancel()
+            self._hear_at = None
+        if self.failed is not None or self._stop.is_set():
+            return
+        batch = self.intake.take(HEAR_BATCH)
+        if batch:
+            self._call(self._hear_batch, batch)
+        if self.failed is None and self.intake.waiting():
+            loop = asyncio.get_running_loop()
+            self._hear_at = loop.call_soon(self._hear_queued) if batch else loop.call_later(RETRY_S, self._hear_queued)
+
+    def _hear_batch(self, batch: list) -> None:
+        heard = self.receptor.hear_all([t.data for t in batch], runner.now_ms())
+        for t, h in zip(batch, heard):           # the save that covers them has landed
+            if h.kept and t.digest is not None:
+                self.intake.remember(t, h.ident, h.until)
+            self.intake.settle(t, h.verified, h.fresh)
 
     def _call(self, fn, *args) -> None:
         """Run a receptor step. A failed save (or any error in the record path) ends the run with `fatal`:
@@ -537,6 +575,10 @@ class Daemon:
         self.emitter.emit("fatal", reason=reason, detail=detail[:200])
         if self._stop is not None:
             self._stop.set()
+
+    def _tick(self, now_ms: int) -> None:
+        self.receptor.tick(now_ms)
+        self.intake.forget(now_ms)
 
     async def _every(self, period_ms: int, fn) -> None:
         while True:
