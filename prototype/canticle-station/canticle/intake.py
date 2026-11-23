@@ -10,9 +10,11 @@ decides only whether it gets a place to wait; ``take`` then hands out what waits
    and dropped. It is never verified, queued or debited. The digest is recorded only after the signature verified and
    the save that covers the frame landed, so nothing a sender claims (a key, a seq) can reserve a place here and shut
    out the valid frame behind it.
-3. **Everything else** waits in the queue of the key, stream and source address it claims, round-robin at each level:
-   over keys, over a key's streams, over the sources of a stream. A queue that is full refuses, and counts why. A copy
-   of what already waits in the same queue takes no second place: the same bytes get the same verdict.
+3. **Everything else** waits in the queue of the key and stream it claims and the source it came from, round-robin at
+   each level: over keys, over a key's streams, over the sources of a stream. A source is the IPv4 address *and* UDP port
+   the kernel gives as the datagram's sender, so ports do form queues, and churning them is bounded (below). A queue that
+   is full refuses, and counts why. A copy of what already waits in the same queue takes no second place: the same bytes
+   get the same verdict.
 
 What is spent, and by whom:
 
@@ -25,19 +27,27 @@ What is spent, and by whom:
   share one. All of them together have one bound, which is what the daemon spends on checks that come to nothing;
 - in a stream, the known sources get every other turn however many strangers claim it. Strangers queue apart too, in
   a pool the stream's longest queue pays for: a flood can fill it, but a source that queues apart still gets a place
-  and its turn.
+  and its turn;
+- whatever churns its sources, a key has at most KNOWN_MAX + STRANGERS_MAX of them and CROWD_LANES lanes for the rest, a
+  stream has at most STRANGER_POOL datagrams waiting for strangers and as many for each known source, and a pick looks
+  at each lane of a stream once at most. A source that gains a share of its own, or loses it to a newer one, is counted.
 
 What this does not do:
 
-- **A source address is not trusted, only queued by.** It admits nothing and refuses nothing (I-11). It is as good as
+- **A source is not trusted, only queued by.** It admits nothing and refuses nothing (I-11). It is as good as
   the network's enforcement: a sender that spoofs the station's exact address and port shares the station's own
   queue and budget. Beyond SOURCE_RATE forgeries a second (or a NO_OP_COSTth as many replays of what is refused),
   each honest frame is then verified only as often as chance picks it among them. Other keys are unaffected and
-  every refusal is counted, but nothing before the signature can tell the two apart.
+  every refusal is counted, but nothing before the signature can tell the two apart. That station is then outside what
+  this guarantees.
+- **The first to be heard with a new frame has the share.** A relay without a key that is heard before the station, with
+  copies of its frames and from a new port each, displaces it from the KNOWN_MAX known sources. It is counted
+  (``displaced``), and the station is a stranger again until one of its own frames is heard first: outside the guarantee too.
 - **A station that is still a stranger, among many.** Until one of its frames verifies from a new address (a cold
   start, or its restart on a new port), it competes with every other stranger claiming its key. STRANGERS_PER_HOST
   ports of a host, and STRANGERS_MAX in all, queue apart; the rest share CROWD_LANES lanes by a salted hash, and a
-  station whose lane a flood shares is verified only as often as chance picks it there.
+  station whose lane a flood shares is verified only as often as chance picks it there. A flood that opens new ports
+  for every datagram crowds every lane.
 - **Source binding and a house MAC** (RFC §10.2) are not here. A binding is only as good as the switch's enforcement.
   A MAC excludes outsiders but not another key holder. Neither replaces the signature.
 - **The reader can be outrun.** Then the kernel drops datagrams, whoever sent them: counted (``socket_drops``), and
@@ -78,7 +88,8 @@ NO_OP_COST = 10                             # what a verified ITEM or PLUCK that
 CHECK_RATE, CHECK_BURST = 2_000.0, 200.0
 UNLISTED_RATE, UNLISTED_BURST = 500.0, 500.0  # datagrams of no listed key examined a second, all together
 UNLISTED_DEPTH = 64
-KNOWN_MAX, KNOWN_DEPTH = 4, 64              # known sources per key; datagrams waiting per stream and known source
+KNOWN_MAX, KNOWN_DEPTH = 4, 64              # known sources per key; datagrams waiting per stream and known source, or
+                                            # more when it became known with more of them waiting (<= STRANGER_POOL)
 STRANGERS_MAX = 64                          # other sources per key that queue apart
 STRANGERS_PER_HOST = 16                     # of them, at one address: ports are free, so they must not fill the table
 CROWD_LANES = 64                            # lanes the sources beyond those bounds share, by a salted hash

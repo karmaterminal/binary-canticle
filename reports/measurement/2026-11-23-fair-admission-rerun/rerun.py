@@ -13,6 +13,7 @@ ROWS = {
     "R1-valid-other-key-4x-max": dict(prod_keys=4, mode="valid", rate=0, sample_every=1000),
     "R2-same-station": dict(producers=0, flood_station_rate=0, quiet_in_flood_station=True),
     "R3-forged-claiming-quiet-2x-max": dict(producers=0, custom="forged", custom_n=2),
+    "R3c-forged-churned-sources-2x-max": dict(producers=0, custom="churn", custom_n=2),
     "R4a-replay-earlier-frames-2x-max": dict(producers=0, custom="earlier", custom_n=2),
     "R4b-replay-latest-item-2x-max": dict(producers=0, custom="latest", custom_n=2),
     "F2b-forged-own-key-2x-max": dict(prod_keys=2, mode="forged", rate=0),

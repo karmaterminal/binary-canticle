@@ -2,6 +2,7 @@
 quiet key's own frames). Same summary format as the harness's ``blast.py``, so ``cells.collect`` reads it.
 
   forged   distinct frames naming the quiet key and stream, each with its own invalid signature (canonical S), flat out;
+  churn    the same, from a newly opened socket for every datagram, every second producer on 60 000 loopback addresses;
   latest   the quiet station's newest item, resent unchanged, flat out, moving on as each is captured (#171's wording);
   earlier  every frame of the quiet station captured at least 8 s ago and still inside its life, plus its beacons of
            the last 5 minutes (a beacon never expires), resent in a cycle, flat out: none of them is the next new item.
@@ -34,13 +35,18 @@ if a.capture:
 while time.monotonic() < a.start_at:
     time.sleep(0.001)
 t0 = time.monotonic(); end = t0 + a.duration; sent = errors = 0; size = 0
+sources, opened = set(), 0
 def send(f):
-    global sent, errors, size
+    global sent, errors, size, sock, opened
     try:
+        if a.mode == "churn":
+            sock.close(); sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); opened += 1
+            sock.bind((socket.inet_ntoa((0x7F000001 + (opened % 60_000 if a.index % 2 else 0)).to_bytes(4, "big")), 0))
+            sources.add(sock.getsockname()); sock.connect((host, int(port)))
         sock.send(f); sent += 1; size = len(f)
     except OSError:
         errors += 1
-if a.mode == "forged":
+if a.mode in ("forged", "churn"):
     kid, n = bytes.fromhex(a.kid), a.index << 36
     head, tail = parts(kid, a.stream, a.epoch); refreshed = t0
     while (now := time.monotonic()) < end:
@@ -73,4 +79,4 @@ else:
             send(f)
 el = time.monotonic() - t0
 Path(a.summary).write_text(json.dumps({"mode": a.mode, "sent": sent, "send_errors": errors, "frame_bytes": size, "elapsed_s": round(el, 2),
-                                       "rate_achieved": round(sent / el, 1)}))
+                                       "rate_achieved": round(sent / el, 1), "opened": opened, "sources": len(sources)}))
