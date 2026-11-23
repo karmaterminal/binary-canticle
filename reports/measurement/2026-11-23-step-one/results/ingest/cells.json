@@ -778,5 +778,44 @@
 "rate": 40,
 "duration": 30,
 "sample_every": 1
+},
+{
+"name": "T-tune-all-e1-s100-p64-40ps",
+"streams": 100,
+"payload": "64",
+"ears": 1,
+"ear_tune": "all",
+"prod_wake": true,
+"producers": 1,
+"mode": "valid",
+"rate": 40,
+"duration": 30,
+"sample_every": 1
+},
+{
+"name": "T-tune-all-e1-s1000-p64-40ps",
+"streams": 1000,
+"payload": "64",
+"ears": 1,
+"ear_tune": "all",
+"prod_wake": true,
+"producers": 1,
+"mode": "valid",
+"rate": 40,
+"duration": 30,
+"sample_every": 1
+},
+{
+"name": "T-tune-all-e1-s10000-p64-40ps",
+"streams": 10000,
+"payload": "64",
+"ears": 1,
+"ear_tune": "all",
+"prod_wake": true,
+"producers": 1,
+"mode": "valid",
+"rate": 40,
+"duration": 30,
+"sample_every": 1
 }
 ]

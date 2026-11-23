@@ -148,6 +148,8 @@ def ingest_table(rows) -> str:
     by = {}
     for r in rows:
         p = r["params"]
+        if not p["name"].startswith("I-"):
+            continue
         key = (p["ears"], p["streams"], p["payload"])
         by.setdefault(key, {})["sat" if p["name"].startswith("I-sat") else "lat"] = r
     for key in sorted(by, key=lambda k: (k[0], k[1], {"64": 0, "512": 1, "max": 2}[k[2]])):
@@ -173,6 +175,27 @@ def ingest_table(rows) -> str:
             f"{(s.get('tap') or {}).get('rec_seq_gap_records')} / {(l.get('tap') or {}).get('rec_seq_gap_records')}",
             json.dumps(fe_counts) if fe_counts else "{}",
         ]) + " |")
+    return "\n".join(out)
+
+
+def tune_table(rows) -> str:
+    out = ["| tuned streams (all of the producer's) | offered/s | verified/s | send→push p50 / p99 ms (n) | pushes (records) | "
+           "frond-ear CPU % mean / max | frond-ear RSS MiB | delivery counts |",
+           "|---|---|---|---|---|---|---|---|"]
+    for r in rows:
+        p = r["params"]
+        if not p["name"].startswith("T-"):
+            continue
+        lp = r.get("latency_send_to_push_ms") or {}
+        fe = proc(r, "frond-ear-ear0")
+        pu = (r.get("pushes") or {}).get("ear0") or {}
+        dc = (((r.get("frond_ear") or {}).get("ear0") or {}).get("canticleDelivery") or {}).get("counts")
+        out.append("| " + " | ".join([num(p["streams"]), num(r.get("offered_rate"), 1),
+                                      num(r.get("probe_verified_rate_in_window"), 1),
+                                      f"{num(lp.get('p50'), 0)} / {num(lp.get('p99'), 0)} ({lp.get('n')})",
+                                      f"{pu.get('pushes')} ({pu.get('records')})",
+                                      f"{fe.get('cpu_mean')} / {fe.get('cpu_max')}", mb(fe.get("rss_max_kb")),
+                                      json.dumps(dc)]) + " |")
     return "\n".join(out)
 
 
@@ -217,6 +240,8 @@ def main() -> int:
             print(flood_tables(rows))
         elif scen == "ingest":
             print(ingest_table(rows))
+            print()
+            print(tune_table(rows))
         elif scen == "admission":
             print(admission_table(rows))
     (root / "summary.json").write_text(json.dumps(
