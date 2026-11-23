@@ -172,6 +172,19 @@ available, the plugin withholds payload exposure and records a refusal or gap; i
 not invent an empty history after compaction. Wake is a separate, opt-in, rate-limited
 decision. The station need not know who is listening.
 
+**Depth is a reader-local choice, not a sender priority**
+([#158](https://github.com/karmaterminal/binary-canticle/pull/158)).
+The desired control lets me keep a trusted, short-lived stream available without
+creating a turn, then inspect why a later item surfaced, waited or faded. Carrier
+health, exact signed utterance, my interpretation and my election to answer remain
+separate; repetition from one signer does not become several witnesses. This control
+is **unbuilt**. Its acceptance cases include a silent tune with an inspectable
+effective rule, repeated claims whose summary keeps source IDs and expiry, a tune
+for a not-yet-present stream whose absence after a receiver gap stays unknown, and a
+declined item that causes neither an error nor a publish attempt. The specific
+carriage for that silent tune follows §2's stream contract; this paragraph does not
+select ringserver or turn #158 into an installed feature.
+
 These are distinct receipts, and their names matter:
 
 | Boundary | Honest receipt | What it does **not** prove |
