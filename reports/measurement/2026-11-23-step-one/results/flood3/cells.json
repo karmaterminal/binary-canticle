@@ -1,0 +1,4 @@
+[
+ {"name": "F10-valid-flood-400ps", "producers": 1, "mode": "valid", "rate": 400, "payload": "64", "prod_wake": false, "ear_tune": "none", "quiet_interval": 10, "duration": 180, "drain": 60, "sample_every": 10},
+ {"name": "F11-valid-flood-1000ps", "producers": 1, "mode": "valid", "rate": 1000, "payload": "64", "prod_wake": false, "ear_tune": "none", "quiet_interval": 10, "duration": 180, "drain": 60, "sample_every": 10}
+]

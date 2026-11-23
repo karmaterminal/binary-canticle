@@ -1,0 +1,8 @@
+[
+ {"name": "F3-unknown-key-flood-2x-max", "prod_keys": 2, "mode": "unknown", "rate": 0, "payload": "64", "prod_wake": false, "ear_tune": "none", "quiet_interval": 10, "duration": 300, "drain": 60, "sample_every": 0},
+ {"name": "F4-replay-flood-2x-max", "prod_keys": 2, "mode": "dup", "rate": 0, "payload": "64", "prod_wake": false, "ear_tune": "none", "quiet_interval": 10, "duration": 300, "drain": 60, "sample_every": 0},
+ {"name": "F5-real-station-flood", "producers": 0, "flood_station_rate": 0, "payload": "64", "prod_wake": false, "ear_tune": "none", "quiet_interval": 10, "duration": 300, "drain": 60},
+ {"name": "F6-quiet-inside-flood-station", "producers": 0, "flood_station_rate": 0, "quiet_in_flood_station": true, "payload": "64", "prod_wake": false, "ear_tune": "none", "quiet_interval": 10, "duration": 300, "drain": 60},
+ {"name": "F7-valid-flood-100ps", "producers": 1, "mode": "valid", "rate": 100, "payload": "64", "prod_wake": false, "ear_tune": "none", "quiet_interval": 10, "duration": 180, "drain": 60, "sample_every": 1},
+ {"name": "F8-valid-flood-40ps", "producers": 1, "mode": "valid", "rate": 40, "payload": "64", "prod_wake": false, "ear_tune": "none", "quiet_interval": 10, "duration": 180, "drain": 60, "sample_every": 1}
+]
