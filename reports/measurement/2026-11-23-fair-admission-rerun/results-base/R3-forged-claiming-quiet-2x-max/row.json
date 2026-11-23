@@ -1,0 +1,40 @@
+{
+ "row": "R3-forged-claiming-quiet-2x-max",
+ "offered_per_s": 1110279.8,
+ "sung": 12,
+ "at_daemon": 6,
+ "at_daemon_during_flood": 3,
+ "pushed": 3,
+ "send_to_record_ms": {
+  "p50": 28114.3,
+  "p90": 42090.0,
+  "p99": 42541.5,
+  "max": 42591.7
+ },
+ "send_to_push_ms": {
+  "p50": 15113.5,
+  "p90": 23113.6,
+  "p99": 24913.6,
+  "max": 25113.6
+ },
+ "kernel_drops": 131066395,
+ "reported_socket_dropped": null,
+ "receive": null,
+ "health_reasons_seen": [],
+ "admission": {
+  "verified": 6,
+  "duplicate": 3
+ },
+ "unverified": {
+  "bad_signature": 2056413
+ },
+ "ear_live_overflow": null,
+ "daemon_cpu_rss": {
+  "cpu_max": 101.9,
+  "rss_max_kb": 34024,
+  "cpu_mean": 88.4
+ },
+ "load_at_start": 1.02,
+ "duration_s": 120.0,
+ "drain_s": 10.0
+}

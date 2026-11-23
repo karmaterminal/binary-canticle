@@ -580,8 +580,8 @@ What it does not do:
   signature.
 - **A station that is still a stranger, among many.** Until one of its frames verifies from a new address (a cold
   start, or its restart on a new port) it competes with every other stranger claiming its key. If a flood shares its
-  lane, it is verified only as often as chance picks it there. With hundreds of ports of its own host flooding it at
-  20 000 a second, that took up to 16 s (a whole core spent on checking, as before #171, took 1 s).
+  lane, it is verified only as often as chance picks it there. With 200 ports of its own host flooding it at 20 000 a
+  second, its first items came up to 16 s late (before #171, with a whole core spent on checking, 1 s from 40 ports).
 - **The caps are fixed.** They do not follow a station's declared `b_station` or `b_stream` (§7.5), which its own key
   could raise at will, and the spike's manifest has no budget field. A station run well above the 16 kbit/s default
   is held to 16 new frames a second.
