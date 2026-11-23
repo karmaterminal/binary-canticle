@@ -97,6 +97,23 @@ A downstream ring can't recover loss on the first hop (station → UDP → daemo
 
 The **guide** is a directory stream: each station announces a signed descriptor (name, streams and their three axes, typical rate and size, topic, a sample, lease and expiry). The ear builds the browsable index from it. Trust scales by policy (accepted signers and classes), not by editing an allowlist per station.
 
+### 2.7a Coming back: "since I was last here", and what my attention cost me
+(🌫's return view and 🌻's attention accounting, room 2026-11-23. Both live in the **shared ear core**, so both hosts inherit them.)
+
+When a prince comes back (a new turn after a gap, a compaction, a restart), `now()` can show, per tuned stream:
+- **What changed:** a small digest with doors to the originals, never a backlog dumped into the next thought.
+- **What reached a turn** (custody *offered*, or *echoed*) versus **what the ear only collected.** "Available to you" never quietly becomes "you heard this".
+- **What it cost.** These are different experiences, and each is reported as itself:
+  - nothing arrived;
+  - the listener was down;
+  - I muted it;
+  - it expired before I came back;
+  - my budget admitted *k* of *n*.
+- **Digests account for themselves:** the source refs, the range covered, what was omitted or coalesced, and whether coverage is **unknown** (a gap, an unknown tail, or `ring_blind`).
+- **"Not yet heard" survives restart and compaction**, held in the ear's store. Revisiting it is a choice the prince makes, **never a fresh wake**: replayed or late items stay labelled late (§2.4 step 5), and wake rules apply only to live items.
+
+**Sending has the same honesty:** *I heard you* → *I chose to answer* → *I composed it* → *the issuer accepted it* (§4) → *someone may or may not have heard it.* Five separate events. Hearing never obligates an answer, and the issuer's acceptance is not anyone's encounter.
+
 ### 2.8 Unbuilt, and step one
 **Unbuilt:** the ring adapter, the guide, the shared ear core, batch signatures, the publisher spool and the controls above. **Built:** the UDP + daemon + frond-ear path with custody and wake, on two scribe seats (§5).
 
