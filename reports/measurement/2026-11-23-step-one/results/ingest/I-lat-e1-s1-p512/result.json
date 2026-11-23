@@ -1,0 +1,375 @@
+{
+ "params": {
+  "streams": 1,
+  "payload": "512",
+  "ears": 1,
+  "ear_tune": "stream0",
+  "prod_wake": true,
+  "producers": 1,
+  "mode": "valid",
+  "name": "I-lat-e1-s1-p512",
+  "rate": 40,
+  "duration": 30,
+  "sample_every": 1,
+  "waited_for_load_s": 0
+ },
+ "lab": "/home/figs/.cache/canticle-measure-2/I-2771466-10262179",
+ "t_start_mono_ns": 2550244324423957,
+ "producers": [
+  {
+   "mode": "valid",
+   "key_id": "35d2fc99a12139d0",
+   "epoch": 1795417472,
+   "streams": 1,
+   "payload_body_bytes": 512,
+   "frame_bytes": 637,
+   "rate_asked": 40.0,
+   "sent": 1200,
+   "send_errors": 0,
+   "elapsed_s": 30.001,
+   "rate_achieved": 40.0,
+   "samples": 1200,
+   "proc_index": 0,
+   "proc_count": 1,
+   "t0_mono_ns": 2550244325135867
+  }
+ ],
+ "offered": 1200,
+ "offered_rate": 40.0,
+ "frame_bytes": 637,
+ "kernel_drops": 0,
+ "snmp_delta": {
+  "InDatagrams": 1690,
+  "OutDatagrams": 1588,
+  "IgnoredMulti": 58
+ },
+ "daemon_health_last": {
+  "v": "canticle-receptor-record/1",
+  "type": "health",
+  "rec_seq": 1246,
+  "run": "2a583d7728429e3d8394354357b31c59",
+  "state": "ok",
+  "reasons": [],
+  "last_datagram_at": 1795417503087,
+  "counters": {
+   "admission": {
+    "verified": 1200,
+    "duplicate": 0,
+    "capability_exceeded": 0,
+    "scope_violation": 0,
+    "hop_limit": 0,
+    "over_quota": 0,
+    "pluck_mismatch": 0,
+    "plucked": 0,
+    "superseded": 0,
+    "class_change": 0,
+    "equivocation": 0
+   },
+   "disposition": {
+    "surface": 1200,
+    "ringbuffer_only": 0,
+    "drop": 0,
+    "quarantine_set": 0,
+    "no_op": 0
+   },
+   "retract": {
+    "plucked": 0,
+    "superseded": 0,
+    "expired": 0,
+    "revoked": 0,
+    "quarantined": 0,
+    "held_expired": 0,
+    "held_plucked": 0,
+    "held_superseded": 0
+   },
+   "beacon": {
+    "verified": 0,
+    "duplicate": 0,
+    "epoch_regression": 0
+   },
+   "unverified": {
+    "unknown_key": 0,
+    "bad_signature": 0,
+    "revoked": 0,
+    "expired": 0,
+    "not_yet_valid": 0,
+    "malformed": 0,
+    "crit_unknown": 0,
+    "version": 0
+   }
+  },
+  "unverified": {
+   "key_ids": [],
+   "other": 0
+  },
+  "dedup": {
+   "entries": 1200,
+   "capacity": 100000
+  },
+  "beacon_age_ms": {},
+  "surfaced": 1200,
+  "quarantined": [],
+  "records": {
+   "emitted": 1245,
+   "dropped": 0,
+   "peers_closed": 0
+  },
+  "snapshots": {
+   "requested": 2,
+   "served": 2,
+   "truncated": 0,
+   "deferred": 0,
+   "closed": 0,
+   "ignored": 0
+  },
+  "t_ns": 2550282031919813,
+  "conn": 1
+ },
+ "tap": {
+  "connections": 1,
+  "lines": 1247,
+  "bytes": 2145835,
+  "counts": {
+   "hello": 1,
+   "landing_state": 1,
+   "snapshot_end": 1,
+   "health": 43,
+   "frame": 1200,
+   "presence": 1
+  },
+  "rec_seq_gaps": 0,
+  "rec_seq_gap_records": 0,
+  "rec_seq_regressions": 0
+ },
+ "tap_events": [
+  {
+   "t_ns": 2550239337170007,
+   "event": "connected",
+   "conn": 1
+  },
+  {
+   "t_ns": 2550239337489498,
+   "event": "hello",
+   "conn": 1,
+   "run": "2a583d7728429e3d8394354357b31c59",
+   "pid": 2782989
+  },
+  {
+   "t_ns": 2550239337567579,
+   "event": "snapshot_end",
+   "conn": 1,
+   "watermark": 2,
+   "count": 0,
+   "truncated": false,
+   "omitted": 0
+  }
+ ],
+ "probe_frames_by_admission": {
+  "verified/surface": 1200
+ },
+ "probe_verified_frames": 1200,
+ "probe_verified_rate_in_window": 40.0,
+ "probe_verified_per_s": [
+  0,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0
+ ],
+ "latency_send_to_record_ms": {
+  "n": 1200,
+  "p50": 10.6912895,
+  "p90": 15.0443874,
+  "p99": 17.44774295,
+  "max": 24.544899
+ },
+ "pushes": {
+  "ear0": {
+   "pushes": 7,
+   "records": 35,
+   "records_per_push_max": 5,
+   "late_lines": 0,
+   "loss_lines": 13,
+   "other_events": 0
+  }
+ },
+ "latency_send_to_push_ms": {
+  "n": 35,
+  "p50": 776.141093,
+  "p99": 6848.03761572,
+  "max": 6856.555293
+ },
+ "frond_ear": {
+  "ear0": {
+   "receiveHealth": "ok",
+   "reasons": [],
+   "counts": {
+    "joined_late": 1
+   },
+   "joinSnapshot": "complete",
+   "canticleDelivery": {
+    "ceiling": "off",
+    "mode": "off",
+    "style": "records",
+    "stations": {
+     "prod": {
+      "ceiling": "immediate",
+      "mode": "immediate"
+     }
+    },
+    "choices": [],
+    "wakeKeys": 1,
+    "windowMs": 60000,
+    "debounceMs": 5000,
+    "maxAgeMs": 30000,
+    "waiting": 22,
+    "nextPushAt": 1795417514276,
+    "held": null,
+    "lastPushAt": 1795417509276,
+    "pushesLastHour": 7,
+    "maxPushesPerHour": 60,
+    "reports": 0,
+    "counts": {
+     "dropped": 1143,
+     "pushes": 7,
+     "records_pushed": 35
+    }
+   },
+   "canticleCustody": {
+    "windowMs": 3600000,
+    "history": "unknown",
+    "reasons": [
+     "no compaction boundary from this session's pressure hook yet (frond-ear pressure --hook --ear)",
+     "35 records offered, never echoed"
+    ],
+    "counts": {
+     "records": 35,
+     "echoed": 0,
+     "echoedBoundaryUnknown": 0,
+     "echoedBeforeBoundary": 0,
+     "offered": 35,
+     "claimed": 0
+    }
+   },
+   "attached": true
+  }
+ },
+ "processes": {
+  "canticle-daemon": {
+   "n": 88,
+   "cpu_max": 42.0,
+   "rss_max_kb": 37128,
+   "rss_first_kb": 32936,
+   "rss_last_kb": 37128,
+   "cpu_mean": 13.1
+  },
+  "frond-ear-ear0": {
+   "n": 88,
+   "cpu_max": 4.0,
+   "rss_max_kb": 110788,
+   "rss_first_kb": 102580,
+   "rss_last_kb": 110788,
+   "cpu_mean": 1.0
+  },
+  "session0": {
+   "n": 88,
+   "cpu_max": 2.0,
+   "rss_max_kb": 11992,
+   "rss_first_kb": 11992,
+   "rss_last_kb": 11992,
+   "cpu_mean": 0.0
+  },
+  "tap": {
+   "n": 88,
+   "cpu_max": 2.0,
+   "rss_max_kb": 11836,
+   "rss_first_kb": 11356,
+   "rss_last_kb": 0,
+   "cpu_mean": 0.2
+  },
+  "shim0": {
+   "n": 80,
+   "cpu_max": 0.0,
+   "rss_max_kb": 107884,
+   "rss_first_kb": 107724,
+   "rss_last_kb": 107884,
+   "cpu_mean": 0.0
+  },
+  "blast0": {
+   "n": 80,
+   "cpu_max": 4.0,
+   "rss_max_kb": 26452,
+   "rss_first_kb": 26292,
+   "rss_last_kb": 0,
+   "cpu_mean": 1.0
+  }
+ },
+ "stderr": {
+  "blast0.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "canticle-daemon.err": {
+   "lines": 3,
+   "tail": [
+    "{\"daemon\": {\"manifest\": \"/home/figs/.cache/canticle-measure-2/I-2771466-10262179/fleet.json\", \"bind\": \"127.0.0.1:43806\", \"multicast\": false, \"socket\": \"/home/figs/.cache/canticle-measure-2/I-2771466-10262179/run/canticle/daemon.sock\", \"state_dir\": \"/home/figs/.cache/canticle-measure-2/I-2771466-10262179/state/canticle-daemon\", \"allowed_uids\": [1000], \"stations\": null}}",
+    "{\"v\":\"canticle-receptor-record/1\",\"type\":\"hello\",\"rec_seq\":1,\"run\":\"2a583d7728429e3d8394354357b31c59\",\"wire_version\":2,\"record_version\":\"canticle-receptor-record/1\",\"pid\":2782989,\"bind\":\"127.0.0.1:43806\",\"multicast\":null,\"transport\":\"lan\",\"manifest_sha256\":\"fd7247d1e80cc48b8e7032752283b3943e3560a6aa43260f8b71a4ce1bfb6021\",\"manifest_label\":\"canticle-fleet/spike-0\",\"state_version\":3,\"receptor_state_version\":1,\"rule_version\":\"canticle-station/0.1.0+bc2\",\"join_snapshot\":true}",
+    "{\"v\":\"canticle-receptor-record/1\",\"type\":\"bye\",\"rec_seq\":1248,\"run\":\"2a583d7728429e3d8394354357b31c59\"}"
+   ]
+  },
+  "frond-ear-ear0.err": {
+   "lines": 19,
+   "tail": [
+    "{\"time\":\"2026-11-23T07:05:12.311Z\",\"level\":\"info\",\"event\":\"ear.detached\",\"ear\":\"ear0\",\"reverted\":0}",
+    "{\"time\":\"2026-11-23T07:05:12.366Z\",\"level\":\"info\",\"event\":\"daemon.draining\",\"inFlight\":0}",
+    "{\"time\":\"2026-11-23T07:05:12.380Z\",\"level\":\"info\",\"event\":\"daemon.stopped\",\"code\":0,\"drained\":true}"
+   ]
+  },
+  "session0.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "session0.shim.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "tap.err": {
+   "lines": 0,
+   "tail": []
+  }
+ }
+}
