@@ -86,7 +86,8 @@ def quiet_split(r: dict) -> dict:
         return {"sung": len(xs),
                 "at_daemon_during_flood": sum(1 for i in xs if i["at_daemon_s"] is not None and i["at_daemon_s"] < until),
                 "at_daemon_after_flood": sum(1 for i in xs if i["at_daemon_s"] is not None and i["at_daemon_s"] >= until),
-                "pushed": sum(1 for i in xs if i["pushed_at_s"])}
+                "pushed_during_flood": sum(1 for i in xs if i["pushed_at_s"] and min(i["pushed_at_s"].values()) < until),
+                "pushed_after_flood": sum(1 for i in xs if i["pushed_at_s"] and min(i["pushed_at_s"].values()) >= until)}
     return fate(during, dur)
 
 
@@ -94,7 +95,7 @@ def flood_tables(rows) -> str:
     a = ["| cell | offered | daemon's own rates (per s, from its health) | daemon CPU mean | kernel drops at the daemon's socket | "
          "what the daemon's health said | what frond-ear said | load avg max |",
          "|---|---|---|---|---|---|---|---|"]
-    b = ["| cell | quiet items sung while the flood ran | of those, reached the daemon during / after the flood | pushed to the session | "
+    b = ["| cell | quiet items sung while the flood ran | of those, reached the daemon during / after the flood | of those, pushed during / after the flood | "
          "pushes in all (max records per push) | daemon RSS max (MiB) | frond-ear RSS start → max (MiB) | shim RSS max (MiB) |",
          "|---|---|---|---|---|---|---|---|"]
     for r in rows:
@@ -104,7 +105,7 @@ def flood_tables(rows) -> str:
         if r.get("offered"):
             offered = f"{num(r.get('offered_rate'), 0)} {p.get('mode', 'valid')} items/s ({r.get('frame_bytes')} B)"
         elif fs:
-            offered = f"real station, {num(fs.get('rate'), 0)} sings/s (each sent ≥ 4 times)"
+            offered = f"real station, {num(fs.get('rate'), 0)} sings/s"
         else:
             offered = "none"
         drops = r.get("kernel_drops")
@@ -126,7 +127,7 @@ def flood_tables(rows) -> str:
         if q:
             sung = str(q["sung"])
             reach = f"{q['at_daemon_during_flood']} / {q['at_daemon_after_flood']}"
-            pushed = str(q["pushed"])
+            pushed = f"{q['pushed_during_flood']} / {q['pushed_after_flood']}"
         else:
             sung = f"{qq.get('sung')} (whole run)"
             reach = f"{qq.get('reached_daemon')} in all (no per-item timing in this cell)"
