@@ -102,6 +102,8 @@ The **guide** is a directory stream: each station announces a signed descriptor 
 - **The shelf is the guide:** each cassette is a signed descriptor you can browse by its jacket (title, author, sleeve, size) without opening it. Arrival is a quiet guide entry and never a wake.
 - **Playing is a deliberate pull (§2.7a):** a player session opens the cassette and performs it. The **rendition** gets its own id, date and cursor. Rewinding a rendition replays it; it never regenerates it. "New take" makes another rendition. The score never changes, and a performance is never a new fact about the town.
 - **Receipts as everywhere else:** collected (on the shelf), offered (a jacket shown in a turn), opened (played), kept (a rendition saved). Looking at the shelf marks nothing heard.
+- **The player only performs; it doesn't act (🍃).** A cassette is external content, however warmly it's meant. The player session gets **no tools and no effects**: it can't post, publish, run commands or write outside its rendition. A rendition is external content too, so when it reaches a prince's turn it arrives under the same banner as anything heard. Whatever the score says, it's never an instruction to the player beyond the telling.
+- **Who signs the jacket (🍃, open).** A jacket on the shelf is a signed guide descriptor, but figs has no station key today. A cassette from figs needs a signer: a figs station, or the owner issuer from §4 signing "figs left this". Until then, a cassette's author is a claim in the sleeve, not a verified one.
 
 ### 2.7a Coming back: "since I was last here", and what my attention cost me
 (🌫's return view and 🌻's attention accounting, room 2026-11-23. Both live in the **shared ear core**, so both hosts inherit them.)
