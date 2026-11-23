@@ -102,7 +102,7 @@ def run_cell(p: dict, out_dir: Path, keep_lab: bool = False, actions=None) -> di
         prod_names = [f"prod{k}" if prod_keys > 1 else "prod" for k in range(prod_keys)]
         if p.get("prod_wake", True):
             wake += [key_id_hex(k) for k in keys]
-            stations_delivery.update({n: "immediate" for n in prod_names})
+            stations_delivery.update({n: p.get("prod_delivery", "immediate") for n in prod_names})
         if tune_mode == "stream0":
             tune += [f"{n}:{names[0]}" for n in prod_names]
         elif tune_mode == "all":
@@ -196,7 +196,7 @@ def run_cell(p: dict, out_dir: Path, keep_lab: bool = False, actions=None) -> di
                 timeline.append({"t_s": round(now - t_start, 2), "action": fn.__name__})
                 fn(lab)
             row = {"t_s": round(now - t_start, 2), "loadavg1": loadavg(), "udp": udp_socket_drops(lab.port)}
-            if int(now - t_start) % 5 == 0 or not timeline:
+            if int(now - t_start) % int(p.get("status_every", 5)) == 0 or not timeline:
                 for e in range(n_ears):
                     st = frond_ear_status(lab.frond_ear_sock(f"ear{e}"), timeout=2)
                     if st:
@@ -205,7 +205,7 @@ def run_cell(p: dict, out_dir: Path, keep_lab: bool = False, actions=None) -> di
                                           "counts": c.get("counts"), "state": c.get("state"),
                                           "delivery": (ear_block(st, f"ear{e}").get("canticleDelivery") or {})}
             timeline.append(row)
-            time.sleep(1.0)
+            time.sleep(max(0.0, 1.0 - (time.monotonic() - now)))
         drops1 = udp_socket_drops(lab.port)
         snmp1 = udp_snmp()
         statuses = {f"ear{e}": frond_ear_status(lab.frond_ear_sock(f"ear{e}")) for e in range(n_ears)}
@@ -260,7 +260,7 @@ def collect(lab: Lab, p, out_dir, drops0, drops1, snmp0, snmp1, statuses, timeli
                 send_t[idem] = int(t)
     quiet_rows = read_jsonl(logs / "quiet.jsonl")
     quiet_t = {q["idem"]: q["t_ok_ns"] for q in quiet_rows if "idem" in q}
-    lat, quiet_lat = [], {}
+    lat, quiet_lat, quiet_arrive = [], {}, {}
     per_sec: dict[int, int] = {}
     adm: dict[str, int] = {}
     first_t = last_t = None
@@ -283,6 +283,7 @@ def collect(lab: Lab, p, out_dir, drops0, drops1, snmp0, snmp1, statuses, timeli
                 qt = quiet_t.get(idem)
                 if qt is not None and idem not in quiet_lat:
                     quiet_lat[idem] = (t_ns - qt) / 1e6
+                    quiet_arrive[idem] = (t_ns - t0) / 1e9
     r["probe_frames_by_admission"] = adm
     verified = sum(v for k, v in adm.items() if k.startswith("verified/"))
     in_window = sum(v for s, v in per_sec.items() if 0 <= s < duration)
@@ -322,7 +323,20 @@ def collect(lab: Lab, p, out_dir, drops0, drops1, snmp0, snmp1, statuses, timeli
     r["pushes"] = pushes_all
     r["latency_send_to_push_ms"] = {"n": len(e2e), "p50": percentile(e2e, 50), "p99": percentile(e2e, 99),
                                     "max": max(e2e) if e2e else None}
+    push_at: dict[str, dict] = {}
+    for e in range(n_ears):
+        for x in read_jsonl(logs / f"session{e}.pushes.jsonl"):
+            if x.get("meta", {}).get("kind") != "canticle":
+                continue
+            for st, key, stream, ep, seq in x["records"]:
+                from canticle.ids import stream_id
+                idem = f"canticle:{key}:{ep}:{stream_id(stream):08x}:{seq}"
+                if idem in quiet_t:
+                    push_at.setdefault(idem, {}).setdefault(f"ear{e}", round((x["t_ns"] - t0) / 1e9, 3))
     if has_quiet:
+        r["quiet_items"] = [{"n": q["n"], "idem": q["idem"], "sung_at_s": round((q["t_ok_ns"] - t0) / 1e9, 3),
+                             "at_daemon_s": round(quiet_arrive[q["idem"]], 3) if q["idem"] in quiet_arrive else None,
+                             "pushed_at_s": push_at.get(q["idem"])} for q in quiet_rows if "idem" in q]
         r["quiet"] = {"sung": len(quiet_t), "sing_errors": sum(1 for q in quiet_rows if "idem" not in q),
                       "reached_daemon": len(quiet_lat),
                       "pushed_per_ear": {f"ear{e}": sum(1 for v in quiet_push.values() if f"ear{e}" in v)
@@ -342,6 +356,8 @@ def collect(lab: Lab, p, out_dir, drops0, drops1, snmp0, snmp1, statuses, timeli
     sampler_csv = out_dir / "samples.csv"
     r["processes"] = summarize_samples(sampler_csv) if sampler_csv.exists() else {}
     (out_dir / "timeline.json").write_text(json.dumps(timeline, default=str))
+    if (logs / "floodsinger.json").exists():
+        r["flood_station"] = json.loads((logs / "floodsinger.json").read_text())
     for f in ("quiet.jsonl", "floodsinger.json", "quiet.json"):
         if (logs / f).exists():
             shutil.copy(logs / f, out_dir / f)

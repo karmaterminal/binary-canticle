@@ -177,9 +177,11 @@ class Lab:
         # (~/.local/state/canticle/daemon), so its per-item fsync costs what the seat's does.
         root = base or Path(HOME) / ".cache" / "canticle-measure-2"
         root.mkdir(parents=True, exist_ok=True)
-        self.dir = Path(f"{root}/{name}-{time.strftime('%Y%m%dT%H%M%S')}-{os.getpid()}")
+        # short: a unix socket path must fit sun_path (108 bytes), so the cell name is kept elsewhere
+        self.dir = Path(f"{root}/{name.split('-')[0][:6]}-{os.getpid()}-{time.monotonic_ns() % 10**8}")
         self.dir.mkdir(mode=0o700)
         self.guard(self.dir)
+        (self.dir / "cell-name").write_text(name)
         self.run = self.dir / "run"
         self.run.mkdir(mode=0o700)
         (self.run / "canticle").mkdir(mode=0o700)

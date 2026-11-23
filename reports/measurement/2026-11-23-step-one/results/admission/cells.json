@@ -1,0 +1,5 @@
+[
+ {"name": "A1-immediate-live-settings-30ps", "producers": 1, "mode": "valid", "rate": 30, "payload": "64", "streams": 1, "ears": 1, "ear_tune": "stream0", "prod_wake": true, "prod_delivery": "immediate", "duration": 420, "sample_every": 1},
+ {"name": "A2-digest-30ps", "producers": 1, "mode": "valid", "rate": 30, "payload": "64", "streams": 1, "ears": 1, "ear_tune": "stream0", "prod_wake": true, "prod_delivery": "digest", "duration": 300, "sample_every": 1},
+ {"name": "A3-immediate-saturated-max", "producers": 1, "mode": "valid", "rate": 0, "payload": "64", "streams": 1, "ears": 1, "ear_tune": "stream0", "prod_wake": true, "prod_delivery": "immediate", "duration": 300, "sample_every": 500}
+]

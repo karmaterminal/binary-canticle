@@ -1,0 +1,30 @@
+[
+ {
+  "name": "F1b-valid-flood-4x-max-then-recovery",
+  "prod_keys": 4,
+  "mode": "valid",
+  "rate": 0,
+  "payload": "64",
+  "prod_wake": false,
+  "ear_tune": "none",
+  "quiet_interval": 10,
+  "duration": 180,
+  "drain": 90,
+  "sample_every": 1000,
+  "status_every": 2
+ },
+ {
+  "name": "F9-untuned-long-ttl-15ps",
+  "producers": 1,
+  "mode": "valid",
+  "rate": 15,
+  "ttl": 300,
+  "payload": "64",
+  "prod_wake": false,
+  "ear_tune": "none",
+  "quiet_interval": 10,
+  "duration": 480,
+  "sample_every": 1,
+  "status_every": 5
+ }
+]
