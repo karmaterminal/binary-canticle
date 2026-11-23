@@ -10,7 +10,7 @@ don't carry to another host.
 |---|---|
 | base | `origin/main` `08c11127d4e11ed00f307a7006d85581c8674a28` |
 | measured | `0d8fafe42a83959aeadcfd84103f006e57e81953` (`prototype/canticle-station`, `git archive`d) |
-| harness | #171's, unchanged, at `7d46e4f28420a2f20de52b442bf4731747d101b3`, with frond-ear `7c9bbd3179c50e6ad6870dcb0c74f68d47b4229d` |
+| harness | #171's, unchanged, [`../2026-11-23-step-one/harness/`](../2026-11-23-step-one/harness/) at `7d46e4f28420a2f20de52b442bf4731747d101b3`, with frond-ear `7c9bbd3179c50e6ad6870dcb0c74f68d47b4229d` |
 | added here | [`rerun.py`](rerun.py), which drives that harness's `run_cell` (at run time it adds a second `--to` to the quiet station, so R4's senders can capture its frames), and [`flood_rows.py`](flood_rows.py), the two producers it has no mode for |
 
 **Verdict: every row passes.** In each flood the quiet tuned stream (a real `canticle station`, one item every 10 s)
@@ -115,7 +115,8 @@ None of those losses was reported.
 ## Rerun
 
 ```sh
-H=<a checkout of 7d46e4f2>/reports/measurement/2026-11-23-step-one/harness   # beside the prototype/ under test
-MEASURE_FROND_EAR=<frond-ear at 7c9bbd31, with node_modules> nice -n 19 ionice -c3 python rerun.py $H results R1,R2,R3,R4a,R4b 570 15
+cd reports/measurement/2026-11-23-fair-admission-rerun
+MEASURE_FROND_EAR=<frond-ear at 7c9bbd31, with node_modules> nice -n 19 ionice -c3 \
+  python rerun.py ../2026-11-23-step-one/harness results R1,R2,R3,R4a,R4b 570 15
 python table.py results
 ```
