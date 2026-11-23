@@ -92,7 +92,7 @@ def quiet_split(r: dict) -> dict:
 
 
 def flood_tables(rows) -> str:
-    a = ["| cell | offered | daemon's own rates (per s, from its health) | daemon CPU mean | kernel drops at the daemon's socket | "
+    a = ["| cell | offered | daemon's own rates (per s, from its health) | daemon CPU mean | kernel drops at the daemon's socket (share of all UDP datagrams the host took in meanwhile) | "
          "what the daemon's health said | what frond-ear said | load avg max |",
          "|---|---|---|---|---|---|---|---|"]
     b = ["| cell | quiet items sung while the flood ran | of those, reached the daemon during / after the flood | of those, pushed during / after the flood | "
@@ -222,7 +222,7 @@ def admission_table(rows) -> str:
 def main() -> int:
     root = Path(sys.argv[1])
     summary = {}
-    for scen in ("flood", "flood2", "ingest", "admission", "reconnect"):
+    for scen in ("flood", "flood2", "flood3", "ingest", "admission", "reconnect"):
         d = root / scen
         if not d.exists():
             continue

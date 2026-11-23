@@ -7,10 +7,10 @@ directory, on loopback only; the live daemon, the live `frond-ear.service`, the 
 were never touched. Raw files are under [`results/`](results/), and the harness is under [`harness/`](harness/).
 
 **Verdict: the §2.8 flood acceptance test FAILS on the built path (ronan, aarch64).** Memory and model
-admission stayed bounded. But under floods of about 60 times what the host daemon could process or more,
-the quiet tuned stream all but stopped arriving; at about twice, it arrived seconds late; and no layer
-reported the loss either way (§1). The cause is the first hop, and it isn't
-verification.
+admission stayed bounded. But as a flood grew past what the host daemon could process, the quiet tuned
+stream degraded by degrees (all of it seconds late at about twice that rate, two thirds at 5–8 times, a
+sixth at 24 times) until it all but stopped at 60 times and more; and no layer reported the loss (§1).
+The cause is the first hop, and it isn't verification.
 
 Headline numbers (ronan, aarch64, every process at `nice -n 19`; they don't carry to silas):
 
@@ -111,26 +111,78 @@ runs out. The **flood** is untuned (not in the tune; not on `wakeKeys` either, e
 the quiet stream's station and key) and comes from a key the manifest
 licenses unless the cell says otherwise. The flood producers and the quiet singer run for the cell's
 duration, then the lab keeps listening for the drain (8 s for F0, F1 and F9; 60 s or more for the others),
-so items the carousel recovers after the flood stops are seen. Command:
-`nice -n 19 ionice -c3 python run_cells.py ../results/flood @../results/flood/cells-rest.json` (F0 and F1
-from `cells.json`, F1b to F9 from `../results/flood2/cells.json`); every cell's parameters are in its
-`result.json`.
+so items the carousel recovers after the flood stops are seen. Commands: `nice -n 19 ionice -c3 python
+run_cells.py ../results/<dir> @../results/<dir>/<list>.json`, with F0 and F1 from `flood/cells.json`, F3–F8
+from `flood/cells-rest.json`, F1b, F2b, F3b and F9 from `flood2/cells.json`, and F10 and F11 from
+`flood3/cells.json` (see *Run history*). Every cell's parameters are in its `result.json`; "4x" or "2x" in a
+cell's name is its number of producer processes, not its overload.
 
-<!-- FLOOD-TABLES -->
+| cell | offered | daemon's own rates (per s, from its health) | daemon CPU mean | kernel drops at the daemon's socket (share of all UDP datagrams the host took in meanwhile) | what the daemon's health said | what frond-ear said | load avg max |
+|---|---|---|---|---|---|---|---|
+| F0-baseline-quiet-only | none | verified 0.1, duplicate 0.7 | 0.4 % | 0 | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 12, 'records_pushed': 12} | 12.0 |
+| F1-valid-flood-4x-max | 153,402 valid items/s (190 B) | verified 36.3 | 51.5 % | 92,020,097 (99.96 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'routed_late': 1} | 17.3 |
+| F1b-valid-flood-2x-max-then-recovery | 77,377 valid items/s (190 B) | verified 36.8 | 32.0 % | 13,921,301 (99.93 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 2, 'records_pushed': 3, 'routed_late': 3, 'off_air_unpushed': 3} | 14.4 |
+| F2b-forged-flood-2x-max | 1,006,277 forged items/s (188 B) | verified 0.0, bad_signature 15,991.8 | 81.9 % | 297,085,287 (98.41 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 5, 'records_pushed': 7, 'routed_late': 1, 'off_air_unpushed': 1} | 12.3 |
+| F3-unknown-key-flood-2x-max | 73,062 unknown items/s (190 B) | verified 0.1, duplicate 0.7, unknown_key 72,789.5 | 51.0 % | 79,866 (0.36 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 30, 'records_pushed': 30} | 14.4 |
+| F3b-unknown-key-flood-2x-max-fixed-frame | 1,001,072 unknown-fixed items/s (188 B) | verified 0.1, duplicate 0.1, unknown_key 205,209.9 | 81.8 % | 238,745,107 (79.49 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 16, 'records_pushed': 21, 'routed_late': 5, 'off_air_unpushed': 5} | 10.0 |
+| F4-replay-flood-2x-max | 1,090,096 dup items/s (188 B) | verified 2.0, duplicate 13,941.1 | 79.8 % | 322,844,021 (98.72 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 2, 'records_pushed': 3, 'routed_late': 3, 'off_air_unpushed': 3} | 11.8 |
+| F5-real-station-flood | real station, 5,250 sings/s | verified 41.3 | 48.0 % | 1,563,613 (98.86 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'routed_late': 4, 'off_air_unpushed': 4, 'pushes': 1, 'records_pushed': 2} | 15.5 |
+| F6-quiet-inside-flood-station | real station, 5,801 sings/s | verified 38.8 | 45.0 % | 1,729,507 (98.71 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'routed_late': 4, 'off_air_unpushed': 4, 'pushes': 2, 'records_pushed': 2} | 13.6 |
+| F7-valid-flood-100ps | 100 valid items/s (188 B) | verified 45.8, duplicate 0.3 | 45.5 % | 9,640 (45.85 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 18, 'records_pushed': 18} | 16.6 |
+| F8-valid-flood-40ps | 40 valid items/s (188 B) | verified 38.9, duplicate 0.7 | 35.6 % | 120 (0.77 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 18, 'records_pushed': 18} | 12.2 |
+| F9-untuned-long-ttl-15ps | 15 valid items/s (188 B) | verified 15.1, duplicate 0.8 | 31.0 % | 0 | `ok`, reasons [], records dropped 0 | `ok` [] {'live_overflow': 414}; delivery {'pushes': 43, 'records_pushed': 43} | 8.2 |
+| F10-valid-flood-400ps | 400 valid items/s (190 B) | verified 46.4, duplicate 0.0, expired 0.0 | 42.7 % | 63,591 (78.27 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 11, 'records_pushed': 13, 'routed_late': 2, 'off_air_unpushed': 2} | 7.9 |
+| F11-valid-flood-1000ps | 1,000 valid items/s (190 B) | verified 41.3 | 37.1 % | 172,488 (87.98 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 4, 'records_pushed': 5, 'routed_late': 3, 'off_air_unpushed': 3} | 6.7 |
+
+| cell | overload | quiet items sung while the flood ran | of those, reached the daemon during / after the flood | of those, pushed during / after the flood | pushes in all (max records per push) | daemon RSS max (MiB) | frond-ear RSS start → max (MiB) | shim RSS max (MiB) |
+|---|---|---|---|---|---|---|---|---|
+| F0-baseline-quiet-only | – | 12 (whole run) | 12 in all (no per-item timing in this cell) | 12 | 12 (1) | 32 | 100 → 103 | 101 |
+| F1-valid-flood-4x-max | ≈ 4 200× | 60 (whole run) | 3 in all (no per-item timing in this cell) | 0 | 0 (0) | 46 | 100 → 106 | 100 |
+| F1b-valid-flood-2x-max-then-recovery | ≈ 2 100× | 18 | 1 / 5 | 1 / 2 | 2 (2) | 44 | 102 → 103 | 101 |
+| F2b-forged-flood-2x-max | ≈ 63× | 30 | 5 / 3 | 4 / 3 | 5 (3) | 32 | 106 → 110 | 99 |
+| F3-unknown-key-flood-2x-max | ≈ 1× | 30 | 30 / 0 | 30 / 0 | 30 (1) | 32 | 108 → 112 | 106 |
+| F3b-unknown-key-flood-2x-max-fixed-frame | ≈ 4.9× | 30 | 23 / 3 | 19 / 2 | 16 (2) | 32 | 100 → 104 | 101 |
+| F4-replay-flood-2x-max | ≈ 78× | 30 | 1 / 5 | 1 / 2 | 2 (2) | 32 | 101 → 103 | 100 |
+| F5-real-station-flood | ≈ 127× | 30 | 1 / 5 | 0 / 2 | 1 (2) | 47 | 101 → 103 | 108 |
+| F6-quiet-inside-flood-station | ≈ 150× | 30 | 2 / 4 | 0 / 2 | 2 (1) | 47 | 99 → 101 | 100 |
+| F7-valid-flood-100ps | ≈ 2.2× | 18 | 18 / 0 | 17 / 1 | 18 (1) | 46 | 101 → 104 | 96 |
+| F8-valid-flood-40ps | ≈ 1× | 18 | 18 / 0 | 17 / 1 | 18 (1) | 42 | 104 → 107 | 108 |
+| F9-untuned-long-ttl-15ps | < 1× (0 drops) | 48 | 48 / 0 | 43 / 0 | 43 (1) | 52 | 100 → 110 | 107 |
+| F10-valid-flood-400ps | ≈ 8.4× | 18 | 13 / 2 | 12 / 1 | 11 (2) | 48 | 101 → 104 | 100 |
+| F11-valid-flood-1000ps | ≈ 23.5× | 18 | 3 / 5 | 3 / 2 | 4 (2) | 46 | 99 → 102 | 102 |
+
+Overload is what the flood offered per second divided by what the daemon processed of that kind per
+second (its own health counters: verified, duplicate, bad_signature or unknown_key). F0 and F1 have no
+per-item timing (it was added to the collector after them; see *Run history*). F1's "3 in all" were
+nonetheless all after the flood: the probe stopped listening at about 609 s, so of the three latencies
+(15.9, 23.5, 43.5 s) the item sung at 592 s can only be the 15.9 s one, which leaves the other two arriving at
+605.6 s; the flood stopped at 600 s. Every cell's parameters, per-item quiet timing (`quiet_items`), the
+daemon's health records, frond-ear's status timeline and the pushes are in its directory.
+
+![F1 RSS over 10 minutes](charts/F1-rss.svg)
+
+![F1 verified frame records per second](charts/F1-verified-rate.svg)
+
+![F8 verified frame records per second](charts/F8-verified-rate.svg)
+
+![F9 RSS while frond-ear's live set fills](charts/F9-rss.svg)
+
+The CSV behind each chart is that cell's `samples.csv` (RSS and CPU every 0.5 s, with the load average)
+or `result.json` (`probe_verified_per_s`).
 
 **PASS criteria, one by one:**
 
 | criterion | verdict | evidence |
 |---|---|---|
-| the quiet tuned stream keeps arriving | **FAIL** | When the flood offered about 60 times or more what the daemon processed of it (overload, offered ÷ processed per second of that kind: F1 ≈ 4 200×, F1b ≈ 2 100×, F6 ≈ 150×, F5 ≈ 130×, F4 ≈ 78×, F2b ≈ 63×), the quiet stream all but stopped while it ran. Valid-key flood: 0 of 60 arrived while it ran (F1; 3 arrived in the 8 s after it stopped, one of them already 43 s old and routed late, and none was pushed before the cell ended), 1 of 18 (F1b). Real station flooded through its own control socket: 1 of 30 (F5); the quiet stream on that same station: 2 of 30, neither pushed (F6). Repeats of one valid frame: 1 of 30 (F4). Forged signatures: 5 of 30 (F2b). Unknown key at 1 M datagrams/s: 23 of 30 arrived, 19 pushed (F3b). A flood the daemon could keep up with still cost quiet items at the ear once it filled frond-ear's live set: 5 of the 20 sung after that point (F9, Finding 4). At about 5× the stream degraded (F3b, above). At 1–2× it survived: unknown key at 73 k/s (F3, 30 of 30, within 71 ms), a valid flood at 40/s (F8), and at 100/s (F7, ≈ 2.2×), where the daemon processed 46/s and the kernel dropped 54 % of the flood, yet every quiet item arrived, up to 8.2 s late |
-| memory stays bounded | **PASS**, for these durations | No process grew without bound in any flood cell: daemon at most 52 MiB, frond-ear at most 110 MiB, shim at most 108 MiB (tables above; traces below). The daemon grows with its dedup set, about 4.5 KB per live entry (32 → 52 MiB in F9 at about 4 500 entries), so its per-key quota (100 000 / keys in the manifest) would allow about 450 MB with one key; no cell got near it, and both it and frond-ear were still at their maximum at F9's last sample. frond-ear rose 100 → 106 MiB over F1's 10 minutes and 100 → 110 MiB in F9 while its live set filled to its 4 096-record bound; under steady pushing (§4) it swung between about 100 and 146 MiB with garbage collection |
-| model admission stays bounded | **PASS** | The untuned flood never reached the session in any cell: it isn't tuned and isn't on `wakeKeys`. The session got at most one push per quiet item, at most 3 records a push |
+| the quiet tuned stream keeps arriving | **FAIL** | When the flood offered about 60 times or more what the daemon processed of it (overload, offered ÷ processed per second of that kind: F1 ≈ 4 200×, F1b ≈ 2 100×, F6 ≈ 150×, F5 ≈ 130×, F4 ≈ 78×, F2b ≈ 63×), the quiet stream all but stopped while it ran. Valid-key flood: 0 of 60 arrived while it ran (F1; 3 arrived in the 8 s after it stopped, one of them already 43 s old and routed late, and none was pushed before the cell ended), 1 of 18 (F1b). Real station flooded through its own control socket: 1 of 30 (F5); the quiet stream on that same station: 2 of 30, neither pushed (F6). Repeats of one valid frame: 1 of 30 (F4). Forged signatures: 5 of 30 (F2b). Unknown key at 1 M datagrams/s: 23 of 30 arrived, 19 pushed (F3b). A flood the daemon could keep up with still cost quiet items at the ear once it filled frond-ear's live set: 5 of the 20 sung after that point (F9, Finding 4). Between those it degraded by degrees: at about 5× (F3b, above), 8× (F10, valid items at 400/s: 12 of 18 pushed while it ran, the rest lost or too late) and 24× (F11 at 1 000/s: 3 of 18). At 1–2× it survived: unknown key at 73 k/s (F3, 30 of 30, within 71 ms), a valid flood at 40/s (F8), and at 100/s (F7, ≈ 2.2×), where the daemon processed 46/s and the kernel dropped 54 % of the flood, yet every quiet item arrived, up to 8.2 s late |
+| memory stays bounded | **PASS**, for these durations | No process grew without bound in any flood cell: daemon at most 52 MiB, frond-ear at most 110 MiB, shim at most 108 MiB (tables and traces above). The daemon grows with its dedup set, about 4.5 KB per live entry (32 → 52 MiB in F9 at about 4 500 entries), so its per-key quota (100 000 / keys in the manifest) would allow about 450 MB with one key; no cell got near it, and both it and frond-ear were still at their maximum at F9's last sample. frond-ear rose 100 → 106 MiB over F1's 10 minutes and 100 → 110 MiB in F9 while its live set filled to its 4 096-record bound; under steady pushing (§4) it swung between about 100 and 146 MiB with garbage collection |
+| model admission stays bounded | **PASS** | The untuned flood never reached the session in any cell: it isn't tuned (and, except in F6, isn't on `wakeKeys`). The session got at most one push per quiet item, at most 3 records a push |
 | the push rate stays under the cap | **PASS** in every flood cell, but see §4 | The most pushes in any flood cell was 43 in 480 s (F9), under `maxPushesPerHour` 60. The quiet stream alone (360 items an hour) is six times that cap: on the live settings it reached the cap at 597 s with no flood at all, and the rest of its items expired unpushed (§4, cell A4; Finding 5) |
 | loss, lag and gaps for the flood are reported, not silent | **FAIL** | In every cell the daemon's health said `ok` with no reasons, and frond-ear's receive health said `ok`. Kernel drops (120 to 323 M per cell; 1.6 M to 323 M in the cells where the quiet stream failed) appear in no record, status or push. A forged or unknown-key flood is visible in the daemon's counters (`bad_signature`, `unknown_key`, and the D34 key-id table naming the impersonated key ids), but nothing reports what it cost. A valid-key flood looks like ordinary traffic. For what did arrive, lag is honest per record (`age=33s` in the push), but in `immediate` pushes (the live setting) a hole in the quiet stream shows only as a jump in item numbers (`item=…/3`, then `…/17`; digest reports would say `N seqs skipped`), and records promised to "the next push" can expire with no push to say so (Findings 3 and 5) |
 
 **Verdict: FAIL.** The prince was not overwhelmed (admission stayed bounded), but the quiet tuned stream
-all but stopped arriving under floods of 60× or more what the daemon could process, arrived seconds late
-at about 2×, and nothing reported the loss.
+all but stopped arriving under floods of 60× or more what the daemon could process, lost most items at 24×
+and about a third at 5–8×, arrived seconds late at about 2×, and nothing reported the loss.
 
 ## 2. Verify cost, per item (and why it isn't the ceiling)
 
@@ -248,8 +300,8 @@ read of the push carrying it (send→push). CPU% is of one core; RSS is the maxi
 
 - **The ceiling is the daemon, and nothing else in the matrix moves it.** Over 20 s from fresh state,
   one flat-out producer got 74–88 items/s verified, at 1 or 10 000 streams, at 64 B or 1 100 B, with 1 or
-  4 ears; the kernel dropped the other 99.7–99.8 % of what was sent. Stream count changes nothing because the daemon keeps no
-  per-stream queue; payload changes nothing because verify is flat in size and the save writes dedup
+  4 ears; the kernel dropped the other 99.7–99.8 % of what was sent. Stream count changes nothing because
+  the daemon keeps no per-stream queue; payload changes nothing because verify is flat in size and the save writes dedup
   rows, not bodies. Four ears add four record connections, which at these rates cost the daemon nothing
   measurable (0 gaps on every connection: no binding ever fell 1 024 records behind).
 - **At 40 items/s on fresh state, send→record is 10–13 ms at p50 and 17–26 ms at p99** in every cell:
@@ -278,8 +330,7 @@ frond-ear matches each live record against the tune on each 1 s poll, stopping a
 fits. Here the 1 200 or so live records all matched within the first 1 200 patterns (the tune lists the
 streams in the producer's round-robin order), so the 1 000- and 10 000-pattern cells did about the same
 work: 2 % of a core. What a long tune costs against untuned records, which scan every pattern, was not
-measured. The push path is what saturates: 5 records per 5 s cannot carry
-40 records/s, so records age past `maxAgeMs` and are routed late (about 270 in 30 s), and send→push grows
+measured. The push path is what saturates: 5 records per 5 s cannot carry 40 records/s, so records age past `maxAgeMs` and are routed late (about 270 in 30 s), and send→push grows
 to 11–21 s at p50.
 
 ## 4. Admission bound: what reaches the session under load, on the live settings
@@ -410,12 +461,12 @@ it's the host owner's). Reproduction: as Finding 1 with `"mode":"dup"`.
 
 When the carousel recovered quiet items after a flood, frond-ear pushed the fresh ones and routed the ones
 older than `maxAgeMs` (30 s) to the next digest report, which is due a `windowMs` (60 s) later. With
-0.8–25 s of life left they expired first. When a later push came, it said so (`… 4 went off air
-unpushed`; F5 at 315 s, F6 at 314 s, F3b). The push that went out said `(3 more records wait for the next push.)`;
-when no later push comes, as at the end of F1b and F4, the session is never told they went off air, and
-only `ear_status` (`off_air_unpushed: 3`) knows. Routed-late records expired in F1b, F2b, F3b, F4, F5 and
-F6. Reproduction: as Finding 1; read the last
-push in `session0.pushes.jsonl` and `frond_ear.ear0.canticleDelivery.counts` in `result.json`.
+0.8–25 s of life left, they expired first. The push that carried the fresh ones said `(3 more records wait
+for the next push.)`. When a later push came, it accounted for them (`… 4 went off air unpushed`; F5 at
+315 s, F6 at 314 s, F3b). When none came, as at the end of F1b and F4, the session was never told they went
+off air; only `ear_status` (`off_air_unpushed: 3`) knows. Routed-late records expired in F1b, F2b, F3b, F4,
+F5 and F6. Reproduction: as Finding 1; read the last push in `session0.pushes.jsonl` and
+`frond_ear.ear0.canticleDelivery.counts` in `result.json`.
 
 ### Finding 4: untuned streams can starve the ear's live set (TROUBLE posted)
 
@@ -427,9 +478,8 @@ is never offered to the ear again, even though its station keeps looping it.
 
 F9: an untuned producer at **15 chatter items/s with a 300 s TTL** (chatter's class maximum), well inside
 the daemon's capacity (0 kernel drops, every item verified), filled the set after about 273 s. From then
-on 5 of the 20 quiet tuned items sung (the singer's 0-based n = 28, 29, 34, 40, 46; seq = n + 1) reached the
-daemon within 0.1 s and were
-never pushed. frond-ear's `receiveHealth` stayed `ok` with no reasons; only `counts.live_overflow` (414)
+on 5 of the 20 quiet tuned items sung (the singer's 0-based n = 28, 29, 34, 40, 46; seq = n + 1) reached
+the daemon within 0.1 s and were never pushed. frond-ear's `receiveHealth` stayed `ok` with no reasons; only `counts.live_overflow` (414)
 in its status shows it, and nothing reaches the session. Reproduction (9 minutes):
 
 ```sh
@@ -458,9 +508,10 @@ For 🍃 and 🌿 (§2) and 🌫, to weigh. Nothing here was changed.
   built daemon has no per-source byte, queue or work cap; it serves datagrams in arrival order until the
   kernel buffer overflows, so whoever sends most decides what everyone hears. The most expensive thing a
   sender can hand this receiver is a *new valid item* (8–48 ms of durable save), not a forged one (60–70 µs
-  in the path, F2b and F4). So the cheapest blackout comes from a licensed key, or a station gone wrong: <!-- BRACKET -->;
-  duplicates of one valid frame do it at about 1 M datagrams/s (F4), which needs no key once a frame has
-  been heard.
+  in the path, F2b and F4). So the cheapest blackout comes from a licensed key, or a station gone wrong:
+  with one producer sending new valid items, 12 of 18 quiet items got through at 400/s (F10), 3 of 18 at
+  1 000/s (F11), and none from a real station driven at 5 000/s (F5). Duplicates of one valid frame do it
+  at about 1 M datagrams/s (F4), which needs no key once a frame has been heard.
 - **The write-ahead save sets the host's new-item ceiling.** Rewriting the whole state with two fsyncs per
   item caps ronan at about 40 new items/s, and lower as the dedup set grows (≈16/s predicted for 900 s
   live-state items). Any ring or carriage that wants more items per second through this daemon meets this
@@ -512,8 +563,9 @@ For 🍃 and 🌿 (§2) and 🌫, to weigh. Nothing here was changed.
 | [`harness/cells.py`](harness/cells.py), [`harness/run_cells.py`](harness/run_cells.py) | One measurement cell = one fresh lab; scenario lists are `results/<scenario>/cells.json` |
 | [`harness/verify_bench.py`](harness/verify_bench.py) | Isolated verify and admission costs, pinned per core type |
 | [`harness/scenario_reconnect.py`](harness/scenario_reconnect.py) | The restart storm |
-| [`harness/summarize.py`](harness/summarize.py), [`harness/plot_svg.py`](harness/plot_svg.py) | The tables and charts in this README, from the result files |
-| [`harness/queue.sh`](harness/queue.sh), [`harness/smoke.py`](harness/smoke.py) | The run order used; a 40-second end-to-end check |
+| [`harness/reconnect_report.py`](harness/reconnect_report.py) | The per-restart analysis of the storm (`results/reconnect/R1-reconnect-storm/reconnect-analysis.json`) |
+| [`harness/summarize.py`](harness/summarize.py), [`harness/plot_svg.py`](harness/plot_svg.py) | The tables and charts in this README, from the result files (`results/summary.json` is its aggregate) |
+| [`harness/queue.sh`](harness/queue.sh), [`harness/queue2.sh`](harness/queue2.sh), [`harness/smoke.py`](harness/smoke.py) | The run order used after F1 (one suite at a time); a 40-second end-to-end check |
 
 To rerun (from `reports/measurement/2026-11-23-step-one/`, with frond-ear cloned beside the worktree as
 `frond-ear-step-one-measurement-2-ro`, or `MEASURE_FROND_EAR` set):
@@ -523,11 +575,37 @@ python3 -m venv ~/.venvs/canticle-measure-2
 ~/.venvs/canticle-measure-2/bin/pip install --require-hashes --only-binary=:all: --no-deps -r ../../../.github/ci/requirements-station.txt
 cd harness
 nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python verify_bench.py ../results/verify/verify.json
-nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py ../results/flood @../results/flood/cells.json
+nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py ../results/flood @../results/flood/cells.json        # F0, F1
+nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py ../results/flood @../results/flood/cells-rest.json   # F3-F8
+nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py ../results/flood2 @../results/flood2/cells.json      # F1b, F2b, F3b, F9
+nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py ../results/flood3 @../results/flood3/cells.json      # F10, F11
 nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py ../results/ingest @../results/ingest/cells.json
 nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py ../results/admission @../results/admission/cells.json
 nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python scenario_reconnect.py ../results/reconnect
+python reconnect_report.py ../results/reconnect/R1-reconnect-storm
 python summarize.py ../results
 ```
 
 A rerun is a new measurement on whatever host runs it, not a reproduction of these numbers.
+
+### Run history (what changed while measuring)
+
+All runs were on 2026-11-22/23 (PST), in this order: verify microbenchmarks; flood `cells.json`;
+flood `cells-rest.json`; `flood2`; ingest; admission; reconnect; `flood3`.
+
+- `results/flood/cells.json` lists F0–F8, but that run was **stopped during F2**: the host's load had
+  reached 16 of 20 (other users' jobs as well as this lane's four flat-out producers), and F2 had shown a
+  harness flaw. Its forged frame was built once, so after its 60 s TTL the daemon rejected it as `expired`,
+  which is a cheaper rejection than the one asked for. Only F0 and F1 come from that run; the partial F2
+  was discarded.
+- [`blast.py`](harness/blast.py) was then changed to rebuild its fixed frame every second (forged and
+  duplicate modes), and an `unknown-fixed` mode was added. F3–F8 ran from `cells-rest.json` with two
+  producers instead of four in the cheap modes: for replay that was still about 78 times what the daemon
+  could process, but the signed unknown-key flood (F3) came out at about 1 times, so F3b re-ran it without
+  per-frame signing.
+- Added as the results asked for them: F1b (F1 again with per-item timing and a 90 s drain), F2b (forged,
+  fixed producer), F3b (unknown key without per-frame signing), F9 (the live-set test), F10/F11 (to bracket
+  the valid-flood threshold), A4 (the quiet stream alone for 12 minutes), and the three tune-all ingest cells.
+- The per-item quiet timing (`quiet_items` in `result.json`) and the gzipped raw CSVs were added to the
+  collector after F1, so F0 and F1 have neither; F1's "0 of 60 during the flood" rests on the elimination
+  argument in its table note.
