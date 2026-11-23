@@ -720,14 +720,24 @@ key's queue.
   not the tag.)
 - *Why the waiting frames count too.* A replayer can capture a frame and resend it before the original
   reaches verify. Checked against verified frames only, those copies would take places in the quiet
-  key's queue and each be verified in turn. Identical bytes get the same verdict, so a copy of a frame
-  already waiting adds nothing, and the station's next loop sends it again if the waiting copy is lost.
-- *Why it is safe.* Only frames that verified and were admitted, or are waiting for verify, enter the
-  set. A sender without the key can't plant a genuine frame's digest there, and a hit is a copy of a
-  frame already admitted or already queued: dropping it loses no item and leaves every derived quantity
-  as it was (I-4, §12.1). Presence, which §7.4 lets a benign repeat refresh, is taken up below. A frame
-  with the same identity and different bytes misses, goes on to verify, and dedup reports the
-  equivocation as it does today (§10.8).
+  key's queue and each be verified in turn. Identical bytes get the same verdict from verify, so a copy
+  of a frame already waiting adds nothing, and the station's next loop sends it again if the waiting
+  copy is lost.
+- *Where a copy joins the waiting frames.* Only once it has passed every check that can tell two copies
+  of one frame apart, and holds its place in the queue: the source binding and house MAC of 4 and the
+  per-source rate (§14.1 step 1, §12.2 step 4) judge the datagram, not the frame's bytes. Otherwise a
+  sender without the key could send a captured frame from an unbound address or with a bad tag, make it
+  the waiting copy, have the station's own copy dropped as its repeat, and then see the waiting copy
+  refused, at every loop. (Keying the waiting entries by digest together with source and tag would do
+  the same.)
+- *Why it is safe.* Only frames that verified and were admitted enter the verified part of the set, so a
+  sender without the key can't plant a digest there. A captured copy can become a waiting entry by
+  arriving first, but under the rule above it then fares exactly as the original would. So a hit is a
+  copy of a frame already admitted or already queued: dropping it loses no item, and leaves every
+  derived quantity other than presence and the on-air item's `copies` as it was (I-4, §12.1); those two,
+  which a benign repeat refreshes today (§7.4 for presence), are taken up below. A frame with the same identity and
+  different bytes misses, goes on to verify, and dedup reports the equivocation as it does today
+  (§10.8).
 - *What it counts.* The station's carousel resends the same bytes (§7.2), so its own repeats hit the
   check too, and §7.4 says an identical repeat is a benign no-op that MUST NOT be reported as a replay.
   The count is of repeats dropped before verify, not of attacks.
@@ -750,7 +760,7 @@ evict the quiet key's digests.
   1 098 B frame on ronan's two core types, against a verify's 41 and 102 µs (§2: the whole parse less the
   verify alone). It inherits dedup's own edge case: `wire.py` checks expiry with the current clock-offset
   estimate δ̂, so if δ̂ rises by more than the 5 s skew after an item was first heard, a copy can outlast
-  the window and still be inside its expiry (§7.4 notes the same for PLUCKs).
+  the window and still be inside its expiry (§7.7 notes the same for PLUCKs).
 - A beacon has neither: it has no time window (§14.1 step 1, §12.2 step 3) and no dedup entry, and its
   `(epoch, bseq)` is checked only after verify (§12.2 step 10; `listener.py`). So once a beacon has been
   verified, a replayed copy of it verifies again and, under debit after verify, is charged to the quiet
