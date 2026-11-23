@@ -166,7 +166,7 @@ that socket and nowhere else.
 | F6-quiet-inside-flood-station | ≈ 150× | 30 | 2 / 4 | 0 / 2 | 2 (1) | 47 | 99 → 101 | 100 |
 | F7-valid-flood-100ps | ≈ 2.2× | 18 | 18 / 0 | 17 / 1 | 18 (1) | 46 | 101 → 104 | 96 |
 | F8-valid-flood-40ps | ≈ 1× | 18 | 18 / 0 | 17 / 1 | 18 (1) | 42 | 104 → 107 | 108 |
-| F9-untuned-long-ttl-15ps | < 1× (0 drops) | 48 | 48 / 0 | 43 / 0 | 43 (1) | 52 | 100 → 110 | 107 |
+| F9-untuned-long-ttl-15ps | < 1× (0 socket drops) | 48 | 48 / 0 | 43 / 0 | 43 (1) | 52 | 100 → 110 | 107 |
 | F10-valid-flood-400ps | ≈ 8.4× | 18 | 13 / 2 | 12 / 1 | 11 (2) | 48 | 101 → 104 | 100 |
 | F11-valid-flood-1000ps | ≈ 23.5× | 18 | 3 / 5 | 3 / 2 | 4 (2) | 46 | 99 → 102 | 102 |
 
@@ -469,8 +469,9 @@ nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py /tmp/r
   '[{"name":"repro-1","prod_keys":2,"mode":"valid","rate":0,"payload":"64","prod_wake":false,"ear_tune":"none","quiet_interval":10,"duration":120,"drain":60,"sample_every":1000}]'
 ```
 
-Expected on ronan: `kernel_drops` (the daemon socket's own `drops`) in the millions, quiet items reaching the daemon during the flood in
-single digits or zero, daemon `health.state` `ok`, frond-ear `receiveHealth` `ok`.
+Expected on ronan: `kernel_drops` (the daemon socket's own `drops`) in the millions, quiet items reaching
+the daemon during the flood in single digits or zero, daemon `health.state` `ok`, frond-ear
+`receiveHealth` `ok`.
 
 ### Finding 2: repeats of one valid frame are enough
 
@@ -506,7 +507,7 @@ ear's view is read). When it is full and nothing in it has expired, a new record
 is never offered to the ear again, even though its station keeps looping it.
 
 F9: an untuned producer at **15 chatter items/s with a 300 s TTL** (chatter's class maximum), well inside
-the daemon's capacity (0 kernel drops, every item verified), filled the set after about 273 s. From then
+the daemon's capacity (0 drops at its socket, every item verified), filled the set after about 273 s. From then
 on 5 of the 20 quiet tuned items sung (the singer's 0-based n = 28, 29, 34, 40, 46; seq = n + 1) reached
 the daemon within 0.1 s and were never pushed. frond-ear's `receiveHealth` stayed `ok` with no reasons; only `counts.live_overflow` (414)
 in its status shows it, and nothing reaches the session. Reproduction (9 minutes):
@@ -560,6 +561,182 @@ are in the next section, kept apart from these observations and marked as candid
 - **The push cap and the quiet stream.** The live delivery settings allow 60 pushes an hour; a stream of
   one item every 10 s is 360 items an hour (§4, cell A4).
 
+## Candidate cures (not implemented, not proven)
+
+The reviewers (🍃, 🌫, 🌻, 🪨, 🌊 and 🩸) named these cures after reading the findings. They are recorded
+here as candidates. Nobody has implemented any of them, this lane included, and none of them is a
+decision. Each stays a candidate until the flood test passes when rerun on a changed path (the rows at
+the end of this section). A change to what the receptor does or emits starts as an RFC-0001 amendment;
+record v1 (§14.18) is frozen against literal SHAs (D29).
+
+Keep them apart: **drop accounting fixes the silence; group commit may raise throughput; neither
+guarantees the quiet stream.** Only fairness at the daemon, before verify and the durable write, is aimed
+at the quiet stream. It is the primary candidate, and the other two are aids.
+
+### 1. Fairness before verify and commit (the primary candidate)
+
+**Why the order of service matters more than its speed.** In every failing cell the daemon served
+datagrams in arrival order, so the quiet stream waited behind the flood. Making each step cheaper doesn't
+change that order, and the floods measured were far beyond what speeding up the save alone could reach.
+With the save free, the whole admission parse still costs 58 µs on an X925 core (§2), so the daemon's one
+event loop gets through at most about 17 000 datagrams/s (about 7 000 on an A725 core). In the path it
+managed about 14 000 duplicates/s (F4) and 16 000 forged frames/s (F2b), against about 1 M/s offered.
+Something has to decide *which* datagrams get verified and saved.
+
+**The candidate, as the room shaped it:**
+
+- **Drain fast.** Read each datagram's header and decide in microseconds whether it gets a place in a
+  bounded queue, so the kernel buffer never fills. The key id is at a fixed offset (RFC §9.2). The stream
+  is inside the CBOR map, so a per-stream queue needs the same bounded CBOR read that RFC §12.2 step 3
+  already uses for the time window. Whatever the drain refuses is **counted**, by reason.
+- **Don't assume the drain can never saturate.** F3b measured the nearest thing the daemon has today, an
+  unknown key refused at the header: about 205 000 refusals/s at 82 % of a core. Even so, at 1 M
+  datagrams/s offered its socket dropped 79.5 %, and only 23 of 30 quiet items arrived while the flood
+  ran. A fast drain still needs the visibility in 2 for the drops it can't prevent.
+- **Before verify, the header's key is only a claim.** So a key's bucket is **debited only after the
+  signature verifies**, and claimed-but-unverified traffic has **its own bounded verify budget**: a flood
+  of forgeries spends that budget, not the claimed key's. RFC §14.1 step 1 puts a per-key rate among the
+  cheap checks before crypto. Charging a key on its claim alone would let a forger spend the quiet key's
+  budget, so adopting this means amending that step. (RFC §12.2 already requires a relay to keep
+  unverified input from displacing verified frames, with separate queues.)
+- **State bounded by the manifest, never by attacker input.** Only manifest-listed keys get their own
+  bucket; **every other claimed key shares one unauthenticated bucket**.
+- **Two levels, so that it reaches the stream.** key:stream budgets nest inside a per-key cap. Within a
+  key, the parent budget is **shared round-robin across the streams' bounded queues**, not first come first
+  served, so a flooding stream gets only its share and a quiet one waits a round at most. Streams are
+  bounded like keys: only the streams the manifest lists for a key get their own queue, and the key's
+  other streams share one bounded queue. Per-key buckets alone would not protect a quiet stream inside the
+  flooding station (F6: 2 of 30 arrived, neither pushed), which is why the candidate goes down to streams.
+- **The refill rate is the signer's declared rate.** A datagram whose claimed key or stream is over its
+  rate is refused at the drain and counted, but the bucket is charged only when a datagram verifies.
+  Stations already declare their rate in their beacons: `b_station`, and `b_stream` for each stream (RFC
+  §7.5, §9.8). For relays, RFC §12.2 step 9 caps a station's ingress budget by the manifest; the spike's
+  manifest has no budget field.
+- **What "a round at most" promises.** It applies to an admitted, eligible item at the head of its queue
+  with parent tokens available. It doesn't cover end-to-end delivery: the durable save, the record
+  fan-out, and frond-ear's tune, debounce and push budget all come after it. That is why the rerun
+  records quiet-stream latency (send → push) as well as the count.
+- **Open: a forged flood that claims the quiet key.** Before verify, the drain can't tell the quiet
+  station's datagrams from forgeries that claim its key. Debiting after verify keeps the forgeries from
+  spending the quiet key's bucket, but they still compete with the real items to be verified. What that
+  costs is what the rerun's two forged-claim rows measure, and what the checks in 4 are for.
+- **Where it comes from.** This is frond-ear#116 amendment 4's receiver caps (byte, queue and
+  verification-work caps per source, before any token budget), applied at the host daemon. It is also
+  design §2.4 step 2, the step that failed (owners section).
+
+### 2. Visibility: count the socket's drops (an aid)
+
+- Set `SO_RXQ_OVFL` on the receptor's UDP socket. Linux then hands over the socket's running drop count
+  with each datagram as ancillary data, so the daemon learns exactly how many datagrams its own socket
+  lost between two reads, with no change to the write path. The daemon reads through asyncio's datagram
+  transport, which calls `recvfrom` and discards ancillary data, so this needs a `recvmsg` reader of its
+  own.
+- Report it. The room's form is `records.dropped` plus a degraded receive health. Today
+  `records.dropped` counts records the daemon dropped for a binding's connection (RFC §14.18.2) and raises
+  `records_lost`. Folding datagram drops into it would change what the field means, which record v1
+  allows only with a new major version (§14.18.3); a separate optional counter and reason would not.
+  Either way it is an amendment to §14.18.
+- What it fixes: the silence (Finding 1), criterion (a) below. What it doesn't fix: it saves no quiet
+  item. In F1 it would have reported about 92 M drops while the quiet stream still drowned. The kernel
+  drops datagrams unread, so the count says how many were lost at the first hop, never whose. A
+  per-stream hole needs `trail_seq` and record v1's `gap` (owners section).
+
+### 3. Throughput: group commit (an aid)
+
+- One durable save per short window (about 10 ms, or *N* items) instead of one per new item. Nothing
+  counts as received until the commit that covers it lands, and no `frame` record goes out before then.
+  The receptor stays write-ahead (`records.py` `Receptor._batch`, §2), with fewer fsyncs.
+- What it may do: about 7 ms of a new item's cost here is fsync (§2), so sharing it across a window should
+  raise the new-item rate. By how much was not measured. The whole-state JSON rewrite, about 4 µs per live
+  dedup entry, still happens once per commit.
+- What it can't do: change the order of service. The quiet stream still waits behind the flood. The floods
+  measured (about 153 000 valid items/s in F1, about 1 M datagrams/s in F2b and F4) are beyond what
+  verification alone gets through (1 above).
+
+### 4. Pre-verify checks against forged claims (separate threat cases)
+
+Before verify, a header that names the quiet key is only a claim. Two cheaper checks were named against a
+flood of such claims. They answer different threats, so they are stated separately:
+
+- **Source binding.** The manifest names each station's host, and a datagram that claims a key from any
+  other source address is refused before verify. It holds only where the network enforces source
+  addresses (a switch that drops spoofed sources). On our flat LAN any host can forge a source address,
+  so there it's a speed bump, not a boundary. Neither the RFC's manifest (§10.3) nor the spike's names a
+  station's address today. It only narrows, never grants: a datagram from the right address is still
+  verified like any other (I-11: trust never comes from network location).
+- **A house MAC.** A keyed tag shared by the house's senders and checked before verify. This is the RFC's
+  optional group HMAC, which a relay MAY use "as an ingress pre-filter tag outside the canonical frame, to
+  drop non-fleet junk before Ed25519 under flood. Never identity, never accord" (§10.2; §10.1, D4). It
+  keeps out senders without the house key. It does not stop another key holder from impersonating the
+  quiet key, since any insider can compute the tag. Today the RFC allows it at relays only.
+- **Neither replaces the signature.** Both only decide what is worth verifying, and whatever passes is
+  still verified before it counts.
+
+### 5. frond-ear: tune before admission, and say when the budget holds
+
+Findings 3–5 are the ear's own, and no daemon cure touches them. The candidates:
+
+- **tune before live-set admission**, with a bounded share for each tuned stream and one shared bucket for
+  all untuned streams; refusals are counted per stream and degrade receive health (Finding 4);
+- **the push-budget hold is visible**: the next push the budget allows carries a coverage note for what
+  expired while held, and "N more records wait for the next push" is true when written (Findings 3 and 5);
+- **held batches push on their own** when the hour's window frees, not only when a new item arrives.
+
+These are tracked in a separate frond-ear workorder (live-set fairness and push-budget visibility, for
+karmaterminal/frond-ear) and are not part of this report.
+
+### Two acceptance criteria, kept apart
+
+- **(a) Honest loss reporting.** Every loss on the path is counted where it happens and reaches the
+  session's view with its reason: the daemon socket's drops and whatever its drain refuses, frond-ear's
+  live-set refusals, and records the push budget held until they expired. Visibility (2) and the
+  frond-ear candidates (5) aim at this.
+- **(b) Per-stream delivery under flood.** In every row below, every quiet item sung while the flood runs
+  is pushed, on time.
+
+The §2.8 test needs both. A change that shows (a) alone fixes the silence and still fails the test. A
+change passes only when the same flood test, rerun on the changed path, shows (b) with (a) still true. A
+higher new-item rate is not (b).
+
+### The rerun: test rows
+
+Run the same harness and flood test as §1 against the changed path, on the same host shape (ronan,
+aarch64, niced) so that the rows compare with §1. The quiet tuned stream is the same real station, one
+item every 10 s. Every row needs **every quiet item sung while the flood runs, pushed** ("57/57" in the
+room, after the measuring lane's F1 checkpoint, which counted 0 of 57; §1 counts 60 sung over F1's whole
+run, so the count follows each row's duration), **and quiet-stream latency p50/p99, send → push**.
+
+| row | flood | what it tests | nearest cell in §1 |
+|---|---|---|---|
+| valid other-key flood | new valid items, flat out, from a licensed key other than the quiet station's; untuned | another key's valid traffic can't take the quiet key's turn | F1, F1b (F10, F11 at set rates) |
+| same-station flood | the quiet stream inside the flooding station: one key, the flood on another of its streams | round-robin across one key's stream queues | F6 |
+| forged flood claiming the quiet key, without source binding | frames whose header names the quiet station's key, with bad signatures | the separate unverified budget and debit after verify, with nothing to tell the forgeries from the quiet station before verify | none: F2b's forgeries claimed the producer's own key |
+| forged flood claiming the quiet key, with source binding | the same, from a source address other than the one the manifest binds to the quiet key | the pre-verify filter. On loopback this shows the filter works, not that a switch enforces sources | none |
+| duplicate replay of one valid frame | one valid frame resent unchanged, flat out | that repeats of one frame stay inside their key's share and don't take the quiet key's turn | F4 (another key's frame) |
+
+For every row, also record:
+
+- criterion (a): the losses that do happen are counted, by reason, and reach the session's view;
+- memory and model admission, bounded as in §1;
+- in the forged and replay rows, that the verify work spent on traffic that never counts stays within its
+  budget (frond-ear#116 amendment 4's flood test).
+
+Notes for whoever builds the rerun:
+
+- **The push budget.** On the live delivery settings the quiet stream alone spends the hour's 60 pushes in
+  about 10 minutes (A4: the last at 597 s), so a row as long as F1 meets that hold near its end whatever
+  the daemon does. The frond-ear candidate (5) makes the hold visible; it doesn't lift the budget. Keep
+  each row under the budget, or report the hold apart from (b), or a budget hold will read as a daemon
+  failure.
+- **Whose frame is replayed.** F4 replayed another key's frame. A replay of the quiet key's own frame
+  verifies, so debiting after verify doesn't stop it: it is charged to the quiet key, or, if dedup refuses
+  it before the charge, it still takes the quiet key's turns to be verified. A house MAC over the same
+  bytes passes too, and so does a spoofed source on a flat LAN. A check that refuses exact repeats before
+  verify would keep it out. The room didn't raise this case; it is noted here so that the replay row can
+  run with both frames.
+- **Latency.** The room set no latency bar. F0's 5.1–6.0 s (frond-ear's 5 s debounce plus its 1 s poll,
+  with no flood) is the reference.
+
 ## Not measurable yet
 
 | §2.8 quantity | Why not, on the built path |
@@ -596,7 +773,7 @@ are in the next section, kept apart from these observations and marked as candid
 | [`harness/verify_bench.py`](harness/verify_bench.py) | Isolated verify and admission costs, pinned per core type |
 | [`harness/scenario_reconnect.py`](harness/scenario_reconnect.py) | The restart storm |
 | [`harness/reconnect_report.py`](harness/reconnect_report.py) | The per-restart analysis of the storm (`results/reconnect/R1-reconnect-storm/reconnect-analysis.json`) |
-| [`harness/summarize.py`](harness/summarize.py), [`harness/plot_svg.py`](harness/plot_svg.py) | The tables and charts in this README, from the result files (`results/summary.json` is its aggregate) |
+| [`harness/summarize.py`](harness/summarize.py), [`harness/plot_svg.py`](harness/plot_svg.py) | The tables and charts in this README, from the result files (`results/summary.json` is its aggregate). Pass 2 edited §1's drop column by hand (see *Run history*); `summarize.py` still prints the pass-1 share |
 | [`harness/queue.sh`](harness/queue.sh), [`harness/queue2.sh`](harness/queue2.sh), [`harness/smoke.py`](harness/smoke.py) | The run order used after F1 (one suite at a time); a 40-second end-to-end check |
 
 To rerun (from `reports/measurement/2026-11-23-step-one/`, with frond-ear cloned beside the worktree as
@@ -641,3 +818,15 @@ flood `cells-rest.json`; `flood2`; ingest; admission; reconnect; `flood3`.
 - The per-item quiet timing (`quiet_items` in `result.json`) and the gzipped raw CSVs were added to the
   collector after F1, so F0 and F1 have neither; F1's "0 of 60 during the flood" rests on the elimination
   argument in its table note.
+- Before F0, a 15 s saturation probe whose files are not in `results/` gave the 568 806 drops in the
+  lane's first TROUBLE report, which labelled them `RcvbufErrors`. The harness read both counters for that
+  probe, and the socket's own `drops` and the namespace's `RcvbufErrors` difference were both 568 806.
+- **Pass 2 (2026-11-23, docs only; no new measurement).** After review in the room, every drop count was
+  attributed to its counter (*How drops were counted*, §1), and every rate is labelled as this niced,
+  durable-write workload's observed rate on ronan aarch64. The *Candidate cures* section, its two
+  acceptance criteria and the rerun's rows were added. §1's share column was re-derived from the same
+  `result.json` fields: pass 1 divided the socket's drops by drops plus the namespace's `InDatagrams`,
+  which counts every UDP socket's deliveries and understated the socket's share (F7 45.85 % → 52.38 %,
+  F10 78.27 % → 87.82 %, F11 87.98 % → 95.61 %). Pass 2 divides by drops plus the datagrams the daemon
+  read. The F7 sentence that said the kernel dropped "54 % of the flood" (drops ÷ flood datagrams sent)
+  now gives the socket-local 52 %.
