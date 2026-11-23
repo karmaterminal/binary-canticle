@@ -368,7 +368,7 @@ class Receptor:
     def note_repeats(self) -> None:
         """Account for the copies the intake dropped before they were heard: each is a benign no-op (§7.4), counted
         as the repeat it is and noted for presence (§8.6)."""
-        for ident, copies, last_ms in self.intake.copies():
+        for ident, copies, last_ms in self.intake.heard_again():
             if len(ident) == 2:            # a beacon: (key id, epoch)
                 st = self.lst.stations.get(ident[0])
                 old = st is not None and ident[1] < st.epoch_hwm

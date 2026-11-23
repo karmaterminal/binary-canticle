@@ -487,7 +487,7 @@ per manifest key; `last_datagram_at`; records emitted and dropped and connection
 since the last `health`) or `datagrams_refused` (the intake refused one that claimed a listed key). The host
 daemon's `health` also carries what was lost before it was heard, in two optional additions (#171):
 `records.socket_dropped`, the kernel's drop count for the daemon's socket, exact; and `receive`, the intake's
-fixed counters (`read`, `repeats`, `verified`, `unverified`, `queued`, and `refused` by reason).
+fixed counters (`read`, `repeats`, `copies`, `verified`, `unverified`, `queued`, and `refused` by reason).
 `records.dropped` keeps its meaning: records dropped for a connection. The receptor keeps which tuples it surfaced, and which
 keys it quarantined, in the listener's state file (`"receptor"`), written with the listener's guards in one
 atomic replace per batch. At start, after `hello` and before the first `landing_state` (so before any
@@ -562,6 +562,8 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
   replays spend the station's bucket or its turns. (An ITEM or PLUCK that changes nothing but comes from a known
   source is its station's to pay, so the records of what it keeps having refused stay within its rate.)
 - **Beacons are timed when they arrive**, not when their turn comes, so the clock offset (§8.2) absorbs no queueing.
+- **A copy takes no second place.** The same bytes already waiting in the same queue get the same verdict, so a copy is
+  counted (`receive.copies`) and not queued. It is neither a repeat (nothing has verified yet) nor refused.
 - **What is counted.** `receive.refused`: `unlisted` (the shared queue was full), `unverified` (the source's budget for
   failed checks was spent), `over_rate` (the key or the stream was over its rate), `backlog` (the daemon was behind).
   Socket drops are the kernel's (`SO_RXQ_OVFL` on what is read, `SO_MEMINFO` at each `health`) and are never mixed

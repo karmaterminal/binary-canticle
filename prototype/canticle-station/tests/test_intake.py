@@ -259,8 +259,8 @@ class RepeatTest(IntakeCase):
         self.accept()
         self.offer(f, f, src=THERE)
         self.assertEqual((self.intake.stats()["queued"], self.intake.repeated), (0, 2))
-        self.assertEqual([(i, n) for i, n, _ in self.intake.copies()], [((KID_A, 5, 0, 1), 2)])
-        self.assertEqual(self.intake.copies(), [])
+        self.assertEqual([(i, n) for i, n, _ in self.intake.heard_again()], [((KID_A, 5, 0, 1), 2)])
+        self.assertEqual(self.intake.heard_again(), [])
 
     def test_a_frame_that_was_not_accepted_skips_nothing(self):
         """Failed, or verified but refused at steps 3-4 (and so perhaps admitted next time): heard again."""
@@ -290,15 +290,36 @@ class RepeatTest(IntakeCase):
         self.assertEqual((self.intake.repeated, self.intake.stats()["queued"]), (0, 5))
 
     def test_copies_that_wait_together_are_verified_once_and_share_the_verdict(self):
-        f = item(A, 1)
-        self.offer(f, f, f)
-        self.offer(f, src=THERE)
-        self.assertEqual(self.accept(), [f])
-        self.assertEqual((self.intake.verified, self.intake.repeated), (1, 3))
-        bad = forge(f)
-        self.offer(bad, bad)
+        """Counted as copies: neither a repeat (nothing has verified yet) nor refused (the same bytes wait)."""
+        f, bad = item(A, 1), forge(item(A, 1))
+        for frame, verified in ((f, True), (bad, False)):
+            self.offer(frame, frame, frame)
+            self.offer(frame, src=THERE)
+            self.assertEqual(self.serve(verified=lambda t: verified), [frame])
+        self.assertEqual((self.intake.verified, self.intake.unverified, self.intake.copied, self.intake.repeated),
+                         (1, 1, 6, 0))
+        self.assertEqual(self.refused, {})
+
+    def test_copies_take_one_place_in_a_queue(self):
+        """However often one sender resends a frame, its stream's other places, and its own queue's, stay free."""
+        bad = forge(item(A, 1))
+        self.offer(*[bad] * 10_000, src=THERE)
+        others = [item(A, n + 2) for n in range(5)]
+        self.offer(*others, *[bad] * 10_000, src=THERE)
+        self.assertEqual((self.intake.stats()["queued"], self.intake.copied), (6, 19_999))
+        self.assertEqual(self.serve(verified=lambda t: t.data != bad), [bad, *others])
+        self.offer(bad, src=THERE)                             # it waits no more, so a copy waits for itself
         self.assertEqual(self.serve(verified=lambda t: False), [bad])
-        self.assertEqual((self.intake.unverified, self.refused["unverified"]), (1, 1))
+        self.assertEqual(self.refused, {})
+
+    def test_a_turn_is_bounded_however_many_copies_wait(self):
+        """The same forgeries from every port: a batch must not hold the lock while it goes through all of them."""
+        bad = [forge(item(A, 1), n) for n in range(4)]
+        for n in range(intake.STRANGERS_MAX):
+            self.offer(*bad, src=addr(n))
+        before = self.intake.stats()["queued"]
+        self.intake.take(8)
+        self.assertLessEqual(before - self.intake.stats()["queued"], 8 * intake.TURN)
 
     def test_a_copy_queued_before_the_verdict_is_a_repeat_after_it(self):
         f = item(A, 1)
@@ -333,9 +354,9 @@ class RepeatTest(IntakeCase):
         self.addCleanup(sys.setswitchinterval, old)
         reader.start()
         while reader.is_alive():
-            total += sum(c for _, c, _ in self.intake.copies())
+            total += sum(c for _, c, _ in self.intake.heard_again())
         reader.join()
-        total += sum(c for _, c, _ in self.intake.copies())
+        total += sum(c for _, c, _ in self.intake.heard_again())
         self.assertEqual(self.intake.repeated, n)
         self.assertEqual(total, n)
 
@@ -550,6 +571,7 @@ class ConsistencyTest(IntakeCase):
                 self.assertEqual(s.pool, sum(len(lane.queue) for lane in s.strange))
                 for ring, known in ((s.known, True), (s.strange, False)):
                     self.assertTrue(all(lane.queue and lane.source.known is known for lane in ring))
+                    self.assertTrue(all(sorted(lane.digests) == sorted(e[1] for e in lane.queue) for lane in ring))
                 for source, lane in s.lanes.items():
                     self.assertIs(lane.source, source)
                     queued[source] += len(lane.queue)
@@ -561,7 +583,8 @@ class ConsistencyTest(IntakeCase):
             self.assertLessEqual(len(key.strangers), intake.STRANGERS_MAX)
             self.assertEqual(dict(key.hosts), Counter(a[0] for a in key.strangers))
             self.assertFalse(set(key.known) & set(key.strangers))
-        self.assertEqual(i.read, i.repeated + i.verified + i.unverified + sum(i.refused.values()) + waiting + in_flight)
+        self.assertEqual(i.read, i.repeated + i.copied + i.verified + i.unverified + sum(i.refused.values()) + waiting
+                         + in_flight)
 
     def test_random_traffic(self):
         for seed in range(12):
@@ -579,14 +602,14 @@ class ConsistencyTest(IntakeCase):
                                            for _ in range(r.randrange(1, 40))])
                     else:
                         batch = self.intake.take(r.choice((1, 4, 32)))
-                        self.check(sum(1 + t.copies for t in batch))
+                        self.check(len(batch))
                         for t in batch:
                             verified = t.data in good
                             fresh = verified and r.random() < 0.7
                             if fresh and r.random() < 0.8:
                                 self.intake.remember(t, (t.data[4:12], 5, 0, 1), runner.now_ms() + r.choice((-1, 60_000)))
                             self.intake.settle(t, verified, fresh)
-                        self.intake.copies()
+                        self.intake.heard_again()
                     self.check()
                 while self.intake.waiting():
                     self.serve(verified=lambda t: False)
@@ -834,8 +857,10 @@ class DaemonIntakeTest(DaemonCase):
         f = item(SK, 1, now=now - 1_000, expires_at=now + 300)
         async def scenario(d, port):
             c = await self.joined(d)
-            self.send(port, f, f)
-            await until(lambda: self.frames(c) and d.intake.repeated == 1)
+            self.send(port, f)
+            await until(lambda: self.frames(c))
+            self.send(port, f)
+            await until(lambda: d.intake.repeated == 1)
             await until(lambda: runner.now_ms() > now + 320)
             self.send(port, f)
             await until(lambda: d.receptor.counters["unverified"]["expired"] == 1)
@@ -871,7 +896,8 @@ class DaemonIntakeTest(DaemonCase):
             return quiet, junk, refused, later
         (quiet, junk, refused, later), _ = self.run_with(scenario)
         self.assertEqual((quiet["state"], quiet["records"]["socket_dropped"]), ("ok", 0))
-        self.assertEqual(set(quiet["receive"]), {"read", "repeats", "verified", "unverified", "queued", "refused"})
+        self.assertEqual(set(quiet["receive"]), {"read", "repeats", "copies", "verified", "unverified", "queued",
+                                                 "refused"})
         self.assertEqual(tuple(quiet["receive"]["refused"]), intake.REFUSED)
         self.assertGreater(junk["receive"]["refused"]["unlisted"], 0)
         self.assertEqual((junk["state"], junk["reasons"]), ("ok", []))

@@ -230,7 +230,6 @@ class Daemon:
         self.udp: Optional[socket.socket] = None
         self.intake: Optional[Intake] = None
         self._hear_at: Optional[asyncio.Handle] = None   # when the queued datagrams are heard next
-        self._batch_heard = False                        # whether the last turn heard any
         self.server: Optional[asyncio.base_events.Server] = None
         self._lease = None
         self._stop: Optional[asyncio.Event] = None
@@ -547,11 +546,10 @@ class Daemon:
             self._hear_at = None
         if self.intake.stopped:
             return
-        self._batch_heard = False
         self._call(self._hear_batch)
         if self.failed is None and self.intake.waiting():
             loop = asyncio.get_running_loop()
-            self._hear_at = (loop.call_soon(self._hear_queued) if self._batch_heard
+            self._hear_at = (loop.call_soon(self._hear_queued) if self.intake.took
                              else loop.call_later(RETRY_S, self._hear_queued))
 
     def _hear_batch(self) -> None:
@@ -563,7 +561,6 @@ class Daemon:
             if h.kept and t.digest is not None:
                 self.intake.remember(t, h.ident, h.until)
             self.intake.settle(t, h.verified, h.fresh)
-        self._batch_heard = True
 
     def _call(self, fn, *args) -> None:
         """Run a receptor step. A failed save (or any error in the record path) ends the run with `fatal`:
