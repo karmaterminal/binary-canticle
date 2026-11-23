@@ -45,13 +45,16 @@ def main() -> int:
     hellos = [e["t_s"] for e in ev if e["event"] == "hello"]
     outages = []
     kills = [(t, n) for t, n in actions if n in ("kill_daemon", "term_daemon", "kill_all")]
+    restarts = [t for t, n in actions if n.startswith("restart")]
     for t, n in kills:
         back = next((h for h in hellos if h > t), None)
-        lost = [i for i, ts in sent if t <= ts < (back if back is not None else 1e9)]
-        reached = [i for i in lost if i in arrived]
-        outages.append({"action": n, "at_s": t, "probe_saw_new_run_at_s": back,
+        up = next((x for x in restarts if x > t), None)   # the restart action: no daemon held the port before it
+        down = [i for i, ts in sent if t <= ts < (up if up is not None else 1e9)]
+        reached = [i for i in down if i in arrived]
+        outages.append({"action": n, "at_s": t, "restarted_at_s": up,
+                        "probe_saw_new_run_at_s": back,
                         "probe_outage_s": round(back - t, 2) if back else None,
-                        "items_sent_in_outage": len(lost), "of_those_reached_daemon": len(reached)})
+                        "items_sent_while_down": len(down), "of_those_reached_daemon": len(reached)})
 
     # per ear: state, health and counts at 1 s, around each action
     def ear_track(ear):
@@ -100,11 +103,11 @@ def main() -> int:
                 "quiet_items": r.get("quiet_items"), "tap_events": ev}
     (d / "reconnect-analysis.json").write_text(json.dumps(analysis, indent=1))
 
-    print("| restart | at s | probe saw the new run at s (outage) | items the producer sent meanwhile | of those, reached the daemon |")
-    print("|---|---|---|---|---|")
+    print("| stop | at s | restarted at s | the probe saw the new run at s (its outage) | items the producer sent while no daemon ran | of those, reached a daemon |")
+    print("|---|---|---|---|---|---|")
     for o in outages:
-        print(f"| {o['action']} | {o['at_s']} | {o['probe_saw_new_run_at_s']} ({o['probe_outage_s']} s) | "
-              f"{o['items_sent_in_outage']} | {o['of_those_reached_daemon']} |")
+        print(f"| {o['action']} | {o['at_s']} | {o['restarted_at_s']} | {o['probe_saw_new_run_at_s']} ({o['probe_outage_s']} s) | "
+              f"{o['items_sent_while_down']} | {o['of_those_reached_daemon']} |")
     print()
     for ear in ears:
         print(f"**{ear}** transitions:")

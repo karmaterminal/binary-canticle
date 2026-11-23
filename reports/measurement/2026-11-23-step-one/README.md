@@ -328,7 +328,43 @@ all restarted at 203; the load ends at 260. frond-ear's status was read every se
 [`results/reconnect/`](results/reconnect/), with the per-restart analysis from
 [`harness/reconnect_report.py`](harness/reconnect_report.py) in `reconnect-analysis.json`.
 
-<!-- RECONNECT-TABLE -->
+| stop | at s | restarted at s | the probe saw the new run at s (its outage) | items the producer sent while no daemon ran | of those, reached a daemon |
+|---|---|---|---|---|---|
+| kill_daemon | 30 | 33 | 37.02 (7.02 s) | 90 | 0 |
+| term_daemon | 70 | 72 | 73.16 (3.16 s) | 60 | 2 |
+| kill_daemon | 150 | 151 | 153.1 (3.1 s) | 30 | 0 |
+| kill_daemon | 154 | 155 | 157.16 (3.16 s) | 30 | 0 |
+| kill_daemon | 158 | 159 | 161.03 (3.03 s) | 30 | 0 |
+| kill_daemon | 162 | 163 | 165.2 (3.2 s) | 30 | 0 |
+| kill_daemon | 166 | 167 | 169.15 (3.15 s) | 30 | 0 |
+| kill_all | 200 | 203 | 207.07 (7.07 s) | 90 | 1 |
+
+- **Catch-up.** frond-ear reconnects on a 1 s·2ⁿ backoff and asks for a join snapshot. After each daemon
+  restart the four ears were `connected` and `ok` again 1–3 s after the restart (ear status read once a
+  second), each with a complete join snapshot of 4–75 frames. Once in the storm an ear's retry landed on the
+  next kill and it caught the restart after that (5 s). The first push followed within about one debounce
+  (1.1–6.3 s after the restart, up to 13.5 s inside the storm). The probe, on the same curve but further
+  backed off, came back up to 4 s after the restart, which is why its outages above are longer than the
+  daemon's.
+- **What was lost.** The producer has no carousel, so the 390 items it sent while no daemon held the port
+  were gone (3 of them reached the daemon just before a stop): 5 % of its 7 800. The quiet station's
+  carousel recovered everything: all 26 quiet items were pushed to all four ears, the slowest 17.5 s after
+  it was sung. **Nothing was pushed twice to any ear** across eight daemon restarts, one ear restart and
+  one restart of everything.
+- **What was reported, and how honestly.** A SIGKILL showed in frond-ear's status as `failed`,
+  `exit_without_bye`, then `run_restarted_without_bye` on the next run; a SIGTERM as `stopped` (the daemon
+  sent `bye`). The pushes after a reconnect carried coverage notes: `late: heard 3s ago (snapshot)` on
+  items that came from the join snapshot, `late: heard 0s ago (resurfaced)` on carousel repeats the
+  restarted daemon re-emitted, and during the storm `canticle: the listener has heard no datagram lately,
+  so every station reads unknown, not offline.` When frond-ear `ear0` itself restarted, its snapshot was cut
+  at the daemon's 511-entry cap, and its first push said so: `canticle: joined the host daemon's run late
+  (joined_late) and its join snapshot was truncated (729 omitted), so items and station presence from before
+  the join may be missing here.` Its receive health stayed `degraded` (`joined_late`) until the next daemon
+  run. What no push said: that the daemon had been down, or how many items fell into the outage. The jump in
+  item numbers is the only trace, the same as under a flood.
+- **Cost.** Daemon 34 % CPU mean, ≤ 40 MiB; each frond-ear about 1 % and 123–138 MiB; each shim 100 MiB.
+  Five bindings asking for a snapshot at once never stalled the daemon (0 `rec_seq` gaps on the probe's
+  nine connections).
 
 ## Findings, with reproductions
 
