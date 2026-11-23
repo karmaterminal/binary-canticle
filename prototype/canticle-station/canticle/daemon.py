@@ -29,7 +29,9 @@ socket:
   Snapshot records are never dropped: one unwritten for 2 s closes the connection;
 - a clean stop emits ``bye``; a failure to start emits ``fatal`` (on stderr: no
   connection exists yet) and exits non-zero;
-- write-ahead: a datagram's or tick's records go out only after the safety state they
+- fair admission (#171): datagrams wait in ``intake.py``'s queues, filled by a thread that only reads the
+  socket, and are heard in its order, at most 32 per turn of the event loop;
+- write-ahead: the records of a turn's datagrams, or of a tick, go out only after the safety state they
   imply is saved. A failed save sends none of them and ends the run with ``fatal``
   (``state_not_durable``) and exit 1; the binding's supervision restarts it (§14.18.2).
 
@@ -228,6 +230,7 @@ class Daemon:
         self.udp: Optional[socket.socket] = None
         self.intake: Optional[Intake] = None
         self._hear_at: Optional[asyncio.Handle] = None   # when the queued datagrams are heard next
+        self._batch_heard = False                        # whether the last turn heard any
         self.server: Optional[asyncio.base_events.Server] = None
         self._lease = None
         self._stop: Optional[asyncio.Event] = None
@@ -432,6 +435,14 @@ class Daemon:
             raise StartError("bind_failed", f"{self.cfg.bind}: {e.strerror or e}") from None
         return sock
 
+    def _make_intake(self, loop) -> Intake:
+        try:
+            return Intake(self.udp, self.receptor.lst.manifest, now_ms=runner.now_ms, rcvbuf=self.cfg.rcvbuf,
+                          wake=lambda: self._from_reader(loop, self._hear_queued),
+                          failed=lambda e: self._from_reader(loop, self._fail, "internal", type(e).__name__))
+        except OSError as e:
+            raise StartError("bind_failed", f"{self.cfg.bind}: {e.strerror or e}") from None
+
     def _prepare_socket_path(self) -> None:
         path = self.cfg.socket_path
         d = os.path.dirname(os.path.abspath(path))
@@ -479,6 +490,7 @@ class Daemon:
             self.receptor = self._load()
             self.receptor.snapshots = self.snapshots
             self.udp = self._bind_udp()
+            self.intake = self.receptor.intake = self._make_intake(loop)
             self.receptor.bind = "%s:%d" % self.udp.getsockname()[:2]   # the port actually bound (port 0 in tests)
             try:
                 self.receptor.start(runner.now_ms())   # hello, then the first landing_state, after the save
@@ -492,10 +504,6 @@ class Daemon:
 
         switch = sys.getswitchinterval()
         sys.setswitchinterval(min(switch, SWITCH_S))
-        self.intake = self.receptor.intake = Intake(
-            self.udp, self.receptor.lst.manifest, now_ms=runner.now_ms, rcvbuf=self.cfg.rcvbuf,
-            wake=lambda: self._from_reader(loop, self._hear_queued),
-            failed=lambda e: self._from_reader(loop, self._fail, "internal", type(e).__name__))
         self.intake.start()
         tasks.append(asyncio.create_task(self._watch()))
         if self.cfg.tick_ms:
@@ -537,21 +545,25 @@ class Daemon:
         if self._hear_at is not None:
             self._hear_at.cancel()
             self._hear_at = None
-        if self.failed is not None or self._stop.is_set():
+        if self.intake.stopped:
             return
-        batch = self.intake.take(HEAR_BATCH)
-        if batch:
-            self._call(self._hear_batch, batch)
+        self._batch_heard = False
+        self._call(self._hear_batch)
         if self.failed is None and self.intake.waiting():
             loop = asyncio.get_running_loop()
-            self._hear_at = loop.call_soon(self._hear_queued) if batch else loop.call_later(RETRY_S, self._hear_queued)
+            self._hear_at = (loop.call_soon(self._hear_queued) if self._batch_heard
+                             else loop.call_later(RETRY_S, self._hear_queued))
 
-    def _hear_batch(self, batch: list) -> None:
-        heard = self.receptor.hear_all([t.data for t in batch], runner.now_ms())
+    def _hear_batch(self) -> None:
+        batch = self.intake.take(HEAR_BATCH)
+        if not batch:
+            return
+        heard = self.receptor.hear_all([(t.data, t.at) for t in batch], runner.now_ms())
         for t, h in zip(batch, heard):           # the save that covers them has landed
             if h.kept and t.digest is not None:
                 self.intake.remember(t, h.ident, h.until)
             self.intake.settle(t, h.verified, h.fresh)
+        self._batch_heard = True
 
     def _call(self, fn, *args) -> None:
         """Run a receptor step. A failed save (or any error in the record path) ends the run with `fatal`:

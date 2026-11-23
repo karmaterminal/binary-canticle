@@ -5,8 +5,10 @@ Two kinds of test. ``IntakeCase`` drives an ``Intake`` with no thread and no soc
 over loopback UDP. The floods are in ``test_fair_admission``.
 """
 
+import errno
 import hashlib
 import json
+import random
 import socket
 import sys
 import threading
@@ -130,6 +132,17 @@ class OrderTest(IntakeCase):
         self.offer(quiet)
         self.assertEqual(self.serve(4).index(quiet), 1)
 
+    def test_a_known_source_gets_every_other_turn_however_many_strangers_claim_its_stream(self):
+        self.offer(item(A, 1), src=HERE)
+        self.serve()
+        for n in range(intake.STRANGERS_MAX):
+            self.offer(*[forge(item(A, 1), 100 * n + i) for i in range(3)], src=addr(20 + n))
+        quiet = [item(A, n + 2) for n in range(5)]
+        self.offer(*quiet, src=HERE)
+        served = self.serve(12, verified=lambda t: t.data in quiet)
+        self.assertEqual([served.index(q) for q in quiet], sorted(served.index(q) for q in quiet))
+        self.assertLessEqual(served.index(quiet[-1]), 2 * len(quiet))
+
     def test_a_quiet_source_waits_behind_one_datagram_of_another_claiming_its_stream(self):
         self.offer(*[forge(item(A, n), n) for n in range(1, 50)], src=THERE)
         quiet = item(A, 1)
@@ -175,15 +188,15 @@ class BoundTest(IntakeCase):
         counted."""
         for n in range(5_000):
             self.intake.offer([(forge(item(A, 1), n), addr(n % 250, n))])
-        most = intake.STRANGERS_MAX * intake.STRANGER_DEPTH + intake.CROWD_DEPTH
         key = self.intake.keys[KID_A]
         self.assertLessEqual(len(key.strangers), intake.STRANGERS_MAX)
-        self.assertLessEqual(self.intake.stats()["queued"], most)
+        self.assertEqual(self.intake.stats()["queued"], intake.STRANGER_POOL)
         self.assertEqual(self.intake.stats()["queued"] + sum(self.refused.values()), 5_000)
 
     def test_a_newcomer_gets_a_queue_once_idle_strangers_are_gone(self):
         for n in range(intake.STRANGERS_MAX):
             self.intake.offer([(item(A, n + 1), addr(10 + n))])
+        self.now += 1
         self.assertIs(self.intake.keys[KID_A].source(THERE, self.now), self.intake.keys[KID_A].crowd)
         self.serve(fresh=False)
         self.now += 1
@@ -199,11 +212,29 @@ class BoundTest(IntakeCase):
         self.offer(quiet, src=HERE)
         self.assertIn(quiet, self.serve(intake.STRANGERS_PER_HOST + 2))
         self.drain_host(7)
+        self.assertEqual(self.intake.stats()["queued"], 0)
         for n in range(10):                                    # and once they are gone, its ports count no more
             self.now += 1
             self.offer(item(A, 10 + n), src=addr(7, 5_000 + n))
             self.assertIn(addr(7, 5_000 + n), self.intake.keys[KID_A].strangers)
             self.serve(fresh=False)
+
+    def test_a_burst_from_an_unknown_port_waits_whole(self):
+        frames = [item(A, n + 1) for n in range(40)]
+        self.offer(*frames)
+        self.assertEqual((self.serve(64), self.refused), (frames, {}))
+
+    def test_a_full_pool_refuses_its_longest_queue_and_never_a_newcomer(self):
+        """The strangers of a stream share one pool. Full, it takes a newcomer's datagram out of the longest queue's
+        place: a flood can fill the pool, but not keep a station's first frame out of it."""
+        self.offer(*[forge(item(A, 1), n) for n in range(2 * intake.STRANGER_POOL)], src=THERE)
+        self.assertEqual(self.intake.stats()["queued"], intake.STRANGER_POOL)
+        quiet = [item(A, n + 1) for n in range(4)]
+        self.offer(*quiet, src=HERE)
+        self.assertEqual(self.intake.stats()["queued"], intake.STRANGER_POOL)
+        self.assertEqual(sum(self.refused.values()), intake.STRANGER_POOL + 4)
+        served = self.serve(8, verified=lambda t: t.data in quiet)
+        self.assertEqual([d for d in served if d in quiet], quiet)
 
     def drain_host(self, host):
         while self.intake.stats()["queued"]:
@@ -331,11 +362,11 @@ class BudgetTest(IntakeCase):
         key = self.intake.keys[KID_A]
         n = 0
         for _ in range(100):
-            self.offer(*[forge(item(A, 1), n + i) for i in range(20)], src=THERE)
-            n += 20
-            self.serve(verified=lambda t: False)
+            self.offer(*[forge(item(A, 1), n + i) for i in range(400)], src=THERE)
+            n += 400
+            self.serve(64, verified=lambda t: False)
             self.now += 0.01
-        self.assertLessEqual(self.intake.unverified, intake.STRANGER_BURST + 1.0 * intake.STRANGER_RATE + 1)
+        self.assertLessEqual(self.intake.unverified, intake.SOURCE_BURST + 1.0 * intake.SOURCE_RATE + 1)
         self.assertEqual(key.bucket.tokens, intake.KEY_BURST)
         self.assertEqual(key.streams[stream_id("chatter")].bucket.tokens, intake.STREAM_BURST)
         self.assertGreater(self.refused["unverified"], 0)
@@ -358,12 +389,28 @@ class BudgetTest(IntakeCase):
             self.now += 0.1
 
     def test_another_keys_verify_share_is_its_own(self):
-        for n in range(500):
+        for n in range(int(intake.CHECK_BURST) - 1):
             self.offer(forge(item(A, 1), n), src=THERE)
             self.serve(verified=lambda t: False)
         f = item(B, 1)
         self.offer(f, src=THERE)
         self.assertEqual(self.serve(), [f])
+
+    def test_all_checks_that_come_to_nothing_share_one_bound(self):
+        """Whatever keys and addresses a flood spoofs, the daemon's work on it is bounded, and a key that forges
+        nothing still gets its turn within a round of the refill."""
+        for sk in (A, B):
+            self.offer(item(sk, 1), src=HERE)
+            self.serve()
+        n = 0
+        for _ in range(100):
+            for sk in (A, B):
+                self.offer(*[forge(item(sk, 1), n + i) for i in range(40)], src=HERE)     # spoofing known sources
+                n += 40
+            self.serve(64, verified=lambda t: False)
+            self.now += 0.01
+        self.assertLessEqual(self.intake.unverified, intake.CHECK_BURST + 1.0 * intake.CHECK_RATE + 1)
+        self.assertGreater(self.intake.unverified, 0.9 * intake.CHECK_RATE)
 
     def test_verified_frames_are_held_to_the_key_and_stream_rates(self):
         seq = iter(range(1, 10**6))
@@ -391,14 +438,34 @@ class BudgetTest(IntakeCase):
         self.offer(f)
         self.assertIn(f, self.serve(2))
 
-    def test_replayed_beacons_do_not_spend_what_items_need(self):
-        """A beacon has no expiry, so an old one past the window verifies each time: its own bucket pays."""
+    def test_only_new_frames_spend_the_stations_buckets(self):
+        """A replay that verifies and changes nothing (an old beacon, which verifies whenever it is replayed, or a
+        frame refused at steps 3-4) is charged to whoever sent it, not to the station that signed it."""
         key = self.intake.keys[KID_A]
-        for n in range(1, 400):
-            self.offer(beacon(A, n), src=THERE)
+        for n in range(1, 200):
+            self.offer(beacon(A, n), item(A, n), src=THERE)
             self.serve(fresh=False)
-        self.assertLessEqual(self.intake.verified, intake.BEACON_BURST)
-        self.assertEqual(key.bucket.tokens, intake.KEY_BURST)
+        self.assertEqual((key.bucket.tokens, key.streams[stream_id("chatter")].bucket.tokens,
+                          key.streams[BEACON].bucket.tokens),
+                         (intake.KEY_BURST, intake.STREAM_BURST, intake.BEACON_BURST))
+        self.assertLess(key.stranger_budget.tokens, 1.0)
+        new = [item(A, 500), beacon(A, 500)]
+        self.offer(*new, src=HERE)
+        self.now += 0.01                                       # the next of the strangers' refill
+        batch = self.intake.take(32)
+        for t in batch:
+            self.intake.settle(t, True, t.data in new)
+        self.assertLessEqual(set(new), {t.data for t in batch})
+        self.assertEqual(list(key.known), [HERE])
+
+    def test_what_a_known_source_resends_is_the_stations_own_to_pay(self):
+        """So the records of frames its station keeps having refused stay within its rate."""
+        self.offer(item(A, 1), src=HERE)
+        self.serve()
+        for n in range(2, 200):
+            self.offer(item(A, n), src=HERE)
+            self.serve(fresh=False)
+        self.assertLessEqual(self.intake.verified, intake.STREAM_BURST)
 
     def test_only_a_fresh_frame_makes_its_address_known(self):
         self.offer(item(A, 1), src=THERE)
@@ -415,24 +482,37 @@ class BudgetTest(IntakeCase):
         self.assertEqual(list(self.intake.keys[KID_A].known), [addr(50 + n) for n in range(3, intake.KNOWN_MAX + 3)])
 
     def test_displacing_a_known_source_leaves_the_queues_consistent(self):
-        """A known source pushed out while it has datagrams waiting and the strangers' table is full: what it had
-        waiting is counted, and nothing of it is left to serve."""
+        """A known source pushed out while it has datagrams waiting queues on as a stranger, or, with that table
+        full, what it had waiting is counted and gone."""
         for n in range(intake.KNOWN_MAX):
             self.offer(item(A, n + 1), src=addr(50 + n))
             self.serve()
-        for n in range(intake.STRANGERS_MAX):
+        known = [addr(51), addr(52), addr(53)]
+        self.offer(item(A, 70), item(A, 71), src=addr(50))     # the oldest known source, waiting
+        key = self.intake.keys[KID_A]
+        with self.intake._lock:
+            key.know(addr(90))
+        self.assertEqual(list(key.known), [*known, addr(90)])
+        self.assertIn(addr(50), key.strangers)
+        self.assertEqual((len(self.serve(fresh=False)), self.intake.waiting()), (2, False))
+
+        for n in range(intake.STRANGERS_MAX + 1):              # every place in the table has something waiting
+            self.now += 1
             self.offer(forge(item(A, 1), n), src=addr(100 + n))
+        self.offer(item(A, 80), item(A, 81), src=addr(51))
         newcomer = item(A, 99)
-        self.offer(newcomer, src=addr(200))                          # beyond the table: in the crowd
-        self.offer(item(A, 70), item(A, 71), src=addr(50))           # the oldest known source, behind it
-        for _ in range(intake.STRANGERS_MAX + 1):
-            (t,) = self.intake.take(1)
-            self.intake.settle(t, t.data == newcomer, t.data == newcomer)
-        self.assertEqual(list(self.intake.keys[KID_A].known), [addr(51), addr(52), addr(53), addr(200)])
-        self.assertEqual((self.intake.stats()["queued"], self.refused, self.intake.waiting()), (0, {"unverified": 2}, False))
-        self.offer(item(A, 72), src=addr(50))                        # a stranger again: it queues, and is served
-        self.assertEqual(len(self.serve()), 1)
-        self.assertFalse(self.intake.waiting())
+        self.offer(newcomer, src=addr(250))                    # beyond the table: in the crowd
+        while (t := self.intake.take(1)[0]).data != newcomer:
+            self.intake.settle(t, False, False)
+            if t.addr == addr(51):
+                self.offer(t.data, src=addr(51))               # so it still has two waiting when the newcomer is verified
+        self.intake.settle(t, True, True)
+        self.assertNotIn(addr(51), key.known)
+        self.assertNotIn(addr(51), key.strangers)
+        self.assertEqual(self.refused.get("unverified"), 2)
+        self.serve(200, verified=lambda t: False)
+        self.assertEqual((self.intake.stats()["queued"], self.intake.waiting()), (0, False))
+        self.assertEqual([(s.pool, s.lanes) for s in key.streams.values()], [(0, {})] * len(key.streams))
 
     def test_the_unlisted_queue_is_examined_on_a_budget(self):
         unknown = Ed25519PrivateKey.generate()
@@ -440,6 +520,74 @@ class BudgetTest(IntakeCase):
             self.offer(item(unknown, n + 1))
             self.serve(verified=lambda t: False)
         self.assertLessEqual(self.intake.unverified, intake.UNLISTED_BURST)
+
+
+class ConsistencyTest(IntakeCase):
+    """Random traffic from many addresses, random verdicts: after every step the queues, rings, tables and counts
+    agree with each other, and once it stops everything is served and every budget refills."""
+
+    def check(self, in_flight=0):
+        i, waiting = self.intake, len(self.intake.unlisted.ready)
+        self.assertEqual(i.unlisted in i._ready, bool(i.unlisted.ready))
+        for key in i.keys.values():
+            self.assertEqual(i._ready.count(key), 1 if key.ready else 0)
+            queued = Counter()
+            for s in key.streams.values():
+                self.assertEqual(key.ready.count(s), 1 if s.lanes else 0)
+                self.assertEqual({*s.known, *s.strange}, set(s.lanes.values()))
+                self.assertEqual(len(s.known) + len(s.strange), len(s.lanes))
+                self.assertEqual(s.pool, sum(len(lane.queue) for lane in s.strange))
+                for ring, known in ((s.known, True), (s.strange, False)):
+                    self.assertTrue(all(lane.queue and lane.source.known is known for lane in ring))
+                for source, lane in s.lanes.items():
+                    self.assertIs(lane.source, source)
+                    queued[source] += len(lane.queue)
+            waiting += sum(queued.values())
+            listed = [*key.known.values(), *key.strangers.values(), key.crowd]
+            self.assertLessEqual(set(queued), set(listed))
+            self.assertTrue(all(source.queued == queued[source] for source in listed))
+            self.assertLessEqual(len(key.known), intake.KNOWN_MAX)
+            self.assertLessEqual(len(key.strangers), intake.STRANGERS_MAX)
+            self.assertEqual(dict(key.hosts), Counter(a[0] for a in key.strangers))
+            self.assertFalse(set(key.known) & set(key.strangers))
+        self.assertEqual(i.read, i.repeated + i.verified + i.unverified + sum(i.refused.values()) + waiting + in_flight)
+
+    def test_random_traffic(self):
+        for seed in range(12):
+            r = random.Random(seed)
+            self.intake = self.make()
+            good = [item(sk, n, stream) if r.random() < 0.7 else beacon(sk, n)
+                    for n in range(1, 50) for sk, stream in [(r.choice((A, B)), r.choice(("chatter", "other", "nowhere")))]]
+            bad = [forge(f, n) for n, f in enumerate(good)]
+            junk = [b"x", item(Ed25519PrivateKey.generate(), 1)]
+            with mock.patch.multiple(intake, STRANGERS_MAX=10, STRANGERS_PER_HOST=3, STRANGER_POOL=20, KNOWN_DEPTH=5):
+                for _ in range(250):
+                    self.now += r.choice((0, 0.001, 0.02, 0.2, 3))
+                    if r.random() < 0.6:
+                        self.intake.offer([(r.choice(r.choice((good, bad, junk))), addr(r.randrange(8), r.randrange(6)))
+                                           for _ in range(r.randrange(1, 40))])
+                    else:
+                        batch = self.intake.take(r.choice((1, 4, 32)))
+                        self.check(sum(1 + t.copies for t in batch))
+                        for t in batch:
+                            verified = t.data in good
+                            fresh = verified and r.random() < 0.7
+                            if fresh and r.random() < 0.8:
+                                self.intake.remember(t, (t.data[4:12], 5, 0, 1), runner.now_ms() + r.choice((-1, 60_000)))
+                            self.intake.settle(t, verified, fresh)
+                        self.intake.copies()
+                    self.check()
+                while self.intake.waiting():
+                    self.serve(verified=lambda t: False)
+                    self.now += 0.5
+                self.check()
+            self.assertEqual(self.intake.stats()["queued"], 0)
+            self.now += 1_000
+            for key in self.intake.keys.values():
+                for b in (key.bucket, key.stranger_budget, self.intake.checks, *(s.bucket for s in key.streams.values()),
+                          *(s.budget for s in key.known.values())):
+                    b.ready(self.now)
+                    self.assertEqual(b.tokens, b.burst)
 
 
 class SocketTest(IntakeCase):
@@ -498,10 +646,33 @@ class SocketTest(IntakeCase):
     def test_a_reader_that_fails_says_so(self):
         failed = []
         self.intake = Intake(self.sock, self.manifest, now_ms=runner.now_ms, wake=lambda: None, failed=failed.append)
-        with mock.patch.object(self.intake._reader, "read", side_effect=OSError(5, "I/O")):
+        with mock.patch.object(self.intake._reader, "read", side_effect=OSError(errno.EBADF, "gone")):
             self.intake.start()
             self.intake._thread.join(5)
         self.assertEqual([type(e) for e in failed], [OSError])
+
+    def test_a_passing_error_is_survived_and_a_forbidden_recvmmsg_is_replaced(self):
+        out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.addCleanup(out.close)
+        failed, f = [], item(A, 1)
+        for code in (errno.ENOBUFS, errno.ENOSYS):
+            i = Intake(self.sock, self.manifest, now_ms=runner.now_ms, wake=lambda: None, failed=failed.append)
+            real, calls = i._reader.read, []
+            def read(real=real, calls=calls, code=code):
+                calls.append(1)
+                if len(calls) == 1:
+                    raise OSError(code, "for now")
+                return real()
+            i._reader.read = read
+            i.start()
+            out.sendto(f, self.sock.getsockname())
+            deadline = time.perf_counter() + 5
+            while not i.read and time.perf_counter() < deadline:
+                threading.Event().wait(0.01)
+            kind = type(i._reader)
+            i._stop = True
+            i._thread.join(5)
+            self.assertEqual((i.read, failed, kind), (1, [], intake._Mmsg if code == errno.ENOBUFS else intake._Msg))
 
 
 class DaemonIntakeTest(DaemonCase):
@@ -559,6 +730,21 @@ class DaemonIntakeTest(DaemonCase):
         self.assertGreater(last, first)
         self.assertGreater(h["last_datagram_at"], at)
 
+    def test_a_beacon_is_timed_when_it_arrives_not_when_its_turn_comes(self):
+        """The clock offset (§8.2) must not absorb the time a beacon waited: an inflated one refuses fresh items as
+        not yet valid."""
+        async def scenario(d, port):
+            with mock.patch.object(d, "_hear_queued"):          # the loop is too busy to hear it yet
+                self.send(port, beacon(SK, 1))
+                await until(lambda: d.intake.read == 1)
+                time.sleep(0.3)
+            d._hear_queued()
+            (st,) = d.receptor.lst.stations.values()
+            return st.offset_ms, runner.now_ms() - st.last_beacon
+        (offset, age), _ = self.run_with(scenario)
+        self.assertLess(offset, 150)
+        self.assertGreaterEqual(age, 300)
+
     def test_old_beacons_replayed_push_no_fresh_one_out(self):
         """An old beacon verifies whenever it is replayed. It is not kept, so the digests are the latest beacons'."""
         old, new = [beacon(SK, n) for n in range(1, 9)], beacon(SK, 100)
@@ -595,6 +781,42 @@ class DaemonIntakeTest(DaemonCase):
             await until(lambda: len(self.frames(c)) == 3)
             return [r["admission"] for r in self.frames(c)]
         self.assertEqual(self.run_with(scenario)[0], ["verified", "over_quota", "verified"])
+
+    def test_a_copy_of_an_earlier_epochs_beacon_is_counted_as_one(self):
+        b = beacon(SK, 9, epoch=5)
+        async def scenario(d, port):
+            self.send(port, b)
+            await until(lambda: d.receptor.counters["beacon"]["verified"] == 1)
+            self.send(port, beacon(SK, 1, epoch=6))
+            await until(lambda: d.receptor.counters["beacon"]["verified"] == 2)
+            self.send(port, b, b)
+            await until(lambda: d.intake.repeated == 2)
+            d.receptor.tick(runner.now_ms())
+            return d.receptor.counters["beacon"]
+        self.assertEqual(self.run_with(scenario)[0], {"verified": 2, "duplicate": 0, "epoch_regression": 2})
+
+    def test_an_item_held_back_at_its_restart_is_judged_again(self):
+        """Restored from before the restart but refused a mark slot: not surfaced, so its digest is not kept."""
+        f = item(SK, 1, stream="lens.threat", cls=3, state_key="k")
+        async def first(d, port):
+            c = await self.joined(d)
+            self.send(port, f)
+            await until(lambda: self.frames(c))
+        async def second(d, port):
+            c = await self.joined(d)
+            d.receptor.lst.hwm.clear()
+            d.receptor.lst.hwm_per_key = {wire.key_id(wire.public_key_bytes(SK)): 10}
+            d.receptor.lst.per_key_mark_quota = 10
+            self.send(port, f)
+            await until(lambda: self.frames(c))
+            kept = len(d.intake.repeats)
+            d.receptor.lst.per_key_mark_quota = 11
+            self.send(port, f)
+            await until(lambda: len(self.frames(c)) == 2)
+            return kept, [(r["admission"], r["dedup"]) for r in self.frames(c)]
+        self.run_with(first)
+        (kept, got), _ = self.run_with(second)
+        self.assertEqual((kept, got), (0, [("over_quota", "first"), ("verified", "resurfaced")]))
 
     def test_a_copy_past_the_items_life_is_expired_again(self):
         now = runner.now_ms()
@@ -646,10 +868,26 @@ class DaemonIntakeTest(DaemonCase):
         self.assertEqual((later["state"], later["reasons"]), ("ok", []))     # reported once per loss
         self.assertEqual(later["records"]["dropped"], 0)
 
+    def test_an_error_in_taking_a_batch_ends_the_run(self):
+        async def scenario(d, port):
+            c = await self.joined(d)
+            with mock.patch.object(d.intake, "take", side_effect=ZeroDivisionError):
+                self.send(port, item(SK, 1))
+                await until(lambda: c.eof)
+            return c.recs[-1]
+        rec, code = self.run_with(scenario)
+        self.assertEqual((rec["type"], rec["reason"], rec["detail"], code), ("fatal", "internal", "ZeroDivisionError", 1))
+
+    def test_a_socket_that_cannot_be_set_up_is_a_failure_to_start(self):
+        with mock.patch("canticle.daemon.Intake", side_effect=OSError(1, "Operation not permitted")):
+            _, code = self.run_with(lambda d, p: None)
+        self.assertEqual(code, 1)
+        self.assertIn('"reason":"bind_failed"', self.fatal())
+
     def test_the_reader_failing_ends_the_run(self):
         async def scenario(d, port):
             c = await self.joined(d)
-            with mock.patch.object(d.intake._reader, "read", side_effect=OSError(5, "I/O")):
+            with mock.patch.object(d.intake._reader, "read", side_effect=OSError(errno.EBADF, "gone")):
                 self.send(port, item(SK, 1))                    # the read in progress returns, the next one fails
                 await until(lambda: c.eof)
             return c.recs[-1]

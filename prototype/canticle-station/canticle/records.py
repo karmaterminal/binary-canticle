@@ -67,6 +67,7 @@ _REFUSALS = {"capability": ("capability_exceeded", "ringbuffer_only"), "hop-limi
 _SCOPE_NAMES = {v: k for k, v in SCOPES.items()}
 _CTYPE_NAMES = {v: k for k, v in CTYPES.items()}
 _SAFE_INT = 2**53 - 1
+_BEACON_KIND = bytes([wire.KIND_BEACON])
 
 
 def _depth(v, d: int = 0) -> int:
@@ -175,7 +176,7 @@ class Heard:
     fresh: bool = False              # and it was accepted for the first time, at its key's current epoch
     kept: bool = False               # and an identical copy is a no-op from now ...
     until: int = 0                   # ... until this time
-    ident: Optional[tuple] = None    # the identity tuple, None for a beacon
+    ident: Optional[tuple] = None    # the identity tuple, or a beacon's (key id, epoch)
 
 
 class Receptor:
@@ -216,7 +217,7 @@ class Receptor:
         self._dropped_at_health = 0
         self._lost_at_health = (0, 0)
         self._dirty = False
-        # One state file, one atomic write per datagram: the listener's guards and this receptor's surfaced
+        # One state file, one atomic write per batch: the listener's guards and this receptor's surfaced
         # set and quarantines are saved together (self._save_if_dirty), so a crash cannot persist a PLUCK
         # or a mark without the retract it implies (#79 review). start() reconciles anyway.
         self.failed: Optional[str] = None   # set when a save failed: nothing more is heard or sent
@@ -323,15 +324,18 @@ class Receptor:
     def hear(self, datagram: bytes, now_ms: int) -> None:
         self._batch(lambda: self._hear(datagram, now_ms))
 
-    def hear_all(self, datagrams: Iterable[bytes], now_ms: int) -> list:
-        """Several datagrams as one write-ahead batch (group commit, #171): one save covers them, and nothing any of
-        them implies is sent before it lands. Returns a ``Heard`` for each, once it has."""
+    def hear_all(self, datagrams: Iterable[tuple], now_ms: int) -> list:
+        """Several (datagram, when it arrived) as one write-ahead batch (group commit, #171): one save covers them, and
+        nothing any of them implies is sent before it lands. Returns a ``Heard`` for each, once it has. A beacon is
+        timed when it arrived (§8.2, §8.6: its clock offset must not absorb the time it waited), the rest now: an item
+        that expired while it waited is expired."""
         out: list = []
-        self._batch(lambda: out.extend(self._hear(d, now_ms) for d in datagrams))
+        self._batch(lambda: out.extend(
+            self._hear(d, at if d[3:4] == _BEACON_KIND else now_ms) for d, at in datagrams))
         return out
 
     def _hear(self, datagram: bytes, now_ms: int) -> Heard:
-        self.last_datagram_at = now_ms
+        self.last_datagram_at = max(self.last_datagram_at or now_ms, now_ms)
         try:
             events = self.lst.hear(datagram, now_ms)
         except Exception as e:  # the receive path survives any datagram (bug B1 class)
@@ -355,9 +359,9 @@ class Receptor:
         current = st is not None and f.body.epoch == st.epoch_hwm
         if f.kind == wire.KIND_BEACON:
             new = current and dedup == "first"
-            return Heard(True, new, new, now_ms + BEACON_REPEAT_MS)
+            return Heard(True, new, new, now_ms + BEACON_REPEAT_MS, (f.key_id, f.body.epoch))
         row = self.lst.dedup.get(f.identity)
-        if row is None or row[0] != hashlib.sha256(f.raw).digest():
+        if row is None or row[0] != hashlib.sha256(f.raw).digest() or f.identity in self.lst._restored:
             return Heard(True)         # refused at steps 3-4: a copy is judged again, and may be admitted then
         return Heard(True, current and dedup in ("first", "resurfaced"), True, row[1] - SKEW_MS, f.identity)
 
@@ -365,8 +369,10 @@ class Receptor:
         """Account for the copies the intake dropped before they were heard: each is a benign no-op (§7.4), counted
         as the repeat it is and noted for presence (§8.6)."""
         for ident, copies, last_ms in self.intake.copies():
-            if ident is None:
-                self.counters["beacon"]["duplicate"] += copies
+            if len(ident) == 2:            # a beacon: (key id, epoch)
+                st = self.lst.stations.get(ident[0])
+                old = st is not None and ident[1] < st.epoch_hwm
+                self.counters["beacon"]["epoch_regression" if old else "duplicate"] += copies
             else:
                 self.counters["admission"]["duplicate"] += copies
                 self.counters["disposition"]["no_op"] += copies
@@ -645,7 +651,7 @@ class Receptor:
     # ------------------------------------------------------------ persisted receptor state
 
     def _save_if_dirty(self) -> None:
-        """One atomic write of the listener's and this receptor's state, after this datagram's records."""
+        """One atomic write of the listener's and this receptor's state, after this batch's records."""
         if self._dirty or self.lst._dirty:
             self.lst._save_if_dirty(force=True)
         self._dirty = False

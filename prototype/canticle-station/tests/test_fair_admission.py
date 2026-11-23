@@ -102,9 +102,12 @@ class Tap(threading.Thread):
 class Quiet(threading.Thread):
     """The quiet station: a real carousel, one item every QUIET_INTERVAL_S, from one socket."""
 
-    def __init__(self, sk, port: int, capture=None):
+    def __init__(self, sk, port: int, capture=None, items=QUIET_ITEMS, bseq=0, beacon_ms=1_000):
         super().__init__(daemon=True)
-        self.st = Station(sk, [StreamConfig("quiet")], epoch=7, rng=random.Random(3), now_ms=runner.now_ms())
+        self.items = items
+        self.st = Station(sk, [StreamConfig("quiet")], epoch=7, rng=random.Random(3), now_ms=runner.now_ms(),
+                          beacon_period_ms=beacon_ms)
+        self.st.bseq = bseq
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(("127.0.0.1", 0))
         self.dest, self.capture = ("127.0.0.1", port), capture
@@ -129,7 +132,7 @@ class Quiet(threading.Thread):
             if self.singing.is_set():
                 start = start or time.monotonic()
                 n = len(self.sung)
-                if n < QUIET_ITEMS and time.monotonic() >= start + n * QUIET_INTERVAL_S:
+                if n < self.items and time.monotonic() >= start + n * QUIET_INTERVAL_S:
                     r = self.st.sing(runner.now_ms(), "quiet", text=f"quiet {n}")
                     self.sung[f"canticle:{self.st.key_id.hex()}:7:{stream_id('quiet'):08x}:{r.seq}"] = time.monotonic()
             self.poll()
@@ -143,7 +146,7 @@ class FairAdmissionCase(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.dir, True)
         self.keys = {}
         entries = []
-        for name, streams in (("quiet", ("quiet", "flood")), ("other", ("flood", "more"))):
+        for name, streams in (("quiet", ("quiet", "flood")), ("other", ("flood", "quiet"))):
             sk = Ed25519PrivateKey.generate()
             self.keys[name] = sk
             path = os.path.join(self.dir, f"{name}.key")
@@ -199,12 +202,12 @@ class FairAdmissionCase(unittest.TestCase):
     @staticmethod
     def totals(proc) -> tuple:
         """(the JSON lines a flood printed, its totals)."""
-        out, _ = proc.communicate(timeout=60)
-        lines = [json.loads(x) for x in out.splitlines()]
+        lines = [json.loads(x) for x in proc.stdout.read().splitlines()]    # not communicate(): it skips what is buffered
+        proc.wait(60)
         return lines[:-1], lines[-1]
 
-    def quiet(self, capture=None) -> Quiet:
-        q = Quiet(self.keys["quiet"], self.port, capture)
+    def quiet(self, name="quiet", **kw) -> Quiet:
+        q = Quiet(self.keys[name], self.port, **kw)
         q.start()
         self.addCleanup(q.join)
         self.addCleanup(q.stop.set)
@@ -217,7 +220,7 @@ class FairAdmissionCase(unittest.TestCase):
             self.assertLess(time.monotonic(), deadline, "the daemon never heard the quiet station")
             time.sleep(0.02)
 
-    def row(self, name: str, sung: dict, floods: list) -> dict:
+    def row(self, name: str, sung: dict, floods: list, items=QUIET_ITEMS) -> dict:
         """Check one row: every quiet item admitted, in time, with every loss counted. Returns the last health."""
         offered = sum(t["sent"] / t["elapsed"] for t in floods)
         time.sleep(0.3)
@@ -229,8 +232,8 @@ class FairAdmissionCase(unittest.TestCase):
         sys.stderr.write(f"\n{name}: quiet {len(lat)}/{len(sung)}; latency ms {dist}; offered {offered:,.0f}/s; "
                          f"socket drops {lost} (reported {health['records'].get('socket_dropped')}); "
                          f"receive {json.dumps(health.get('receive'))}\n")
-        self.assertEqual(len(sung), QUIET_ITEMS)
-        self.assertEqual(len(lat), QUIET_ITEMS, f"{name}: {QUIET_ITEMS - len(lat)} quiet items were never admitted")
+        self.assertEqual(len(sung), items)
+        self.assertEqual(len(lat), items, f"{name}: {items - len(lat)} quiet items were never admitted")
         self.assertLessEqual(percentile(lat, 50), LATENCY_P50_S, name)
         self.assertLessEqual(max(lat), LATENCY_MAX_S, name)
         self.assertEqual(health["records"].get("socket_dropped"), lost, f"{name}: the kernel's drops are not reported")
@@ -272,7 +275,7 @@ class FloodRowsTest(FairAdmissionCase):
         q.singing.set()
         health = self.row("R3 forged flood claiming the quiet key", q.sung, [self.totals(f)[1]])
         self.assertGreater(health["counters"]["unverified"]["bad_signature"], 0)     # some were verified, and failed
-        self.assertLess(health["counters"]["unverified"]["bad_signature"], 5_000)    # and only a bounded number were
+        self.assertLess(health["counters"]["unverified"]["bad_signature"], 20_000)   # and only a bounded number were
         self.assertGreater(sum(health["receive"]["refused"].values()), 100_000)
 
     def test_r4_replays_of_the_quiet_keys_own_frames(self):
@@ -299,6 +302,73 @@ class FloodRowsTest(FairAdmissionCase):
         self.assertGreater(health["receive"]["repeats"], 100_000)
         # One verify per distinct frame, give or take the copies already queued when the first one was verified.
         self.assertLessEqual(health["receive"]["verified"], len(q.distinct) + 50)
+
+
+class LowRateTest(FairAdmissionCase):
+    """Floods that base, with a whole core to spend on them, would have survived. Twenty items each."""
+
+    ITEMS = 20
+    DURATION = ITEMS * QUIET_INTERVAL_S + TAIL_S
+
+    def test_old_beacons_replayed_cost_the_station_nothing(self):
+        """A beacon has no expiry: one the digests no longer hold, or of an earlier epoch, verifies each time it is
+        replayed. It must spend neither the station's beacons' turns nor its bucket, nor push its clock offset up
+        until its items read `not_yet_valid`."""
+        self.daemon()
+        cap = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.addCleanup(cap.close)
+        cap.bind(("127.0.0.1", 0))
+        old = [wire.encode_beacon(self.keys["quiet"], wire.Beacon(
+            epoch=epoch, bseq=bseq, wallclock=runner.now_ms() - 60_000, next_beacon_ms=1000,
+            profile="canticle-regulation/1", streams=(), b_station=16_000)) for epoch in (6, 7) for bseq in range(1, 51)]
+        for b in old:
+            cap.sendto(b, cap.getsockname())
+        q = self.quiet(items=self.ITEMS, bseq=1_000, beacon_ms=250)
+        self.settle(q)
+        f = self.flood("replay", self.DURATION, "--rate", 500, "--ports", 10, "--capture", cap.fileno(), fds=(cap.fileno(),))
+        time.sleep(2)
+        q.singing.set()
+        health = self.row("replayed old beacons, 10 ports", q.sung, [self.totals(f)[1]], items=self.ITEMS)
+        self.assertEqual(health["counters"]["unverified"]["not_yet_valid"], 0)
+        self.assertLess(max(h["beacon_age_ms"].get(self.kid("quiet"), 0) for h in self.tap.healths()), 2_500)
+
+    def test_a_station_that_starts_inside_a_forged_flood_from_its_own_host(self):
+        """Nothing of the key has verified yet, and its station shares its address with the forger's twelve ports."""
+        self.daemon()
+        f = self.flood("forged", self.DURATION + 2, "--kid", self.kid("quiet"), "--stream", "quiet", "--rate", 20_000,
+                       "--ports", 12, "--beacons")
+        time.sleep(1)
+        q = self.quiet(items=self.ITEMS)
+        q.singing.set()
+        self.row("cold start inside a forged flood, 12 ports", q.sung, [self.totals(f)[1]], items=self.ITEMS)
+
+    def test_a_forger_at_the_stations_own_address_costs_only_that_station(self):
+        """The limit, measured: forgeries from the quiet station's very socket share its queue, and nothing before
+        the signature can tell them apart. Up to what the daemon spends on failed checks for one source, it costs
+        nothing; here it is far more, and other stations must still lose nothing, the verify work stay bounded, and
+        the loss be reported."""
+        self.daemon()
+        q, other = self.quiet(items=self.ITEMS), self.quiet("other", items=self.ITEMS)
+        self.settle(q)
+        f = self.flood("forged", self.DURATION, "--kid", self.kid("quiet"), "--stream", "quiet", "--rate", FLOOD_RATE,
+                       "--fd", q.sock.fileno(), fds=(q.sock.fileno(),))
+        q.singing.set()
+        other.singing.set()
+        total = self.totals(f)[1]
+        health = self.row("R3 from the station's own socket: another station", other.sung, [total], items=self.ITEMS)
+        sys.stderr.write(f"R3 from the station's own socket: that station, {sum(i in self.tap.first for i in q.sung)}"
+                         f"/{len(q.sung)} (not asserted)\n")
+        self.assertLess(health["counters"]["unverified"]["bad_signature"], 20_000)
+        self.assertIn("datagrams_refused", {r for h in self.tap.healths() for r in h["reasons"]})
+
+    def test_a_slow_forger_at_the_stations_own_address_costs_nothing(self):
+        self.daemon()
+        q = self.quiet(items=self.ITEMS)
+        self.settle(q)
+        f = self.flood("forged", self.DURATION, "--kid", self.kid("quiet"), "--stream", "quiet", "--rate", 500,
+                       "--fd", q.sock.fileno(), fds=(q.sock.fileno(),))
+        q.singing.set()
+        self.row("slow R3 from the station's own socket", q.sung, [self.totals(f)[1]], items=self.ITEMS)
 
 
 class LossVisibilityTest(FairAdmissionCase):

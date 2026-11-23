@@ -15,29 +15,33 @@ decides only whether it gets a place to wait; ``take`` then hands out what waits
 
 What is spent, and by whom:
 
-- a key and each of its streams have a bucket, debited only by frames whose signature verified. A key's cap is shared
-  round-robin by its streams, and one stream's cap is below it, so a flooding stream leaves its siblings room;
-- a failed check is charged to the source it came from: each address a new frame of this key was verified from (at
-  most KNOWN_MAX, the latest) has a budget of its own, and all other addresses claiming the key share one. So
-  forgeries can use up neither the honest station's verify work nor its bucket;
-- beacons have their own bucket: an old beacon verifies whenever it is replayed (it has no expiry, §14.1 step 1), and
-  must not spend what items need.
+- a key and each of its streams have a bucket, spent only by frames whose signature verified and that were new. A
+  key's cap is shared round-robin by its streams, and one stream's cap is below it, so a flooding stream leaves its
+  siblings room. Beacons have their own bucket;
+- a check that comes to nothing (it failed, or it verified a frame that changed nothing, such as a replayed beacon,
+  which has no expiry and verifies for ever) is charged to the source it came from. Each address a new frame of the
+  key was verified from (the latest KNOWN_MAX) has a budget of its own, and all other addresses claiming the key
+  share one. All of them together have one bound, which is what the daemon spends on checks that come to nothing;
+- in a stream, the known sources get every other turn however many strangers claim it. Strangers queue apart too, in
+  a pool the stream's longest queue pays for, so a flood can fill it but not keep a station's first frame out.
 
 What this does not do:
 
 - **A source address is not trusted, only queued by.** It admits nothing and refuses nothing (I-11). It is as good as
   the network's enforcement: a sender that spoofs the station's exact address and port shares the station's own
-  queue and budget, and then each honest frame is verified only as often as chance picks it among the forgeries.
-  Other keys are unaffected and every refusal is counted, but nothing before the signature can tell the two apart.
-- **A cold start under a flood from many addresses.** Until a frame of a key has verified, its station is one
-  stranger among those claiming the key. Up to STRANGERS_MAX addresses queue apart; beyond that they share one.
+  queue and budget. Beyond SOURCE_RATE forgeries a second, each honest frame is then verified only as often as
+  chance picks it among them. Other keys are unaffected and every refusal is counted, but nothing before the
+  signature can tell the two apart.
+- **A station that is still a stranger, among many.** Until one of its frames verifies from a new address (a cold
+  start, or its restart on a new port), it competes with every other stranger claiming its key. STRANGERS_PER_HOST
+  ports of a host, and STRANGERS_MAX in all, queue apart; beyond that they share one queue, and chance decides.
 - **Source binding and a house MAC** (RFC §10.2) are not here. A binding is only as good as the switch's enforcement.
   A MAC excludes outsiders but not another key holder. Neither replaces the signature.
 - **The reader can be outrun.** Then the kernel drops datagrams, whoever sent them: counted (``socket_drops``), and
   never hidden among the refusals.
 
-The buckets' sizes are [PROPOSED DEFAULT]s of this spike. RFC §14.1 checks the per-key rate and deduplicates in
-another order: see the departures in the prototype README.
+The sizes are [PROPOSED DEFAULT]s of this spike. RFC §14.1 checks the per-key rate and deduplicates in another order:
+see the departures in the prototype README.
 """
 
 from __future__ import annotations
@@ -57,25 +61,28 @@ from typing import Callable, Optional
 
 from . import wire
 
-# Verified frames a second, and at once, per key (beacons apart) and per stream of it. B_station (§7.5: 16 kbit/s)
+# New verified frames a second, and at once, per key (beacons apart) and per stream of it. B_station (§7.5: 16 kbit/s)
 # carries about 10 frames of 190 B a second, repeats included, and repeats cost nothing here. A stream's cap is below
 # its key's, so its siblings have room.
 KEY_RATE, KEY_BURST = 16.0, 64.0
 STREAM_RATE, STREAM_BURST = 12.0, 48.0
-BEACON_RATE, BEACON_BURST = 8.0, 16.0       # verified beacons per key
-KNOWN_RATE, KNOWN_BURST = 50.0, 50.0        # failed checks per key and known source
-STRANGER_RATE, STRANGER_BURST = 50.0, 50.0  # failed checks per key, all other sources together
+BEACON_RATE, BEACON_BURST = 8.0, 16.0       # new beacons per key
+# Checks a second, and at once, that come to nothing: per known source of a key, and per key for all its strangers;
+# and for everything that claims a listed key, together (a check is 60-140 µs on ronan, #171).
+SOURCE_RATE, SOURCE_BURST = 1_000.0, 100.0
+CHECK_RATE, CHECK_BURST = 2_000.0, 200.0
 UNLISTED_RATE, UNLISTED_BURST = 500.0, 500.0  # datagrams of no listed key examined a second, all together
-KNOWN_MAX, KNOWN_DEPTH = 4, 64              # known sources per key; datagrams waiting per stream and known source
-STRANGERS_MAX, STRANGER_DEPTH = 12, 8       # other sources per key that queue apart; datagrams waiting for each
-STRANGERS_PER_HOST = 4                      # of them, at one address: ports are free, so they must not fill the table
-CROWD_DEPTH = 16                            # datagrams waiting per stream for every source beyond those
 UNLISTED_DEPTH = 64
+KNOWN_MAX, KNOWN_DEPTH = 4, 64              # known sources per key; datagrams waiting per stream and known source
+STRANGERS_MAX = 64                          # other sources per key that queue apart
+STRANGERS_PER_HOST = 16                     # of them, at one address: ports are free, so they must not fill the table
+STRANGER_POOL = 256                         # datagrams waiting per stream for all strangers together
 RECLAIM_S = 0.1                             # how often a full table of strangers is searched for idle ones
 BEACON_REPEATS = 64                         # beacon digests kept per key
 RCVBUF = 4 << 20                            # asked of the kernel (capped by net.core.rmem_max)
 READ_TIMEOUT_S = 0.25                       # how long the reader waits before it looks whether to stop
 READ_BATCH = 256                            # datagrams per read
+PAUSE_S = 0.01                              # after a read that failed for now
 REFUSED = ("unlisted", "unverified", "over_rate", "backlog")
 
 SO_RXQ_OVFL, SO_MEMINFO = 40, 55            # Linux (asm-generic); the socket module names neither
@@ -85,6 +92,7 @@ _KINDS = (wire.KIND_ITEM, wire.KIND_BEACON, wire.KIND_PLUCK)
 _HEAD = wire.MAGIC + bytes([wire.VERSION])
 _MIN_FRAME = wire.HEADER_LEN + 1 + wire.SIG_LEN
 _SLOT = 1216                                # bytes read per datagram: more than MAX_DATAGRAM, so oversize shows
+_BROKEN = (errno.EBADF, errno.ENOTSOCK, errno.EFAULT, errno.EINVAL)   # a read that fails so always will
 BEACON, OTHER = "beacon", "other"           # the queues of a key beside its listed streams
 
 
@@ -112,10 +120,10 @@ class Bucket:
 class Source:
     """One address and port claiming one key, or (``crowd``) every one beyond the table's bound."""
 
-    __slots__ = ("budget", "depth", "queued")
+    __slots__ = ("budget", "known", "queued")
 
-    def __init__(self, budget: Bucket, depth: int):
-        self.budget, self.depth, self.queued = budget, depth, 0
+    def __init__(self, budget: Bucket):
+        self.budget, self.known, self.queued = budget, False, 0
 
 
 def host_of(addr):
@@ -136,28 +144,75 @@ class Lane:
 
 
 class StreamQueue:
-    __slots__ = ("bucket", "beacon", "lanes", "ready")
+    """What waits for one stream of a key: a lane per source, the known ones and the strangers in turn."""
+
+    __slots__ = ("bucket", "beacon", "lanes", "known", "strange", "pool", "known_next")
 
     def __init__(self, bucket: Bucket, beacon: bool = False):
         self.bucket, self.beacon = bucket, beacon
-        self.lanes: dict = {}          # Source -> Lane
-        self.ready: deque = deque()    # the same lanes, in turn
+        self.lanes: dict = {}                           # Source -> Lane: every lane of the two rings below
+        self.known, self.strange = deque(), deque()
+        self.pool = 0                                   # datagrams waiting in the strangers' lanes
+        self.known_next = True
+
+    def put(self, source: Source, entry: tuple) -> tuple:
+        """(whether a lane was opened, datagrams of which source lost their place or None): at most one, the new
+        one or, when a stranger below its share of a full pool comes, the newest of the longest lane."""
+        lane = self.lanes.get(source)
+        out = None
+        if source.known:
+            if lane is not None and len(lane.queue) >= KNOWN_DEPTH:
+                return False, source
+        elif self.pool >= STRANGER_POOL:
+            if lane is not None and len(lane.queue) >= STRANGER_POOL // len(self.strange):
+                return False, source
+            longest = max(self.strange, key=lambda o: len(o.queue))
+            out = longest.source
+            longest.queue.pop()
+            out.queued -= 1
+            self.pool -= 1
+        new = lane is None
+        if new:
+            lane = self.lanes[source] = Lane(source)
+            (self.known if source.known else self.strange).append(lane)
+        lane.queue.append(entry)
+        source.queued += 1
+        self.pool += not source.known
+        return new, out
 
     def pick(self, now: float) -> Optional[tuple]:
-        for _ in range(len(self.ready)):
-            lane = self.ready[0]
-            self.ready.rotate(-1)
-            source = lane.source
-            if not source.budget.ready(now):
-                continue
-            got = lane.queue.popleft()
-            source.queued -= 1
-            source.budget.take()
-            if not lane.queue:
-                self.ready.pop()
-                del self.lanes[source]
-            return (*got, source.budget)
+        for ring in ((self.known, self.strange) if self.known_next else (self.strange, self.known)):
+            for _ in range(len(ring)):
+                lane = ring[0]
+                ring.rotate(-1)
+                source = lane.source
+                if not source.budget.ready(now):
+                    continue
+                entry = lane.queue.popleft()
+                source.queued -= 1
+                source.budget.take()
+                self.pool -= ring is self.strange
+                self.known_next = ring is self.strange
+                if not lane.queue:
+                    ring.pop()
+                    del self.lanes[source]
+                return (*entry, source)
         return None
+
+    def change(self, source: Source) -> None:
+        """``source`` has just become known, or a stranger again: its lane goes to the other ring."""
+        lane = self.lanes.get(source)
+        if lane is not None:
+            old, new = (self.strange, self.known) if source.known else (self.known, self.strange)
+            old.remove(lane)
+            new.append(lane)
+            self.pool += -len(lane.queue) if source.known else len(lane.queue)
+
+    def drop(self, source: Source) -> None:
+        """Forget what a source that is no longer known has waiting."""
+        lane = self.lanes.pop(source, None)
+        if lane is not None:
+            self.known.remove(lane)
 
 
 class KeyQueue:
@@ -169,12 +224,12 @@ class KeyQueue:
         self.bucket = Bucket(KEY_RATE, KEY_BURST)
         self.streams = {sid: StreamQueue(Bucket(STREAM_RATE, STREAM_BURST)) for sid in (*stream_ids, OTHER)}
         self.streams[BEACON] = StreamQueue(Bucket(BEACON_RATE, BEACON_BURST), beacon=True)
-        self.ready: deque = deque()
+        self.ready: deque = deque()               # the streams with something waiting, in turn
         self.known: OrderedDict = OrderedDict()   # address -> Source, oldest first
         self.strangers: dict = {}                 # address -> Source
         self.hosts: Counter = Counter()           # host -> how many of the strangers are there
-        self.stranger_budget = Bucket(STRANGER_RATE, STRANGER_BURST)
-        self.crowd = Source(self.stranger_budget, CROWD_DEPTH)
+        self.stranger_budget = Bucket(SOURCE_RATE, SOURCE_BURST)
+        self.crowd = Source(self.stranger_budget)
         self.reclaimed = 0.0
 
     def source(self, addr, now: float) -> Source:
@@ -188,7 +243,7 @@ class KeyQueue:
                 self._leave(a)
         if not self._room(host):
             return self.crowd
-        return self._enter(addr, Source(self.stranger_budget, STRANGER_DEPTH))
+        return self._enter(addr, Source(self.stranger_budget))
 
     def _room(self, host) -> bool:
         return len(self.strangers) < STRANGERS_MAX and self.hosts[host] < STRANGERS_PER_HOST
@@ -211,25 +266,26 @@ class KeyQueue:
         """A new frame of this key was verified from ``addr``. Returns how many waiting datagrams that displaced."""
         got = self.known.pop(addr, None)
         if got is None:
-            got = self._leave(addr) or Source(self.stranger_budget, STRANGER_DEPTH)
-            got.budget, got.depth = Bucket(KNOWN_RATE, KNOWN_BURST), KNOWN_DEPTH
+            got = self._leave(addr) or Source(self.stranger_budget)
+            got.budget, got.known = Bucket(SOURCE_RATE, SOURCE_BURST), True
+            for s in self.streams.values():
+                s.change(got)
         self.known[addr] = got
         if len(self.known) <= KNOWN_MAX:
             return 0
         old_addr, old = self.known.popitem(last=False)
+        old.budget, old.known = self.stranger_budget, False
         if self._room(host_of(old_addr)):
-            old.budget, old.depth = self.stranger_budget, STRANGER_DEPTH
             self._enter(old_addr, old)
+            for s in self.streams.values():
+                s.change(old)
             return 0
         # No room to keep it apart: what it had waiting goes, so lanes stay bounded by the two tables.
-        gone = old.queued
         for s in self.streams.values():
-            lane = s.lanes.pop(old, None)
-            if lane is not None:
-                s.ready.remove(lane)
-                if not s.ready and s in self.ready:
-                    self.ready.remove(s)
-        return gone
+            s.drop(old)
+            if not s.lanes and s in self.ready:
+                self.ready.remove(s)
+        return old.queued
 
     def pick(self, now: float) -> Optional["Ticket"]:
         for _ in range(len(self.ready)):
@@ -240,7 +296,7 @@ class KeyQueue:
             got = s.pick(now)
             if got is None:
                 continue
-            if not s.ready:
+            if not s.lanes:
                 self.ready.pop()
             s.bucket.take()
             if not s.beacon:
@@ -261,18 +317,20 @@ class Unlisted:
         if not self.ready or not self.bucket.ready(now):
             return None
         self.bucket.take()
-        return Ticket(self.ready.popleft(), None, None, None, None, None)
+        data, at = self.ready.popleft()
+        return Ticket(data, None, None, at, None, None, None)
 
 
 class Ticket:
     """A datagram whose turn has come. It holds one token of each bucket it might pay from until ``settle``."""
 
-    __slots__ = ("data", "digest", "addr", "budget", "key", "stream", "copies")
+    __slots__ = ("data", "digest", "addr", "at", "budget", "known", "key", "stream", "copies")
 
-    def __init__(self, data: bytes, digest: Optional[bytes], addr, budget: Optional[Bucket],
+    def __init__(self, data: bytes, digest: Optional[bytes], addr, at: int, source: Optional[Source],
                  key: Optional[KeyQueue], stream: Optional[StreamQueue]):
-        self.data, self.digest, self.addr = data, digest, addr
-        self.budget, self.key, self.stream = budget, key, stream
+        self.data, self.digest, self.addr, self.at = data, digest, addr, at    # at: when it arrived
+        self.budget, self.known = (source.budget, source.known) if source is not None else (None, False)
+        self.key, self.stream = key, stream
         self.copies = 0        # identical datagrams that had their turn in the same batch: they share its verdict
 
 
@@ -281,8 +339,8 @@ class Repeat:
 
     __slots__ = ("ident", "until", "copies", "last_ms")
 
-    def __init__(self, ident: Optional[tuple], until: int):
-        self.ident, self.until = ident, until      # ident: the item's or PLUCK's tuple, None for a beacon
+    def __init__(self, ident: tuple, until: int):
+        self.ident, self.until = ident, until      # ident: an item's or PLUCK's tuple, a beacon's (key id, epoch)
         self.copies = self.last_ms = 0             # since the event loop last asked, and when the last one came
 
 
@@ -394,6 +452,7 @@ class Intake:
         self.sock, self.now_ms, self.wake, self.failed = sock, now_ms, wake, failed
         self.keys = {e.key_id: KeyQueue(e.stream_names) for e in manifest if not e.revoked}
         self.unlisted = Unlisted()
+        self.checks = Bucket(CHECK_RATE, CHECK_BURST)
         self.repeats: dict = {}                    # digest -> Repeat (recorded by ``remember`` only)
         self._due: list = []                       # heap of (until, digest) over the items and PLUCKs in it
         self._beacons = {kid: deque() for kid in self.keys}
@@ -412,8 +471,7 @@ class Intake:
         except OSError:
             pass                                   # not Linux: socket_drops() then stays what it can see
         sock.settimeout(None)
-        sec = int(READ_TIMEOUT_S)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVTIMEO, struct.pack("@ll", sec, int((READ_TIMEOUT_S - sec) * 1e6)))
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVTIMEO, struct.pack("@ll", 0, int(READ_TIMEOUT_S * 1e6)))
         try:
             self._reader = _Mmsg(sock)
         except AttributeError:
@@ -432,12 +490,25 @@ class Intake:
         if self._thread.is_alive():
             self._thread.join()
 
+    @property
+    def stopped(self) -> bool:
+        return self._stop
+
     # ------------------------------------------------------------ the reader thread
 
     def _run(self) -> None:
         try:
             while not self._stop:
-                batch, drops = self._reader.read()
+                try:
+                    batch, drops = self._reader.read()
+                except OSError as e:
+                    if e.errno in (errno.ENOSYS, errno.EPERM) and isinstance(self._reader, _Mmsg):
+                        self._reader = _Msg(self.sock)    # a sandbox without recvmmsg
+                    elif e.errno in _BROKEN:
+                        raise
+                    else:
+                        time.sleep(PAUSE_S)
+                    continue
                 if drops is not None:
                     self._note_drops(drops)
                 if batch and not self._stop:
@@ -457,22 +528,22 @@ class Intake:
             key = keys.get(data[4:12])
             if (key is None or data[:3] != _HEAD or not _MIN_FRAME <= len(data) <= wire.MAX_FRAME
                     or data[3] not in _KINDS):
-                strange.append(data)
+                strange.append((data, now_ms))
                 continue
             digest = sha256(data).digest()
             rep = repeats.get(digest)
             if rep is not None and rep.until > now_ms:
                 copies[rep] = copies.get(rep, 0) + 1
             else:
-                claims.append((key, data, digest, addr))
+                claims.append((key, (data, digest, addr, now_ms)))
         fresh = False
         with self._lock:
             self.read += len(batch)
             self.last_datagram_at = now_ms
             for rep, n in copies.items():
                 self._copy(rep, now_ms, n)
-            for key, data, digest, addr in claims:
-                fresh |= self._place(key, data, digest, addr, now)
+            for key, entry in claims:
+                fresh |= self._place(key, entry, now)
             if strange:
                 fresh |= self._place_unlisted(strange)
         if fresh:
@@ -485,26 +556,22 @@ class Intake:
         rep.copies += n
         rep.last_ms = now_ms
 
-    def _place(self, key: KeyQueue, data: bytes, digest: bytes, addr, now: float) -> bool:
-        """Queue one claim, or refuse it. True when its stream had nothing waiting from that source."""
+    def _place(self, key: KeyQueue, entry: tuple, now: float) -> bool:
+        """Queue one claim, or refuse it (or the one it displaces). True when a source has something waiting for
+        the stream that had nothing."""
+        data = entry[0]
         stream = key.streams.get(BEACON if data[3] == wire.KIND_BEACON else peek_stream(data)) or key.streams[OTHER]
-        source = key.source(addr, now)
-        lane = stream.lanes.get(source)
-        new = lane is None
-        if new:
-            lane = stream.lanes[source] = Lane(source)
-            stream.ready.append(lane)
-            if len(stream.ready) == 1:
-                key.ready.append(stream)
-                if len(key.ready) == 1:
-                    self._ready.append(key)
-        elif len(lane.queue) >= source.depth:
-            self.refused["unverified" if source.budget.tokens < 1.0 else
+        source = key.source(entry[2], now)
+        idle = not stream.lanes
+        new, out = stream.put(source, entry)
+        if out is not None:
+            self.refused["unverified" if out.budget.tokens < 1.0 or self.checks.tokens < 1.0 else
                          "over_rate" if stream.bucket.tokens < 1.0 or (key.bucket.tokens < 1.0 and not stream.beacon)
                          else "backlog"] += 1
-            return False
-        lane.queue.append((data, digest, addr))
-        source.queued += 1
+        if idle:
+            key.ready.append(stream)
+            if len(key.ready) == 1:
+                self._ready.append(key)
         return new
 
     def _place_unlisted(self, datagrams: list) -> bool:
@@ -546,36 +613,41 @@ class Intake:
         for _ in range(len(self._ready)):
             key = self._ready[0]
             self._ready.rotate(-1)
+            if key is not self.unlisted and not self.checks.ready(now):
+                continue
             t = key.pick(now)
             if not key.ready:
                 self._ready.pop()
             if t is not None:
+                if t.key is not None:
+                    self.checks.take()
                 return t
         return None
 
     def waiting(self) -> bool:
         return bool(self._ready)
 
-    @staticmethod
-    def _release(t: Ticket, verified: Optional[bool] = None) -> None:
-        """Give back what a ticket held: all of it, or (by verdict) all but the bucket that pays."""
+    def _release(self, t: Ticket, station_pays: Optional[bool] = None) -> None:
+        """Give back what a ticket held: all of it (no verdict was needed), or all but what the verdict costs."""
         if t.key is None:
             return
-        if verified is not False:
+        if station_pays is not False:
             t.budget.give()
-        if verified is not True:
+            self.checks.give()
+        if station_pays is not True:
             t.stream.bucket.give()
             if not t.stream.beacon:
                 t.key.bucket.give()
 
     def settle(self, t: Ticket, verified: bool, fresh: bool) -> None:
-        """The verdict on a ticket. A verified frame pays from its station's buckets, anything else from its source's
-        budget for failed checks. ``fresh`` (a verified frame not accepted before, at the key's current epoch) makes
-        its address a known source of the key: an old frame replayed from elsewhere does not. Copies that had their
-        turn beside the ticket were not looked at: they are repeats of a frame that verified, or refused with one
-        that did not."""
+        """The verdict on a ticket. ``fresh`` is a verified frame not accepted before, at its key's current epoch: its
+        station pays, and its address is a known source of the key from now on. A check that came to nothing is paid
+        by the source it came from: forgeries by their sender, and so is a replay that verified and changed nothing,
+        unless it came from a known source, whose station then answers for it (so what a station keeps having
+        refused, and the records that makes, stay within its rate). Copies that had their turn beside the ticket were
+        not looked at: they are repeats of a frame that verified, or refused with one that did not."""
         with self._lock:
-            self._release(t, verified)
+            self._release(t, verified and (fresh or t.known))
             if not verified:
                 self.unverified += 1
                 self.refused["unverified"] += t.copies
@@ -591,25 +663,25 @@ class Intake:
                 if not t.key.ready and t.key in self._ready:
                     self._ready.remove(t.key)
 
-    def remember(self, t: Ticket, ident: Optional[tuple], until: int) -> None:
+    def remember(self, t: Ticket, ident: tuple, until: int) -> None:
         """From now until ``until``, a copy of this verified, accepted and durably saved frame is a repeat. There is
         one entry per live dedup entry (``until`` is inside its retention), so the listener's per-key quotas bound
         them and no key can push out another's, plus the latest BEACON_REPEATS beacons of each key."""
-        rep = self.repeats[t.digest] = Repeat(ident, until)
-        if ident is not None:
+        self.repeats[t.digest] = Repeat(ident, until)
+        if t.stream is not None and t.stream.beacon:
+            kept = self._beacons[t.data[4:12]]
+            kept.append(t.digest)
+            if len(kept) > BEACON_REPEATS:
+                self.repeats.pop(kept.popleft(), None)
+        else:
             heapq.heappush(self._due, (until, t.digest))
-            return
-        kept = self._beacons[t.data[4:12]]
-        kept.append(t.digest)
-        if len(kept) > BEACON_REPEATS:
-            self.repeats.pop(kept.popleft(), None)
 
     def forget(self, now_ms: int) -> None:
         while self._due and self._due[0][0] <= now_ms:
             self.repeats.pop(heapq.heappop(self._due)[1], None)
 
     def copies(self) -> list:
-        """[(ident or None for a beacon, copies since the last call, when the last one came)]"""
+        """[(ident as remembered, copies since the last call, when the last one came)]"""
         out = []
         with self._lock:
             while self._touched:

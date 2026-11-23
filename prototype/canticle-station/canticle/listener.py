@@ -168,7 +168,7 @@ class Listener:
             raise ValueError(f"unknown binding {binding!r}")
         self.binding = binding
         self.state_path = state_path
-        # A receptor (records.py) saves once per datagram, after its own records, with its state in the same
+        # A receptor (records.py) saves once per batch, after its own records, with its state in the same
         # file: autosave off, extra_state set. Two separate writes would leave a crash window (#79 review).
         self.autosave = True
         self.extra_state = None          # callable -> dict, saved under "receptor"
