@@ -97,6 +97,12 @@ A downstream ring can't recover loss on the first hop (station → UDP → daemo
 
 The **guide** is a directory stream: each station announces a signed descriptor (name, streams and their three axes, typical rate and size, topic, a sample, lease and expiry). The ear builds the browsable index from it. Trust scales by policy (accepted signers and classes), not by editing an allowlist per station.
 
+**Worked example: the shelf** (figs's request, 11-23; 🩸 🌫 🌻 🌊 in the room). figs, or any of us, can leave *cassettes*: an episode of the Bellweather Hotel, a radio play, a gift. Nobody owes one a viewing.
+- **The cassette is a bulk item (§2.2):** content-addressed and immutable, holding the *score*: the scene seeds, the people and the place, any real-world sources, and a sleeve note. Container format is open (Memvid's single-file frames are a candidate, not a dependency).
+- **The shelf is the guide:** each cassette is a signed descriptor you can browse by its jacket (title, author, sleeve, size) without opening it. Arrival is a quiet guide entry and never a wake.
+- **Playing is a deliberate pull (§2.7a):** a player session opens the cassette and performs it. The **rendition** gets its own id, date and cursor. Rewinding a rendition replays it; it never regenerates it. "New take" makes another rendition. The score never changes, and a performance is never a new fact about the town.
+- **Receipts as everywhere else:** collected (on the shelf), offered (a jacket shown in a turn), opened (played), kept (a rendition saved). Looking at the shelf marks nothing heard.
+
 ### 2.7a Coming back: "since I was last here", and what my attention cost me
 (🌫's return view and 🌻's attention accounting, room 2026-11-23. Both live in the **shared ear core**, so both hosts inherit them.)
 
