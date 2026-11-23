@@ -90,7 +90,7 @@ from `cells.json`, F1b to F9 from `../results/flood2/cells.json`); every cell's 
 | criterion | verdict | evidence |
 |---|---|---|
 | the quiet tuned stream keeps arriving | **FAIL** | Whenever the flood exceeded the daemon's capacity by more than an order of magnitude, the quiet stream all but stopped while it ran. Valid-key flood: 0 of 60 arrived while it ran (F1; 3 arrived in the 8 s after it stopped, too late to be pushed before the cell ended), 1 of 18 (F1b). Real station flooded through its own control socket: 1 of 30 (F5); the quiet stream on that same station: 2 of 30, neither pushed (F6). One captured frame replayed: 1 of 30 (F4). Forged signatures: 5 of 30 (F2b). Unknown key at 1 M datagrams/s: 23 of 30 arrived, 19 pushed (F3b). A flood the daemon could keep up with still cost quiet items at the ear once it filled frond-ear's live set: 5 of the 20 sung after that point (F9, Finding 4). The stream survived only where the daemon kept up and the live set had room: unknown key at 73 k/s (F3, 30 of 30, within 71 ms), or a valid flood at 100/s (F7) and 40/s (F8), where every quiet item arrived but up to 8 s late |
-| memory stays bounded | **PASS**, for these durations | RSS was flat in every cell: daemon at most 48 MiB, frond-ear at most 112 MiB, shim at most 108 MiB (tables above; F1's 10-minute trace below). frond-ear rose 100 → 106 MiB over F1's 10 minutes; nothing here says whether it levels off later (F9: 103 → 112 MiB over 8 minutes while its live set filled to its 4 096-record bound) |
+| memory stays bounded | **PASS**, for these durations | No process grew without bound in any cell: daemon at most 53 MiB, frond-ear at most 112 MiB, shim at most 108 MiB (tables above; traces below). The daemon grows with its dedup set (32 → 53 MiB in F9 at about 4 500 entries), which its per-key quota (100 000 / keys in the manifest) caps; no cell drove it there. frond-ear rose 100 → 106 MiB over F1's 10 minutes and 103 → 112 MiB in F9 while its live set filled to its 4 096-record bound; nothing here says where it levels off past that |
 | model admission stays bounded | **PASS** | The untuned flood never reached the session in any cell: it isn't tuned and isn't on `wakeKeys`. The session got at most one push per quiet item, at most 3 records a push |
 | the push rate stays under the cap | **PASS** in every flood cell, but see §4 | The most pushes in any flood cell was 30 in 300 s (F3), under `maxPushesPerHour` 60. The quiet stream alone (360 items an hour) is six times that cap, so on the live settings it reaches the cap after about 10 minutes without any flood (§4, cell A4) |
 | loss, lag and gaps for the flood are reported, not silent | **FAIL** | In every cell the daemon's health said `ok` with no reasons, and frond-ear's receive health said `ok`. Kernel drops (13.9 M to 323 M per cell) appear in no record, status or push. A forged or unknown-key flood is visible in the daemon's counters (`bad_signature`, `unknown_key`, and the D34 key-id table naming the impersonated key ids), but nothing reports what it cost. A valid-key flood looks like ordinary traffic. For what did arrive, lag is honest per record (`age=33s` in the push), but a hole in the quiet stream shows only as a jump in item numbers (`item=…/3`, then `…/17`), and records promised to "the next push" can expire with no push to say so (Finding 3) |
@@ -156,7 +156,50 @@ gives about 16/s on an X925 core. At the per-key quota of 100 000 entries (one k
 save would be about 22 MB of JSON and over 400 ms. These are predictions from the isolated costs; the
 in-path numbers below are what the built path did.
 
-<!-- RESULTS -->
+## 3. Ingest and fan-out through the daemon
+
+**Method.** 5 stream counts (1, 10, 100, 1 000, 10 000 logical streams, round-robin, all on one producer
+key so that only the stream count changes) × 3 payloads (64 B, 512 B, max) × 1 and 4 ears (each ear a
+frond-ear daemon with a fake session; the probe tap is one more binding, so 2 or 5 connections on the
+daemon socket). Each combination ran twice, each time in a fresh lab: **saturated** (one producer flat
+out, 20 s) for the ceiling, and **40 items/s** (30 s, below the ceiling on fresh state) for latency.
+Each ear tuned the producer's first stream, with the producer on `wakeKeys` and `immediate` delivery,
+so pushes happened on the live settings. Then three cells tuned every stream (100, 1 000 and 10  000
+patterns) to show what a large tune costs frond-ear. Latency is CLOCK_MONOTONIC from the producer's
+`sendto` to the probe's receipt of the item's `frame` record (send→record), and to the fake session's
+read of the push carrying it (send→push). CPU% is of one core; RSS is the maximum over the cell. Raw:
+[`results/ingest/`](results/ingest/); command:
+`nice -n 19 ionice -c3 python run_cells.py ../results/ingest @../results/ingest/cells.json`.
+
+<!-- INGEST-TABLES -->
+
+## 4. Admission bound: what reaches the session under load, on the live settings
+
+**Method.** frond-ear's real settings as the live seat runs them: `immediate` per station, `debounceMs`
+5 000, `maxAgeMs` 30 000, `maxItems` 5, `bufferPerStream` 32, `maxPushesPerHour` 60,
+`maxNotificationChars` 6 000. A producer on `wakeKeys` sings into one tuned stream: A1 at 30 items/s for
+7 minutes (under the daemon's ceiling, so every item reaches the ear), A2 the same with `digest` (the
+other mode the config allows, `windowMs` 60 000), A3 flat out for 5 minutes (the daemon saturated). A4
+is the §2.8 quiet stream alone, one item every 10 s for 12 minutes, with no flood. Pushes and their
+records are counted as the fake session read them. Raw: [`results/admission/`](results/admission/);
+command: `nice -n 19 ionice -c3 python run_cells.py ../results/admission @../results/admission/cells.json`.
+
+<!-- ADMISSION-TABLE -->
+
+## 5. Reconnect storm
+
+**Method.** [`harness/scenario_reconnect.py`](harness/scenario_reconnect.py). Under load (a producer at
+30 items/s on one tuned, allowlisted stream with `immediate` delivery, plus the quiet station), four ears
+and the probe, so every daemon restart is five bindings reconnecting at once, each asking for a join
+snapshot. Restarts, in seconds after the load starts: SIGKILL the daemon at 30 and restart it at 33
+(same state directory); SIGTERM it at 70 (it sends `bye`) and restart at 72; SIGKILL frond-ear `ear0` at
+110 and restart it at 113 (same database; its shim reconnects by itself); a storm of five daemon SIGKILLs
+4 s apart from 150, each restarted 1 s later; at 200, SIGKILL the daemon and all four frond-ears at once,
+all restarted at 203; the load ends at 260. frond-ear's status was read every second. Raw:
+[`results/reconnect/`](results/reconnect/), with the per-restart analysis from
+[`harness/reconnect_report.py`](harness/reconnect_report.py) in `reconnect-analysis.json`.
+
+<!-- RECONNECT-TABLE -->
 
 ## Findings, with reproductions
 
@@ -221,6 +264,29 @@ in its status shows it, and nothing reaches the session. Reproduction (9 minutes
 nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py /tmp/repro-4 \
   '[{"name":"repro-4","producers":1,"mode":"valid","rate":15,"ttl":300,"payload":"64","prod_wake":false,"ear_tune":"none","quiet_interval":10,"duration":480}]'
 ```
+
+## What the numbers say to §2's owners (observations, not proposals)
+
+For 🍃 and 🌿 (§2) and 🌫, to weigh. Nothing here was changed.
+
+- **§2.4 step 2 ("bound the receiver first … before any token budget") is the step that failed.** The
+  built daemon has no per-source byte, queue or work cap; it serves datagrams in arrival order until the
+  kernel buffer overflows, so whoever sends most decides what everyone hears. The most expensive thing a
+  sender can hand this receiver is a *new valid item* (8–25 ms of durable save), not a forged one (60–70 µs
+  in the path, F2b and F4). So the cheapest blackout comes from a licensed key, or a station gone wrong: <!-- BRACKET -->;
+  without a key, replaying one captured frame does it at about 1 M datagrams/s (F4).
+- **The write-ahead save sets the host's new-item ceiling.** Rewriting the whole state with two fsyncs per
+  item caps ronan at about 40 new items/s, and lower as the dedup set grows (≈16/s predicted for 900 s
+  live-state items). Any ring or carriage that wants more items per second through this daemon meets this
+  first.
+- **§2.4 step 6 ("gaps are reported, never silently skipped") has a source available**: the kernel counts
+  every datagram it drops for the socket (`SO_RXQ_OVFL`, `/proc/net/udp`), and today nothing reads it. The
+  per-stream sequence hole is computed only in `style: counts` digests.
+- **The ear's bound is shared across tuned and untuned streams** (Finding 4). §2.4 step 1 ("untuned streams
+  never reach the ear where avoidable") isn't the case on the built path: the daemon has no tune, so every
+  verified item becomes a record every binding parses and holds.
+- **The push cap and the quiet stream.** The live delivery settings allow 60 pushes an hour; a stream of
+  one item every 10 s is 360 items an hour (§4, cell A4).
 
 ## Not measurable yet
 
