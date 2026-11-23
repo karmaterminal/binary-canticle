@@ -328,9 +328,11 @@ class LowRateTest(FairAdmissionCase):
         f = self.flood("replay", self.DURATION, "--rate", 500, "--ports", 10, "--capture", cap.fileno(), fds=(cap.fileno(),))
         time.sleep(2)
         q.singing.set()
-        health = self.row("replayed old beacons, 10 ports", q.sung, [self.totals(f)[1]], items=self.ITEMS)
+        totals = self.totals(f)[1]
+        beacons = sum(frame[3] == wire.KIND_BEACON for frame in q.distinct)
+        health = self.row("replayed old beacons, 10 ports", q.sung, [totals], items=self.ITEMS)
         self.assertEqual(health["counters"]["unverified"]["not_yet_valid"], 0)
-        self.assertLess(max(h["beacon_age_ms"].get(self.kid("quiet"), 0) for h in self.tap.healths()), 2_500)
+        self.assertGreaterEqual(health["counters"]["beacon"]["verified"], beacons)     # every one of its own was heard
 
     def test_a_station_that_starts_inside_a_forged_flood_from_its_own_host(self):
         """Nothing of the key has verified yet, and its station shares its address with the forger's twelve ports."""

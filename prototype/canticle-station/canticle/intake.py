@@ -642,12 +642,12 @@ class Intake:
     def settle(self, t: Ticket, verified: bool, fresh: bool) -> None:
         """The verdict on a ticket. ``fresh`` is a verified frame not accepted before, at its key's current epoch: its
         station pays, and its address is a known source of the key from now on. A check that came to nothing is paid
-        by the source it came from: forgeries by their sender, and so is a replay that verified and changed nothing,
-        unless it came from a known source, whose station then answers for it (so what a station keeps having
-        refused, and the records that makes, stay within its rate). Copies that had their turn beside the ticket were
-        not looked at: they are repeats of a frame that verified, or refused with one that did not."""
+        by the source it came from: forgeries by their sender, and so is a replay that verified and changed nothing.
+        The exception is an ITEM or PLUCK from a known source: its station answers for it, so that the records of
+        what it keeps having refused stay within its rate. Copies that had their turn beside the ticket were not
+        looked at: they are repeats of a frame that verified, or refused with one that did not."""
         with self._lock:
-            self._release(t, verified and (fresh or t.known))
+            self._release(t, verified and (fresh or t.known and not t.stream.beacon))
             if not verified:
                 self.unverified += 1
                 self.refused["unverified"] += t.copies

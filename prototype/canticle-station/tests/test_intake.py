@@ -140,6 +140,7 @@ class OrderTest(IntakeCase):
         quiet = [item(A, n + 2) for n in range(5)]
         self.offer(*quiet, src=HERE)
         served = self.serve(12, verified=lambda t: t.data in quiet)
+        self.assertLessEqual(set(quiet), set(served))
         self.assertEqual([served.index(q) for q in quiet], sorted(served.index(q) for q in quiet))
         self.assertLessEqual(served.index(quiet[-1]), 2 * len(quiet))
 
@@ -457,6 +458,16 @@ class BudgetTest(IntakeCase):
             self.intake.settle(t, True, t.data in new)
         self.assertLessEqual(set(new), {t.data for t in batch})
         self.assertEqual(list(key.known), [HERE])
+
+    def test_old_beacons_from_a_known_source_spend_no_beacons_turn(self):
+        """Not even those of a sender that spoofs the station's address: they make no records, so nothing needs the
+        station's bucket to bound them."""
+        self.offer(beacon(A, 1_000), src=HERE)
+        self.serve()
+        for n in range(1, 90):
+            self.offer(beacon(A, n), src=HERE)
+            self.serve(fresh=False)
+        self.assertEqual(self.intake.keys[KID_A].streams[BEACON].bucket.tokens, intake.BEACON_BURST - 1)
 
     def test_what_a_known_source_resends_is_the_stations_own_to_pay(self):
         """So the records of frames its station keeps having refused stay within its rate."""
