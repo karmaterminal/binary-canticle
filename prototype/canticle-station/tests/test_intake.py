@@ -1080,7 +1080,7 @@ class DaemonIntakeTest(DaemonCase):
         (quiet, junk, refused, later), _ = self.run_with(scenario)
         self.assertEqual((quiet["state"], quiet["records"]["socket_dropped"]), ("ok", 0))
         self.assertEqual(set(quiet["receive"]), {"read", "repeats", "copies", "verified", "unverified", "queued",
-                                                 "refused"})
+                                                 "known", "displaced", "refused"})
         self.assertEqual(tuple(quiet["receive"]["refused"]), intake.REFUSED)
         self.assertGreater(junk["receive"]["refused"]["unlisted"], 0)
         self.assertEqual((junk["state"], junk["reasons"]), ("ok", []))

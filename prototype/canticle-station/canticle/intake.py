@@ -176,11 +176,7 @@ class StreamQueue:
         elif self.pool >= STRANGER_POOL:
             if lane is not None and len(lane.queue) >= STRANGER_POOL // len(self.strange):
                 return False, source
-            longest = max(self.strange, key=lambda o: len(o.queue))
-            longest.digests.remove(longest.queue.pop()[1])
-            out = longest.source
-            out.queued -= 1
-            self.pool -= 1
+            out = self._shed()
         new = lane is None
         if new:
             lane = self.lanes[source] = Lane(source)
@@ -190,6 +186,14 @@ class StreamQueue:
         source.queued += 1
         self.pool += not source.known
         return new, out
+
+    def _shed(self) -> Source:
+        """The newest datagram of the strangers' longest lane loses its place. Returns whose it was."""
+        longest = max(self.strange, key=lambda o: len(o.queue))
+        longest.digests.remove(longest.queue.pop()[1])
+        longest.source.queued -= 1
+        self.pool -= 1
+        return longest.source
 
     def pick(self, now: float) -> Optional[tuple]:
         for ring in ((self.known, self.strange) if self.known_next else (self.strange, self.known)):
@@ -211,14 +215,20 @@ class StreamQueue:
                 return (*entry, source)
         return None
 
-    def change(self, source: Source) -> None:
-        """``source`` has just become known, or a stranger again: its lane goes to the other ring."""
+    def change(self, source: Source) -> int:
+        """``source`` has just become known, or a stranger again: its lane goes to the other ring. Returns how many
+        datagrams that left without a place in the strangers' pool."""
         lane = self.lanes.get(source)
-        if lane is not None:
-            old, new = (self.strange, self.known) if source.known else (self.known, self.strange)
-            old.remove(lane)
-            new.append(lane)
-            self.pool += -len(lane.queue) if source.known else len(lane.queue)
+        if lane is None:
+            return 0
+        old, new = (self.strange, self.known) if source.known else (self.known, self.strange)
+        old.remove(lane)
+        new.append(lane)
+        self.pool += -len(lane.queue) if source.known else len(lane.queue)
+        over = max(0, self.pool - STRANGER_POOL)
+        for _ in range(over):
+            self._shed()
+        return over
 
     def drop(self, source: Source) -> None:
         """Forget what a source that is no longer known has waiting."""
@@ -231,7 +241,7 @@ class KeyQueue:
     """Everything that waits under one listed key."""
 
     __slots__ = ("bucket", "streams", "ready", "known", "strangers", "hosts", "stranger_budget", "crowd", "salt",
-                 "reclaimed")
+                 "reclaimed", "shares", "displaced")
 
     def __init__(self, stream_ids):
         self.bucket = Bucket(KEY_RATE, KEY_BURST)
@@ -245,6 +255,7 @@ class KeyQueue:
         self.crowd = [Source(self.stranger_budget) for _ in range(CROWD_LANES)]
         self.salt = secrets.randbits(64)          # so a sender can't choose to share a station's lane
         self.reclaimed = 0.0
+        self.shares = self.displaced = 0          # sources that became known, and those a newer one displaced
 
     def source(self, addr, now: float) -> Source:
         got = self.known.get(addr) or self.strangers.get(addr)
@@ -282,18 +293,18 @@ class KeyQueue:
         if got is None:
             got = self._leave(addr) or Source(self.stranger_budget)
             got.budget, got.known = Bucket(SOURCE_RATE, SOURCE_BURST), True
+            self.shares += 1
             for s in self.streams.values():
                 s.change(got)
         self.known[addr] = got
         if len(self.known) <= KNOWN_MAX:
             return 0
         old_addr, old = self.known.popitem(last=False)
+        self.displaced += 1
         old.budget, old.known = self.stranger_budget, False
         if self._room(host_of(old_addr)):
             self._enter(old_addr, old)
-            for s in self.streams.values():
-                s.change(old)
-            return 0
+            return sum(s.change(old) for s in self.streams.values())
         # No room to keep it apart: what it had waiting goes, so lanes stay bounded by the two tables.
         for s in self.streams.values():
             s.drop(old)
@@ -735,4 +746,6 @@ class Intake:
             queued = len(self.unlisted.ready) + sum(
                 len(lane.queue) for k in self.keys.values() for s in k.streams.values() for lane in s.lanes.values())
             return {"read": self.read, "repeats": self.repeated, "copies": self.copied, "verified": self.verified,
-                    "unverified": self.unverified, "queued": queued, "refused": dict(self.refused)}
+                    "unverified": self.unverified, "queued": queued,
+                    "known": sum(k.shares for k in self.keys.values()),
+                    "displaced": sum(k.displaced for k in self.keys.values()), "refused": dict(self.refused)}

@@ -403,9 +403,9 @@ class LowRateTest(FairAdmissionCase):
 class SourceChurnTest(FairAdmissionCase):
     """A source is an IPv4 address and a UDP port, so a sender can have as many as it likes (🌫's condition on #173)."""
 
-    def test_forged_flood_from_a_new_port_per_datagram(self):
-        """R3 from sources never seen before: every forgery has a port of its own, every second one on the station's
-        own host. The station is established, and keeps its share."""
+    def test_forged_flood_from_a_new_socket_per_datagram(self):
+        """R3 with the sources churned: a newly opened socket for every forgery, every second one on the station's own
+        host and the others on 60 000 addresses. The station is established, and keeps its share."""
         self.daemon()
         q = self.quiet()
         self.settle(q)
@@ -415,16 +415,17 @@ class SourceChurnTest(FairAdmissionCase):
                        "--rate", FLOOD_RATE / 2, "--churn", 1, "--hosts", 60_000)
         q.singing.set()
         totals = [self.totals(x)[1] for x in (f, g)]
-        health = self.row("R3 from a new port per datagram", q.sung, totals,
-                          note=f"{sum(t['ports'] for t in totals):,} ports")
-        self.assertGreater(sum(t["ports"] for t in totals), 100_000)
+        sources = sum(t["sources"] for t in totals)
+        health = self.row("R3 from a new socket per datagram", q.sung, totals,
+                          note=f"{sum(t['opened'] for t in totals):,} sockets, {sources:,} sources")
+        self.assertGreater(sources, 100_000)
         self.assertLess(health["counters"]["unverified"]["bad_signature"], 20_000)
         self.assertEqual((health["receive"].get("known"), health["receive"].get("displaced")), (1, 0))
 
     def test_a_relay_that_is_heard_first_takes_the_stations_share_and_it_is_counted(self):
         """FAIL, outside the supported guarantee, for the relayed station: a relay without a key, on a faster path,
         is heard first with the station's own beacons, from a new port each, so its ports are the known sources and
-        the station is a stranger when the forged flood comes, from new ports too. Nothing before the signature can tell
+        the station is a stranger when the forged flood comes, from new sockets too. Nothing before the signature can tell
         a relay from the station. Its row is measured and printed, not asserted. Asserted is that the churn shows
         in the counts, and that another station loses nothing."""
         self.daemon()
@@ -432,13 +433,14 @@ class SourceChurnTest(FairAdmissionCase):
         self.settle(q)
         time.sleep(3)                           # a dozen beacons, each heard from the relay first
         before = self.tap.next_health()["receive"]
-        f = self.flood("forged", self.DURATION, "--kid", self.kid("quiet"), "--stream", "quiet", "--rate", FLOOD_RATE,
+        f = self.flood("forged", self.DURATION + 1, "--kid", self.kid("quiet"), "--stream", "quiet", "--rate", FLOOD_RATE,
                        "--churn", 1)
+        time.sleep(1)                           # no item of the station's slips in before the flood is at its rate
         q.singing.set()
         other.singing.set()
         total = self.totals(f)[1]
-        self.measure("a relay heard first, then R3 from new ports: that station", q.sung, [total], note=OUTSIDE)
-        health = self.row("a relay heard first, then R3 from new ports: another station", other.sung, [total],
+        self.measure("a relay heard first, then R3 from new sockets: that station", q.sung, [total], note=OUTSIDE)
+        health = self.row("a relay heard first, then R3 from new sockets: another station", other.sung, [total],
                           items=self.ITEMS)
         self.assertGreater(before.get("displaced") or 0, 0, "the station's share went to the relay, and no count says so")
         self.assertGreaterEqual(health["receive"]["displaced"], before["displaced"])

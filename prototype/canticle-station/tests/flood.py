@@ -11,8 +11,9 @@ are the test's own throwaway keys.
   replay   genuine frames of the quiet station, captured before the flood and resent unchanged (R4).
 
 ``--fd`` sends from the station's own socket, which is what a perfect source spoof looks like to the receiver,
-``--ports`` from that many ports in turn, and ``--churn`` from a new port for every so many datagrams, on
-``--hosts`` loopback addresses in turn (the first is 127.0.0.1, the station's own).
+``--ports`` from that many ports in turn, and ``--churn`` from a newly opened socket for every so many datagrams (the
+kernel picks its port, out of some 28 000), on ``--hosts`` loopback addresses in turn (the first is 127.0.0.1, the
+station's own).
 """
 
 import argparse
@@ -87,7 +88,8 @@ def main() -> int:
         socket.socket(socket.AF_INET, socket.SOCK_DGRAM) for _ in range(a.ports)]
     dest = ("127.0.0.1", a.port)
     sk = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(open(a.key).read())) if a.key else None
-    sent, opened = 0, len(socks)
+    sent = opened = 0
+    sources: set = set()
 
     def send(frame: bytes) -> None:
         nonlocal sent, opened
@@ -95,6 +97,7 @@ def main() -> int:
             socks[0].close()
             socks[0] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             socks[0].bind((socket.inet_ntoa((0x7F000001 + opened % a.hosts).to_bytes(4, "big")), 0))
+            sources.add(socks[0].getsockname())
             opened += 1
         try:
             socks[sent % len(socks)].sendto(frame, dest)
@@ -151,7 +154,8 @@ def main() -> int:
             for f in frames:
                 send(f)
                 pace.wait(sent)
-    print(json.dumps({"sent": sent, "elapsed": time.monotonic() - start, "ports": opened}), flush=True)
+    print(json.dumps({"sent": sent, "elapsed": time.monotonic() - start, "opened": opened,
+                      "sources": len(sources) or len(socks)}), flush=True)
     return 0
 
 
