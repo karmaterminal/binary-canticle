@@ -14,14 +14,16 @@ The cause is the first hop, and it isn't verification.
 
 Headline numbers (ronan, aarch64, every process at `nice -n 19`; they don't carry to silas):
 
-1. **The host daemon takes 74–88 new items/s for the first 20 s from an empty state, and about 40/s sustained**
-   (chatter, 60 s TTL). That held at every stream count (1 to 10 000), payload (64 B to 1 100 B frames) and
-   ear count (1 or 4). The limit is the write-ahead save of the whole state before each new item: about
-   7 ms of fsync plus about 4 µs per live dedup entry. An Ed25519 verify is 41 µs on an X925 core and 101 µs
-   on an A725 core, and the whole admission parse 58 and 136 µs. Per-batch verify: not measurable yet (no
-   batch signatures).
+1. **The host daemon took 74–88 new items/s for the first 20 s from an empty state, and about 40/s sustained**
+   (chatter, 60 s TTL). That is **this niced, durable-write workload's observed rate on ronan aarch64**, not
+   a general daemon ceiling. It held at every stream count (1 to 10 000), payload (64 B to 1 100 B frames)
+   and ear count (1 or 4). What held it there is the write-ahead save of the whole state before each new
+   item: about 7 ms of fsync plus about 4 µs per live dedup entry. An Ed25519 verify is 41 µs on an X925
+   core and 101 µs on an A725 core, and the whole admission parse 58 and 136 µs. Per-batch verify: not
+   measurable yet (no batch signatures).
 2. **Above that rate the kernel drops datagrams at the daemon's socket, and nothing reports it**: 92 M in
-   F1's 10 minutes, with the daemon's health `ok` (no reasons), frond-ear's receive health `ok`, and record
+   F1's 10 minutes (the socket's own `drops` counter in `/proc/net/udp`, 99.98 % of the datagrams that
+   reached it), with the daemon's health `ok` (no reasons), frond-ear's receive health `ok`, and record
    v1's per-item gap `"unavailable"`. The quiet tuned stream (one item every 10 s from a real station) lost
    all or nearly all of its items during valid-key, real-station, replay and forged floods (0–5 of 18–60
    arrived) — floods of 60× to 4 200× what the daemon processed of them.
@@ -64,10 +66,10 @@ unit's node (v26.12.1), and its shim on the live session's node (v26.9.0).
 | RAM | 122 GiB |
 | disk | ext4 on NVMe (`nvme0n1`, scheduler `none`). Scratch state lived on this same filesystem as the live daemon's `~/.local/state/canticle/daemon`, so a fsync costs what it costs the seat |
 | loopback | `lo`, MTU 65 536. `net.core.rmem_default` 212 992 B (the daemon sets no `SO_RCVBUF`), `rmem_max` 4 MiB |
-| niceness | every process of this lane ran under `nice -n 19 ionice -c3`, in this session's cgroup (`app.slice/scribe-rez.service`), never in `openclaw-gateway.service`. With the NVMe scheduler at `none`, the kernel does not arbitrate I/O by ionice class, so `-c3` is recorded but had no effect. The daemon under test therefore ran at nice 19 beside nice-0 neighbours (load up to 17 of 20 cores in F1); the part of its per-item cost that is CPU (the JSON rewrite) may run slower than the live, un-niced daemon's, so the ceilings here are a floor for this host, not a forecast |
+| niceness | every process of this lane ran under `nice -n 19 ionice -c3`, in this session's cgroup (`app.slice/scribe-rez.service`), never in `openclaw-gateway.service`. With the NVMe scheduler at `none`, the kernel does not arbitrate I/O by ionice class, so `-c3` is recorded but had no effect. The daemon under test therefore ran at nice 19 beside nice-0 neighbours (load up to 17 of 20 cores in F1); the part of its per-item cost that is CPU (the JSON rewrite) may run slower than the live, un-niced daemon's. Every rate here is therefore this niced, durable-write workload's observed rate on ronan: a floor for this host, not a forecast, and not a general daemon ceiling |
 | neighbours | 🌊's live gateway and an unrelated uid's CI-like node jobs shared the host. The 1-minute load average is in every sampler row (`samples.csv`, column `loadavg1`) and in each table below; it stayed under `nproc` (20) except where a table says otherwise |
 
-**Do not extrapolate.** The two costs that set every ceiling below are an Ed25519 verify (CPU) and a
+**Do not extrapolate.** The two costs behind every rate below are an Ed25519 verify (CPU) and a
 durable save (disk). Both differ between ronan's two core types, and both will differ on silas.
 
 ## The path, as the live seats configure it (multicast off, unicast)
@@ -117,22 +119,39 @@ from `flood/cells-rest.json`, F1b, F2b, F3b and F9 from `flood2/cells.json`, and
 `flood3/cells.json` (see *Run history*). Every cell's parameters are in its `result.json`; "4x" or "2x" in a
 cell's name is its number of producer processes, not its overload.
 
-| cell | offered | daemon's own rates (per s, from its health) | daemon CPU mean | kernel drops at the daemon's socket (share of all UDP datagrams the host took in meanwhile) | what the daemon's health said | what frond-ear said | load avg max |
+**How drops were counted.** Every kernel-drop count in this report is the daemon socket's own `drops`
+counter in `/proc/net/udp`, read after the daemon bound and again after the drain, with the difference
+reported (`kernel_drops` in each `result.json`; [`mlib.py`](harness/mlib.py) `udp_socket_drops`). The
+harness found the socket's row by its local address, the daemon's `127.0.0.1:<port>`, a port the lab
+picked free for the daemon alone. It recorded the row's inode once a second (`udp` in each
+`timeline.json`): one inode for the whole of every cell (nine in R1, one per daemon run, each at 0 drops).
+It did not cross-check that inode against the daemon process's file descriptors. The harness also read
+`RcvbufErrors` from `/proc/net/snmp` (`snmp_delta`). That counter is **network-namespace-wide**, shared
+with every UDP socket in the namespace (🌊's gateway and other users' jobs included), so it is
+namespace-level and not attributed to the socket. No number in this report rests on it, though in every
+cell its difference equalled the socket's own count exactly. The share beside each count below is
+socket-local: drops ÷ (drops + the datagrams the daemon read, which is the sum of its own `admission`,
+`beacon` and `unverified` counters in its last health record). Drops plus reads equal what the producers
+sent exactly in A1–A3 and in all 63 ingest cells, and exceed it only by the quiet station's own
+datagrams (404–1 142) in the flood cells with producers. So on this loopback path, datagrams were lost at
+that socket and nowhere else.
+
+| cell | offered | daemon's own rates (per s, from its health) | daemon CPU mean | kernel drops at the daemon's socket, its own `drops` (share of the datagrams that reached the socket) | what the daemon's health said | what frond-ear said | load avg max |
 |---|---|---|---|---|---|---|---|
 | F0-baseline-quiet-only | none | verified 0.1, duplicate 0.7 | 0.4 % | 0 | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 12, 'records_pushed': 12} | 12.0 |
-| F1-valid-flood-4x-max | 153,402 valid items/s (190 B) | verified 36.3 | 51.5 % | 92,020,097 (99.96 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'routed_late': 1} | 17.3 |
-| F1b-valid-flood-2x-max-then-recovery | 77,377 valid items/s (190 B) | verified 36.8 | 32.0 % | 13,921,301 (99.93 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 2, 'records_pushed': 3, 'routed_late': 3, 'off_air_unpushed': 3} | 14.4 |
-| F2b-forged-flood-2x-max | 1,006,277 forged items/s (188 B) | verified 0.0, bad_signature 15,991.8 | 81.9 % | 297,085,287 (98.41 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 5, 'records_pushed': 7, 'routed_late': 1, 'off_air_unpushed': 1} | 12.3 |
-| F3-unknown-key-flood-2x-max | 73,062 unknown items/s (190 B) | verified 0.1, duplicate 0.7, unknown_key 72,789.5 | 51.0 % | 79,866 (0.36 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 30, 'records_pushed': 30} | 14.4 |
-| F3b-unknown-key-flood-2x-max-fixed-frame | 1,001,072 unknown-fixed items/s (188 B) | verified 0.1, duplicate 0.1, unknown_key 205,209.9 | 81.8 % | 238,745,107 (79.49 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 16, 'records_pushed': 21, 'routed_late': 5, 'off_air_unpushed': 5} | 10.0 |
-| F4-replay-flood-2x-max | 1,090,096 dup items/s (188 B) | verified 2.0, duplicate 13,941.1 | 79.8 % | 322,844,021 (98.72 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 2, 'records_pushed': 3, 'routed_late': 3, 'off_air_unpushed': 3} | 11.8 |
-| F5-real-station-flood | real station, 5,250 sings/s | verified 41.3 | 48.0 % | 1,563,613 (98.86 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'routed_late': 4, 'off_air_unpushed': 4, 'pushes': 1, 'records_pushed': 2} | 15.5 |
-| F6-quiet-inside-flood-station | real station, 5,801 sings/s | verified 38.8 | 45.0 % | 1,729,507 (98.71 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'routed_late': 4, 'off_air_unpushed': 4, 'pushes': 2, 'records_pushed': 2} | 13.6 |
-| F7-valid-flood-100ps | 100 valid items/s (188 B) | verified 45.8, duplicate 0.3 | 45.5 % | 9,640 (45.85 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 18, 'records_pushed': 18} | 16.6 |
-| F8-valid-flood-40ps | 40 valid items/s (188 B) | verified 38.9, duplicate 0.7 | 35.6 % | 120 (0.77 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 18, 'records_pushed': 18} | 12.2 |
+| F1-valid-flood-4x-max | 153,402 valid items/s (190 B) | verified 36.3 | 51.5 % | 92,020,097 (99.98 %) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'routed_late': 1} | 17.3 |
+| F1b-valid-flood-2x-max-then-recovery | 77,377 valid items/s (190 B) | verified 36.8 | 32.0 % | 13,921,301 (99.95 %) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 2, 'records_pushed': 3, 'routed_late': 3, 'off_air_unpushed': 3} | 14.4 |
+| F2b-forged-flood-2x-max | 1,006,277 forged items/s (188 B) | verified 0.0, bad_signature 15,991.8 | 81.9 % | 297,085,287 (98.41 %) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 5, 'records_pushed': 7, 'routed_late': 1, 'off_air_unpushed': 1} | 12.3 |
+| F3-unknown-key-flood-2x-max | 73,062 unknown items/s (190 B) | verified 0.1, duplicate 0.7, unknown_key 72,789.5 | 51.0 % | 79,866 (0.36 %) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 30, 'records_pushed': 30} | 14.4 |
+| F3b-unknown-key-flood-2x-max-fixed-frame | 1,001,072 unknown-fixed items/s (188 B) | verified 0.1, duplicate 0.1, unknown_key 205,209.9 | 81.8 % | 238,745,107 (79.50 %) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 16, 'records_pushed': 21, 'routed_late': 5, 'off_air_unpushed': 5} | 10.0 |
+| F4-replay-flood-2x-max | 1,090,096 dup items/s (188 B) | verified 2.0, duplicate 13,941.1 | 79.8 % | 322,844,021 (98.72 %) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 2, 'records_pushed': 3, 'routed_late': 3, 'off_air_unpushed': 3} | 11.8 |
+| F5-real-station-flood | real station, 5,250 sings/s | verified 41.3 | 48.0 % | 1,563,613 (99.17 %) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'routed_late': 4, 'off_air_unpushed': 4, 'pushes': 1, 'records_pushed': 2} | 15.5 |
+| F6-quiet-inside-flood-station | real station, 5,801 sings/s | verified 38.8 | 45.0 % | 1,729,507 (99.30 %) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'routed_late': 4, 'off_air_unpushed': 4, 'pushes': 2, 'records_pushed': 2} | 13.6 |
+| F7-valid-flood-100ps | 100 valid items/s (188 B) | verified 45.8, duplicate 0.3 | 45.5 % | 9,640 (52.38 %) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 18, 'records_pushed': 18} | 16.6 |
+| F8-valid-flood-40ps | 40 valid items/s (188 B) | verified 38.9, duplicate 0.7 | 35.6 % | 120 (1.58 %) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 18, 'records_pushed': 18} | 12.2 |
 | F9-untuned-long-ttl-15ps | 15 valid items/s (188 B) | verified 15.1, duplicate 0.8 | 31.0 % | 0 | `ok`, reasons [], records dropped 0 | `ok` [] {'live_overflow': 414}; delivery {'pushes': 43, 'records_pushed': 43} | 8.2 |
-| F10-valid-flood-400ps | 400 valid items/s (190 B) | verified 46.4, duplicate 0.0, expired 0.0 | 42.7 % | 63,591 (78.27 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 11, 'records_pushed': 13, 'routed_late': 2, 'off_air_unpushed': 2} | 7.9 |
-| F11-valid-flood-1000ps | 1,000 valid items/s (190 B) | verified 41.3 | 37.1 % | 172,488 (87.98 % of datagrams) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 4, 'records_pushed': 5, 'routed_late': 3, 'off_air_unpushed': 3} | 6.7 |
+| F10-valid-flood-400ps | 400 valid items/s (190 B) | verified 46.4, duplicate 0.0, expired 0.0 | 42.7 % | 63,591 (87.82 %) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 11, 'records_pushed': 13, 'routed_late': 2, 'off_air_unpushed': 2} | 7.9 |
+| F11-valid-flood-1000ps | 1,000 valid items/s (190 B) | verified 41.3 | 37.1 % | 172,488 (95.61 %) | `ok`, reasons [], records dropped 0 | `ok` []; delivery {'pushes': 4, 'records_pushed': 5, 'routed_late': 3, 'off_air_unpushed': 3} | 6.7 |
 
 | cell | overload | quiet items sung while the flood ran | of those, reached the daemon during / after the flood | of those, pushed during / after the flood | pushes in all (max records per push) | daemon RSS max (MiB) | frond-ear RSS start → max (MiB) | shim RSS max (MiB) |
 |---|---|---|---|---|---|---|---|---|
@@ -174,17 +193,17 @@ or `result.json` (`probe_verified_per_s`).
 
 | criterion | verdict | evidence |
 |---|---|---|
-| the quiet tuned stream keeps arriving | **FAIL** | When the flood offered about 60 times or more what the daemon processed of it (overload, offered ÷ processed per second of that kind: F1 ≈ 4 200×, F1b ≈ 2 100×, F6 ≈ 150×, F5 ≈ 130×, F4 ≈ 78×, F2b ≈ 63×), the quiet stream all but stopped while it ran. Valid-key flood: 0 of 60 arrived while it ran (F1; 3 arrived in the 8 s after it stopped, one of them already 43 s old and routed late, and none was pushed before the cell ended), 1 of 18 (F1b). Real station flooded through its own control socket: 1 of 30 (F5); the quiet stream on that same station: 2 of 30, neither pushed (F6). Repeats of one valid frame: 1 of 30 (F4). Forged signatures: 5 of 30 (F2b). Unknown key at 1 M datagrams/s: 23 of 30 arrived, 19 pushed (F3b). A flood the daemon could keep up with still cost quiet items at the ear once it filled frond-ear's live set: 5 of the 20 sung after that point (F9, Finding 4). Between those it degraded by degrees: at about 5× (F3b, above), 8× (F10, valid items at 400/s: 12 of 18 pushed while it ran, the rest lost or too late) and 24× (F11 at 1 000/s: 3 of 18). At 1–2× it survived: unknown key at 73 k/s (F3, 30 of 30, within 71 ms), a valid flood at 40/s (F8), and at 100/s (F7, ≈ 2.2×), where the daemon processed 46/s and the kernel dropped 54 % of the flood, yet every quiet item arrived, up to 8.2 s late |
+| the quiet tuned stream keeps arriving | **FAIL** | When the flood offered about 60 times or more what the daemon processed of it (overload, offered ÷ processed per second of that kind: F1 ≈ 4 200×, F1b ≈ 2 100×, F6 ≈ 150×, F5 ≈ 130×, F4 ≈ 78×, F2b ≈ 63×), the quiet stream all but stopped while it ran. Valid-key flood: 0 of 60 arrived while it ran (F1; 3 arrived in the 8 s after it stopped, one of them already 43 s old and routed late, and none was pushed before the cell ended), 1 of 18 (F1b). Real station flooded through its own control socket: 1 of 30 (F5); the quiet stream on that same station: 2 of 30, neither pushed (F6). Repeats of one valid frame: 1 of 30 (F4). Forged signatures: 5 of 30 (F2b). Unknown key at 1 M datagrams/s: 23 of 30 arrived, 19 pushed (F3b). A flood the daemon could keep up with still cost quiet items at the ear once it filled frond-ear's live set: 5 of the 20 sung after that point (F9, Finding 4). Between those it degraded by degrees: at about 5× (F3b, above), 8× (F10, valid items at 400/s: 12 of 18 pushed while it ran, the rest lost or too late) and 24× (F11 at 1 000/s: 3 of 18). At 1–2× it survived: unknown key at 73 k/s (F3, 30 of 30, within 71 ms), a valid flood at 40/s (F8), and at 100/s (F7, ≈ 2.2×), where the daemon processed 46/s and its socket dropped 9 640 datagrams (its own `drops`, 52 % of what reached it), yet every quiet item arrived, up to 8.2 s late |
 | memory stays bounded | **PASS**, for these durations | No process grew without bound in any flood cell: daemon at most 52 MiB, frond-ear at most 110 MiB, shim at most 108 MiB (tables and traces above). The daemon grows with its dedup set, about 4.5 KB per live entry (32 → 52 MiB in F9 at about 4 500 entries), so its per-key quota (100 000 / keys in the manifest) would allow about 450 MB with one key; no cell got near it, and both it and frond-ear were still at their maximum at F9's last sample. frond-ear rose 100 → 106 MiB over F1's 10 minutes and 100 → 110 MiB in F9 while its live set filled to its 4 096-record bound; under steady pushing (§4) it swung between about 100 and 146 MiB with garbage collection |
 | model admission stays bounded | **PASS** | The untuned flood never reached the session in any cell: it isn't tuned (and, except in F6, isn't on `wakeKeys`). The session got at most one push per quiet item, at most 3 records a push |
 | the push rate stays under the cap | **PASS** in every flood cell, but see §4 | The most pushes in any flood cell was 43 in 480 s (F9), under `maxPushesPerHour` 60. The quiet stream alone (360 items an hour) is six times that cap: on the live settings it reached the cap at 597 s with no flood at all, and the rest of its items expired unpushed (§4, cell A4; Finding 5) |
-| loss, lag and gaps for the flood are reported, not silent | **FAIL** | In every cell the daemon's health said `ok` with no reasons, and frond-ear's receive health said `ok`. Kernel drops (120 to 323 M per cell; 1.6 M to 323 M in the cells where the quiet stream failed) appear in no record, status or push. A forged or unknown-key flood is visible in the daemon's counters (`bad_signature`, `unknown_key`, and the D34 key-id table naming the impersonated key ids), but nothing reports what it cost. A valid-key flood looks like ordinary traffic. For what did arrive, lag is honest per record (`age=33s` in the push), but in `immediate` pushes (the live setting) a hole in the quiet stream shows only as a jump in item numbers (`item=…/3`, then `…/17`; digest reports would say `N seqs skipped`), and records promised to "the next push" can expire with no push to say so (Findings 3 and 5) |
+| loss, lag and gaps for the flood are reported, not silent | **FAIL** | In every cell the daemon's health said `ok` with no reasons, and frond-ear's receive health said `ok`. Kernel drops at the daemon's socket (its own `drops`: from 120 in F8 to 323 M in F4, and 1.6 M to 323 M in the cells where the quiet stream all but stopped) appear in no record, status or push. A forged or unknown-key flood is visible in the daemon's counters (`bad_signature`, `unknown_key`, and the D34 key-id table naming the impersonated key ids), but nothing reports what it cost. A valid-key flood looks like ordinary traffic. For what did arrive, lag is honest per record (`age=33s` in the push), but in `immediate` pushes (the live setting) a hole in the quiet stream shows only as a jump in item numbers (`item=…/3`, then `…/17`; digest reports would say `N seqs skipped`), and records promised to "the next push" can expire with no push to say so (Findings 3 and 5) |
 
 **Verdict: FAIL.** The prince was not overwhelmed (admission stayed bounded), but the quiet tuned stream
 all but stopped arriving under floods of 60× or more what the daemon could process, lost most items at 24×
 and about a third at 5–8×, arrived seconds late at about 2×, and nothing reported the loss.
 
-## 2. Verify cost, per item (and why it isn't the ceiling)
+## 2. Verify cost, per item (and why it isn't what held the rate)
 
 Method: [`harness/verify_bench.py`](harness/verify_bench.py), one process pinned with `sched_setaffinity`
 to cpu 19 (Cortex-X925) and then cpu 14 (Cortex-A725), 3 000 frames per step (300 for sign, 1 000 for the
@@ -241,12 +260,13 @@ core (8 µs on an A725)**, about 226 B of state per entry, while a duplicate cos
 (62.6 µs X925, 150.9 µs A725, no save). Verify is under 1 % of a new item's cost.
 
 A dedup entry lives for the item's local expiry plus 5 s, so at a steady rate *r* of new chatter items
-(TTL 60 s) the daemon holds about 65·*r* entries, and the ceiling is where *r* × cost(65·*r*) = 1 s. On an
-X925 core that is about 50 items/s, on an A725 core about 35/s, for every stream and every payload size.
-For live-state items at the 900 s TTL the live `facts` and `display` streams use, the same arithmetic
+(TTL 60 s) the daemon holds about 65·*r* entries, and the predicted rate is where *r* × cost(65·*r*) = 1 s.
+On an X925 core that is about 50 items/s, on an A725 core about 35/s, for every stream and every payload
+size. For live-state items at the 900 s TTL the live `facts` and `display` streams use, the same arithmetic
 gives about 16/s on an X925 core. At the per-key quota of 100 000 entries (one key in the manifest), a
-save would be about 22 MB of JSON and over 400 ms. These are predictions from the isolated costs; the
-in-path numbers below are what the built path did.
+save would be about 22 MB of JSON and over 400 ms. These are predictions for this durable-write workload
+on ronan's two core types, from the isolated costs, not a general daemon ceiling; the in-path numbers
+below are what the built path did.
 
 ## 3. Ingest and fan-out through the daemon
 
@@ -254,7 +274,7 @@ in-path numbers below are what the built path did.
 key so that only the stream count changes) × 3 payloads (64 B, 512 B, max) × 1 and 4 ears (each ear a
 frond-ear daemon with a fake session; the probe tap is one more binding, so 2 or 5 connections on the
 daemon socket). Each combination ran twice, each time in a fresh lab: **saturated** (one producer flat
-out, 20 s) for the ceiling, and **40 items/s** (30 s, below the ceiling on fresh state) for latency.
+out, 20 s) for the observed rate, and **40 items/s** (30 s, below that rate on fresh state) for latency.
 Each ear tuned the producer's first stream, with the producer on `wakeKeys` and `immediate` delivery,
 so pushes happened on the live settings. Then three cells tuned every stream (100, 1 000 and 10 000
 patterns) to show what a large tune costs frond-ear. Latency is CLOCK_MONOTONIC from the producer's
@@ -263,7 +283,7 @@ read of the push carrying it (send→push). CPU% is of one core; RSS is the maxi
 [`results/ingest/`](results/ingest/); command:
 `nice -n 19 ionice -c3 python run_cells.py ../results/ingest @../results/ingest/cells.json`.
 
-| ears | streams | payload (frame B) | saturated: offered/s → verified/s, kernel drops | 40/s: send→record p50 / p99 ms | 40/s: send→push p50 / p99 ms (n) | daemon CPU % sat / 40 | daemon RSS MiB | frond-ear CPU % (mean of ears) / RSS MiB (max of ears), saturated cell | shim RSS MiB | probe gaps sat / 40 | frond-ear loss counts: receive side (all ears, both cells); delivery (ear0, 40/s cell) |
+| ears | streams | payload (frame B) | saturated: offered/s → verified/s, kernel drops (the daemon socket's own `drops`) | 40/s: send→record p50 / p99 ms | 40/s: send→push p50 / p99 ms (n) | daemon CPU % sat / 40 | daemon RSS MiB | frond-ear CPU % (mean of ears) / RSS MiB (max of ears), saturated cell | shim RSS MiB | probe gaps sat / 40 | frond-ear loss counts: receive side (all ears, both cells); delivery (ear0, 40/s cell) |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 1 | 64 (190) | 38,729 → 79.9, 772,785 | 11.4 / 20.8 | 778 / 6,842 (35) | 32.0 / 13.7 | 39 | 1.4 / 120 | 100 | 0 / 0 | receive none; 40/s delivery: pushed 35, dropped 1143, late 0 |
 | 1 | 1 | 512 (639) | 37,365 → 80.5, 745,531 | 10.7 / 17.4 | 776 / 6,848 (35) | 32.0 / 13.1 | 40 | 1.5 / 117 | 100 | 0 / 0 | receive none; 40/s delivery: pushed 35, dropped 1143, late 0 |
@@ -298,9 +318,12 @@ read of the push carrying it (send→push). CPU% is of one core; RSS is the maxi
 
 **What this says.**
 
-- **The ceiling is the daemon, and nothing else in the matrix moves it.** Over 20 s from fresh state,
+- **The daemon sets the rate, and nothing else in the matrix moves it.** Over 20 s from fresh state,
   one flat-out producer got 74–88 items/s verified, at 1 or 10 000 streams, at 64 B or 1 100 B, with 1 or
-  4 ears; the kernel dropped the other 99.7–99.8 % of what was sent. Stream count changes nothing because
+  4 ears. That is this niced, durable-write workload's observed rate on ronan aarch64, not a general
+  daemon ceiling. The daemon's socket dropped the other 99.75–99.79 % of what was sent (its own `drops`
+  ÷ the producer's sends; in every cell, drops plus the datagrams the daemon read equal the sends
+  exactly). Stream count changes nothing because
   the daemon keeps no per-stream queue; payload changes nothing because verify is flat in size and the save writes dedup
   rows, not bodies. Four ears add four record connections, which at these rates cost the daemon nothing
   measurable (0 gaps on every connection: no binding ever fell 1 024 records behind).
@@ -338,8 +361,9 @@ to 11–21 s at p50.
 **Method.** frond-ear's real settings as the live seat runs them: `immediate` per station, `debounceMs`
 5 000, `maxAgeMs` 30 000, `maxItems` 5, `bufferPerStream` 32, `maxPushesPerHour` 60,
 `maxNotificationChars` 6 000. A producer on `wakeKeys` sings into one tuned stream: A1 at 30 items/s for
-7 minutes (under the daemon's ceiling, so every item reaches the ear), A2 the same with `digest` (the
-other mode the config allows, `windowMs` 60 000), A3 flat out for 5 minutes (the daemon saturated). A4
+7 minutes (under the daemon's observed rate here, so every item reaches the ear; its socket dropped none),
+A2 the same with `digest` (the other mode the config allows, `windowMs` 60 000), A3 flat out for 5 minutes
+(the daemon saturated; its socket dropped 11 673 865 datagrams, 99.87 % of what reached it). A4
 is the §2.8 quiet stream alone, one item every 10 s for 12 minutes, with no flood. Pushes and their
 records are counted as the fake session read them. Raw: [`results/admission/`](results/admission/);
 command: `nice -n 19 ionice -c3 python run_cells.py ../results/admission @../results/admission/cells.json`.
@@ -427,11 +451,15 @@ throwaway lab from `harness/`, niced, and touches nothing live.
 **What happens.** The daemon reads datagrams one at a time on one event loop. A new valid item costs
 8–25 ms on an X925 core and 8–48 ms on an A725 core (§2: two fsyncs plus a JSON rewrite of every live
 dedup entry), so on ronan, at `nice -n 19` beside busier nice-0 neighbours, it sustained about 40
-new items/s, falling as its dedup set grows. Anything faster fills the socket's receive buffer (212 992 B,
+new items/s, falling as its dedup set grows (this niced, durable-write workload's observed rate on ronan
+aarch64, not a general daemon ceiling). Anything faster fills the socket's receive buffer (212 992 B,
 the kernel default; the daemon sets no `SO_RCVBUF`), and the kernel drops what doesn't fit, quiet stream
-and flood alike. Those drops are counted only in `/proc/net/udp` and `RcvbufErrors`. The daemon's health
-stayed `ok` with no reasons in every flood cell, frond-ear's receive health stayed `ok`, record v1's `gap`
-is `"unavailable"`, and no push mentions it. In F1 that was 92 020 097 datagrams over 10 minutes.
+and flood alike. Only the kernel counts those drops: per socket in `/proc/net/udp` (`drops`, the number
+used throughout this report), and network-namespace-wide in `/proc/net/snmp` `RcvbufErrors`, which can't
+attribute a drop to a socket. The daemon's health stayed `ok` with no reasons in every flood cell,
+frond-ear's receive health stayed `ok`, record v1's `gap` is `"unavailable"`, and no push mentions it. In
+F1 the daemon's socket dropped 92 020 097 datagrams over 10 minutes (its own `drops`, 99.98 % of what
+reached it).
 
 **Reproduction** (about 4 minutes):
 
@@ -441,15 +469,16 @@ nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py /tmp/r
   '[{"name":"repro-1","prod_keys":2,"mode":"valid","rate":0,"payload":"64","prod_wake":false,"ear_tune":"none","quiet_interval":10,"duration":120,"drain":60,"sample_every":1000}]'
 ```
 
-Expected on ronan: `kernel_drops` in the millions, quiet items reaching the daemon during the flood in
+Expected on ronan: `kernel_drops` (the daemon socket's own `drops`) in the millions, quiet items reaching the daemon during the flood in
 single digits or zero, daemon `health.state` `ok`, frond-ear `receiveHealth` `ok`.
 
 ### Finding 2: repeats of one valid frame are enough
 
 A valid frame resent unchanged is a duplicate: the daemon still verifies it before dedup finds the
 repeat, at about 70 µs each in the path (F4: 13 941 duplicates/s with the daemon at 97 % of a core while
-the flood ran). Two producers sending duplicates (1.09 M datagrams/s) dropped 98.7 % of everything at the
-kernel, and 1 of 30 quiet items arrived while it ran. Method note: each F4 producer re-signed its frame
+the flood ran). With two producers sending duplicates (1.09 M datagrams/s), the daemon's socket dropped
+98.7 % of the datagrams that reached it (322 844 021, its own `drops`), and 1 of 30 quiet items arrived
+while it ran. Method note: each F4 producer re-signed its frame
 once a second (so it never aged into the cheaper `expired` rejection), which adds 2 new items/s in all,
 about 2 % of the daemon's time; every other datagram was an exact duplicate. A sender without a key who
 replays frames captured from live traffic would send the same duplicates; that keyless case itself was
@@ -502,7 +531,8 @@ nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py /tmp/r
 
 ## What the numbers say to §2's owners (observations, not proposals)
 
-For 🍃 and 🌿 (§2) and 🌫, to weigh. Nothing here was changed.
+For 🍃 and 🌿 (§2) and 🌫, to weigh. Nothing here was changed. The cures the reviewers named afterwards
+are in the next section, kept apart from these observations and marked as candidates.
 
 - **§2.4 step 2 ("bound the receiver first … before any token budget") is the step that failed.** The
   built daemon has no per-source byte, queue or work cap; it serves datagrams in arrival order until the
@@ -512,12 +542,14 @@ For 🍃 and 🌿 (§2) and 🌫, to weigh. Nothing here was changed.
   with one producer sending new valid items, 12 of 18 quiet items got through at 400/s (F10), 3 of 18 at
   1 000/s (F11), and none from a real station driven at 5 000/s (F5). Duplicates of one valid frame do it
   at about 1 M datagrams/s (F4), which needs no key once a frame has been heard.
-- **The write-ahead save sets the host's new-item ceiling.** Rewriting the whole state with two fsyncs per
-  item caps ronan at about 40 new items/s, and lower as the dedup set grows (≈16/s predicted for 900 s
-  live-state items). Any ring or carriage that wants more items per second through this daemon meets this
-  first.
+- **The write-ahead save set the new-item rate observed here.** Rewriting the whole state with two fsyncs
+  per item held this niced workload on ronan aarch64 to about 40 new items/s, lower as the dedup set grows
+  (≈16/s predicted for 900 s live-state items). That is this durable-write workload's observed rate on
+  this host, not a general daemon ceiling. Any ring or carriage that wants more items per second through
+  this daemon meets it first.
 - **§2.4 step 6 ("gaps are reported, never silently skipped") has a source available**: the kernel counts
-  every datagram it drops for the socket (`SO_RXQ_OVFL`, `/proc/net/udp`), and today nothing reads it. The
+  every datagram it drops for the socket (`SO_RXQ_OVFL`, `/proc/net/udp`; the namespace-wide
+  `RcvbufErrors` can't say which socket), and today nothing reads it. The
   per-stream sequence hole (`N seqs skipped`) appears only in digest reports, not in the `immediate`
   pushes the live seats use. And the station already beacons `trail_seq` (amendment A1, `station.py`),
   which the RFC names as the source of record v1's per-item `gap`; the receptor still emits
@@ -545,7 +577,7 @@ For 🍃 and 🌿 (§2) and 🌫, to weigh. Nothing here was changed.
 
 | Layer | Counter or signal | Where it shows | Sees kernel socket drops? |
 |---|---|---|---|
-| kernel | per-socket `drops` and `rx_queue` (`/proc/net/udp`); host-wide `RcvbufErrors` (`/proc/net/snmp`) | nowhere in canticle; only this harness reads it | it is them |
+| kernel | per-socket `drops` and `rx_queue` (`/proc/net/udp`; also `SO_RXQ_OVFL`, if a socket asks for it); network-namespace-wide `RcvbufErrors` (`/proc/net/snmp`; namespace-level, not attributed to a socket) | nowhere in canticle; only this harness reads it | it is them |
 | host daemon | `health.counters.admission` (verified, duplicate, over_quota, …) and `.unverified` (unknown_key, bad_signature, expired, …), the D34 key-id table, `records.dropped` and `peers_closed` (a slow binding's queue), reasons `no_datagrams`, `records_lost`, `clock_skew` | `health` records every 10 s (1 s here) | **no**: it only counts what `recvfrom` returned. Record v1's per-item `gap` is always `"unavailable"` (`records.py`), though the RFC's §14.18.3 table makes it `trail_seq`-based once beacons carry `trail_seq`, which the built station's beacons now do |
 | record v1 binding (frond-ear `RecordConsumer`, this harness's probe) | `rec_seq` gaps → `records_lost` (and the live set cleared), `exit_without_bye`, `joined_late`, join-snapshot `truncated`/`omitted`, `live_overflow`, `malformed_record` | frond-ear `status` → `canticle.receiveHealth`, `reasons`, `counts`; `ear_status` | no |
 | frond-ear delivery | per-ear `counts`: `dropped` (per-stream buffer full), `off_air_unpushed`, `routed_late`, `not_allowlisted`, `muted`, `push_budget` (as `held`) | `ear_status` → `canticleDelivery`; and **in the push itself**: footer lines such as `prod:s00000: 380 dropped from a full buffer.`, `… 4 went off air unpushed` and `(27 more records wait for the next push.)`, a `late` line on a record past `maxAgeMs`, and in digest reports `N seqs skipped` | no |
