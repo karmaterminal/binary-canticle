@@ -63,7 +63,75 @@ producer ──UDP──▶ kernel socket buffer ──▶ canticle daemon ─�
                                             1 024 records each)
 ```
 
+## 2. Verify cost, per item (and why it isn't the ceiling)
+
+Method: [`harness/verify_bench.py`](harness/verify_bench.py), one process pinned with `sched_setaffinity`
+to cpu 19 (Cortex-X925) and then cpu 14 (Cortex-A725), 3 000 frames per step, `perf_counter_ns` around
+each call; frames are chatter ITEMs signed by a throwaway key, bodies of 64 B, 512 B and the largest that
+fits the frame. Raw: [`results/verify/verify.json`](results/verify/verify.json). Command:
+`nice -n 19 ionice -c3 python verify_bench.py ../results/verify/verify.json`.
+
+**Batches: not measurable yet.** Frame v2 carries one Ed25519 signature per datagram and the daemon
+verifies one per datagram; batch roots and membership proofs are unbuilt (design §2.8).
+
+**On payload size.** The workorder's "1 200 B" is the datagram cap (`MAX_DATAGRAM`). A frame may be at
+most 1 100 B (`MAX_FRAME`, RFC §9), so the largest payload is a body of about 975 B in a 1 098 B frame.
+That is what "max" means everywhere in this report.
+
+| step (ronan, aarch64) | frame | X925 mean µs (p99) | X925 per core /s | A725 mean µs (p99) | A725 per core /s |
+|---|---|---|---|---|---|
+| sign (what the station pays, for scale) | 186 B | 23.1 (25.6) | 43 206 | 52.0 (57.3) | 19 250 |
+| sign | 1 098 B | 24.8 (26.7) | 40 400 | 54.8 (64.5) | 18 264 |
+| Ed25519 verify alone | 186 B | 40.5 (42.8) | 24 722 | 101.4 (105.5) | 9 866 |
+| Ed25519 verify alone | 635 B | 40.8 (43.0) | 24 518 | 101.8 (105.8) | 9 819 |
+| Ed25519 verify alone | 1 098 B | 41.1 (43.2) | 24 344 | 102.3 (106.1) | 9 775 |
+| CBOR decode + re-encode (the determinism check) | 1 098 B | 12.2 (14.0) | 82 302 | 23.6 (26.8) | 42 417 |
+| whole admission parse, `wire.parse` | 186 B | 57.6 (60.0) | 17 367 | 136.0 (144.6) | 7 354 |
+| whole admission parse, `wire.parse` | 1 098 B | 58.9 (61.2) | 16 993 | 138.4 (148.3) | 7 226 |
+| `Listener.hear`, new item, no state file | 186 B | 65.2 (81.1) | 15 330 | 155.0 (189.3) | 6 453 |
+| `Listener.hear`, duplicate (a carousel repeat) | 186 B | 61.7 (64.7) | 16 196 | 146.1 (160.0) | 6 843 |
+
+Verify is flat in payload size: SHA-512 over 1 KB costs nothing next to the curve arithmetic. An A725
+core is 2.3–2.5 × slower than an X925 core at every step.
+
+**What a new item actually costs the daemon.** The daemon's `Receptor.hear` is write-ahead (RFC §14.18.2;
+`records.py` `Receptor._batch`): before it emits a new item's record, it saves the whole safety state,
+which is a JSON document of every live dedup entry and every surfaced tuple, written to a temporary file,
+fsynced, renamed and the directory fsynced. The same call with its state on the lab disk, then on
+`/dev/shm` (where fsync is free), as the dedup set grows:
+
+| live dedup entries before | state file after | X925, ext4/NVMe: ms per new item mean (p99) | X925, tmpfs | A725, ext4/NVMe | A725, tmpfs |
+|---|---|---|---|---|---|
+| 0 | 56 KB | 8.2 (26.2) | 0.6 | 8.1 (12.3) | 1.2 |
+| 1 000 | 280 KB | 12.5 (20.9) | 4.3 | 16.2 (22.4) | 9.1 |
+| 2 000 | 506 KB | 16.1 (20.4) | 8.2 | 26.9 (88.2) | 17.2 |
+| 3 000 | 732 KB | 20.7 (27.8) | 12.2 | 40.6 (100.8) | 24.8 |
+| 3 500 | 845 KB | 22.7 (30.5) | 14.2 | 44.5 (57.8) | 29.6 |
+
+A durable save of a tiny file alone (`atomic_write_json`, two fsyncs) took 7.4 ms mean, 13.8 ms p99,
+500 samples. So a new item costs about **7 ms of fsync plus about 4 µs per live dedup entry on an X925
+core (8 µs on an A725)**, about 226 B of state per entry, while a duplicate costs only its verify
+(62.6 µs X925, 150.9 µs A725, no save). Verify is under 1 % of a new item's cost.
+
+A dedup entry lives for the item's local expiry plus 5 s, so at a steady rate *r* of new chatter items
+(TTL 60 s) the daemon holds about 65·*r* entries, and the ceiling is where *r* × cost(65·*r*) = 1 s. On an
+X925 core that is about 50 items/s, on an A725 core about 35/s, for every stream and every payload size.
+For live-state items at the 900 s TTL the live `facts` and `display` streams use, the same arithmetic
+gives about 16/s on an X925 core. At the per-key quota of 100 000 entries (one key in the manifest), a
+save would be about 22 MB of JSON and over 400 ms. These are predictions from the isolated costs; the
+in-path numbers below are what the built path did.
+
 <!-- RESULTS -->
+
+## What each layer can report about loss, and what it can't
+
+| Layer | Counter or signal | Where it shows | Sees kernel socket drops? |
+|---|---|---|---|
+| kernel | per-socket `drops` and `rx_queue` (`/proc/net/udp`); host-wide `RcvbufErrors` (`/proc/net/snmp`) | nowhere in canticle; only this harness reads it | it is them |
+| host daemon | `health.counters.admission` (verified, duplicate, over_quota, …) and `.unverified` (unknown_key, bad_signature, expired, …), the D34 key-id table, `records.dropped` and `peers_closed` (a slow binding's queue), reasons `no_datagrams`, `records_lost`, `clock_skew` | `health` records every 10 s (1 s here) | **no**: it only counts what `recvfrom` returned. Record v1's per-item `gap` is `"unavailable"` (RFC §14.18.3 table: not until beacons carry `trail_seq`) |
+| record v1 binding (frond-ear `RecordConsumer`, this harness's probe) | `rec_seq` gaps → `records_lost` (and the live set cleared), `exit_without_bye`, `joined_late`, join-snapshot `truncated`/`omitted`, `live_overflow`, `malformed_record` | frond-ear `status` → `canticle.receiveHealth`, `reasons`, `counts`; `ear_status` | no |
+| frond-ear delivery | per-ear `counts`: `dropped` (per-stream buffer full), `off_air_unpushed`, `routed_late`, `not_allowlisted`, `muted`, `push_budget` (as `held`) | `ear_status` → `canticleDelivery`; and **in the push itself**: footer lines such as `prod:s00000: 380 dropped from a full buffer.` and `(27 more records wait for the next push.)`, and a `late` line on a record past `maxAgeMs` | no |
+| the session | what the push says | the channel event | no |
 
 ## Harness
 

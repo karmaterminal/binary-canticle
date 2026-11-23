@@ -42,7 +42,7 @@ def main() -> int:
     cells = json.loads(Path(spec[1:]).read_text() if spec.startswith("@") else spec)
     out.mkdir(parents=True, exist_ok=True)
     m = machine()
-    (out / "machine.json").write_text(json.dumps(m, indent=1))
+    (out / f"machine-{Path(spec[1:]).stem if spec.startswith('@') else 'inline'}.json").write_text(json.dumps(m, indent=1))
     n = os.cpu_count()
     for p in cells:
         waited = 0
