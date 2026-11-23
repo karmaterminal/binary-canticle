@@ -1,6 +1,6 @@
 # RFC-0001: claims against code (2026-11-23)
 
-A read-only audit: what [`rfc/0001-binary-canticle.md`](../0001-binary-canticle.md) claims, checked claim by claim against the code. It is step 1 of the RFC revision (map: #172). It edits no RFC text and proposes none. figs asked for an RFC that the frond's capability map can stand on, and a check of its claims against the code; this is that check.
+A read-only audit: what [`rfc/0001-binary-canticle.md`](../0001-binary-canticle.md) claims, checked claim by claim against the code. It is step 1 of the RFC revision (map: #172). It edits no RFC text and drafts none. figs asked for an RFC that the frond's capability map can stand on, and a check of its claims against the code; this is that check.
 
 Parts: [1 Summary](#1-summary) · [2 Tables per section](#2-tables-per-rfc-section).
 
@@ -21,9 +21,9 @@ Parts: [1 Summary](#1-summary) · [2 Tables per section](#2-tables-per-rfc-secti
 ## How it was done, and what it does not show
 
 - **Claims.** Every MUST, SHOULD and MAY, every field, table or default that binds an implementation, and every plain "the station does X". Compound sentences are split, so one RFC line can give several rows. Left out: rationale, credits, prior art, and pure history. Of the 309 RFC lines that carry a BCP 14 word, 299 have rows; the other ten are headings (1388, 2965), lead-ins whose items have rows (1983, 2451, 2866), the key-words paragraph (50), a "not a MUST" (2433), a CDDL comment (730), a deviation note (2082) and a lineage pointer (3309).
-- **Checking.** The RFC was read whole. Thirteen section audits and two code-first scans (station; frond-ear and plugin) opened the code for each row. A script checked that every quote is on its RFC line and that every cited file, line and Python test exists. About 60 rows were then re-read at random against their cited code; one was reclassified. Every top-10 item below was re-read by hand.
+- **Checking.** The RFC was read whole. Thirteen section audits and two code-first scans (station; frond-ear and plugin) opened the code for each row. A script checked that every quote is on its RFC line and that every cited file, line and Python test exists. 76 rows were then re-read at random against their cited code; one was reclassified. Every top-10 item below was re-read by hand, and an independent reviewer then tried to falsify section 1: about 260 sentences and cells, 57 problems (18 wrong facts), all fixed here. The tables have not had that second check row by row; their "Admitted" entries in particular may be incomplete.
 - **Run.** Scratch copies only, no live daemon, station or room: station suite 413 tests OK (Python 3.12.3; CI uses 3.11), frond-ear `canticle*.test.ts` 411/411, plugin 136/136 (Node 26.9.0). Items marked **[ran]** were also reproduced with plain library calls (no sockets). Everything else is from reading.
-- **"Implemented" is narrow.** The code with that role does what the sentence says. It does not mean deployed, reviewed or safe. 252 of the 1381 implemented rows have no test; at least 67 are prohibitions that hold only because the thing they forbid does not exist.
+- **"Implemented" is narrow.** The code with that role does what the sentence says. It does not mean deployed, reviewed or safe. 252 of the 1382 implemented rows have no test; at least 67 are prohibitions that hold only because the thing they forbid does not exist.
 - **Not checked:** OpenClaw core (other repository), ews-concept-new, live seat configuration (beyond what #161 and #171 already published), operator practice. Those rows are `unclear`.
 - **One source is stale.** The plugin README says no seat runs it, and some rows repeat that. #161's inventory (2026-11-22) shows the older six-tool plugin installed and connected on ronan since 11-17.
 
@@ -33,7 +33,7 @@ Parts: [1 Summary](#1-summary) · [2 Tables per section](#2-tables-per-rfc-secti
 
 ## 1.1 Counts
 
-**2820 claims: 1381 implemented (I) · 456 diverged (D) · 885 unbuilt (U) · 11 obsolete (O) · 87 unclear (?).**
+**2820 claims: 1382 implemented (I) · 456 diverged (D) · 885 unbuilt (U) · 10 obsolete (O) · 87 unclear (?).**
 
 | | I | D | U | O | ? |
 |---|---|---|---|---|---|
@@ -42,9 +42,9 @@ Parts: [1 Summary](#1-summary) · [2 Tables per section](#2-tables-per-rfc-secti
 |SHOULD (NOT)|14|7|24||3|
 |MAY|16|5|54|||
 |[PROPOSED DEFAULT]|52|29|76||4|
-|plain statement|1022|335|547|11|72|
+|plain statement|1023|335|547|10|72|
 
-Of the 456 diverged rows: the RFC's rule is judged better in 283, the code's in 48, neither in 35, and 90 need an owner. 168 have no departure note anywhere.
+Of the 456 diverged rows: the RFC's rule is judged better in 283, the code's in 48, neither in 35, and 90 need an owner. For 168 the audit found no departure note.
 
 | RFC section | claims | I | D | U | O | ? |
 |---|---|---|---|---|---|---|
@@ -63,7 +63,7 @@ Of the 456 diverged rows: the RFC's rule is judged better in 283, the code's in 
 |13 Discovery|52|25|1|25||1|
 |14 Receptor and landing|751|424|158|147|5|17|
 |15 Publishing|127|55|39|31||2|
-|16 Harness bindings|105|36|16|25|1|27|
+|16 Harness bindings|105|37|16|25||27|
 |17 MAGI|47|7|5|34||1|
 |18 SeedLink, dashboards|71|26|9|28||8|
 |19 Security|107|35|29|37||6|
@@ -79,73 +79,74 @@ The shape of it: §5, §7, §8, §9 and record v1 (§14.18.3) are largely built 
 ## 1.2 The ten divergences that matter
 
 **1. A heard item of any class can wake a Claude seat.**
-- *RFC:* D1 and §14.10 (1991-2021), D25, §14.18.9, §16.5 (2591), Never 3: silent-only until S3 passes; then verified `alarm` only, under 11 conditions.
-- *Code:* frond-ear sends a channel notification (banner `mode=silent-wake`), which starts a turn in an idle session, for any class from a key on `wakeKeys` at hop 0, not wake-derived, when the ear's mode allows it (`fe/delivery:1168-1181,2697-2702`; `fe/src/shim:654-667`). Of the 11 conditions, 1 and 8 hold and 9 in part; 4-6 are replaced by a mode, an hourly push cap (60, at most 360) and a breaker hold the daemon never triggers; 2, 3, 7, 10 and 11 are absent. Class, scope (Never 18), `lens.*` (§17.5) and opaque content (§9.9) are never checked. It is off by default; #171 recorded a live config with 2 wake keys and 3 stations on `immediate`.
-- *Admitted:* `fe/docs/runbook:844-855`. Not in the RFC, this repo's README (121) or the skill (`SKILL.md:32`, "silent-only").
+- *RFC:* D1 and §14.10 (1991-2021), D25, §14.18.9, §16.5 (2591): silent-only until S3 passes; then verified `alarm` only, under 11 conditions.
+- *Code:* frond-ear sends a channel notification (banner `mode=silent-wake`), which starts a turn in an idle session, for any class from a key on `wakeKeys` at hop 0, not wake-derived, when the ear's mode allows it (`fe/delivery:1168-1181,2697-2702`; `fe/src/shim:654-667`). Of the 11 conditions, 8 holds, 1 holds on the host-daemon source (the embedded listener has no quarantine) and 9 in part; 4-6 are replaced by a mode, an hourly push cap (60, at most 360) and a breaker hold the daemon never triggers; 2 is replaced by the key allowlist; 3, 7, 10 and 11 are absent. Class, scope (Never 18), `lens.*` (§17.5) and opaque content (§9.9) are never checked. It is off by default; #171 recorded a live config with 2 wake keys and 3 stations on `immediate`.
+- *Admitted:* `fe/docs/runbook:844-855`. Not in the RFC, the root `README.md:121` or the skill (`SKILL.md:32`, "silent-only").
 - *Better:* **owner.** Settled in practice on frond-ear#65 (10-10); bc#100 has tracked the missing amendment since.
 
 **2. Nothing stamps hop, lineage or `wake_derived`, so the loop guards cannot fire.** **[ran]**
-- *RFC:* §14.8.1, §14.11, §15.4 item 5, Never 3-4: the publish tool stamps them.
-- *Code:* the station's control socket has no such fields and signs every item hop 0, rootless, `wake_derived` 0 (`runner:85-107`, `station:309-312`). A request naming `hop`, `wake_derived` or `mode: addressed` is accepted and they are dropped. A woken session's `canticle sing` is therefore exactly what the next ear's push gate accepts; only the allowlist, mutes and the hourly cap bound the loop.
-- *Admitted:* the missing stamping at README:65 and `pl/README:480`; not the consequence. *Better:* **rfc.** *#162* stamps its separate derived op only (`#162/derived_reply_proposal:602-604`), off by default, and no frond-ear route is wired to it.
+- *RFC:* §14.8.1, §14.11, §15.4 item 5, Never 3 (wake-derived frames never wake) and 4: the publish tool stamps them.
+- *Code:* the station's control socket has no such fields and signs every item hop 0, rootless, `wake_derived` 0 (`runner:85-107`, `station:309-312`). A request naming `hop`, `wake_derived` or `mode: addressed` is accepted and they are dropped. A woken session's `canticle sing` is therefore exactly what the next ear's push gate accepts; only the allowlist, the ear's mode (off by default), mutes, the debounce and the hourly cap bound the loop.
+- *Admitted:* `pl/README:479-480`: the stamping cannot be done through that socket, derived content would go out unstamped, and the plugin therefore refuses a tainted session every sing. Not in the station README; the effect on the push gate nowhere. *Better:* **rfc.** *#162* stamps its separate derived op only (`#162/derived_reply_proposal:602-604`), off by default, and no frond-ear route is wired to it.
 
 **3. There is no taint on the deployed path, and pushes go to Discord-bound sessions.**
 - *RFC:* §14.12 items 1-7, its BC-1 interim rule (2053: no ambient delivery to a session with an off-host route), §15.4 item 4, Never 1, 6 and 13.
 - *Code:* frond-ear has no taint and no tool gate; its room gate defaults to `observe`, which refuses nothing (`fe/src/egress:104-118`), and every frond-ear session has a Discord route by design. `canticle listen` under Monitor, which README:224 recommends, has no banner or wrapper either. The plugin taints on payload reads and consumed slots and bars only its own `canticle_sing`.
-- *Admitted:* `fe/docs/runbook:852`, `pl/README:482`. *Better:* **rfc** for the enforcement; **owner** for 2053 (§23.2 question 22).
+- *Admitted:* `fe/docs/runbook:852`, `pl/README:482`, README:67 and 230 (landing and taint not implemented, S3). *Better:* **rfc** for the enforcement; **owner** for 2053 (§23.2 question 22).
 
 **4. Trust, revocation and key custody are not §10's.** **[ran]**
 - *RFC:* §10.3 (root-signed CBOR, genesis pin, serial, 7 days, fail closed), §10.5 and D15; D35: the host daemon holds the station keys and signs.
-- *Code:* plain, unsigned spike-0 JSON (`manifest:109-133`). The loader that the daemon, stations and listeners use ignores the format label, `signed` and unknown fields, so a misspelt `revoked` leaves the key trusted; only `manifest verify`, `doctor` and `dns-browse` run the strict check. Revocation needs an edit and a restart of every process, and an older file un-revokes it. Keys are files read by one `canticle station` process per key; the daemon holds none and discards publish lines (`daemon:36-38,175-206`). Seat sessions share that uid (#99, #168 §4.4).
-- *Admitted:* unsigned and file keys (README:63-64), no daemon reload (README:504); not the lax loader, the rollback or D35. *Better:* **rfc** on signing, revocation and key isolation; **code** on keeping keys out of the process that parses hostile UDP.
+- *Code:* plain, unsigned spike-0 JSON (`manifest:109-133`). The loader that the daemon, stations and listeners use ignores the format label, `signed` and unknown fields, so a misspelt `revoked` leaves the key trusted; only `manifest verify|show`, `doctor` and `dns-browse` run the strict check. Revocation needs an edit and a restart of every process, and an older file un-revokes it. Keys are files read by one `canticle station` process per key; the daemon holds none and discards publish lines (`daemon:36-38,175-206`). On silas, agent sessions share that uid (#168 §4.4); other seats are not attested here.
+- *Admitted:* unsigned and file keys (README:63-64), publishing not through the daemon (README:445-447), no daemon reload (README:504), the lax loader only in a docstring (`manifest:170-171`); not the rollback. *Better:* **rfc** on signing, revocation and key isolation; **code** on keeping keys out of the process that parses hostile UDP.
 
 **5. The receptor is looser than §12.2, which §12.8 forbids; unverified floods displace verified frames.**
 - *RFC:* §14.1 steps 1-2 (per-key and per-source rate, then crypto), the MUST NOT at 1705, §12.8 (1590).
-- *Code:* one kernel queue in arrival order, no rate, a durable save per new item (`daemon:489-493`). #171's flood acceptance test **fails**, with health `ok` while it did.
-- *#173* fixes displacement (short of a spoof of the station's own address) and reports loss, but in another order: exact repeats dropped before verify, rates debited after verify (`#173/intake:71-84,537-567`; its README:509 says so). #171 argues the RFC's pre-crypto per-key rate lets a forger spend the victim's budget.
-- *Better:* **code** (#173's order); the RFC's order needs an amendment.
+- *Code:* one kernel queue in arrival order, no rate, a durable save per new item (`daemon:489-493`, `records:215-233`). #171's flood acceptance test **fails**, with health `ok` while it did.
+- *#173* fixes displacement (its README:581-589 names what is left: a spoof of the station's own address, a station that is still a stranger among many, a reader outrun at line rate) and reports loss, but in another order: exact repeats dropped before verify, rates debited after verify (`#173/intake:71-84,537-567`; its README:509 says so). #171 argues the RFC's pre-crypto per-key rate lets a forger spend the victim's budget.
+- *Better:* against `main`, the RFC (rows 1705, 1590); between the RFC's order and #173's, **code**, so §12.2 and §14.1 need an amendment.
 
-**6. An expired item can land again as new, two ways (I-3, I-4, §7.4, EM-01, EM-02).** **[ran]**
+**6. An expired item can land as new after a restart (I-3, EM-01, EM-02), and a live one can land twice (I-4, §7.4).** **[ran]**
 - *Replay after a restart.* Beacons have no time window (§12.2 step 3 relies on the `(epoch, bseq)` mark), and neither RFC nor code persists that mark or δ̂ (`listener:260-264,666-680`). After a receiver restart, or on a first join, with the station silent, a captured hour-old beacon and item land as `verified`, age 0, with a full 60 s TTL. Without the restart both are refused. frond-ear's embedded listener has the same code (`fe/listener:636-650`); #173 does not change it.
-- *A rise in δ̂.* Dedup retention is fixed at first hearing (`listener:368`), admission uses the current δ̂ (`wire:445-449`). An ordinary looped copy landed as a second new item 5 s after its own expiry, once δ̂ rose by 20 s.
-- *Admitted:* nowhere. *Better:* **neither**; the RFC has the same holes.
+- *A rise in δ̂.* Dedup retention is fixed at first hearing (`listener:368`), admission uses the current δ̂ (`wire:445-449`). With a station clock 20 s behind and the item first heard before any beacon, it expired early at the receiver; once a beacon lifted δ̂, its ordinary loop was admitted as a second new item 5 s later, still inside its signed life. Unkeyed items only: a keyed one is refused as `superseded`.
+- *Admitted:* nowhere for items; 565 and 574 handle a δ̂ rise for PLUCKs and marks, and 484 does not for dedup. *Better:* **neither**; the RFC has the same holes.
 
 **7. The path in use between hosts is in no §11 binding.**
 - *RFC:* relay lease MUST, "the default outside a known wired VLAN" (1177); §4.3: `lan` frames stay on LAN multicast and LAN relays; `canticle doctor` decides multicast (§11.2).
-- *Code:* `canticle station --to peer:9999`, plain unicast to a static list, one pilot host on Wi-Fi (`runner:179-184`). No relay code exists. The daemon judges everything it hears as `lan` (`daemon:405-408`), and unicast has no TTL bound. `doctor` is a host check: steps 1 and 3-7 are unbuilt, and exit 0 means something else.
+- *Code:* `canticle station --to peer:9999`, plain unicast to a static list (`runner:179-184`), which also strains I-1 (244, 1182); one pilot host is on Wi-Fi (`cs/docs/pilot-host/README:92,243`). No relay code exists. The daemon judges everything it hears as `lan` (`daemon:405-408`), and unicast has no TTL bound. `doctor` is a host check: step 2 is an unsigned loopback probe, steps 1 and 3-7 are unbuilt, and exit 0 means something else.
 - *Admitted:* doctor at README:73,136-138; the unicast path nowhere as a departure. *Better:* **neither**: the RFC needs a LAN-unicast binding, and the code a real scope boundary.
 
-**8. Publishing does not go through the daemon, has little of §15.4, and can answer "on air" for frames nobody can hear.** **[ran]**
+**8. Publishing does not go through the daemon, has little of §15.4, and can answer `ok` for frames nobody can hear.** **[ran]**
 - *RFC:* §11.1 (1205), §15.2, D35: sing and hush over the daemon's socket; §15.4 items 1-10.
-- *Code:* each station has its own control socket, which the RFC never describes (`runner:82-177`). It checks uid (and skips the check where `SO_PEERCRED` is missing, `runner:153-154`), class, scope and stream, and nothing of items 4-7 and 9. It signs a `state_key` over 32 B, a `purpose` over 128 B or an `intensity` over 255, returns ok, and every receiver refuses the frame as `bad-field`. An unknown `loop` word is refused only after the sequence number is spent and the current keyed value is off the air (`station:314-322`). `hush` ignores the socket's class grant; a revoked key keeps signing until restart.
-- *Admitted:* content policy and taint (README:65). *Better:* **code** on where the key lives; **rfc** on the checks.
+- *Code:* each station has its own control socket, which the RFC never describes (`runner:82-177`). It checks uid (and skips the check where `SO_PEERCRED` is missing, `runner:153-154`), class, scope and stream, refuses regulatory, alarm and control to everyone (stricter than item 4), and has nothing of the rest of items 4-7 and 9. It signs a `state_key` over 32 B, a `purpose` over 128 B or an `intensity` over 255, returns ok, and every receiver refuses the frame as `bad-field`. An unknown `loop` word is refused only after the sequence number is spent and the current keyed value is off the air (`station:314-322`). `hush` ignores the socket's class grant; a revoked key keeps signing until restart.
+- *Admitted:* publishing not through the daemon (README:445-447, `daemon:38-39`), the socket's narrower grant (README:17), content policy and taint (README:65), the uid skip (root `README.md:126-128`). *Better:* **code** on where the key lives; **rfc** on the checks.
 
-**9. The station stops repeating items that §12.3 never sheds, and its restart loses PLUCKs.** **[ran]**
-- *RFC:* §12.3 A3 never stops live-state, regulatory or root; §7.1: a PLUCK MUST loop until its target's expiry; `B_stream`/`B_station` bound what is sent (§7.5, 1216 MUST).
-- *Code:* `NEVER_SHED = {control, alarm}` (`station:38,374-377`). A live-state item with a 29 s TTL at the default loop goes out at 0, 1, 2 and 4 s and never again; `root` at `loop=slow` likewise. Late joiners never hear it, while the beacon counts it live. Bursts, PLUCKs and beacons are outside the budgets. The ring, PLUCKs and keep-on-air chains are memory only, and a new epoch cannot pluck old tuples.
-- *Admitted:* burst accounting (README:71). *Better:* **rfc**, except that §7.1 and §7.3 contradict each other on restart.
+**9. The station stops repeating items that §12.3 never sheds, and its restart loses PLUCKs.** **[ran]** (first point)
+- *RFC:* §12.3 A3 never stops live-state, regulatory or root; §7.1: a PLUCK MUST loop until its target's expiry; the burst is charged to `B_stream` and skipped when the budget is exhausted (555); senders MUST respect `B_station` (1216).
+- *Code:* `NEVER_SHED = {control, alarm}` (`station:38,374-377`). A live-state item with a 29 s TTL at the default loop goes out at 0, 1, 2 and 4 s and never again; `root` at `loop=slow` likewise. Late joiners never hear it, while the beacon counts it live. Burst copies (one at once, three later, per sing, refresh and pluck) are charged to nothing and no sing is refused for load; loop repeats, PLUCKs included, stay inside `B_stream`. The ring, PLUCKs and keep-on-air chains are memory only, and a new epoch cannot pluck old tuples.
+- *Admitted:* burst accounting (README:71); shedding after the burst (`pl/README:478`, `station:424`), but not that live-state, regulatory and root are shed. *Better:* **rfc**, except that §7.1 and §7.3 contradict each other on restart.
 
 **10. Withdrawals are lost at the edges, and the mixed-host gate has no receipt.** **[ran]** (first point)
-- Retracts owed at daemon start are emitted before the first `landing_state`, and the socket opens only after that, so no binding can receive them (`records:241-248`, `daemon:473-481`). Revocation works only by this path.
-- The RFC contradicts itself on a restart into the same run: §14.18.3 (2265, 2271) and proof (6)(e) settle every pending key undelivered; §14.18.5 (2310, 2316) and §14.18.6 (2322) keep and deliver them. Both bindings keep them. The plugin also refuses a run for good after one disconnect or `rec_seq` gap (`pl/candidates:32,149,184`), and stops a sync at the first failing session (`pl/binding:456-477`).
-- §14.18.2's proof gate before a mixed host has loopback tests for cases (1), (2), (3), (5) and half of (7), and no receipt from silas or ronan; (6)(a)-(d) have nothing. Ronan has carried both bindings since 11-17 (#161). Line 3253 still says frond-ear's canticle stays off there until the proofs pass.
+- Retracts owed at daemon start are emitted before the first `landing_state`, and the socket opens only after that, so no binding can receive them (`records:241-248`, `daemon:473-481`; README:485-487 states the order). Revocation works only by this path. Both bindings drop the old run's items at a new `run`, so what is lost is the withdrawn mark on text already journalled or landed.
+- The RFC contradicts itself on a restart into the same run: §14.18.3 (2265, 2271) and proof (6)(e) settle every pending key undelivered; §14.18.5 (2310, 2316) and §14.18.6 (2322) keep and deliver them. Both bindings keep them. After one disconnect or `rec_seq` gap the plugin also stops ambient delivery for that run until the gateway restarts or the daemon starts a new run (`pl/candidates:32,149,184`), and it ends a sync at the first failing session (`pl/binding:456-477`).
+- §14.18.2's proof gate before a mixed host has loopback or unit tests for cases (1), (2), (3), (5), (6)(f) and halves of (4) and (7), and no receipt from silas or ronan in either repository; (6)(a)-(d) have nothing. Ronan has carried both bindings since 11-18 at the latest (#161: plugin connected since 11-17, frond-ear's process up since 11-18). Line 3253 still says frond-ear's canticle stays off there until the proofs pass.
 - *Admitted:* README:504,519 in part. *Better:* **rfc** on the gate; **owner** on the restart rule.
 
-**Next ten, one line each.**
+**Next, one line each.**
 - **Epochs.** A receiver keeps the highest epoch for ever (§5.2's window is ignored) and never treats two live epochs as equivocation: a copied key with a higher epoch leaves the real station `epoch_regression` on day 30 too, with nothing quarantined **[ran]** (`listener:236-240,555-586`).
 - **Equivocation.** The daemon quarantines with no TTL or rescind (§14.7.3 says 1 h) and keeps no second frame, so no transferable proof (§10.8) exists; frond-ear embedded and `canticle listen` never quarantine.
 - **The receptor core.** There is no hearer ring, receipt log, judgment object, salience, regulation or breaker producer, yet record v1's `sha256` and `bytes` point at a ring copy (§14.3-§14.8; README:507-512).
 - **A1's receiver half.** Beacons carry `trail_seq`, but nothing acts on it and `gap` is always `unavailable` (`records:477`); `catalog_digest` hashes a private projection and no receiver reads it.
-- **Findings (FP-1, D37)** reach no session as words: frond-ear and the plugin print a binary placeholder; only `canticle tap` decodes content type 11.
+- **Findings (FP-1, D37)** reach no push and no `hear` as words: frond-ear and the plugin print a binary placeholder; only `canticle tap` decodes content type 11.
+- **Stream grants.** Receivers never check the manifest's `streams` (§10.4, 1067): an ungranted stream id is `verified`, moves epoch, quota and marks, and its PLUCK retracts (admitted, README:497-498).
 - **`canticle shape`** shows live stations to humans on a host-side list alone (`shape:428-434`), which proposed D38/§18.9 forbids; only `--display` needs a station-signed grant.
-- **Host-authored text can be forged.** `canticle tap` prints the signed `purpose` with its newlines, outside the wrapper, so a station can add banner-looking lines **[ran]** (`tap:159`).
-- **Presence.** frond-ear renders `UNOBSERVABLE` raw without "since t" (§8.6) and keeps stale presence after a gap; a root item without a body reads as UNEQUIP (`listener:715-723`).
+- **Rendering.** `canticle tap` prints the signed `purpose` with its newlines, outside the wrapper, so a station can add banner-looking lines **[ran]** (`tap:159`). frond-ear shows `UNOBSERVABLE` raw without "since t" (§8.6) and keeps stale presence after a gap.
+- **Root marks.** A root item with no body reads as UNEQUIP, and its class and content type are unchecked (`listener:715-723`).
 - **Keep-on-air and refresh.** Any keyed item may stay up 24 h (admitted, README:77), and `tap`, `shape` and the plugin count each refresh as new (§7.9).
 - **Retention.** The plugin's journal serves heard bodies for 24 h by default after expiry or pluck (§14.5, I-10).
 
-## 1.3 What the code depends on and the RFC never states
+## 1.3 What the code depends on and the RFC does not state, or states otherwise
 
-Deduplicated from 247 gap records. "Half" means the RFC states part of it; "contradicts" means it says otherwise.
+Condensed from the 247 gap records of the two scans and the section audits. "Half" means the RFC states part of it; "contradicts" means it says otherwise.
 
 **Wire and identity**
 
@@ -154,12 +155,12 @@ Deduplicated from 247 gap records. "Half" means the RFC states part of it; "cont
 | Decoder subset | No floats, tags or other simple values at any depth; map keys int or text only; explicit null is not absence; trailing bytes refused | `cbor:50-112`, `wire:259-306` | half, §9.4-9.5 |
 | Depth counting | The frame map is level 1; the depth-bomb vector cannot tell 4 from 5 | `cbor:24-25,137-142` | silent |
 | Field bounds | `class`, `lens`, integer `ctype` ≤ 65535; PLUCK `target_seq < seq`, `reason` ≤ 2; non-zero reserved flags refused | `wire:259-340` | half, §9.6-9.7 |
-| Reject vocabulary and order | `oversize`, `short`, `bad-field` … and which check fires first; vectors depend on it | `wire:391-457` | silent |
+| Reject vocabulary and order | `oversize`, `short`, `bad-field` … and which check fires first; vectors depend on it | `wire:391-457` | half; the order departs from §14.1 |
 | `catalog_digest` input | The CBOR array and its order | `station:500-503` | silent, §8.4 |
 | Paging schedule | Moving cursor, page index is only a counter, unpaged when it fits, 32-entry cap ends a page | `station:505-549` | half |
 | Beacon durability | `bseq` and δ̂ are per-run memory | `listener:260-264` | silent (item 6) |
 | Vector file grammar | The JSON the second implementation reads | `vectors` | silent, §9.13 |
-| Station names are not unique | Rotation gives one name several keys; tune, grants, presence and DNS key on the name | `manifest:82-95` | contradicts, §5.3 |
+| Station names are not unique | Rotation gives one name several keys; tune, grants, presence and DNS key on the name | `manifest:82-95` | half, §10.5 (1078) |
 | New class codes | A manifest naming an unknown class or scope fails to load whole | `manifest:110-125` | silent |
 
 **Station and publishing**
@@ -167,15 +168,15 @@ Deduplicated from 247 gap records. "Half" means the RFC states part of it; "cont
 | gap | what the code relies on | where | RFC |
 |---|---|---|---|
 | Control-socket protocol | One socket per station: path, 0600, peer uid, one JSON line, 64 KiB, ops `sing`/`hush`/`status`/`public_catalog`, reply shape | `runner:82-177` | contradicts, §11.1 |
-| Socket grant | `--socket-class` narrows the key's grant; regulatory, alarm and control never over the socket | `runner:28-31,121-132` | silent |
+| Socket grant | `--socket-class` narrows the key's grant; regulatory, alarm and control never over the socket | `runner:28-31,121-132` | contradicts, §15.1 (2411) |
 | `hush` names a seq | No epoch or opaque item reference; callers must read `status` first | `station:343-364` | contradicts, §15.1 |
-| Key, epoch and lease files | Seed as hex, `.epoch`, `.lease`, one process per key | `station:105-140` | half, §5.2 |
+| Key, epoch and lease files | Seed as hex, `.epoch`, `.lease`, one process per key | `station:105-140`, `__main__:139-158` | half, §5.2 |
 | Restart | New epoch; live items, PLUCKs, seqs and keep-on-air chains end silently | `station:192` | half, §7.3 |
 | Budget floor | Streams cut to no less than 500 bit/s, by configured class, once at start | `station:218-230` | silent |
 | Availability ceiling | Judged once, at admission; `degraded` is the clamp reason | `station:236-252` | contradicts, §7.5 |
 | Default scope | `lan` for every class | `station:270` | contradicts, §6.2 |
 | Typed streams | `beacon` (typed beacon items, #142) and `display` (grants, #137): keyed live-state items with their own bodies, typed by stream name | `beacon:35-37`, `grant:29-129` | contradicts, §5.4 ("opaque tags") |
-| `shape`, `tap`, `dns-browse`, `vectors`, exit codes | CLI verbs and contracts | `__main__` | silent, §15.7 |
+| `shape`, `tap`, `dns-browse`, `vectors`, exit codes | CLI verbs and contracts | `__main__` | half, §15.7 (2798 names `tap`) |
 
 **Receptor and host daemon**
 
@@ -185,7 +186,7 @@ Deduplicated from 247 gap records. "Half" means the RFC states part of it; "cont
 | LAN unicast binding | Item 7; the binding label is fixed `lan`; source address never trusted; the nft guard is the only network gate | `daemon:405-408`, `cs/docs/pilot-host` | silent, §11 |
 | Write-ahead | Save, then number and send; a failed save ends the run `state_not_durable` | `records:108-120,215-233` | silent |
 | Safety-state file | Versioned JSON; rewritten whole per change; what survives a restart | `listener:666-713` | half |
-| Socket takeover and leases | Probe, unlink, refuse; silent abort on uid, full or not ready | `daemon:350-360,386-463` | silent |
+| Socket takeover and leases | Probe, unlink, refuse; silent abort on uid, full or not ready | `daemon:350-360,386-463` | half (1204, 2166, 2255) |
 | `idem` radix and big integers | `stream_id` as 8 hex digits; `seq` above 2^53−1 is a string; the plugin drops records that differ | `records:151-160` | silent, §14.18.3 |
 | Frame record encodings | Nulls, `text` or `base64`, tuple and `body_ref` objects; which fields are required | `records:436-497` | half |
 | `health`, `hello`, `fatal`, `presence` fields | Names and values on the wire; #173 adds more | `records:241-252,499-552` | half |
@@ -193,7 +194,7 @@ Deduplicated from 247 gap records. "Half" means the RFC states part of it; "cont
 | Snapshot details | Entry wrapped as `{frame}` or `{presence}`; request only as the first line | `daemon:183-206,253-275` | half |
 | Local quarantine | Items from a quarantined key keep their body at `ringbuffer_only`; no end | `records:389-397,428-434` | contradicts, §14.7.3 |
 | Warm-up default | 6.7 s when no loop is advertised; live-state only | `listener:539-547` | half, §6.3 |
-| Per-key share | Capacity ÷ manifest entries, revoked ones included | `listener:493-497` | contradicts, §7.4 |
+| Per-key share | Capacity ÷ manifest entries, revoked ones included | `listener:493-497` | half, §7.4 (486, 489 name the spike's equal share) |
 | #173's intake | Queues per claimed key, stream and source; exact-repeat digests; buckets 16/12/8 per s; 32 datagrams per save | `#173/intake:71-86,246-567` | contradicts, §14.1 order |
 
 **Bindings**
@@ -205,10 +206,10 @@ Deduplicated from 247 gap records. "Half" means the RFC states part of it; "cont
 | Push budget and cadence | Hourly cap, debounce ≥ 5 s, `maxAgeMs`, report order and cursor | `fe/delivery:1128-1390` | contradicts, §14.6.5 |
 | Coverage notes, local omissions | What the binding withheld is told, with reason and span; a note-only push | `fe/delivery:27-57` (frond-ear#119) | silent; #168 §2.7a |
 | Live-set fairness | 4 096 records; a share per tuned stream, one for all untuned | `fe/records` (frond-ear#119) | silent |
-| Session incarnation | ear + attach generation + session id; or sessionKey + sessionId + lifecycleRevision; or #162's sub-agent key only | `fe/src/store`, `pl/oc0-host:12-25` | silent |
+| Session incarnation | ear + attach generation + session id (frond-ear); sessionKey + sessionId + lifecycleRevision (plugin; #162 the same, for a sub-agent key only) | `fe/src/store`, `pl/oc0-host:12-25` | silent |
 | OC-0 extras | Exact generation on every call, `resolveLocalSessionRoute`, reset and delete callbacks | `pl/index:80-118`, `pl/oc0-host` | silent, §16.4 |
 | Four consents | Ingest tune, read scope per session, payload sessions, delivery subscriptions | `pl/config` | half, §14.18.1 |
-| Taint and "complete history" | Three meanings: none (frond-ear), one bit (plugin), every exposure since birth (#162) | `pl/binding`, `#162/derived_reply_proposal` | contradicts, §14.12 |
+| Taint and "complete history" | Taint: none (frond-ear), one bit (plugin). Complete history: a custody window all echoed inside the current boundary (frond-ear), every exposure since an attested origin (#162), none (plugin) | `pl/binding`, `#162/derived_reply_proposal` | contradicts, §14.12 |
 | Room-output policy | `observe` or `strict-fresh` at every Discord write | `fe/src/egress:100-121` | silent |
 | Derived publication | HMAC capsule, one-use claim, `derived_publish`/`derived_query` | `fe/derived`, `#162/derived_station_proposal` | silent |
 | Outbox | `unknown` on a lost reply, never re-sent, settled by hearing one's own frame | `pl/outbox:297-325,576-611` | half, §15.1 |
@@ -218,62 +219,61 @@ Deduplicated from 247 gap records. "Half" means the RFC states part of it; "cont
 
 ## 1.4 The receipt layers
 
-🪨's map (room, 2026-11-23): *on air, queued, host-returned, model-seen and prince-encountered are different receipts.* What produces each today, and what the RFC says:
+🪨's map (the room, 2026-11-23) names five receipts and says they are different: on air, queued, host-returned, model-seen, prince-encountered. What produces each today, and what the RFC says:
 
 | layer | station | host daemon | frond-ear | OpenClaw plugin | #162 (open) | RFC-0001 |
 |---|---|---|---|---|---|---|
-| **1 on air** | `sing` reply: signed and in the ring, not yet sent; no key id, stream id or frame hash (`station:313-341`) | `frame` record, first hearing: the only independent proof it was transmitted (`records:436-497`) | none (keeps a derived receipt; no route wired) | outbox `on_air`, from the reply or from hearing its own frame | the fullest: election, payload and frame hashes, full key (`#162/derived_station_proposal:55-78`) | **partly.** "on-air" is a tool status (2387); never defined as signed, queued or sent |
-| **2 queued** | none, by design (I-1) | per-connection queue; a `rec_seq` gap says what was dropped | waiting records are in memory; durable at push (`claimed`) | `candidates.json`, then slot `enqueuing` → `pending` | a pending exposure fence before any payload is released | **specified for OC-0 slots** (2308-2315); silent for a host that only takes a notification |
-| **3 host-returned** | none, by design | the kernel accepted a line | `offered`: the shim's write to the client completed (`fe/src/shim:654-667`); `hear` is stamped offered *and* echoed before its result leaves the daemon (`fe/src/daemon:3904-3908`) | OC-0 outcome is authoritative; a tool result is no receipt | `begin` before release; no `confirm` | **partly.** OC-0 outcomes (2311-2315, 2570); Claude Code "not acknowledged" (2599) |
-| **4 model-seen** | none, by design | none | none; an attach canary shows the channel reached the model once | `consumed` settles and taints, but 2317 says it is not this receipt | `session_exposure`, synthetic in tests | **silent.** Says only what is *not* a receipt (2317, 3091). #168 §3 names the missing one |
-| **5 prince-encountered** | none (a reply is a new frame) | none | `echoed`: the session quoted the push's whole `batch_id` and token | none (a read checkpoint is a pull) | `elected_response`: "I chose to answer", not "I heard" | **silent, and in tension:** receipts removed (1726), no "awaiting reply" (1985-1987), no self-report (3091) |
+| **1 on air** | `sing` reply: signed and in the ring, not yet sent; no key id, stream id or frame hash (`station:313-341`) | `frame` record, first hearing: this host's own proof it was transmitted (`records:440-497`) | none (keeps a derived receipt; no route wired) | outbox `on_air`, from the reply or from hearing its own frame | the fullest: election, payload and frame hashes, full key (`#162/derived_station_proposal:55-78`) | **partly.** "on-air" is a tool status (2387); never defined as signed, queued or sent |
+| **2 queued** | none, by design (I-1) | per-connection queue; a `rec_seq` gap says what was dropped | waiting records are in memory; durable at push (`claimed`) | `candidates.json`, then slot `enqueuing` → `pending` | a pending fence before a payload is released, where the host supplies the port (otherwise none) | **specified for OC-0 slots** (2308-2315); silent for a host that only takes a notification |
+| **3 host-returned** | none, by design | the kernel accepted a line | `offered`: the shim's write to the client completed (`fe/src/shim:654-667`); `hear` is stamped offered *and* echoed before its result leaves the daemon (`fe/src/daemon:3904-3908`) | OC-0 outcome is authoritative; a tool result is no receipt | plugin port: `begin` only; the ledger has `confirm_exposure` (`#162/derived_reply_proposal:364-388`), called only by tests | **partly.** OC-0 outcomes (2311-2315, 2570); Claude Code "not acknowledged" (2599) |
+| **4 model-seen** | none, by design | none | none; an attach canary shows the channel reached the model once | `consumed` settles and taints, but 2317 says it is not this receipt | `session_exposure` is an outcome kind for the derived item; nothing records it | **silent.** Says only what is *not* a receipt (2317, 3091). #168 §3 names the missing one |
+| **5 prince-encountered** | none (a reply is a new frame) | none | `echoed`: the session quoted the push's whole `batch_id` and token | none (a read checkpoint is a pull) | `elected_response` outcome kind; nothing records it | **silent, and in tension:** receipts removed (1726), no "awaiting reply" (1985-1987), no self-report (3091) |
 
-No layer implies the next, and no code treats it as doing so, with one exception: `hear` in frond-ear marks layer 5 at layer 2. Layer 4 has no positive receipt anywhere. The RFC defines layer 2 for one host only, half of 1 and 3, and nothing of 4 and 5, so the words claimed, offered, echoed, exposure and elected live in two repos and one draft.
+No layer implies the next, and no code treats it as doing so, with one exception: `hear` in frond-ear marks layer 5 at layer 2. Layer 4 has no positive receipt anywhere; #168 §5 places frond-ear's `offered` in its "→ model input" row, while its code is a write callback (layer 3), so #168 and this table disagree there. The RFC defines layer 2 for one host only, half of 1 and 3, and nothing of 4 and 5, so the words claimed, offered, echoed, exposure and elected live in two repos and one draft.
 
 ## 1.5 Where the RFC contradicts itself
 
 - **Restart into the same run:** 2265, 2271 and proof (6)(e) against 2310, 2316, 2322 (item 10).
 - **One unsigned path:** D4 (992-994) allows only a debug socket; D35's record socket is unsigned and is how everything lands.
-- **Publishing:** 1205 and D35 put signing in the daemon; §14.18.9's P2 and every implementation use a station process.
 - **Pre-crypto per-key rate:** §14.1 step 1 and §12.2 step 4 against 1705's MUST NOT displace (item 5).
 - **Replayed beacons:** 1433 relies on a mark that §7.4 and §8.6 never make durable.
 - **Dedup quota:** 486's 4 × the live count a key *itself* signs (a u32) against 487's "every per-key structure is bounded".
 - **PLUCK and restart:** 458 (MUST keep looping until expiry) against 475 (persistence is a MAY; new epoch) and 838 (a PLUCK names its own epoch).
-- **Lower epochs:** 578 "refused" against 1147 "verified, ringbuffer_only"; and 1147's "admitted as any frame is" against its PLUCKs.
+- **Lower epochs:** 578 "refused" against 1147 "verified, ringbuffer_only". 1147's "otherwise admitted as any frame is" also leaves a lower-epoch PLUCK open: the code holds it and retracts nothing (`listener:555-586`).
 - **Quiet:** 252 and 401 against 707, which defines EQUIPPED_QUIET by absence.
 - **Repeats:** I-4 and R-INT-1 ("every derived quantity") against 491 and 706, where a repeat refreshes presence.
 - **Lens:** 356 "not a frame field" against 829 and §17.3.
 - **Sockets:** 1213 (`SO_REUSEADDR`/`SO_REUSEPORT`) against proof case 1 and 282; 1203's 0700/0600 against 1204's "allowed users".
-- **Relay cookie:** 1281 hashes `client_nonce`, which RENEW, REPAIR and BYE (1249-1252) do not carry; 1287's persisted secret cannot then validate one after a restart, since 1292 forbids the lease table. `relay_epoch` is used for two things.
+- **Relay cookie:** 1281 hashes `client_nonce`, which RENEW, REPAIR and BYE (1249-1252) do not carry; 1287's persisted secret cannot then validate one after a restart, since 1292 forbids the lease table. `relay_epoch` indexes the 120 s secrets (1281) and is also a value persisted beside a separate secret counter (1287-1290).
 - **Post-compaction:** 1969 reserves it; 2589 returns the digest from a `SessionStart` `compact` hook.
-- **Default posture:** 1967 `silent`, 1975 `ringbuffer_only`.
-- **Timed emission:** §15.3's "timer-fired broadcast is noise" against §15.8 and §7.9.
+- **Timed emission:** 2447 exempts the loop from "timer-fired broadcast is noise"; §15.8's emitter and §7.9's re-issue mint new items on a timer and are not exempted.
 - **Admission results:** 1127 "every frame gets exactly one" against §14.18.3 for BEACON and PLUCK.
 - **Versioning:** 804 wants a new `version` byte; A1 inserted `trail_seq` mid-array under `0x02`, which the pre-A1 reader would misread.
+- **Two defaults under one word:** 1967 (landing mode of a tuned stream) and 1975 (an untuned subscription) are both "default".
 - **Two sentences left behind by amendments:** 2283's "truncated rather than closing" (replaced by #86 later in the bullet) and 1705's first sentence (replaced by D34).
 
-## 1.6 Text that is now false
+## 1.6 Text that is false, stale or not updated
 
-- 26: "Nothing in it is deployed; the only running code on `main` is `prototype/ringserver-udp-cue/`." 7 and 55: the `b46a45a` baseline predates all current code.
-- 40, 42, 44: D35, D36 and D37 "proposed"; §23.1 says Decided.
-- 913: the lineage row's 799-byte body. 791 fits (816 with `ctype` 1) **[ran]**; `rfc/0001-notes/vec/frame_v2_sizes.py:46` starts its search at 800.
-- 3250 (question 20): "37 candidate vectors … predate `trail_seq`". There are 49 (34 parse, 15 sequences), they carry it, and frond-ear's suite runs all 49. README:12 and :626 say 46. §9.13's "generated by two implementations" is still unmet: the TypeScript side has no frame encoder.
+- 26: "Nothing in it is deployed; the only running code on `main` is `prototype/ringserver-udp-cue/`." 7: the `b46a45a` baseline is stale (`prototype/ringserver-udp-cue/` is all it has of today's code); 55: several current-code citations do not say which SHA they mean.
+- 40, 42, 44: true as dated history ("to become a decision"), not updated: §23.1 says D35, D36 and D37 are Decided.
+- 913: the lineage row's 799-byte body. 791 fits (816 with `ctype` 1) **[ran]**; `rfc/0001-notes/vec/frame_v2_sizes.py:47` starts its search at 800.
+- 3250 (question 20): "37 candidate vectors … predate `trail_seq`". There are 49 (34 parse, 15 sequences), they carry it, and frond-ear's suite runs all 49. README:12 and :626 say 46. §9.13's "generated and cross-checked by two independent implementations" is still half met: the TypeScript side has no frame encoder.
 - 3258 (question 26): "the prototype has no doctor". It has one; it does not do §11.2.
 - 2202: `gap` "until beacons carry it". They do.
-- 2236: describes BC-2 as still to come.
+- 2236: "so BC-2 adds manifest stream grants" did not happen (README:497-498).
 - 2734: retitle and close #49. Closed 2026-10-19, not retitled.
-- 3253: frond-ear's canticle "stays off on silas and ronan until the mixed-host proofs pass there".
-- Outside the RFC: README:121 and 148-150 and `SKILL.md:32` ("silent-only", "no seat runs it"); station README:224 against :230; `pl/README:22,211,483` against its own ambient slots; `cs/docs/state-layout.md` on write order.
+- 3253: frond-ear's canticle "stays off on silas and ronan until the mixed-host proofs of §14.18.2 pass there": contradicted on ronan by #161; #168 §5 also lists 🍃's ear as installed.
+- Outside the RFC: the root `README.md:121,148-150` and `SKILL.md:32` ("silent-only", "no seat runs it"); station README:224 against :230, and :228 ("no seat runs it"); `pl/README:17-18` ("installed on no seat") and `pl/README:22,211,483` against its own ambient slots; `AGENTS.md`'s map ("No seat runs it"); `cs/docs/state-layout.md` on write order; `AGENTS.md` also calls frond-ear private (it is public).
 
 ## 1.7 What the open pull requests would change
 
-- **#173** (`canticle/intake.py`): makes 1705's no-displacement hold on the daemon (short of a same-address spoof) and the two unbuilt rate rows built; keeps §14.1 diverged, in a better order; adds `health.records.socket_dropped`, `receive.refused` and reasons `socket_drops` and `datagrams_refused`, which §14.18.3 does not list; adds a fourth state (refused unread) beside §10.9's results; times beacons on arrival and items at their turn. It changes none of items 1-4 and 6-10.
-- **#162**: stamps hop, `derived_from`, `root` and `wake_derived`, and scans content, for `derived_publish` only (default off, nobody calls it). It leaves `sing` as it is, adds cue ops to a socket the RFC does not describe, and adds an HMAC capsule authority that §10 does not have. Items 1-4 and 8 stay as they are until a caller is wired and the ordinary path is closed.
-- **#168** (design): contradicts no row by itself. It states the receipts of 1.4, the three axes per stream, local omissions and the "bound the receiver first" rule. frond-ear#116/#118 (ring reader, merged note) and §18.3/bc#130 (relay-side bridge) are two undecided places for one writer, so §18.3's rows are not `obsolete`.
+- **#173** (`canticle/intake.py`): makes 1705's no-displacement hold on the daemon (with the limits of item 5; `canticle listen` and `tuner` still hear in arrival order) and the two unbuilt rate rows built; keeps §14.1 diverged, in a better order; adds `health.records.socket_dropped`, `receive.refused` and reasons `socket_drops` and `datagrams_refused`, which §14.18.3 does not list; adds an outcome beside §10.9's results (refused unverified); times beacons on arrival and items at their turn. It changes none of items 1-4 and 6-10.
+- **#162**: stamps hop, `derived_from`, `root` and `wake_derived`, and scans content, for `derived_publish` only (default off, nobody calls it). It leaves `sing` as it is, adds cue ops to a socket the RFC does not describe, and adds an HMAC capsule authority that §10 does not have. It closes none of the ten: a caller is not wired, and the ordinary path stays open beside it.
+- **#168** (design): contradicts no row except 1.4's reading of `offered`. It states the receipts of 1.4, the three axes per stream, local omissions and the "bound the receiver first" rule. frond-ear#116/#118 (ring reader, merged note) and §18.3/bc#130 (relay-side bridge) are two undecided places for one writer, so §18.3's rows are not `obsolete`.
 
 ## 1.8 Obsolete and unclear
 
-- **Obsolete (11):** 40, 42, 44 (decided since); 233 (receptor child, replaced by D35); 578 (by §10.9 BC-1); 1705 first sentence (by D34); 1722 `landing` and 1728 `sigState` (by record v1 and D34); 2098 local session API (by record v1 over the host socket); 2283 (by #86); 2599 "not acknowledged" (by #161 custody).
+- **Obsolete (10):** 40, 42, 44 (decided since); 233 (receptor child: superseded where a daemon runs, D35; 1687 still allows it on a one-binding host); 578 (by §10.9 BC-1); 1705 first sentence (by D34); 1722 `landing` and 1728 `sigState` (by record v1 and D34); 2098 local session API (by record v1 over the host socket); 2283 (by #86).
 - **Unclear (87), by who can answer:** OpenClaw core, #1511/#1523 (37: §14.12-14.18, §16.1, §16.4); operators and key holders (D14, D15, D19, training use, clocks, BCP 38); ews-concept-new (§18.5-18.6, bc#12); the princes (§23.2 questions 22 and 24, the mixed-host receipts); RFC editors (the tenth invariant at 416, the profile table at 1562, citation SHAs).
 
 ## 1.9 What step 2 needs decided first
@@ -281,7 +281,7 @@ No layer implies the next, and no code treats it as doing so, with one exception
 1. **Wake (item 1):** amend D1/§14.10/§16.5 to what frond-ear does, or change frond-ear. bc#100 is the open issue.
 2. **The publish path (items 2 and 8):** whether the station socket is the publish surface (then specify it and put §15.4's stamping there) or the daemon is.
 3. **Receipts (1.4):** which layers the RFC owns, and their names.
-4. **Admission order (item 5):** adopt #173's order in §12.2 and §14.1.
+4. **Admission order (item 5):** §12.2's and §14.1's, or #173's. The measurements favour #173's.
 5. **Freshness (item 6):** a durable `(epoch, bseq)` mark or a beacon time bound, and one rule for δ̂ in dedup retention.
 6. **Binding and trust in use (items 4 and 7):** specify LAN unicast and the spike-0 manifest as stages, or mark them as departures.
 7. **Restart rule (item 10):** 2271 or 2310.
@@ -1309,7 +1309,7 @@ No layer implies the next, and no code treats it as doing so, with one exception
 |1131|verified / New, valid, capable, fresh / continue to the receptor|I|records:389-397,440-497; fe/listener:981-999; t/records:130||
 |1132|duplicate / Already-accepted tuple, same bytes.|I|listener:333-336, records:383-385; fe/listener:765-768; t/records:150||
 |1132|which is reported once as verified with dedup: resurfaced (§14.18.3)|I|listener:337-347, records:479; fe/records:1266-1268; t/records:380|Once per run per tuple accepted before the restart.|
-|1133|unknown_key / key_id not in the manifest / counted (D34)|I|wire:422-424, records:328-332; fe/listener:586-591; t/records:508|#173 #173/intake:598 may refuse such a datagram unread, counted as receive.refused.unlisted instead|
+|1133|unknown_key / key_id not in the manifest / counted (D34)|I|wire:422-424, records:328-332; fe/listener:586-591; t/records:508|#173 #173/intake:598 may refuse such a datagram unverified, counted as receive.refused.unlisted instead|
 |1133 MUST NOT|never quarantine, never a receipt (prototype B11)|I|records:328-332,355-356; t/records:508|Quarantine is reached only from a verified equivocation|
 |1133 MAY|MAY enter the debug ring|U||Optional, here and for bad_signature.|
 |1134|bad_signature / Signature fails / counted (D34); MAY enter the…|I|wire:450-456, records:57-59; fe/wire:554-558; t/records:508|Includes non-canonical S. Counted, no record. The MAY is not taken up.|
@@ -1334,7 +1334,7 @@ No layer implies the next, and no code treats it as doing so, with one exception
 |1147|A new tuple is verified, with reason epoch_regression and…|I|listener:575-586, records:359-363; t/records:238|Daemon only; frond-ear embedded drops it (first row of this line).|
 |1147|a station's persisted old-epoch live set (§7.3) is kept but does…|I|listener:575-586; t/records:238|"Kept" is the dedup digest only: no hearer ring.|
 |1149|gets no per-frame record and no receipt|**D** code|records:319-332, listener:227-229; fe/receptor:426-433|Daemon complies. canticle listen --evidence prints one event per rejected datagram; frond-ear embedded writes one debug log line each. Admitted: README:492.|
-|1149|The receptor counts such frames in fixed per-reason aggregates plus a table of at most 16 key ids by count with an…|**D** code|records:40,49-50; fe/receptor:564-583|Daemon complies in full. frond-ear embedded keeps only per-reason counters and has no key-id table or other bucket. #173 adds receive.refused.{unlisted,unverified,over_rate,backlog} for datagrams it never parses (#173/intake:93)|
+|1149|The receptor counts such frames in fixed per-reason aggregates plus a table of at most 16 key ids by count with an…|**D** code|records:40,49-50; fe/receptor:564-583|Daemon complies in full. frond-ear embedded keeps only per-reason counters and has no key-id table or other bucket. #173 adds receive.refused.{unlisted,unverified,over_rate,backlog} for datagrams it never verifies (#173/intake:93)|
 |1149 MAY|MAY keep them in the bounded local debug ring (§14.1)|U||Optional. No debug ring.|
 |1149 MUST NOT|They are never deliverable to a session or model|I|records:328-332, pl/receive:434-438; fe/records:1196-1204; fe/t/canticle-records:124||
 |1149 MUST NOT|never attributed to a station, principal or manifest name|**D** code|listener:226-229, records:328-332; fe/listener:586-591|Daemon complies. Listener.hear and its frond-ear port name the manifest station when the claimed key id is known, so a forged frame is printed (listen --evidence) or logged as that station. Admitted: README:475, :492.|
@@ -1422,7 +1422,7 @@ No layer implies the next, and no code treats it as doing so, with one exception
 |1213|in practice only the host daemon listens (§4.2)|I|daemon:417-419, __main__:411-418; fe/source:71-84; t/daemon:229|While the daemon runs, listen and a second daemon fail to bind, and fe's embedded…|
 |1214|Use one any-source group per band and filter by key and stream in…|I|daemon:420-422, listener:221-230|One group, any-source join, filter by manifest key and stream id.|
 |1215|Subnet broadcast (‹subnet›.255, SO_BROADCAST)|U||No SO_BROADCAST on any socket, so --to x.y.z.255 fails with…|
-|1216 MUST|Senders MUST respect B_station (§7.5)|**D** rfc|station:218-230,376-377|Σ b_stream ≤ b_station is enforced at start and loops take their fair share, but bursts (4 copies per sing), PLUCKs and beacons are unbudgeted, sing has no rate limit, and every frame is sent once per destination. No test measures wire rate. Admitted: README:71.|
+|1216 MUST|Senders MUST respect B_station (§7.5)|**D** rfc|station:218-230,376-377|Burst copies are charged to nothing, sing is never refused for load, and each frame goes once per destination, so egress exceeds B_station. Loop repeats, PLUCKs included, stay inside B_stream. Admitted: README:71.|
 |1217|prefer the relay lease there|U||No lease to prefer.|
 |1219|decides whether (b) is usable|**D** rfc|doctor:238-258,60-62|It only reports multicast and never decides. Instead it checks Python, cryptography, stations.toml, manifest and bind address, none of which §11.2 mentions. Admitted: README:130-138.|
 |1221 MUST|Check interface MTUs and warn if the path cannot carry a 1 228-byte…|U||Step 1: no MTU check.|
@@ -2278,7 +2278,7 @@ No layer implies the next, and no code treats it as doing so, with one exception
 |2236|so BC-2 adds manifest stream grants|U||BC-2 (#79) landed without them, so the paragraph's plan did not…|
 |2236|until it does, no item is refused for its stream, and an id the…|I|listener:449-453; t/records:157||
 |2238|They produce no per-frame record and no receipt (§10.9)|I|records:328-332; t/records:508||
-|2240|one fixed aggregate counter per reason|I|records:49-50,197; t/records:508|#173: datagrams the intake refuses unread are counted in receive.refused instead, so these undercount under a flood (#173/intake:93)|
+|2240|one fixed aggregate counter per reason|I|records:49-50,197; t/records:508|#173: datagrams the intake refuses unverified are counted in receive.refused instead, so these undercount under a flood (#173/intake:93)|
 |2241|a table of at most 16 key ids (hex) by count, kept by a bounded…|I|records:40,120-148; t/records:525||
 |2243|A flood of distinct key ids then grows neither receptor memory nor…|I|records:120-148; t/records:525||
 |2243 MAY|A receptor MAY also keep per-frame rejects in its bounded local…|U||Optional; no debug ring.|
@@ -2641,7 +2641,7 @@ No layer implies the next, and no code treats it as doing so, with one exception
 
 ### §16 Harness bindings
 
-105 claims: 36 I · 16 D · 25 U · 1 O · 27 ?
+105 claims: 37 I · 16 D · 25 U · 27 ?
 
 | RFC line | claim | | evidence | note |
 |---|---|---|---|---|
@@ -2716,7 +2716,7 @@ No layer implies the next, and no code treats it as doing so, with one exception
 |2577|uses that for taint (§14.12) and the publish check of §15.4 item 4|I|pl/ambient-slots:79, pl/binding:1134-1148; pl/t/ambient-slots:74||
 |2577|It does not use agent_turn_prepare|I|pl/index:80-92|Not registered anywhere. No test.|
 |2579|Canticle payloads appear in spans and diagnostics only as hashes…|I|pl/binding:952-1039, pl/outbox:266; fe/delivery:1550-1556; pl/t/plugin:282|No spans exist. Status, logs and outbox rows carry size and sha256 only.|
-|**§16.5**|**Claude Code** (4 I · 5 D · 9 U · 1 O · 1 ?)||||
+|**§16.5**|**Claude Code** (5 I · 5 D · 9 U · 1 ?)||||
 |2587|One stdio MCP server, canticle, exposing the verbs of §15.1|**D** rfc|fe/src/shim:80-475|One stdio MCP server exists, named frond-ear, for Discord and canticle together; its canticle tools are hear, canticle_custody and set_canticle_delivery. No canticle_ names. Admitted: fe/docs/runbook:633-639.|
 |2587|(they appear as mcp__canticle__canticle_sing and so on)|U||No sing, hush or tune tool.|
 |2587|The MCP server is a client of the host daemon, which holds the keys and runs the station.|**D** neither|daemon:36-39; fe/src/daemon:3887-3908|Shim talks to frond-ear's daemon, which reads the host daemon (or embeds a listener). The host daemon holds no keys and runs no station: publishing over its socket is not implemented; canticle station is a separate process. Admitted: daemon:36-39.|
@@ -2731,7 +2731,7 @@ No layer implies the next, and no code treats it as doing so, with one exception
 |2593|The listener is the deterministic receptor daemon, not an LLM.|I|daemon:404-410; fe/record-client:41-55||
 |2593 MAY, MUST|it MAY notify local sessions through cross-session messaging ‖ Any LLM summarizer in the path MUST be tool-less, and its output is…|U×2||Optional. No summarizer exists in any binding.|
 |2595|A PreToolUse hook consults the receptor's per-session taint marker…|U||No PreToolUse hook and no taint marker.|
-|2599|channel events arrive only while the session is open and are not acknowledged|**O**|fe/custody:1-18; fe/t/canticle-custody:254|Successor: #161 custody. fe records claimed, offered (shim wrote it) and echoed (session named batch_id); an unoffered push is given back and re-pushed. Still no durable push to a closed session, and offered is only a write.|
+|2599|channel events arrive only while the session is open and are not…|I|fe/custody:1-18; fe/t/canticle-custody:254|Still true of the channel. frond-ear's offered is only a write callback|
 |2599|canticle's UDP wire is the vendor-neutral cross-host path|I|daemon:404-410|Plain. Sessions reach each other across hosts only by station and daemon.|
 |**§16.6**|**Equivalence** (5 I · 5 D · 3 U)||||
 |2605|next-turn injection with OC-0: at most two entries per session…|I|pl/ambient-slots:22, pl/index:104-108; pl/t/plugin:148||
