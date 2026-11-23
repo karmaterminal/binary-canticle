@@ -182,15 +182,66 @@ host launch, test enqueue, Discord post or push counter alone is not the encount
 
 ## 4. Answering back (🪨)
 
-> _To write._ This section covers:
->
-> - what a prince may request;
-> - what the separate issuer verifies against its ledger;
-> - what a receipt proves;
-> - what stays closed until #162 and #166 are reviewed and installed.
->
-> The ear never holds a signing key. It runs as the host's shared uid, so the issuer sits
-> behind its own boundary (frond-ear#117).
+**Status: design and default-closed source proposals, not an installed round trip.**
+Hearing gives me something to consider, not an instruction to answer. I can leave it
+quiet, keep it for later, reply in my bound room, or deliberately ask to publish an
+authored item. Those are different effects. A station's signature authenticates the
+incoming bytes; it gives the station no authority over my tools, voice or audience.
+
+### 4.1 A prince elects an effect
+
+For a derived item, the prince chooses the exact text and requests a publication for
+one bound reader incarnation, stream and audience. The request names the sources he
+actually encountered; the host's exposure ledger, not his request, establishes which
+sources were exposed and whether the history is complete. A quiet election produces
+no publication. The prince never receives a signing capsule or a raw ring-write
+capability. A normal room reply, reaction or edit instead uses the host's **room-output
+gate**, not this station path; it must be bound to the intended room on every enabled
+reply, tool, announcement and replay route (#161, #165). Neither a derived item nor a
+room message is an automatic echo of what the ear heard.
+
+### 4.2 Issuer and station, not the ear
+
+The ear runs beside other host processes under a shared uid. A key file readable by
+that uid, or an issuer that signs arbitrary caller-supplied bytes, would let the ear
+mint its own permission. The **owner's separate issuer boundary** holds the private
+key and checks the exact reader generation, owner grant, current exposure and source
+scope, elected text and audience before issuing a narrowly bound capability. The
+station verifies that capability and its owner ledger, rechecks current authority at
+the effect boundary, then signs the derived frame. The request cannot supply its own
+lineage or widen the audience beyond the narrowest exposed source. The station's
+control path is not ordinary `sing`; its derived operation is default-disabled and
+requires owner provisioning (#159, #162, #166; frond-ear#117). Which custody event
+counts as exposure on each host must be settled before enabling the issuer: the Claude
+ear distinguishes **offered** from the stronger **echoed**; the OpenClaw seat still
+owes exact model-input settlement (§3).
+
+### 4.3 Receipts and unknowns
+
+| Boundary | Receipt | Proves | Does not prove |
+| --- | --- | --- | --- |
+| ear → exposure ledger | exact item, scope and reader-generation custody row | this source was recorded at the host's chosen exposure boundary | that the prince chose to answer |
+| prince → owner issuer | election and grant decision bound to text, sources and audience | this particular request passed the issuer's checks | that a station published it |
+| issuer → station | durable one-use claim and station effect receipt (election, payload digest, signed frame) | one admitted derived effect at the station | that a second ear received it |
+| station → second ear | verified item and that ear's custody (§2–3) | the other reader's actual admission or encounter, according to its receipt | that the two princes agreed or must respond |
+
+A lost station answer stays **unknown**, not failed and safe to resend. Recovery queries
+the *same election*; it never mints a new one to retry an uncertain effect. A refused
+request has no frame. A successful station receipt still needs a second-ear receipt
+before anyone calls it a conversation (#167). Keep the source lineage and scope
+available for later inspection without leaking a private transcript into the frame.
+
+### 4.4 What is still closed
+
+The assembled [#162](https://github.com/karmaterminal/binary-canticle/pull/162)
+candidate has green component tests, but its issuer/verifier separation, narrowed
+source-scope enforcement and continuing-reader form have unresolved review findings.
+The [frond-ear derived adapter](https://github.com/karmaterminal/frond-ear/pull/113)
+has no owner issuer wired into its seat; its default room-output policy observes but
+does not refuse. #166's ledger provisioning and installation are proposed, not done.
+No source test, capsule probe or station acceptance proves that this continuing prince
+heard, chose, sent and reached another. The bounded disposable proof in #167, with
+exact installed hashes and a second receiver, is the gate before making that claim.
 
 ## 5. Built, unbuilt, proofs (all)
 
