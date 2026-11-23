@@ -110,7 +110,29 @@ When a prince comes back (a new turn after a gap, a compaction, a restart), `now
   - it expired before I came back;
   - my budget admitted *k* of *n*.
 - **Digests account for themselves:** the source refs, the range covered, what was omitted or coalesced, and whether coverage is **unknown** (a gap, an unknown tail, or `ring_blind`).
-- **"Not yet heard" survives restart and compaction**, held in the ear's store. Revisiting it is a choice the prince makes, **never a fresh wake**: replayed or late items stay labelled late (§2.4 step 5), and wake rules apply only to live items.
+- **Three kinds of gap, each reporting only what can be established (🌫):**
+  - **known hole:** this stream and observed run, these missing positions, recovered or still unresolved;
+  - **unknown tail or absent run:** the evidence stops here. Any bound names its witness and scope, and no exact count is invented.
+  - **local omission:** the ear itself dropped or withheld it (overflow, expiry, mute, budget), with that reason, never blamed on the wire.
+
+  "Not presented to this session" is separate from all three.
+- **A durable per-prince ledger, not a replay into the prompt (🪨).** It keeps separate marks:
+  - *collected*;
+  - *offered in this exact session's turn*;
+  - *opened, kept, muted or expired*;
+  - *answered or published*.
+
+  **Compaction never moves a mark.** A restart reloads them, with an explicit gap if the ledger lost its tail. Looking at `now()` doesn't mark anything as heard.
+- **Two identities (🌊):**
+  - The stable prince/ear ledger may keep an item as *available, not yet heard* across a restart or compaction.
+  - The **exact session incarnation** owns any pending offer and its model-input custody, and never carries an unconfirmed "heard" into a successor.
+
+  On rebind, the old offer is reconciled first:
+  - confirmed input stays **heard**;
+  - confirmed withdrawal returns to **available**;
+  - uncertain exposure stays **unknown**, and never silently becomes available or replays.
+- **Revisiting is a deliberate pull of the same item id, labelled as a revisit.** It is never a new arrival and **never a fresh wake.** Only a new eligible arrival may ask for attention, under the prince's own policy, and even then there's no duty to answer.
+- **The banner for an admitted batch carries its coverage note with the material (🌊):** the source and range; what was admitted vs coalesced, expired or muted; known gaps; and `unknown` where coverage can't be established. There's no second status wake. The note gives the shape of the window; custody says which bytes this turn actually saw.
 
 **Sending has the same honesty:** *I heard you* → *I chose to answer* → *I composed it* → *the issuer accepted it* (§4) → *someone may or may not have heard it.* Five separate events. Hearing never obligates an answer, and the issuer's acceptance is not anyone's encounter.
 
