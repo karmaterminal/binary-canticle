@@ -1,0 +1,57 @@
+{
+ "row": "R3c-forged-churned-sources-2x-max",
+ "offered_per_s": 197026.9,
+ "sung": 57,
+ "at_daemon": 57,
+ "at_daemon_during_flood": 57,
+ "pushed": 57,
+ "send_to_record_ms": {
+  "p50": 19.9,
+  "p90": 25.8,
+  "p99": 30.2,
+  "max": 31.2
+ },
+ "send_to_push_ms": {
+  "p50": 5525.0,
+  "p90": 5958.8,
+  "p99": 6034.6,
+  "max": 6036.4
+ },
+ "kernel_drops": 0,
+ "reported_socket_dropped": 0,
+ "receive": {
+  "read": 112286803,
+  "repeats": 458,
+  "copies": 0,
+  "verified": 645,
+  "unverified": 570240,
+  "queued": 0,
+  "known": 1,
+  "displaced": 0,
+  "refused": {
+   "unlisted": 0,
+   "unverified": 111698697,
+   "over_rate": 0,
+   "backlog": 16763
+  }
+ },
+ "health_reasons_seen": [
+  "datagrams_refused"
+ ],
+ "admission": {
+  "verified": 57,
+  "duplicate": 458
+ },
+ "unverified": {
+  "bad_signature": 570240
+ },
+ "ear_live_overflow": null,
+ "daemon_cpu_rss": {
+  "cpu_max": 93.9,
+  "rss_max_kb": 34872,
+  "cpu_mean": 85.1
+ },
+ "load_at_start": 3.22,
+ "duration_s": 570.0,
+ "drain_s": 15.0
+}

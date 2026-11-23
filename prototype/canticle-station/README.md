@@ -487,7 +487,8 @@ per manifest key; `last_datagram_at`; records emitted and dropped and connection
 since the last `health`) or `datagrams_refused` (the intake refused one that claimed a listed key). The host
 daemon's `health` also carries what was lost before it was heard, in two optional additions (#171):
 `records.socket_dropped`, the kernel's drop count for the daemon's socket, exact; and `receive`, the intake's
-fixed counters (`read`, `repeats`, `copies`, `verified`, `unverified`, `queued`, and `refused` by reason).
+fixed counters (`read`, `repeats`, `copies`, `verified`, `unverified`, `queued`, `known` and `displaced`, the sources
+that gained a share of their own and those that lost it to a newer one, and `refused` by reason).
 `records.dropped` keeps its meaning: records dropped for a connection. The receptor keeps which tuples it surfaced, and which
 keys it quarantined, in the listener's state file (`"receptor"`), written with the listener's guards in one
 atomic replace per batch. At start, after `hello` and before the first `landing_state` (so before any
@@ -548,16 +549,17 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
   reserves anything. A frame refused at steps 3-4 is not recorded, and its next copy is judged again. One digest per
   live dedup entry, until the item's local expiry, so the listener's per-key quotas bound them, plus the latest 64
   beacons of each key. A restart starts with none, so the first copy after it resurfaces.
-- **Round-robin at three levels.** Over the claimed keys, over a key's streams, over the source addresses claiming a
-  stream. So a quiet key waits behind one datagram of a flooding key, a quiet stream behind one of its own station's
-  flooding stream, and the station itself behind one of a forger. Within a stream, the addresses new frames of the
-  key last verified from (at most 4) get every other turn, however many others claim it. Those others queue apart too,
+- **Round-robin at three levels.** Over the claimed keys, over a key's streams, over the sources claiming a stream. A
+  source is the IPv4 address *and* UDP port the kernel gives as the datagram's sender (`sockaddr_in`; `_Mmsg` and
+  `KeyQueue.source` in `intake.py`), per listed key: two ports of one host are two sources. So a quiet key waits behind one datagram of a flooding key, a quiet stream behind one of its own station's
+  flooding stream, and the station itself behind one of a forger. Within a stream, the sources new frames of the
+  key last verified from (at most 4, the known sources) get every other turn, however many others claim it. Those others queue apart too,
   16 ports of a host and 64 in all, and the rest share 64 lanes by a salted hash. Their places per stream are a pool of
   256, and when it is full the longest queue gives one up: a flood can fill the pool, but a source that queues apart
   still gets a place and its turn.
 - **Who pays.** A frame that verified and was new debits its key's bucket (16 a second, burst 64) and its stream's (12
   and 48, below the key's, so siblings have room); beacons have their own (8 and 16). A check that comes to nothing
-  is charged to its source: each of those 4 addresses may spend 1 000 of them a second, all other addresses claiming
+  is charged to its source: each of those 4 sources may spend 1 000 of them a second, all other sources claiming
   the key share 1 000, and everything together may spend 2 000. That covers a forgery, and a replay that verifies and
   changes nothing: an old beacon (it has no expiry, so it verifies whenever it is replayed), or a frame refused at steps
   3-4, which costs ten, because it makes a record each time. So neither spends the station's bucket.
@@ -567,21 +569,37 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
 - **What is counted.** `receive.refused`: `unlisted` (the shared queue was full), `unverified` (the source's budget for
   failed checks was spent), `over_rate` (the key or the stream was over its rate), `backlog` (the daemon was behind).
   Socket drops are the kernel's (`SO_RXQ_OVFL` on what is read, `SO_MEMINFO` at each `health`) and are never mixed
-  with these. Refusing `unlisted` datagrams does not degrade `health`: no station lost anything by it.
+  with these. Refusing `unlisted` datagrams does not degrade `health`: no station lost anything by it. `receive.known`
+  and `receive.displaced` count the sources that became known and those a newer one displaced: an established station
+  that loses its share shows there even when none of its datagrams was refused.
+- **What churning sources can do is bounded.** A key has at most 4 known sources and 64 strangers (16 a host), and 64 lanes
+  for everything else. A stream's queue holds at most 256 datagrams of strangers and, per known source, 64 (or what it had
+  waiting when it became known, at most 256): 1 280, of at most 1 100 B each. A displaced source's datagrams go to the
+  strangers' 256, and what does not fit is refused as `backlog`. A pick looks at each lane of a stream once at most. The
+  tests are `ChurnTest` (`test_intake.py`) and `SourceChurnTest` (`test_fair_admission.py`); measured in
+  [`reports/measurement/2026-11-23-fair-admission-rerun/`](../../reports/measurement/2026-11-23-fair-admission-rerun/README.md).
 
 What it does not do:
 
-- **A source address is never trusted.** It admits and refuses nothing (I-11); it only picks a queue. A sender that
-  spoofs the station's exact address and port shares the station's own queue and budget: up to 1 000 forgeries a
-  second (or 100 replays of what is refused) cost it nothing, and beyond that each of its frames is verified only as
-  often as chance picks it among them. Other keys are unaffected and the refusals are counted, but nothing before the
+- **A source is never trusted.** It admits and refuses nothing (I-11); it only picks a queue. Scheduling by source
+  narrows the threat model; it does not give a station R3's guarantee against a forger at its own source. **An exact-source
+  spoof is a FAIL, outside the supported guarantee:** a sender that spoofs the station's exact address and port shares the
+  station's own queue and budget. Up to 1 000 forgeries a second (or 100 replays of what is refused) cost it nothing, and
+  beyond that each of its frames is verified only as often as chance picks it among them. Other keys are unaffected and the refusals are counted, but nothing before the
   signature can tell the two apart. Source binding would help only as far as the switch enforces addresses, and a
   house MAC only against senders without the house key (RFC §10.2). Neither is here, and neither replaces the
   signature.
-- **A station that is still a stranger, among many.** Until one of its frames verifies from a new address (a cold
+- **The first to be heard with a new frame has the share.** A relay without a key whose copies of a station's frames are
+  heard before the station's own, from a new port each, displaces the station from its key's 4 known sources, and it is
+  then a stranger in any flood: **a FAIL, outside the supported guarantee.** `receive.displaced` counts it. A relay that
+  is heard after the station displaces nothing.
+- **A station that is still a stranger, among many.** Until one of its frames verifies from a new source (a cold
   start, or its restart on a new port) it competes with every other stranger claiming its key. If a flood shares its
-  lane, it is verified only as often as chance picks it there. With 200 ports of its own host flooding it at 20 000 a
-  second, its first items came up to 16 s late (before #171, with a whole core spent on checking, 1 s from 40 ports).
+  lane, it is verified only as often as chance picks it there. Flooded at 20 000 a second from 12 or 40 ports of its own
+  host, its first valid frame was admitted within 0.1 s; from 200 ports its first items came up to 16 s late in one run
+  (at most 2 s in five others); from a newly opened socket per datagram its first valid frame took up to 14 s and its
+  items up to 25 s: **a FAIL of the rows' 4.5 s bound**, and worse than before #171, when a whole core spent on checking
+  admitted the first one within 0.1 s at that rate.
 - **The caps are fixed.** They do not follow a station's declared `b_station` or `b_stream` (§7.5), which its own key
   could raise at will, and the spike's manifest has no budget field. A station run well above the 16 kbit/s default
   is held to 16 new frames a second.
@@ -745,18 +763,20 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
   - socket and directory modes, a refused peer uid, the peer limit, bytes from a peer ignored, `bye` and end of
     stream on a clean stop, a live socket not taken over and a loose socket directory refused.
 - `test_intake.py` holds the intake's invariants (#171): the order of service at each level, the bounds on keys,
-  streams, sources and queues, who pays for a new frame, a forgery and a replayed beacon, random traffic after which
+  streams, sources and queues, whatever churns the sources, who pays for a new frame, a forgery and a replayed beacon, random traffic after which
   every queue and count must agree, and what may be skipped before verify: only the exact bytes of an accepted frame. An invalid packet with the same key, epoch,
   stream and seq arriving first suppresses nothing. Against the daemon: repeats still count and refresh presence,
   a restart resurfaces, an `over_quota` frame is judged again, one save covers a batch and a failed one sends
   nothing, and `health` tells the kinds of loss apart.
-- `test_fair_admission.py` runs #171's rerun rows against a `canticle daemon` process, scaled to a minute: 57 quiet
+- `test_fair_admission.py` runs #171's rerun rows against a `canticle daemon` process, scaled down: 57 quiet
   items during (R1) a valid flood of another key, (R2) a flood of the quiet station's own other stream, (R3) distinct
   invalid signatures claiming the quiet key and (R4) replays of the quiet key's own frames, also from its very
   socket. Every item is admitted within the station's burst and every row prints its latency and losses. (R5) counts
   the kernel's drops exactly. Then the floods base survived with a core to spend on them: old beacons replayed from
   ten ports, a station that starts inside a forged flood from its own host, a slow forger at the station's own
-  address, and a fast one there, whose own loss is measured and not asserted.
+  source, and a fast one there. Then churned sources: R3 from a newly opened socket per datagram, and a relay that is
+  heard before the station. What a fast forger at the station's own source and that relay cost the station itself is
+  measured, not asserted: both rows are a FAIL, outside the supported guarantee.
 - `test_join_snapshot.py` runs proof case (5) with a join snapshot (BC-1b, D36), daemon side, with a binding's
   validation and view-application model in the test:
   - (a) `hello` 1, `landing_state` 50, I1 at 60, S's presence at 70, a held item, I2 at 80 plucked at 90, B asks

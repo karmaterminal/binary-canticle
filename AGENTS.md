@@ -53,7 +53,7 @@ pip install --no-deps -e prototype/canticle-station
 From the repository root:
 
 ```sh
-# Everything CI's station-tests job runs (two to three minutes).
+# Everything CI's station-tests job runs (about four minutes).
 PYTHONPATH=prototype/canticle-station python -m unittest discover -s prototype/canticle-station/tests
 
 # One module, or tests whose names match a pattern.
@@ -64,7 +64,7 @@ PYTHONPATH=prototype/canticle-station python -m unittest discover -s prototype/c
 git status --porcelain
 ```
 
-- `test_fair_admission.py` takes about a minute, and `test_station.py`, `test_daemon.py` and
+- `test_fair_admission.py` takes about two minutes, and `test_station.py`, `test_daemon.py` and
   `test_join_snapshot.py` up to about 30 s each. The other modules take a few seconds or less. Run the module you changed first, then the whole suite.
 - The tests use loopback UDP, unix sockets and temporary directories. They need no network, no root and no
   keys of yours. `test_pilot_host.py`'s `NftTest` runs the real `nft` only inside a throwaway network
