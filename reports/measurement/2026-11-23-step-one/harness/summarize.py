@@ -1,14 +1,23 @@
-"""Turn results/<scenario>/<cell>/result.json into the report's tables (markdown on stdout) and
-results/summary.json. Every number in the README's tables comes from here.
+"""Turn results/<scenario>/<cell>/result.json into the README's §1, §3 and §4 tables (markdown on
+stdout) and results/summary.json. Every number in those tables comes from here; --check confirms that
+each table it prints appears in the README byte for byte.
 
-    python summarize.py <results dir>
+    python summarize.py <results dir> [--check <README.md>]
 """
 
 from __future__ import annotations
 
+import argparse
 import json
+import re
 import sys
 from pathlib import Path
+
+FLOOD_SCENARIOS = ("flood", "flood2", "flood3")
+
+# The daemon's own health counter for what each flood mode offers: overload's denominator.
+PROCESSED_AS = {"valid": "admission.verified", "dup": "admission.duplicate", "forged": "unverified.bad_signature",
+                "unknown": "unverified.unknown_key", "unknown-fixed": "unverified.unknown_key"}
 
 
 def load(d: Path) -> list[dict]:
@@ -91,13 +100,60 @@ def quiet_split(r: dict) -> dict:
     return fate(during, dur)
 
 
-def flood_tables(rows) -> str:
-    a = ["| cell | offered | daemon's own rates (per s, from its health) | daemon CPU mean | kernel drops at the daemon's socket (share of all UDP datagrams the host took in meanwhile) | "
+def cell_order(r: dict) -> tuple:
+    """F0, F1, F1b, F2b, F3, F3b, …, F9, F10, F11: by the number in the cell's name, then its suffix."""
+    m = re.match(r"[A-Z]+(\d+)([a-z]*)-", r["params"]["name"])
+    return (int(m.group(1)), m.group(2)) if m else (sys.maxsize, r["params"]["name"])
+
+
+def daemon_reads(r: dict) -> int:
+    """Datagrams the daemon read from its socket: the sum of its own admission, beacon and unverified
+    counters in its last health record (the run started at zero)."""
+    _, c = health_delta(r)
+    return sum(sum((c.get(group) or {}).values()) for group in ("admission", "beacon", "unverified"))
+
+
+def drops_cell(r: dict) -> str:
+    """The daemon socket's own kernel drops, with their socket-local share: drops ÷ (drops + the
+    datagrams the daemon read), the share of the datagrams that reached that socket."""
+    drops = r.get("kernel_drops")
+    if not drops:
+        return num(drops)
+    return f"{num(drops)} ({100 * drops / (drops + daemon_reads(r)):.2f} %)"
+
+
+def two_figures(x: float) -> str:
+    """x to two significant figures, trailing zeros dropped as %g drops them: 4 200, 63, 4.9, 1."""
+    v = float(f"{x:.2g}")
+    return f"{v:,.0f}".replace(",", " ") if v >= 10 else f"{v:g}"
+
+
+def offered_rate(r: dict):
+    """What the flood offered per second: the producers' sends, or the flooding station's sings."""
+    if r.get("offered"):
+        return r.get("offered_rate")
+    return (r.get("flood_station") or {}).get("rate")
+
+
+def overload_cell(r: dict) -> str:
+    """What the flood offered per second ÷ what the daemon processed of that kind per second, from its
+    own health rates (PROCESSED_AS). A flood its socket dropped none of is under 1×."""
+    offered = offered_rate(r)
+    if not offered:
+        return "–"
+    if r.get("kernel_drops") == 0:
+        return "< 1× (0 socket drops)"
+    processed = (r.get("health_rates") or {}).get(PROCESSED_AS[r["params"].get("mode", "valid")])
+    return f"≈ {two_figures(offered / processed)}×" if processed else "–"
+
+
+def flood_tables(rows) -> list[str]:
+    a = ["| cell | offered | daemon's own rates (per s, from its health) | daemon CPU mean | kernel drops at the daemon's socket, its own `drops` (share of the datagrams that reached the socket) | "
          "what the daemon's health said | what frond-ear said | load avg max |",
          "|---|---|---|---|---|---|---|---|"]
-    b = ["| cell | quiet items sung while the flood ran | of those, reached the daemon during / after the flood | of those, pushed during / after the flood | "
+    b = ["| cell | overload | quiet items sung while the flood ran | of those, reached the daemon during / after the flood | of those, pushed during / after the flood | "
          "pushes in all (max records per push) | daemon RSS max (MiB) | frond-ear RSS start → max (MiB) | shim RSS max (MiB) |",
-         "|---|---|---|---|---|---|---|---|"]
+         "|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         p = r["params"]
         h, c = health_delta(r)
@@ -108,9 +164,6 @@ def flood_tables(rows) -> str:
             offered = f"real station, {num(fs.get('rate'), 0)} sings/s"
         else:
             offered = "none"
-        drops = r.get("kernel_drops")
-        total_in = (r.get("snmp_delta") or {}).get("InDatagrams", 0) + (drops or 0)
-        share = f" ({100 * drops / total_in:.2f} % of datagrams)" if drops and total_in else ""
         rates = r.get("health_rates") or {}
         rate_s = ", ".join(f"{k.split('.', 1)[1]} {num(v, 1)}" for k, v in rates.items() if k != "dedup_entries_end")
         says = f"`{h.get('state')}`, reasons {h.get('reasons')}, records dropped {(h.get('records') or {}).get('dropped')}"
@@ -121,7 +174,7 @@ def flood_tables(rows) -> str:
         if dcounts:
             fe_says += f"; delivery {dcounts}"
         a.append("| " + " | ".join([p["name"], offered, rate_s or "–", f"{proc(r, 'canticle-daemon').get('cpu_mean')} %",
-                                    f"{num(drops)}{share}", says, fe_says, num(r.get("load_max"), 1)]) + " |")
+                                    drops_cell(r), says, fe_says, num(r.get("load_max"), 1)]) + " |")
         q = r.get("quiet_split") or {}
         qq = r.get("quiet") or {}
         if q:
@@ -134,17 +187,19 @@ def flood_tables(rows) -> str:
             pushed = str((qq.get("pushed_per_ear") or {}).get("ear0"))
         pu = (r.get("pushes") or {}).get("ear0") or {}
         fe_p = proc(r, "frond-ear-ear0")
-        b.append("| " + " | ".join([p["name"], sung, reach, pushed, f"{pu.get('pushes')} ({pu.get('records_per_push_max')})",
+        b.append("| " + " | ".join([p["name"], overload_cell(r), sung, reach, pushed,
+                                    f"{pu.get('pushes')} ({pu.get('records_per_push_max')})",
                                     mb(proc(r, 'canticle-daemon').get('rss_max_kb')),
                                     f"{mb(fe_p.get('rss_first_kb'))} → {mb(fe_p.get('rss_max_kb'))}",
                                     mb(proc(r, 'shim0').get('rss_max_kb'))]) + " |")
-    return "\n".join(a) + "\n\n" + "\n".join(b)
+    return ["\n".join(a), "\n".join(b)]
 
 
 def ingest_table(rows) -> str:
-    out = ["| ears | streams | payload (frame B) | saturated: offered/s → verified/s, kernel drops | 40/s: send→record p50 / p99 ms | "
-           "40/s: send→push p50 / p99 ms (n) | daemon CPU % sat / 40 | daemon RSS MiB | frond-ear CPU % / RSS MiB (mean of ears) | "
-           "shim RSS MiB | probe gaps sat / 40 | frond-ear loss counts (ear0) |",
+    out = ["| ears | streams | payload (frame B) | saturated: offered/s → verified/s, kernel drops (the daemon socket's own `drops`) | "
+           "40/s: send→record p50 / p99 ms | 40/s: send→push p50 / p99 ms (n) | daemon CPU % sat / 40 | daemon RSS MiB | "
+           "frond-ear CPU % (mean of ears) / RSS MiB (max of ears), saturated cell | shim RSS MiB | probe gaps sat / 40 | "
+           "frond-ear loss counts: receive side (all ears, both cells); delivery (ear0, 40/s cell) |",
            "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     by = {}
     for r in rows:
@@ -220,7 +275,12 @@ def admission_table(rows) -> str:
 
 
 def main() -> int:
-    root = Path(sys.argv[1])
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("results", type=Path)
+    ap.add_argument("--check", type=Path, metavar="README",
+                    help="exit 1 unless every table printed appears in this file byte for byte")
+    args = ap.parse_args()
+    root = args.results
     summary = {}
     for scen in ("flood", "flood2", "flood3", "ingest", "admission", "reconnect"):
         d = root / scen
@@ -239,18 +299,30 @@ def main() -> int:
             r["health_rates"] = health_rates(d, r)
             r["quiet_split"] = quiet_split(r)
         summary[scen] = rows
-        print(f"\n### {scen}\n")
-        if scen.startswith("flood"):
-            print(flood_tables(rows))
-        elif scen == "ingest":
-            print(ingest_table(rows))
-            print()
-            print(tune_table(rows))
-        elif scen == "admission":
-            print(admission_table(rows))
+    sections = []
+    floods = [s for s in FLOOD_SCENARIOS if s in summary]
+    if floods:
+        # §1 is one table pair for the three flood runs (see the README's *Run history*), in cell order.
+        sections.append((f"§1 flood test ({', '.join(floods)})",
+                         flood_tables(sorted((r for s in floods for r in summary[s]), key=cell_order))))
+    if "ingest" in summary:
+        sections.append(("§3 ingest", [ingest_table(summary["ingest"]), tune_table(summary["ingest"])]))
+    if "admission" in summary:
+        sections.append(("§4 admission", [admission_table(summary["admission"])]))
+    for title, tables in sections:
+        print(f"\n### {title}\n")
+        print("\n\n".join(tables))
     (root / "summary.json").write_text(json.dumps(
         {k: [{kk: vv for kk, vv in r.items() if kk not in ("tap_events", "stderr")} for r in v] for k, v in summary.items()},
         indent=1, default=str))
+    if args.check:
+        readme = "\n" + args.check.read_text() + "\n"
+        missing = [t.split("\n", 1)[0][:100] for _, tables in sections for t in tables if f"\n{t}\n" not in readme]
+        for header in missing:
+            print(f"not in {args.check} byte for byte: {header}…", file=sys.stderr)
+        if missing:
+            return 1
+        print(f"\nall {sum(len(t) for _, t in sections)} tables appear in {args.check} byte for byte", file=sys.stderr)
     return 0
 
 
