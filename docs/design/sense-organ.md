@@ -244,18 +244,30 @@ gate**, not this station path; it must be bound to the intended room on every en
 reply, tool, announcement and replay route (#161, #165). Neither a derived item nor a
 room message is an automatic echo of what the ear heard.
 
+That room-output fence is a requirement, not a claim that it is already universal.
+On Claude seats, frond-ear's current gate covers only its own `reply`,
+`edit_message` and `react` routes (including retries). Bash, `gh`, file writes
+and other MCP servers remain outside that enforcement. Its installed policy
+observes those frond-ear routes rather than refusing them (§4.4).
+
 ### 4.2 Issuer and station, not the ear
 
-The ear runs beside other host processes under a shared uid. A key file readable by
-that uid, or an issuer that signs arbitrary caller-supplied bytes, would let the ear
-mint its own permission. The **owner's separate issuer boundary** holds the private
-key and checks the exact reader generation, owner grant, current exposure and source
-scope, elected text and audience before issuing a narrowly bound capability. The
-station verifies that capability and its owner ledger, rechecks current authority at
-the effect boundary, then signs the derived frame. The request cannot supply its own
-lineage or widen the audience beyond the narrowest exposed source. The station's
-control path is not ordinary `sing`; its derived operation is default-disabled and
-requires owner provisioning (#159, #162, #166; frond-ear#117). Which custody event
+The ear runs beside other host processes under a shared uid. Both signing keys
+matter: if that uid can read either the **issuer** key or the **station** key, a
+reader-side process can bypass the intended election and sign an effect itself.
+An issuer that signs arbitrary caller-supplied bytes has the same defect. The
+**owner's separate issuer boundary** holds its private key and checks the exact
+reader generation, owner grant, current exposure and source scope, elected text
+and audience before issuing a narrowly bound capability. A narrowed or revoked
+grant must govern the next check **and every check after a restart**; a persisted
+old grant is not authority. The station verifies that capability and its owner
+ledger, rechecks current authority at the effect boundary, then signs the derived
+frame. Its own signing key must also be unreadable by the ear's uid, with a
+separate policy-enforcing station service/control path rather than an arbitrary
+signing oracle. The request cannot supply its own lineage or widen the audience
+beyond the narrowest exposed source. The station's control path is not ordinary
+`sing`; its derived operation is default-disabled and requires owner provisioning
+(#159, #162, #166; frond-ear#117). Which custody event
 counts as exposure on each host must be settled before enabling the issuer: the Claude
 ear distinguishes **offered** from the stronger **echoed**; the OpenClaw seat still
 owes exact model-input settlement (§3).
@@ -282,7 +294,11 @@ candidate has green component tests, but its issuer/verifier separation, narrowe
 source-scope enforcement and continuing-reader form have unresolved review findings.
 The [frond-ear derived adapter](https://github.com/karmaterminal/frond-ear/pull/113)
 has no owner issuer wired into its seat; its default room-output policy observes but
-does not refuse. #166's ledger provisioning and installation are proposed, not done.
+does not refuse. On silas today, the Claude-ear processes and station
+key files share the `figs` uid; the reader uid can read those station keys. Thus
+station-key custody is still **host-proof, not seat-proof** (binary-canticle#99),
+and an issuer alone would not close the derived-publication boundary. #166's
+ledger provisioning and installation are proposed, not done.
 No source test, capsule probe or station acceptance proves that this continuing prince
 heard, chose, sent and reached another. The bounded disposable proof in #167, with
 exact installed hashes and a second receiver, is the gate before making that claim.
@@ -293,7 +309,7 @@ exact installed hashes and a second receiver, is the gate before making that cla
 | --- | --- | --- |
 | Claude-seat ear receives signed station items | installed on 🍃 and 🌿 | the 2026-11-22 town item, echoed with custody (frond-ear#112) |
 | Claude-seat ear can wake its session | installed (`wake_on` GitHub off) | frond-ear#114 merged `43dab0e5`; my seat's #1041 receipt |
-| Derived publication (answering back) | closed: no owner issuer | frond-ear#113; #162 draft |
+| Derived publication (answering back) | closed: no owner issuer; on silas the station keys remain readable by the ear uid | frond-ear#113; #162 draft; binary-canticle#99 |
 | OpenClaw continuing-reader ingress | conditional OC-0 source slice; live continuing-session drain/custody unproved | #161 and the pinned prototype README |
 | Ring-backed ear | design only | frond-ear#116 |
 | End-to-end round trip to a second ear | not proven | #167 |
