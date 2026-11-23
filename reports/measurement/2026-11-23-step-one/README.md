@@ -6,7 +6,37 @@ component code was changed. Every instance measured here was a throwaway built f
 directory, on loopback only; the live daemon, the live `frond-ear.service`, the live stations and the room
 were never touched. Raw files are under [`results/`](results/), and the harness is under [`harness/`](harness/).
 
-<!-- HEADLINE -->
+**Verdict: the §2.8 flood acceptance test FAILS on the built path (ronan, aarch64).** Memory and model
+admission stayed bounded. But under any flood the host daemon couldn't keep up with, the quiet tuned
+stream stopped arriving, and no layer reported the loss (§1). The cause is the first hop, and it isn't
+verification.
+
+Headline numbers (ronan, aarch64, every process at `nice -n 19`; they don't carry to silas):
+
+1. **The host daemon takes 75–88 new items/s for the first 20 s from an empty state, and about 40/s sustained**
+   (chatter, 60 s TTL). That held at every stream count (1 to 10 000), payload (64 B to 1 100 B frames) and
+   ear count (1 or 4). The limit is the write-ahead save of the whole state before each new item: about
+   7 ms of fsync plus about 4 µs per live dedup entry. An Ed25519 verify is 41 µs on an X925 core and 101 µs
+   on an A725 core, and the whole admission parse 58 and 136 µs. Per-batch verify: not measurable yet (no
+   batch signatures).
+2. **Above that rate the kernel drops datagrams at the daemon's socket, and nothing reports it**: 92 M in
+   F1's 10 minutes, with the daemon's health `ok` (no reasons), frond-ear's receive health `ok`, and record
+   v1's per-item gap `"unavailable"`. The quiet tuned stream (one item every 10 s from a real station) lost
+   all or nearly all of its items during valid-key, real-station, replay and forged floods (0–5 of 18–60
+   arrived).
+3. **Latency**: station send → daemon record 9–15 ms when idle and p50 10–13 ms / p99 17–26 ms at 40
+   items/s; send → push 5.1–6.0 s, which is frond-ear's 5 s debounce plus its 1 s poll. Under a 100/s
+   flood every quiet item still arrived, 2.5–8 s late.
+4. **Admission is bounded**: on the live settings the session gets at most 60 pushes an hour and 5 records
+   a push, whatever is offered. A1 offered 12 600 items and pushed 300; A3 offered 11.7 M and pushed 300.
+   The §2.8 quiet stream alone (one item every 10 s) reaches that cap after 10 minutes, and the rest of its
+   hour expires unpushed without a word to the session (A4).
+5. **Memory stayed bounded in every cell**: daemon ≤ 53 MiB, frond-ear ≤ 134 MiB, shim ≤ 109 MiB.
+
+Four findings are written up with reproductions: silent loss at the first hop; one captured frame,
+replayed, is enough to black out reception; a push can promise "N more records wait for the next push"
+and then go silent; and untuned streams can fill frond-ear's 4 096-record live set, so tuned items are
+refused (5 of 20 lost at only 15 items/s).
 
 ## What was measured, and at which SHAs
 
@@ -249,7 +279,27 @@ is the §2.8 quiet stream alone, one item every 10 s for 12 minutes, with no flo
 records are counted as the fake session read them. Raw: [`results/admission/`](results/admission/);
 command: `nice -n 19 ionice -c3 python run_cells.py ../results/admission @../results/admission/cells.json`.
 
-<!-- ADMISSION-TABLE -->
+| cell | duration s | offered items | reached the ear (verified records) | pushes | records pushed | max records/push | pushes/hour cap | held at end | delivery counts |
+|---|---|---|---|---|---|---|---|---|---|
+| A1-immediate-live-settings-30ps | 420 | 12,600 | 12,600 | 60 | 300 | 5 | 60 | push_budget | {"dropped": 12268, "pushes": 60, "records_pushed": 300} |
+| A2-digest-30ps | 300 | 9,000 | 9,000 | 5 | 25 | 5 | 60 | None | {"dropped": 8948, "reports": 5, "records_pushed": 25} |
+| A3-immediate-saturated-max | 300 | 11,688,704 | 14,839 | 60 | 300 | 5 | 60 | None | {"dropped": 14507, "pushes": 60, "records_pushed": 300} |
+| A4-quiet-only-live-settings-12min | 720 | 0 | 72 | 60 | 60 | 1 | 60 | push_budget | {"pushes": 60, "records_pushed": 60, "routed_late": 12, "off_air_unpushed": 9} |
+
+(A4's producer is the quiet station itself: 72 items sung, all 72 verified.)
+
+- **The bound holds whatever is offered.** 12 600 items (A1) and 11.7 M items (A3, with the daemon
+  saturated) both became exactly 60 pushes of at most 5 records: 300 records an hour at most, one push per
+  `debounceMs`. Digest (A2) sent one report per `windowMs`, 5 records each. Everything else was dropped
+  from the 32-record per-stream buffer and said so in the push footer (`prod:s00000: 146 dropped from a
+  full buffer.`; in digest, `5 new records (items …/1800 to …/1804), 1799 dropped from a full buffer:`).
+- **When the hour's 60 pushes are spent, the ear goes quiet without saying so.** A1's last push, at 302 s,
+  ended `(27 more records wait for the next push.)`; nothing was pushed for the rest of the run, and only
+  `ear_status` showed `held: "push_budget"`.
+- **The §2.8 quiet stream alone reaches that cap.** A4, one item every 10 s and no flood: 60 items were
+  pushed, one per push, the last at 597 s. The 12 sung after that were never pushed: 9 went off air and 3
+  were still waiting when the cell ended. The session wasn't told. On the live settings a stream of one
+  item every 10 s is heard for 10 minutes in each hour (Finding 5).
 
 ## 5. Reconnect storm
 
@@ -328,6 +378,19 @@ in its status shows it, and nothing reaches the session. Reproduction (9 minutes
 ```sh
 nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py /tmp/repro-4 \
   '[{"name":"repro-4","producers":1,"mode":"valid","rate":15,"ttl":300,"payload":"64","prod_wake":false,"ear_tune":"none","quiet_interval":10,"duration":480}]'
+```
+
+### Finding 5: the hourly push budget cuts a quiet stream off silently (TROUBLE posted)
+
+`maxPushesPerHour` defaults to 60 for `windowMs` 60 000, and `immediate` makes one push per debounce, so a
+tuned stream of one item every 10 s spends the hour's budget in 10 minutes. After that the ear holds
+(`held: "push_budget"`), records wait in the 32-record buffer, expire and are counted `off_air_unpushed`,
+and the session gets no push saying the budget is spent (A4: 72 sung, 60 pushed, the last at 597 s; the 12
+after it never pushed). Finding 3 is the same silence from another cause. Reproduction (13 minutes):
+
+```sh
+nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py /tmp/repro-5 \
+  '[{"name":"repro-5","producers":0,"prod_wake":false,"ear_tune":"none","quiet_interval":10,"duration":720,"drain":30}]'
 ```
 
 ## What the numbers say to §2's owners (observations, not proposals)
