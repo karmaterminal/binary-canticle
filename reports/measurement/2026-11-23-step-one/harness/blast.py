@@ -14,7 +14,8 @@ Modes:
            (what a carousel's repeats cost).
   forged   a licensed key id with a corrupted signature (R half, so S stays canonical): parsed in
            full, then rejected at verify (`bad_signature`).
-  unknown  a key id the manifest doesn't list: rejected at the header (`unknown_key`).
+  unknown  a key id the manifest doesn't list: rejected at the header (`unknown_key`). Each frame is
+           signed, so the rate is bounded by signing; `unknown-fixed` resends one such frame instead.
 
 Writes a JSON summary (sent, achieved rate, frame size) and, with --sample-log, one CSV line
 per sampled item: idem, t_send_ns (CLOCK_MONOTONIC, the same clock the other probes use).
@@ -65,7 +66,7 @@ def main() -> int:
     p.add_argument("--target", required=True)
     p.add_argument("--key", required=True)
     p.add_argument("--streams", required=True, help="comma list, or @file with one name per line")
-    p.add_argument("--mode", choices=["valid", "dup", "forged", "unknown"], default="valid")
+    p.add_argument("--mode", choices=["valid", "dup", "forged", "unknown", "unknown-fixed"], default="valid")
     p.add_argument("--payload", default="64", help="body bytes, or 'max' to fill the 1 100-byte frame")
     p.add_argument("--rate", type=float, default=0.0, help="items/s; 0 = as fast as this process can sign and send")
     p.add_argument("--duration", type=float, required=True)
@@ -85,7 +86,7 @@ def main() -> int:
     host, port = a.target.rsplit(":", 1)
     dest = (host, int(port))
     sk = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(Path(a.key).read_text().strip()))
-    if a.mode == "unknown":
+    if a.mode in ("unknown", "unknown-fixed"):
         sk = Ed25519PrivateKey.generate()     # a key no manifest lists
     kid = wire.key_id(wire.public_key_bytes(sk)).hex()
     names = (Path(a.streams[1:]).read_text().split() if a.streams.startswith("@") else a.streams.split(","))
@@ -114,13 +115,20 @@ def main() -> int:
             samples.append(f"canticle:{kid}:{a.epoch}:{sids[s]:08x}:{seq}")
         return f
 
-    if a.mode in ("dup", "forged"):
-        fixed = make(0)
+    def make_fixed(i: int) -> bytes:
+        f = make(i)
         if a.mode == "forged":
-            b = bytearray(fixed)
+            b = bytearray(f)
             b[-wire.SIG_LEN] ^= 0x01          # R half of the signature: still canonical S, fails verify
-            fixed = bytes(b)
+            f = bytes(b)
+        return f
+
+    if a.mode in ("dup", "forged", "unknown-fixed"):
+        # Rebuilt every second with a fresh issued_at: a frame left to age past its TTL is rejected as
+        # `expired` before its signature is checked, which would measure a cheaper flood than asked for.
+        fixed = make_fixed(0)
         samples.clear()
+    refreshed = time.monotonic()
 
     while time.monotonic() < a.start_at:
         time.sleep(0.001)
@@ -137,6 +145,9 @@ def main() -> int:
             if i >= due:
                 time.sleep(min(0.002, (i + 1) / a.rate - (now - t0)))
                 continue
+        if fixed is not None and now - refreshed >= 1.0:
+            fixed, refreshed = make_fixed(i), now
+            samples.clear()
         frame = fixed if fixed is not None else make(i)
         try:
             sock.sendto(frame, dest)

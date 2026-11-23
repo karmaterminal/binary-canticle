@@ -1,7 +1,7 @@
 [
  {
-  "name": "F1b-valid-flood-4x-max-then-recovery",
-  "prod_keys": 4,
+  "name": "F1b-valid-flood-2x-max-then-recovery",
+  "prod_keys": 2,
   "mode": "valid",
   "rate": 0,
   "payload": "64",
@@ -12,6 +12,33 @@
   "drain": 90,
   "sample_every": 1000,
   "status_every": 2
+ },
+ {
+  "name": "F2b-forged-flood-2x-max",
+  "prod_keys": 2,
+  "mode": "forged",
+  "rate": 0,
+  "payload": "64",
+  "prod_wake": false,
+  "ear_tune": "none",
+  "quiet_interval": 10,
+  "duration": 300,
+  "drain": 60,
+  "sample_every": 0,
+  "status_every": 5
+ },
+ {
+  "name": "F3b-unknown-key-flood-2x-max-fixed-frame",
+  "prod_keys": 2,
+  "mode": "unknown-fixed",
+  "rate": 0,
+  "payload": "64",
+  "prod_wake": false,
+  "ear_tune": "none",
+  "quiet_interval": 10,
+  "duration": 300,
+  "drain": 60,
+  "sample_every": 0
  },
  {
   "name": "F9-untuned-long-ttl-15ps",

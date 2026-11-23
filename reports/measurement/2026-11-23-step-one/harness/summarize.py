@@ -51,40 +51,93 @@ def health_delta(r):
     return h, c
 
 
-def flood_table(rows) -> str:
-    out = ["| cell | flood offered/s | kernel drops (share of all datagrams) | daemon verified/s | daemon health says | "
-           "quiet sung → at daemon → pushed | pushes (max records/push) | frond-ear says | daemon RSS max / CPU mean | "
-           "frond-ear RSS max / CPU mean | load avg max |",
-           "|---|---|---|---|---|---|---|---|---|---|---|"]
+def health_rates(d: Path, r: dict) -> dict:
+    """Per-second rates of the daemon's own counters over the producers' window, from its health records
+    (1 s apart): what the daemon says it did, as opposed to what was offered."""
+    f = d / r["params"]["name"] / "health.jsonl"
+    if not f.exists():
+        return {}
+    t0 = r.get("t_start_mono_ns", 0)
+    dur = float(r["params"].get("duration", 30))
+    hs = [json.loads(l) for l in open(f) if l.strip()]
+    win = [h for h in hs if 2e9 <= h["t_ns"] - t0 <= (dur - 1) * 1e9]
+    if len(win) < 2:
+        return {}
+    a, b = win[0], win[-1]
+    dt = (b["t_ns"] - a["t_ns"]) / 1e9
+    out = {}
+    for group in ("admission", "unverified"):
+        for k, v in b["counters"][group].items():
+            dv = v - a["counters"][group].get(k, 0)
+            if dv:
+                out[f"{group}.{k}"] = round(dv / dt, 1)
+    out["dedup_entries_end"] = b.get("dedup", {}).get("entries")
+    return out
+
+
+def quiet_split(r: dict) -> dict:
+    """Quiet items sung while the flood ran vs after it stopped, and what became of each."""
+    items = r.get("quiet_items")
+    if not items:
+        return {}
+    dur = float(r["params"].get("duration", 30))
+    during = [i for i in items if i["sung_at_s"] < dur]
+    def fate(xs, until):
+        return {"sung": len(xs),
+                "at_daemon_during_flood": sum(1 for i in xs if i["at_daemon_s"] is not None and i["at_daemon_s"] < until),
+                "at_daemon_after_flood": sum(1 for i in xs if i["at_daemon_s"] is not None and i["at_daemon_s"] >= until),
+                "pushed": sum(1 for i in xs if i["pushed_at_s"])}
+    return fate(during, dur)
+
+
+def flood_tables(rows) -> str:
+    a = ["| cell | offered | daemon's own rates (per s, from its health) | daemon CPU mean | kernel drops at the daemon's socket | "
+         "what the daemon's health said | what frond-ear said | load avg max |",
+         "|---|---|---|---|---|---|---|---|"]
+    b = ["| cell | quiet items sung while the flood ran | of those, reached the daemon during / after the flood | pushed to the session | "
+         "pushes in all (max records per push) | daemon RSS max (MiB) | frond-ear RSS start → max (MiB) | shim RSS max (MiB) |",
+         "|---|---|---|---|---|---|---|---|"]
     for r in rows:
         p = r["params"]
         h, c = health_delta(r)
-        sent = r.get("offered") or 0
         fs = r.get("flood_station") or {}
-        q = r.get("quiet") or {}
+        if r.get("offered"):
+            offered = f"{num(r.get('offered_rate'), 0)} {p.get('mode', 'valid')} items/s ({r.get('frame_bytes')} B)"
+        elif fs:
+            offered = f"real station, {num(fs.get('rate'), 0)} sings/s (each sent ≥ 4 times)"
+        else:
+            offered = "none"
         drops = r.get("kernel_drops")
         total_in = (r.get("snmp_delta") or {}).get("InDatagrams", 0) + (drops or 0)
-        share = f"{100 * drops / total_in:.2f} %" if drops and total_in else "0"
-        unv = {k: v for k, v in (c.get("unverified") or {}).items() if v}
-        adm = {k: v for k, v in (c.get("admission") or {}).items() if v}
-        says = f"state {h.get('state')}, reasons {h.get('reasons')}, records.dropped {(h.get('records') or {}).get('dropped')}"
-        if unv:
-            says += f", unverified {unv}"
-        says += f", admission {adm}"
+        share = f" ({100 * drops / total_in:.2f} % of datagrams)" if drops and total_in else ""
+        rates = r.get("health_rates") or {}
+        rate_s = ", ".join(f"{k.split('.', 1)[1]} {num(v, 1)}" for k, v in rates.items() if k != "dedup_entries_end")
+        says = f"`{h.get('state')}`, reasons {h.get('reasons')}, records dropped {(h.get('records') or {}).get('dropped')}"
         fe = (r.get("frond_ear") or {}).get("ear0") or {}
-        fe_says = f"{fe.get('receiveHealth')} {fe.get('reasons')} {fe.get('counts')}"
-        pushes = (r.get("pushes") or {}).get("ear0") or {}
-        load_max = r.get("load_max")
-        out.append("| " + " | ".join([
-            p["name"], num(r.get("offered_rate"), 0) if sent else (num(fs.get("rate"), 0) + " sings/s" if fs else "0"),
-            f"{num(drops)} ({share})", num(r.get("probe_verified_rate_in_window"), 1), says,
-            f"{q.get('sung')} → {q.get('reached_daemon')} → {(q.get('pushed_per_ear') or {}).get('ear0')}",
-            f"{pushes.get('pushes')} ({pushes.get('records_per_push_max')})", fe_says,
-            f"{mb(proc(r, 'canticle-daemon').get('rss_max_kb'))} MiB / {proc(r, 'canticle-daemon').get('cpu_mean')} %",
-            f"{mb(proc(r, 'frond-ear-ear0').get('rss_max_kb'))} MiB / {proc(r, 'frond-ear-ear0').get('cpu_mean')} %",
-            num(load_max, 1),
-        ]) + " |")
-    return "\n".join(out)
+        fe_counts = {k: v for k, v in (fe.get("counts") or {}).items() if k != "joined_late"}
+        fe_says = f"`{fe.get('receiveHealth')}` {fe.get('reasons')} {fe_counts or ''}".strip()
+        dcounts = ((fe.get("canticleDelivery") or {}).get("counts")) or {}
+        if dcounts:
+            fe_says += f"; delivery {dcounts}"
+        a.append("| " + " | ".join([p["name"], offered, rate_s or "–", f"{proc(r, 'canticle-daemon').get('cpu_mean')} %",
+                                    f"{num(drops)}{share}", says, fe_says, num(r.get("load_max"), 1)]) + " |")
+        q = r.get("quiet_split") or {}
+        qq = r.get("quiet") or {}
+        if q:
+            sung = str(q["sung"])
+            reach = f"{q['at_daemon_during_flood']} / {q['at_daemon_after_flood']}"
+            pushed = str(q["pushed"])
+        else:
+            sung = f"{qq.get('sung')} (whole run)"
+            reach = f"{qq.get('reached_daemon')} in all (no per-item timing in this cell)"
+            pushed = str((qq.get("pushed_per_ear") or {}).get("ear0"))
+        pu = (r.get("pushes") or {}).get("ear0") or {}
+        fe_p = proc(r, "frond-ear-ear0")
+        b.append("| " + " | ".join([p["name"], sung, reach, pushed, f"{pu.get('pushes')} ({pu.get('records_per_push_max')})",
+                                    mb(proc(r, 'canticle-daemon').get('rss_max_kb')),
+                                    f"{mb(fe_p.get('rss_first_kb'))} → {mb(fe_p.get('rss_max_kb'))}",
+                                    mb(proc(r, 'shim0').get('rss_max_kb'))]) + " |")
+    return "\n".join(a) + "\n\n" + "\n".join(b)
 
 
 def ingest_table(rows) -> str:
@@ -142,7 +195,7 @@ def admission_table(rows) -> str:
 def main() -> int:
     root = Path(sys.argv[1])
     summary = {}
-    for scen in ("flood", "ingest", "admission", "reconnect"):
+    for scen in ("flood", "flood2", "ingest", "admission", "reconnect"):
         d = root / scen
         if not d.exists():
             continue
@@ -156,14 +209,19 @@ def main() -> int:
             fsj = d / r["params"]["name"] / "floodsinger.json"
             if fsj.exists():
                 r["flood_station"] = json.loads(fsj.read_text())
+            r["health_rates"] = health_rates(d, r)
+            r["quiet_split"] = quiet_split(r)
         summary[scen] = rows
         print(f"\n### {scen}\n")
-        if scen == "flood":
-            print(flood_table(rows))
+        if scen.startswith("flood"):
+            print(flood_tables(rows))
         elif scen == "ingest":
             print(ingest_table(rows))
         elif scen == "admission":
             print(admission_table(rows))
+    (root / "summary.json").write_text(json.dumps(
+        {k: [{kk: vv for kk, vv in r.items() if kk not in ("tap_events", "stderr")} for r in v] for k, v in summary.items()},
+        indent=1, default=str))
     return 0
 
 

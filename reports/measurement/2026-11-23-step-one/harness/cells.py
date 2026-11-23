@@ -361,6 +361,12 @@ def collect(lab: Lab, p, out_dir, drops0, drops1, snmp0, snmp1, statuses, timeli
     for f in ("quiet.jsonl", "floodsinger.json", "quiet.json"):
         if (logs / f).exists():
             shutil.copy(logs / f, out_dir / f)
+    # raw per-item files, gzipped: the probe's frame arrivals and the producers' send logs
+    import gzip
+    for f in sorted(os.listdir(logs)):
+        if f == "tap.frames.csv" or (f.startswith("blast") and f.endswith(".samples.csv")):
+            with open(logs / f, "rb") as src, gzip.open(out_dir / (f + ".gz"), "wb", compresslevel=6) as dst:
+                shutil.copyfileobj(src, dst)
     # error tails of every process, for the record
     errs = {}
     for f in sorted(os.listdir(logs)):
