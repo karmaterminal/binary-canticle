@@ -24,18 +24,20 @@ What is spent, and by whom:
   key was verified from (the latest KNOWN_MAX) has a budget of its own, and all other addresses claiming the key
   share one. All of them together have one bound, which is what the daemon spends on checks that come to nothing;
 - in a stream, the known sources get every other turn however many strangers claim it. Strangers queue apart too, in
-  a pool the stream's longest queue pays for, so a flood can fill it but not keep a station's first frame out.
+  a pool the stream's longest queue pays for: a flood can fill it, but a source that queues apart still gets a place
+  and its turn.
 
 What this does not do:
 
 - **A source address is not trusted, only queued by.** It admits nothing and refuses nothing (I-11). It is as good as
   the network's enforcement: a sender that spoofs the station's exact address and port shares the station's own
-  queue and budget. Beyond SOURCE_RATE forgeries a second, each honest frame is then verified only as often as
-  chance picks it among them. Other keys are unaffected and every refusal is counted, but nothing before the
-  signature can tell the two apart.
+  queue and budget. Beyond SOURCE_RATE forgeries a second (or a NO_OP_COSTth as many replays of what is refused),
+  each honest frame is then verified only as often as chance picks it among them. Other keys are unaffected and
+  every refusal is counted, but nothing before the signature can tell the two apart.
 - **A station that is still a stranger, among many.** Until one of its frames verifies from a new address (a cold
   start, or its restart on a new port), it competes with every other stranger claiming its key. STRANGERS_PER_HOST
-  ports of a host, and STRANGERS_MAX in all, queue apart; beyond that they share one queue, and chance decides.
+  ports of a host, and STRANGERS_MAX in all, queue apart; the rest share CROWD_LANES lanes by a salted hash, and a
+  station whose lane a flood shares is verified only as often as chance picks it there.
 - **Source binding and a house MAC** (RFC §10.2) are not here. A binding is only as good as the switch's enforcement.
   A MAC excludes outsiders but not another key holder. Neither replaces the signature.
 - **The reader can be outrun.** Then the kernel drops datagrams, whoever sent them: counted (``socket_drops``), and
@@ -51,6 +53,7 @@ import ctypes
 import errno
 import heapq
 import os
+import secrets
 import socket
 import struct
 import sys
@@ -71,20 +74,22 @@ BEACON_RATE, BEACON_BURST = 8.0, 16.0       # new beacons per key
 # Checks a second, and at once, that come to nothing: per known source of a key, and per key for all its strangers;
 # and for everything that claims a listed key, together (a check is 60-140 µs on ronan, #171).
 SOURCE_RATE, SOURCE_BURST = 1_000.0, 100.0
+NO_OP_COST = 10                             # what a verified ITEM or PLUCK that changes nothing costs: it makes a record
 CHECK_RATE, CHECK_BURST = 2_000.0, 200.0
 UNLISTED_RATE, UNLISTED_BURST = 500.0, 500.0  # datagrams of no listed key examined a second, all together
 UNLISTED_DEPTH = 64
 KNOWN_MAX, KNOWN_DEPTH = 4, 64              # known sources per key; datagrams waiting per stream and known source
 STRANGERS_MAX = 64                          # other sources per key that queue apart
 STRANGERS_PER_HOST = 16                     # of them, at one address: ports are free, so they must not fill the table
-STRANGER_POOL = 256                         # datagrams waiting per stream for all strangers together
+CROWD_LANES = 64                            # lanes the sources beyond those bounds share, by a salted hash
+STRANGER_POOL = 256                         # datagrams waiting per stream for all strangers and the crowd together
 TURN = 4                                    # places looked at per datagram a turn may serve
 RECLAIM_S = 0.1                             # how often a full table of strangers is searched for idle ones
 BEACON_REPEATS = 64                         # beacon digests kept per key
 RCVBUF = 4 << 20                            # asked of the kernel (capped by net.core.rmem_max)
 READ_TIMEOUT_S = 0.25                       # how long the reader waits before it looks whether to stop
 READ_BATCH = 256                            # datagrams per read
-PAUSE_S = 0.01                              # after a read that failed for now
+PAUSE_S, PAUSES = 0.01, 100                 # after a read that failed for now, and how often in a row
 REFUSED = ("unlisted", "unverified", "over_rate", "backlog")
 
 SO_RXQ_OVFL, SO_MEMINFO = 40, 55            # Linux (asm-generic); the socket module names neither
@@ -112,15 +117,15 @@ class Bucket:
             self.at = now
         return self.tokens >= 1.0
 
-    def take(self) -> None:
-        self.tokens -= 1.0
+    def take(self, n: float = 1.0) -> None:
+        self.tokens -= n
 
     def give(self) -> None:
         self.tokens = min(self.burst, self.tokens + 1.0)
 
 
 class Source:
-    """One address and port claiming one key, or (``crowd``) every one beyond the table's bound."""
+    """One address and port claiming one key, or (``crowd``) those beyond the tables' bounds that share a lane."""
 
     __slots__ = ("budget", "known", "queued")
 
@@ -225,7 +230,8 @@ class StreamQueue:
 class KeyQueue:
     """Everything that waits under one listed key."""
 
-    __slots__ = ("bucket", "streams", "ready", "known", "strangers", "hosts", "stranger_budget", "crowd", "reclaimed")
+    __slots__ = ("bucket", "streams", "ready", "known", "strangers", "hosts", "stranger_budget", "crowd", "salt",
+                 "reclaimed")
 
     def __init__(self, stream_ids):
         self.bucket = Bucket(KEY_RATE, KEY_BURST)
@@ -236,7 +242,8 @@ class KeyQueue:
         self.strangers: dict = {}                 # address -> Source
         self.hosts: Counter = Counter()           # host -> how many of the strangers are there
         self.stranger_budget = Bucket(SOURCE_RATE, SOURCE_BURST)
-        self.crowd = Source(self.stranger_budget)
+        self.crowd = [Source(self.stranger_budget) for _ in range(CROWD_LANES)]
+        self.salt = secrets.randbits(64)          # so a sender can't choose to share a station's lane
         self.reclaimed = 0.0
 
     def source(self, addr, now: float) -> Source:
@@ -249,7 +256,7 @@ class KeyQueue:
             for a in [a for a, s in self.strangers.items() if not s.queued]:
                 self._leave(a)
         if not self._room(host):
-            return self.crowd
+            return self.crowd[hash((self.salt, addr)) % len(self.crowd)]
         return self._enter(addr, Source(self.stranger_budget))
 
     def _room(self, host) -> bool:
@@ -331,12 +338,12 @@ class Unlisted:
 class Ticket:
     """A datagram whose turn has come. It holds one token of each bucket it might pay from until ``settle``."""
 
-    __slots__ = ("data", "digest", "addr", "at", "budget", "known", "key", "stream")
+    __slots__ = ("data", "digest", "addr", "at", "budget", "key", "stream")
 
     def __init__(self, data: bytes, digest: Optional[bytes], addr, at: int, source: Optional[Source],
                  key: Optional[KeyQueue], stream: Optional[StreamQueue]):
         self.data, self.digest, self.addr, self.at = data, digest, addr, at    # at: when it arrived
-        self.budget, self.known = (source.budget, source.known) if source is not None else (None, False)
+        self.budget = source.budget if source is not None else None
         self.key, self.stream = key, stream
 
 
@@ -504,6 +511,7 @@ class Intake:
     # ------------------------------------------------------------ the reader thread
 
     def _run(self) -> None:
+        failures = 0
         try:
             while not self._stop:
                 try:
@@ -511,11 +519,13 @@ class Intake:
                 except OSError as e:
                     if e.errno in (errno.ENOSYS, errno.EPERM) and isinstance(self._reader, _Mmsg):
                         self._reader = _Msg(self.sock)    # a sandbox without recvmmsg
-                    elif e.errno in _BROKEN:
+                        continue
+                    failures += 1
+                    if e.errno in _BROKEN or failures > PAUSES:
                         raise
-                    else:
-                        time.sleep(PAUSE_S)
+                    time.sleep(PAUSE_S)
                     continue
+                failures = 0
                 if drops is not None:
                     self._note_drops(drops)
                 if batch and not self._stop:
@@ -657,17 +667,18 @@ class Intake:
     def settle(self, t: Ticket, verified: bool, fresh: bool) -> None:
         """The verdict on a ticket. ``fresh`` is a verified frame not accepted before, at its key's current epoch: its
         station pays, and its address is a known source of the key from now on. A check that came to nothing is paid
-        by the source it came from: forgeries by their sender, and so is a replay that verified and changed nothing.
-        The exception is an ITEM or PLUCK from a known source: its station answers for it, so that the records of
-        what it keeps having refused stay within its rate."""
+        by the source it came from, forgeries by their sender, and so is a replay that verified and changed nothing;
+        an ITEM or PLUCK that changes nothing costs more, for the record it makes (§14.18.3)."""
         with self._lock:
-            self._release(t, verified and (fresh or t.known and not t.stream.beacon))
+            self._release(t, fresh)
+            if verified and not fresh and not t.stream.beacon:
+                t.budget.take(NO_OP_COST - 1)
             if not verified:
                 self.unverified += 1
                 return
             self.verified += 1
             if fresh and t.key is not None:
-                self.refused["unverified"] += t.key.know(t.addr)
+                self.refused["backlog"] += t.key.know(t.addr)
                 if not t.key.ready and t.key in self._ready:
                     self._ready.remove(t.key)
 

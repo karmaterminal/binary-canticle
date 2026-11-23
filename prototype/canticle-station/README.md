@@ -551,16 +551,16 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
 - **Round-robin at three levels.** Over the claimed keys, over a key's streams, over the source addresses claiming a
   stream. So a quiet key waits behind one datagram of a flooding key, a quiet stream behind one of its own station's
   flooding stream, and the station itself behind one of a forger. Within a stream, the addresses new frames of the
-  key last verified from (at most 4) get every other turn, however many others claim it. Those others share a pool
-  of 256 places per stream, and when it is full the longest queue gives one up, so a flood can fill the pool but not
-  keep a station's first frame out of it.
+  key last verified from (at most 4) get every other turn, however many others claim it. Those others queue apart too,
+  16 ports of a host and 64 in all, and the rest share 64 lanes by a salted hash. Their places per stream are a pool of
+  256, and when it is full the longest queue gives one up: a flood can fill the pool, but a source that queues apart
+  still gets a place and its turn.
 - **Who pays.** A frame that verified and was new debits its key's bucket (16 a second, burst 64) and its stream's (12
   and 48, below the key's, so siblings have room); beacons have their own (8 and 16). A check that comes to nothing
   is charged to its source: each of those 4 addresses may spend 1 000 of them a second, all other addresses claiming
   the key share 1 000, and everything together may spend 2 000. That covers a forgery, and a replay that verifies and
-  changes nothing: an old beacon verifies whenever it is replayed, since it has no expiry. So neither forgeries nor
-  replays spend the station's bucket or its turns. (An ITEM or PLUCK that changes nothing but comes from a known
-  source is its station's to pay, so the records of what it keeps having refused stay within its rate.)
+  changes nothing: an old beacon (it has no expiry, so it verifies whenever it is replayed), or a frame refused at steps
+  3-4, which costs ten, because it makes a record each time. So neither spends the station's bucket.
 - **Beacons are timed when they arrive**, not when their turn comes, so the clock offset (§8.2) absorbs no queueing.
 - **A copy takes no second place.** The same bytes already waiting in the same queue get the same verdict, so a copy is
   counted (`receive.copies`) and not queued. It is neither a repeat (nothing has verified yet) nor refused.
@@ -573,13 +573,15 @@ What it does not do:
 
 - **A source address is never trusted.** It admits and refuses nothing (I-11); it only picks a queue. A sender that
   spoofs the station's exact address and port shares the station's own queue and budget: up to 1 000 forgeries a
-  second cost it nothing, and beyond that each of its frames is verified only as often as chance picks it among them.
-  Other keys are unaffected and the refusals are counted, but nothing before the signature can tell the two apart.
-  Source binding would help only as far as the switch enforces addresses, and a house MAC only against senders
-  without the house key (RFC §10.2). Neither is here, and neither replaces the signature.
+  second (or 100 replays of what is refused) cost it nothing, and beyond that each of its frames is verified only as
+  often as chance picks it among them. Other keys are unaffected and the refusals are counted, but nothing before the
+  signature can tell the two apart. Source binding would help only as far as the switch enforces addresses, and a
+  house MAC only against senders without the house key (RFC §10.2). Neither is here, and neither replaces the
+  signature.
 - **A station that is still a stranger, among many.** Until one of its frames verifies from a new address (a cold
-  start, or its restart on a new port) it competes with every other stranger claiming its key. Sixteen ports of a
-  host queue apart, and 64 strangers in all; beyond that they share one queue, and chance decides.
+  start, or its restart on a new port) it competes with every other stranger claiming its key. If a flood shares its
+  lane, it is verified only as often as chance picks it there. With hundreds of ports of its own host flooding it at
+  20 000 a second, that took up to 16 s (a whole core spent on checking, as before #171, took 1 s).
 - **The caps are fixed.** They do not follow a station's declared `b_station` or `b_stream` (§7.5), which its own key
   could raise at will, and the spike's manifest has no budget field. A station run well above the 16 kbit/s default
   is held to 16 new frames a second.

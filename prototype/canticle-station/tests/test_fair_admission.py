@@ -38,7 +38,7 @@ QUIET_ITEMS = 57                # #171: "57/57"
 QUIET_INTERVAL_S = 0.15
 TAIL_S = 5.0                    # the flood outlasts the last quiet item's burst, so nothing is admitted after it
 LATENCY_MAX_S = 4.5             # the last copy of the station's burst, and half a second
-LATENCY_P50_S = 0.5
+LATENCY_P50_S = 0.25
 FLOOD_RATE = 100_000            # datagrams/s
 BURST = 40_000                  # datagrams sent at a stopped daemon: more than any socket buffer it can ask for
 

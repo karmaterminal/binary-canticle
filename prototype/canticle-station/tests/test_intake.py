@@ -198,7 +198,7 @@ class BoundTest(IntakeCase):
         for n in range(intake.STRANGERS_MAX):
             self.intake.offer([(item(A, n + 1), addr(10 + n))])
         self.now += 1
-        self.assertIs(self.intake.keys[KID_A].source(THERE, self.now), self.intake.keys[KID_A].crowd)
+        self.assertIn(self.intake.keys[KID_A].source(THERE, self.now), self.intake.keys[KID_A].crowd)
         self.serve(fresh=False)
         self.now += 1
         self.offer(item(A, 99), src=THERE)
@@ -211,7 +211,9 @@ class BoundTest(IntakeCase):
         self.assertEqual(len(self.intake.keys[KID_A].strangers), intake.STRANGERS_PER_HOST)
         quiet = item(A, 1)
         self.offer(quiet, src=HERE)
-        self.assertIn(quiet, self.serve(intake.STRANGERS_PER_HOST + 2))
+        lanes = intake.STRANGERS_PER_HOST + intake.CROWD_LANES + 1
+        served = [d for _ in range(lanes // 16 + 1) for d in self.serve(16, verified=lambda t: t.data == quiet)]
+        self.assertIn(quiet, served[:lanes])
         self.drain_host(7)
         self.assertEqual(self.intake.stats()["queued"], 0)
         for n in range(10):                                    # and once they are gone, its ports count no more
@@ -219,6 +221,33 @@ class BoundTest(IntakeCase):
             self.offer(item(A, 10 + n), src=addr(7, 5_000 + n))
             self.assertIn(addr(7, 5_000 + n), self.intake.keys[KID_A].strangers)
             self.serve(fresh=False)
+
+    def test_a_newcomer_beyond_the_table_still_gets_its_turn(self):
+        """A host with more ports than queue apart: the rest share many lanes, by a salted hash, not one. So a
+        station starting on that host is crowded by the few ports that fall in its lane, not by all of them."""
+        key = self.intake.keys[KID_A]
+        for n in range(40):
+            self.offer(*[forge(item(A, 1), 100 * n + i) for i in range(20)], src=addr(7, n))
+        mine = {key.source(addr(7, n), self.now) for n in range(40)}
+        quiet = next(addr(7, port) for port in range(1_000, 2_000) if key.source(addr(7, port), self.now) not in mine)
+        f = item(A, 1)
+        self.offer(f, src=quiet)
+        served = [d for _ in range(len(mine) // 16 + 1) for d in self.serve(16, verified=lambda t: t.data == f)]
+        self.assertIn(f, served[:len(mine) + 1])
+
+    def test_the_lane_of_a_crowded_address_cannot_be_chosen(self):
+        lanes = []
+        for _ in range(2):
+            self.intake = self.make()
+            key = self.intake.keys[KID_A]
+            for n in range(intake.STRANGERS_PER_HOST):
+                self.offer(item(A, n + 1), src=addr(7, n))
+            lanes.append([key.crowd.index(key.source(addr(7, 100 + n), self.now)) for n in range(40)])
+        self.assertNotEqual(*lanes)
+
+    def test_the_pool_holds_more_than_one_datagram_per_lane(self):
+        """Or the longest lane could be emptied to make room (``StreamQueue.put``)."""
+        self.assertGreater(intake.STRANGER_POOL, 2 * (intake.STRANGERS_MAX + intake.CROWD_LANES) - 1)
 
     def test_a_burst_from_an_unknown_port_waits_whole(self):
         frames = [item(A, n + 1) for n in range(40)]
@@ -462,23 +491,41 @@ class BudgetTest(IntakeCase):
 
     def test_only_new_frames_spend_the_stations_buckets(self):
         """A replay that verifies and changes nothing (an old beacon, which verifies whenever it is replayed, or a
-        frame refused at steps 3-4) is charged to whoever sent it, not to the station that signed it."""
+        frame refused at steps 3-4) is charged to whoever sent it, not to the station that signed it. From the
+        station's own address too: a sender may spoof that."""
         key = self.intake.keys[KID_A]
-        for n in range(1, 200):
-            self.offer(beacon(A, n), item(A, n), src=THERE)
-            self.serve(fresh=False)
-        self.assertEqual((key.bucket.tokens, key.streams[stream_id("chatter")].bucket.tokens,
-                          key.streams[BEACON].bucket.tokens),
-                         (intake.KEY_BURST, intake.STREAM_BURST, intake.BEACON_BURST))
-        self.assertLess(key.stranger_budget.tokens, 1.0)
+        self.offer(item(A, 1_000), beacon(A, 1_000), src=HERE)
+        self.serve()
+        full = intake.KEY_BURST - 1, intake.STREAM_BURST - 1, intake.BEACON_BURST - 1
+        for src in (HERE, THERE):
+            for n in range(1, 200):
+                self.offer(beacon(A, n), item(A, n), src=src)
+                self.serve(fresh=False)
+            self.assertEqual((key.bucket.tokens, key.streams[stream_id("chatter")].bucket.tokens,
+                              key.streams[BEACON].bucket.tokens), full)
+            self.assertLess(key.source(src, self.now).budget.tokens, 1.0)
         new = [item(A, 500), beacon(A, 500)]
-        self.offer(*new, src=HERE)
-        self.now += 0.01                                       # the next of the strangers' refill
+        self.offer(*new, src=addr(3))                          # its station, on another port
+        self.now += 0.5
         batch = self.intake.take(32)
         for t in batch:
             self.intake.settle(t, True, t.data in new)
         self.assertLessEqual(set(new), {t.data for t in batch})
-        self.assertEqual(list(key.known), [HERE])
+        self.assertIn(addr(3), key.known)
+
+    def test_items_that_change_nothing_cost_their_sender_more(self):
+        """Each makes a record (a refused one, §14.18.3) for every binding, so fewer are heard than forgeries are
+        checked, whoever sends them."""
+        for n in range(1, 1_000):
+            self.offer(item(A, n))
+            self.serve(fresh=False)
+        self.assertLessEqual(self.intake.verified, intake.SOURCE_BURST / intake.NO_OP_COST + 1)
+        before = self.intake.verified
+        for n in range(1_000, 6_000):                          # ten seconds: the rate, and at most one batch beyond it
+            self.offer(item(A, n))
+            self.serve(fresh=False)
+            self.now += 0.002
+        self.assertLessEqual(self.intake.verified - before, 10 * intake.SOURCE_RATE / intake.NO_OP_COST + 32)
 
     def test_old_beacons_from_a_known_source_spend_no_beacons_turn(self):
         """Not even those of a sender that spoofs the station's address: they make no records, so nothing needs the
@@ -489,15 +536,6 @@ class BudgetTest(IntakeCase):
             self.offer(beacon(A, n), src=HERE)
             self.serve(fresh=False)
         self.assertEqual(self.intake.keys[KID_A].streams[BEACON].bucket.tokens, intake.BEACON_BURST - 1)
-
-    def test_what_a_known_source_resends_is_the_stations_own_to_pay(self):
-        """So the records of frames its station keeps having refused stay within its rate."""
-        self.offer(item(A, 1), src=HERE)
-        self.serve()
-        for n in range(2, 200):
-            self.offer(item(A, n), src=HERE)
-            self.serve(fresh=False)
-        self.assertLessEqual(self.intake.verified, intake.STREAM_BURST)
 
     def test_only_a_fresh_frame_makes_its_address_known(self):
         self.offer(item(A, 1), src=THERE)
@@ -541,7 +579,7 @@ class BudgetTest(IntakeCase):
         self.intake.settle(t, True, True)
         self.assertNotIn(addr(51), key.known)
         self.assertNotIn(addr(51), key.strangers)
-        self.assertEqual(self.refused.get("unverified"), 2)
+        self.assertEqual(self.refused.get("backlog"), 2)
         self.serve(200, verified=lambda t: False)
         self.assertEqual((self.intake.stats()["queued"], self.intake.waiting()), (0, False))
         self.assertEqual([(s.pool, s.lanes) for s in key.streams.values()], [(0, {})] * len(key.streams))
@@ -556,7 +594,8 @@ class BudgetTest(IntakeCase):
 
 class ConsistencyTest(IntakeCase):
     """Random traffic from many addresses, random verdicts: after every step the queues, rings, tables and counts
-    agree with each other, and once it stops everything is served and every budget refills."""
+    agree with each other, and the station's buckets and the daemon's hold exactly what the verdicts left them (the
+    clock refills nothing). Once it stops, everything is served."""
 
     def check(self, in_flight=0):
         i, waiting = self.intake, len(self.intake.unlisted.ready)
@@ -576,7 +615,7 @@ class ConsistencyTest(IntakeCase):
                     self.assertIs(lane.source, source)
                     queued[source] += len(lane.queue)
             waiting += sum(queued.values())
-            listed = [*key.known.values(), *key.strangers.values(), key.crowd]
+            listed = [*key.known.values(), *key.strangers.values(), *key.crowd]
             self.assertLessEqual(set(queued), set(listed))
             self.assertTrue(all(source.queued == queued[source] for source in listed))
             self.assertLessEqual(len(key.known), intake.KNOWN_MAX)
@@ -587,41 +626,49 @@ class ConsistencyTest(IntakeCase):
                          + in_flight)
 
     def test_random_traffic(self):
+        never = {f"{b}_{k}": v for b in ("KEY", "STREAM", "BEACON", "SOURCE", "CHECK", "UNLISTED")
+                 for k, v in (("RATE", 0.0), ("BURST", 1e6))}
         for seed in range(12):
             r = random.Random(seed)
-            self.intake = self.make()
             good = [item(sk, n, stream) if r.random() < 0.7 else beacon(sk, n)
                     for n in range(1, 50) for sk, stream in [(r.choice((A, B)), r.choice(("chatter", "other", "nowhere")))]]
             bad = [forge(f, n) for n, f in enumerate(good)]
             junk = [b"x", item(Ed25519PrivateKey.generate(), 1)]
-            with mock.patch.multiple(intake, STRANGERS_MAX=10, STRANGERS_PER_HOST=3, STRANGER_POOL=20, KNOWN_DEPTH=5):
+            spent: Counter = Counter()
+            with mock.patch.multiple(intake, STRANGERS_MAX=10, STRANGERS_PER_HOST=3, STRANGER_POOL=40, CROWD_LANES=6,
+                                     KNOWN_DEPTH=5, **never):
+                self.intake = self.make()
+
+                def turn(limit, verdict):
+                    batch = self.intake.take(limit)
+                    self.check(len(batch))
+                    for t in batch:
+                        verified, fresh = verdict(t)
+                        if fresh and r.random() < 0.8:
+                            self.intake.remember(t, (t.data[4:12], 5, 0, 1), runner.now_ms() + r.choice((-1, 60_000)))
+                        self.intake.settle(t, verified, fresh)
+                        if t.key is not None:
+                            spent.update([t.stream.bucket] + [t.key.bucket] * (not t.stream.beacon) if fresh else
+                                         [self.intake.checks])
+                    self.intake.heard_again()
+                    self.check()
+                    station = [b for k in self.intake.keys.values()
+                               for b in (k.bucket, *(s.bucket for s in k.streams.values()))]
+                    for b in (*station, self.intake.checks):
+                        self.assertEqual(1e6 - b.tokens, spent[b])
+
                 for _ in range(250):
                     self.now += r.choice((0, 0.001, 0.02, 0.2, 3))
                     if r.random() < 0.6:
                         self.intake.offer([(r.choice(r.choice((good, bad, junk))), addr(r.randrange(8), r.randrange(6)))
                                            for _ in range(r.randrange(1, 40))])
+                        self.check()
                     else:
-                        batch = self.intake.take(r.choice((1, 4, 32)))
-                        self.check(len(batch))
-                        for t in batch:
-                            verified = t.data in good
-                            fresh = verified and r.random() < 0.7
-                            if fresh and r.random() < 0.8:
-                                self.intake.remember(t, (t.data[4:12], 5, 0, 1), runner.now_ms() + r.choice((-1, 60_000)))
-                            self.intake.settle(t, verified, fresh)
-                        self.intake.heard_again()
-                    self.check()
-                while self.intake.waiting():
-                    self.serve(verified=lambda t: False)
-                    self.now += 0.5
-                self.check()
-            self.assertEqual(self.intake.stats()["queued"], 0)
-            self.now += 1_000
-            for key in self.intake.keys.values():
-                for b in (key.bucket, key.stranger_budget, self.intake.checks, *(s.bucket for s in key.streams.values()),
-                          *(s.budget for s in key.known.values())):
-                    b.ready(self.now)
-                    self.assertEqual(b.tokens, b.burst)
+                        turn(r.choice((1, 4, 32)),
+                             lambda t: (v := t.data in good, v and r.random() < 0.7))
+                for _ in range(1_000):
+                    turn(32, lambda t: (False, False))
+                self.assertEqual((self.intake.stats()["queued"], self.intake.waiting()), (0, False))
 
 
 class SocketTest(IntakeCase):
@@ -684,6 +731,15 @@ class SocketTest(IntakeCase):
             self.intake.start()
             self.intake._thread.join(5)
         self.assertEqual([type(e) for e in failed], [OSError])
+
+    def test_an_error_that_does_not_pass_ends_it(self):
+        failed = []
+        i = Intake(self.sock, self.manifest, now_ms=runner.now_ms, wake=lambda: None, failed=failed.append)
+        with mock.patch.object(i._reader, "read", side_effect=OSError(errno.ENOBUFS, "still")), \
+                mock.patch.object(intake, "PAUSE_S", 0.0):
+            i.start()
+            i._thread.join(5)
+        self.assertEqual([e.errno for e in failed], [errno.ENOBUFS])
 
     def test_a_passing_error_is_survived_and_a_forbidden_recvmmsg_is_replaced(self):
         out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -799,6 +855,22 @@ class DaemonIntakeTest(DaemonCase):
             await until(lambda: self.frames(c))
             return self.frames(c)[0]["dedup"]
         self.assertEqual([self.run_with(scenario)[0] for _ in range(2)], ["first", "resurfaced"])
+
+    def test_what_resurfaces_after_a_restart_makes_no_address_known(self):
+        """Anyone may hold a captured copy of it. The station's next beacon makes its own known."""
+        f = item(SK, 1)
+        kid = wire.key_id(wire.public_key_bytes(SK))
+        async def first(d, port):
+            c = await self.joined(d)
+            self.send(port, f)
+            await until(lambda: self.frames(c))
+            return len(d.intake.keys[kid].known)
+        async def second(d, port):
+            resurfaced = await first(d, port)
+            self.send(port, beacon(SK, 1))
+            await until(lambda: d.intake.keys[kid].known)
+            return resurfaced
+        self.assertEqual([self.run_with(x)[0] for x in (first, second)], [1, 0])
 
     def test_a_frame_refused_for_want_of_room_is_judged_again(self):
         """Verified but `over_quota`: its digest is not kept, so its next copy can still be admitted."""

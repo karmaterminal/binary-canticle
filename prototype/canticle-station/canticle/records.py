@@ -173,7 +173,7 @@ class Heard:
     """What became of one datagram, for the transport that queued it (``intake.py``)."""
 
     verified: bool = False           # its signature verified against a manifest key
-    fresh: bool = False              # and it was accepted for the first time, at its key's current epoch
+    fresh: bool = False              # and it was accepted for the first time ever, at its key's current epoch
     kept: bool = False               # and an identical copy is a no-op from now ...
     until: int = 0                   # ... until this time
     ident: Optional[tuple] = None    # the identity tuple, or a beacon's (key id, epoch)
@@ -363,7 +363,7 @@ class Receptor:
         row = self.lst.dedup.get(f.identity)
         if row is None or row[0] != hashlib.sha256(f.raw).digest() or f.identity in self.lst._restored:
             return Heard(True)         # refused at steps 3-4: a copy is judged again, and may be admitted then
-        return Heard(True, current and dedup in ("first", "resurfaced"), True, row[1] - SKEW_MS, f.identity)
+        return Heard(True, current and dedup == "first", True, row[1] - SKEW_MS, f.identity)
 
     def note_repeats(self) -> None:
         """Account for the copies the intake dropped before they were heard: each is a benign no-op (§7.4), counted
