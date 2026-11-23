@@ -41,6 +41,10 @@ LATENCY_MAX_S = 4.5             # the last copy of the station's burst, and half
 LATENCY_P50_S = 0.25
 FLOOD_RATE = 100_000            # datagrams/s
 BURST = 40_000                  # datagrams sent at a stopped daemon: more than any socket buffer it can ask for
+RELAY_LEAD_S = 0.01             # how much earlier than the station a relay on a faster path is heard
+
+
+OUTSIDE = "FAIL, outside the supported guarantee (not asserted)"
 
 
 def kernel_drops(port: int) -> int:
@@ -100,9 +104,10 @@ class Tap(threading.Thread):
 
 
 class Quiet(threading.Thread):
-    """The quiet station: a real carousel, one item every QUIET_INTERVAL_S, from one socket."""
+    """The quiet station: a real carousel, one item every QUIET_INTERVAL_S, from one socket. With ``relayed``, a relay
+    without a key is heard RELAY_LEAD_S before it with a copy of each of its beacons, from a new port each."""
 
-    def __init__(self, sk, port: int, capture=None, items=QUIET_ITEMS, bseq=0, beacon_ms=1_000):
+    def __init__(self, sk, port: int, capture=None, items=QUIET_ITEMS, bseq=0, beacon_ms=1_000, relayed=False):
         super().__init__(daemon=True)
         self.items = items
         self.st = Station(sk, [StreamConfig("quiet")], epoch=7, rng=random.Random(3), now_ms=runner.now_ms(),
@@ -115,10 +120,17 @@ class Quiet(threading.Thread):
         self.distinct: set = set()
         self.singing, self.stop = threading.Event(), threading.Event()
         self.warm: list = []          # items to sing before the row starts
+        self.first_sent = None        # when its first frame went out
+        self.relayed, self.relays = relayed, []    # the relay's sockets: kept open, so each copy has a port of its own
 
     def poll(self):
         for frame in self.st.poll(runner.now_ms()):
             self.distinct.add(frame)
+            if self.relayed and frame[3] == wire.KIND_BEACON:
+                self.relays.append(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+                self.relays[-1].sendto(frame, self.dest)
+                time.sleep(RELAY_LEAD_S)
+            self.first_sent = self.first_sent or time.monotonic()
             self.sock.sendto(frame, self.dest)
             if self.capture is not None and not self.singing.is_set():
                 for dest in self.capture:
@@ -137,7 +149,8 @@ class Quiet(threading.Thread):
                     self.sung[f"canticle:{self.st.key_id.hex()}:7:{stream_id('quiet'):08x}:{r.seq}"] = time.monotonic()
             self.poll()
             self.stop.wait(0.01)
-        self.sock.close()
+        for s in (self.sock, *self.relays):
+            s.close()
 
 
 class FairAdmissionCase(unittest.TestCase):
@@ -213,6 +226,12 @@ class FairAdmissionCase(unittest.TestCase):
         self.addCleanup(q.stop.set)
         return q
 
+    def first_frame(self, q: Quiet) -> float:
+        """Seconds from the station's first frame, beacon or item, to the first record of its key: before it, the
+        daemon had verified nothing of it."""
+        return next(at for at, r in list(self.tap.recs)
+                    if r["type"] == "presence" or (r["type"] == "frame" and r["admission"] == "verified")) - q.first_sent
+
     def settle(self, q: Quiet):
         """The daemon has heard the quiet station before the flood starts, as on a live seat."""
         deadline = time.monotonic() + 10
@@ -220,8 +239,9 @@ class FairAdmissionCase(unittest.TestCase):
             self.assertLess(time.monotonic(), deadline, "the daemon never heard the quiet station")
             time.sleep(0.02)
 
-    def row(self, name: str, sung: dict, floods: list, items=QUIET_ITEMS) -> dict:
-        """Check one row: every quiet item admitted, in time, with every loss counted. Returns the last health."""
+    def measure(self, name: str, sung: dict, floods: list, note="") -> tuple:
+        """Print one row: what arrived and when, what was offered, and what was lost, by reason. Returns (the latencies,
+        the last health, the kernel's drops)."""
         offered = sum(t["sent"] / t["elapsed"] for t in floods)
         time.sleep(0.3)
         health = self.tap.next_health()
@@ -231,7 +251,12 @@ class FairAdmissionCase(unittest.TestCase):
                         (("p50", 50), ("p90", 90), ("p99", 99), ("max", 100))) if lat else "-"
         sys.stderr.write(f"\n{name}: quiet {len(lat)}/{len(sung)}; latency ms {dist}; offered {offered:,.0f}/s; "
                          f"socket drops {lost} (reported {health['records'].get('socket_dropped')}); "
-                         f"receive {json.dumps(health.get('receive'))}\n")
+                         f"receive {json.dumps(health.get('receive'))}; {note}\n")
+        return lat, health, lost
+
+    def row(self, name: str, sung: dict, floods: list, items=QUIET_ITEMS, note="") -> dict:
+        """Check one row: every quiet item admitted, in time, with every loss counted. Returns the last health."""
+        lat, health, lost = self.measure(name, sung, floods, note)
         self.assertEqual(len(sung), items)
         self.assertEqual(len(lat), items, f"{name}: {items - len(lat)} quiet items were never admitted")
         self.assertLessEqual(percentile(lat, 50), LATENCY_P50_S, name)
@@ -342,13 +367,16 @@ class LowRateTest(FairAdmissionCase):
         time.sleep(1)
         q = self.quiet(items=self.ITEMS)
         q.singing.set()
-        self.row("cold start inside a forged flood, 12 ports", q.sung, [self.totals(f)[1]], items=self.ITEMS)
+        totals = self.totals(f)[1]
+        self.row("cold start inside a forged flood, 12 ports", q.sung, [totals], items=self.ITEMS,
+                 note=f"its first valid frame was admitted {1000 * self.first_frame(q):.0f} ms after it went out")
 
     def test_a_forger_at_the_stations_own_address_costs_only_that_station(self):
-        """The limit, measured: forgeries from the quiet station's very socket share its queue, and nothing before
-        the signature can tell them apart. Up to what the daemon spends on failed checks for one source, it costs
-        nothing; here it is far more, and other stations must still lose nothing, the verify work stay bounded, and
-        the loss be reported."""
+        """FAIL, outside the supported guarantee, for the spoofed station: forgeries from its very socket share its
+        queue, and nothing before the signature can tell them apart. Scheduling by source narrows the threat model, it
+        does not give that station R3's guarantee. Up to what the daemon spends on failed checks for one source, they
+        cost nothing; here they are far more. The station's row is measured and printed, not asserted. Asserted is what
+        is supported: other stations lose nothing, the verify work stays bounded, and the loss is reported."""
         self.daemon()
         q, other = self.quiet(items=self.ITEMS), self.quiet("other", items=self.ITEMS)
         self.settle(q)
@@ -357,9 +385,8 @@ class LowRateTest(FairAdmissionCase):
         q.singing.set()
         other.singing.set()
         total = self.totals(f)[1]
+        self.measure("R3 from the station's own socket: that station", q.sung, [total], note=OUTSIDE)
         health = self.row("R3 from the station's own socket: another station", other.sung, [total], items=self.ITEMS)
-        sys.stderr.write(f"R3 from the station's own socket: that station, {sum(i in self.tap.first for i in q.sung)}"
-                         f"/{len(q.sung)} (not asserted)\n")
         self.assertLess(health["counters"]["unverified"]["bad_signature"], 20_000)
         self.assertIn("datagrams_refused", {r for h in self.tap.healths() for r in h["reasons"]})
 
@@ -371,6 +398,53 @@ class LowRateTest(FairAdmissionCase):
                        "--fd", q.sock.fileno(), fds=(q.sock.fileno(),))
         q.singing.set()
         self.row("slow R3 from the station's own socket", q.sung, [self.totals(f)[1]], items=self.ITEMS)
+
+
+class SourceChurnTest(FairAdmissionCase):
+    """A source is an IPv4 address and a UDP port, so a sender can have as many as it likes (🌫's condition on #173)."""
+
+    def test_forged_flood_from_a_new_port_per_datagram(self):
+        """R3 from sources never seen before: every forgery has a port of its own, every second one on the station's
+        own host. The station is established, and keeps its share."""
+        self.daemon()
+        q = self.quiet()
+        self.settle(q)
+        f = self.flood("forged", QUIET_ITEMS * QUIET_INTERVAL_S + TAIL_S, "--kid", self.kid("quiet"), "--stream", "quiet",
+                       "--rate", FLOOD_RATE / 2, "--churn", 1)
+        g = self.flood("forged", QUIET_ITEMS * QUIET_INTERVAL_S + TAIL_S, "--kid", self.kid("quiet"), "--stream", "quiet",
+                       "--rate", FLOOD_RATE / 2, "--churn", 1, "--hosts", 60_000)
+        q.singing.set()
+        totals = [self.totals(x)[1] for x in (f, g)]
+        health = self.row("R3 from a new port per datagram", q.sung, totals,
+                          note=f"{sum(t['ports'] for t in totals):,} ports")
+        self.assertGreater(sum(t["ports"] for t in totals), 100_000)
+        self.assertLess(health["counters"]["unverified"]["bad_signature"], 20_000)
+        self.assertEqual((health["receive"].get("known"), health["receive"].get("displaced")), (1, 0))
+
+    def test_a_relay_that_is_heard_first_takes_the_stations_share_and_it_is_counted(self):
+        """FAIL, outside the supported guarantee, for the relayed station: a relay without a key, on a faster path,
+        is heard first with the station's own beacons, from a new port each, so its ports are the known sources and
+        the station is a stranger when the forged flood comes, from new ports too. Nothing before the signature can tell
+        a relay from the station. Its row is measured and printed, not asserted. Asserted is that the churn shows
+        in the counts, and that another station loses nothing."""
+        self.daemon()
+        q, other = self.quiet(items=self.ITEMS, beacon_ms=250, relayed=True), self.quiet("other", items=self.ITEMS)
+        self.settle(q)
+        time.sleep(3)                           # a dozen beacons, each heard from the relay first
+        before = self.tap.next_health()["receive"]
+        f = self.flood("forged", self.DURATION, "--kid", self.kid("quiet"), "--stream", "quiet", "--rate", FLOOD_RATE,
+                       "--churn", 1)
+        q.singing.set()
+        other.singing.set()
+        total = self.totals(f)[1]
+        self.measure("a relay heard first, then R3 from new ports: that station", q.sung, [total], note=OUTSIDE)
+        health = self.row("a relay heard first, then R3 from new ports: another station", other.sung, [total],
+                          items=self.ITEMS)
+        self.assertGreater(before.get("displaced") or 0, 0, "the station's share went to the relay, and no count says so")
+        self.assertGreaterEqual(health["receive"]["displaced"], before["displaced"])
+        self.assertIn("datagrams_refused", {r for h in self.tap.healths() for r in h["reasons"]})
+
+    ITEMS, DURATION = LowRateTest.ITEMS, LowRateTest.DURATION
 
 
 class LossVisibilityTest(FairAdmissionCase):

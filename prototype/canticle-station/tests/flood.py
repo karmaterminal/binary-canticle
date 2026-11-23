@@ -10,8 +10,9 @@ are the test's own throwaway keys.
            key: only the public key id. ``--beacons`` makes every other one a beacon;
   replay   genuine frames of the quiet station, captured before the flood and resent unchanged (R4).
 
-``--fd`` sends from the station's own socket, which is what a perfect source spoof looks like to the receiver, and
-``--ports`` from that many ports in turn.
+``--fd`` sends from the station's own socket, which is what a perfect source spoof looks like to the receiver,
+``--ports`` from that many ports in turn, and ``--churn`` from a new port for every so many datagrams, on
+``--hosts`` loopback addresses in turn (the first is 127.0.0.1, the station's own).
 """
 
 import argparse
@@ -76,6 +77,8 @@ def main() -> int:
     p.add_argument("--beacons", action="store_true")
     p.add_argument("--fd", type=int, help="send from this inherited socket")
     p.add_argument("--ports", type=int, default=1)
+    p.add_argument("--churn", type=int, default=0)
+    p.add_argument("--hosts", type=int, default=1)
     p.add_argument("--capture", type=int, help="replay: the inherited socket genuine frames arrive on")
     p.add_argument("--quiet-items", type=int, default=0)
     p.add_argument("--quiet-interval", type=float, default=0.15)
@@ -84,10 +87,15 @@ def main() -> int:
         socket.socket(socket.AF_INET, socket.SOCK_DGRAM) for _ in range(a.ports)]
     dest = ("127.0.0.1", a.port)
     sk = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(open(a.key).read())) if a.key else None
-    sent = 0
+    sent, opened = 0, len(socks)
 
     def send(frame: bytes) -> None:
-        nonlocal sent
+        nonlocal sent, opened
+        if a.churn and sent % a.churn == 0:
+            socks[0].close()
+            socks[0] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            socks[0].bind((socket.inet_ntoa((0x7F000001 + opened % a.hosts).to_bytes(4, "big")), 0))
+            opened += 1
         try:
             socks[sent % len(socks)].sendto(frame, dest)
             sent += 1
@@ -143,7 +151,7 @@ def main() -> int:
             for f in frames:
                 send(f)
                 pace.wait(sent)
-    print(json.dumps({"sent": sent, "elapsed": time.monotonic() - start}), flush=True)
+    print(json.dumps({"sent": sent, "elapsed": time.monotonic() - start, "ports": opened}), flush=True)
     return 0
 
 

@@ -592,6 +592,112 @@ class BudgetTest(IntakeCase):
         self.assertLessEqual(self.intake.unverified, intake.UNLISTED_BURST)
 
 
+class ChurnTest(IntakeCase):
+    """🌫's condition on #173: a source is an address and a port, and ports cost a sender nothing. Whatever churns
+    them, the tables, what waits and a turn's work stay bounded, and an established source loses nothing uncounted."""
+
+    @property
+    def shares(self):
+        """(sources that were given a share of their own, how many of them lost it to a newer one), as reported."""
+        return tuple(self.intake.stats().get(k) for k in ("known", "displaced"))
+
+    def accept_from(self, src, *frames):
+        self.offer(*frames, src=src)
+        self.assertEqual(set(self.accept()), set(frames))
+
+    def test_forged_churn_costs_an_established_source_nothing(self):
+        """Every forgery from an address and port never seen before, half of them on the station's own host."""
+        self.accept_from(HERE, item(A, 1))
+        key, n = self.intake.keys[KID_A], 0
+        for seq in range(2, 40):
+            for _ in range(500):
+                n += 1
+                src = (HERE[0], 1_000 + n) if n % 2 else (f"198.51.{n >> 8}.{n & 255}", 1_000 + n)
+                self.intake.offer([(forge(item(A, 1), n), src)])
+            f = item(A, seq)
+            self.offer(f, src=HERE)
+            self.assertLessEqual(self.serve(8, verified=lambda t: t.data == f).index(f), 1)
+            self.now += 0.1
+        self.assertEqual(list(key.known), [HERE])
+        self.assertLessEqual((len(key.strangers), len(key.hosts)), (intake.STRANGERS_MAX, intake.STRANGERS_MAX))
+
+    def test_a_source_that_loses_its_share_to_newer_ones_is_counted(self):
+        """What the daemon hears first from a port makes that port known, so a relay without a key, heard before the
+        station with a copy of each of its frames and from a port of its own each, displaces it. Nothing waited, so
+        nothing is refused: only this count says that the station is a stranger again."""
+        self.accept_from(HERE, item(A, 1))
+        for n in range(intake.KNOWN_MAX):
+            f = item(A, n + 2)
+            self.accept_from(addr(7, 5_000 + n), f)
+            self.offer(f, src=HERE)                            # the station's own copy: a repeat
+        self.assertNotIn(HERE, self.intake.keys[KID_A].known)
+        self.assertEqual(self.refused, {})
+        self.assertEqual(self.shares, (1 + intake.KNOWN_MAX, 1))
+        self.accept_from(HERE, item(A, 90))                    # its next frame heard first from there restores it
+        self.assertIn(HERE, self.intake.keys[KID_A].known)
+        self.assertEqual(self.shares, (2 + intake.KNOWN_MAX, 2))
+
+    def test_known_sources_and_strangers_dilute_an_established_source_by_a_bound(self):
+        """The worst that is left: every other known place is a relay's and forges, and so does a full table of
+        strangers. The station's frame is at most KNOWN_MAX known turns away, each beside one of a stranger."""
+        relays = [addr(7, 5_000 + n) for n in range(intake.KNOWN_MAX - 1)]
+        for n, src in enumerate((*relays, HERE)):
+            self.accept_from(src, item(A, n + 1))
+        for n, src in enumerate((*relays, *(addr(20 + n) for n in range(intake.STRANGERS_MAX)))):
+            self.offer(*[forge(item(A, 1), 100 * n + i) for i in range(4)], src=src)
+        f = item(A, 50)
+        self.offer(f, src=HERE)
+        self.assertIn(f, self.serve(2 * intake.KNOWN_MAX, verified=lambda t: t.data == f))
+
+    def test_what_waits_is_bounded_however_many_sources_become_known(self):
+        """Each in turn has a new frame verified, then fills its lanes and is displaced with them full."""
+        key = self.intake.keys[KID_A]
+        chatter, most = key.streams[stream_id("chatter")], Counter()
+        for n in range(3 * intake.STRANGERS_MAX):
+            src, f = addr(1 + n % 250, 4_000 + n), item(A, n + 1)
+            self.offer(f, src=src)
+            while True:
+                self.now += 0.5
+                (t,) = self.intake.take(1)
+                self.intake.settle(t, t.data == f, t.data == f)
+                if t.data == f:
+                    break
+            self.offer(*[forge(item(A, 1), 1_000 * n + i) for i in range(300)], src=src)
+            most["pool"] = max(most["pool"], chatter.pool)
+            most["queued"] = max(most["queued"], self.intake.stats()["queued"])
+        self.assertLessEqual(most["pool"], intake.STRANGER_POOL)
+        # A known source's lane holds KNOWN_DEPTH, or what it had waiting when it became known: at most the pool.
+        self.assertLessEqual(most["queued"], (1 + intake.KNOWN_MAX) * intake.STRANGER_POOL)
+        self.assertEqual(self.intake.read, self.intake.verified + self.intake.unverified + sum(self.refused.values())
+                         + self.intake.stats()["queued"])
+
+    def test_a_stranger_that_becomes_known_keeps_its_places(self):
+        """A station that starts in a flood does not lose what it had waiting by being verified."""
+        frames = [item(A, n + 1) for n in range(100)]
+        self.offer(*frames, src=THERE)
+        self.accept(1)
+        self.assertEqual((self.intake.stats()["queued"], self.refused), (99, {}))
+
+    def test_placing_and_serving_look_at_a_bounded_number_of_lanes(self):
+        """The scheduler's work is per lane, and 100 000 ports open at most KNOWN_MAX + STRANGERS_MAX + CROWD_LANES
+        lanes of a stream, however they come and go."""
+        key = self.intake.keys[KID_A]
+        chatter, most = key.streams[stream_id("chatter")], 0
+        for n in range(100_000):
+            self.intake.offer([(forge(item(A, 1), n) if n < 1_000 else self.cheap(n), (f"198.51.{n >> 8 & 255}.{n & 255}", n))])
+            most = max(most, len(chatter.lanes))
+            if n % 100 == 0:
+                self.now += 0.05
+                self.serve(8, verified=lambda t: False)
+        self.assertLessEqual(most, intake.KNOWN_MAX + intake.STRANGERS_MAX + intake.CROWD_LANES)
+        self.assertLessEqual(len(key.strangers), intake.STRANGERS_MAX)
+        self.assertEqual((key.known, self.intake.repeats), ({}, {}))
+
+    def cheap(self, n: int) -> bytes:
+        self._one = getattr(self, "_one", None) or item(A, 1)
+        return forge(self._one, n)
+
+
 class ConsistencyTest(IntakeCase):
     """Random traffic from many addresses, random verdicts: after every step the queues, rings, tables and counts
     agree with each other, and the station's buckets and the daemon's hold exactly what the verdicts left them (the
@@ -622,6 +728,11 @@ class ConsistencyTest(IntakeCase):
             self.assertLessEqual(len(key.strangers), intake.STRANGERS_MAX)
             self.assertEqual(dict(key.hosts), Counter(a[0] for a in key.strangers))
             self.assertFalse(set(key.known) & set(key.strangers))
+            for s in key.streams.values():
+                self.assertLessEqual(s.pool, intake.STRANGER_POOL)
+                self.assertLessEqual(max((len(lane.queue) for lane in s.known), default=0), intake.STRANGER_POOL)
+        self.assertEqual(i.stats().get("known", 0) - i.stats().get("displaced", 0),
+                         sum(len(k.known) for k in i.keys.values()))
         self.assertEqual(i.read, i.repeated + i.copied + i.verified + i.unverified + sum(i.refused.values()) + waiting
                          + in_flight)
 
