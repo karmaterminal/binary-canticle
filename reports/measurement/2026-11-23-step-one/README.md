@@ -7,13 +7,14 @@ directory, on loopback only; the live daemon, the live `frond-ear.service`, the 
 were never touched. Raw files are under [`results/`](results/), and the harness is under [`harness/`](harness/).
 
 **Verdict: the §2.8 flood acceptance test FAILS on the built path (ronan, aarch64).** Memory and model
-admission stayed bounded. But under any flood the host daemon couldn't keep up with, the quiet tuned
-stream stopped arriving, and no layer reported the loss (§1). The cause is the first hop, and it isn't
+admission stayed bounded. But under floods of about 60 times what the host daemon could process or more,
+the quiet tuned stream all but stopped arriving; at about twice, it arrived seconds late; and no layer
+reported the loss either way (§1). The cause is the first hop, and it isn't
 verification.
 
 Headline numbers (ronan, aarch64, every process at `nice -n 19`; they don't carry to silas):
 
-1. **The host daemon takes 75–88 new items/s for the first 20 s from an empty state, and about 40/s sustained**
+1. **The host daemon takes 74–88 new items/s for the first 20 s from an empty state, and about 40/s sustained**
    (chatter, 60 s TTL). That held at every stream count (1 to 10 000), payload (64 B to 1 100 B frames) and
    ear count (1 or 4). The limit is the write-ahead save of the whole state before each new item: about
    7 ms of fsync plus about 4 µs per live dedup entry. An Ed25519 verify is 41 µs on an X925 core and 101 µs
@@ -23,7 +24,7 @@ Headline numbers (ronan, aarch64, every process at `nice -n 19`; they don't carr
    F1's 10 minutes, with the daemon's health `ok` (no reasons), frond-ear's receive health `ok`, and record
    v1's per-item gap `"unavailable"`. The quiet tuned stream (one item every 10 s from a real station) lost
    all or nearly all of its items during valid-key, real-station, replay and forged floods (0–5 of 18–60
-   arrived).
+   arrived) — floods of 60× to 4 200× what the daemon processed of them.
 3. **Latency**: station send → daemon record 9–15 ms when idle and p50 10–13 ms / p99 17–26 ms at 40
    items/s; send → push 5.1–6.0 s, which is frond-ear's 5 s debounce plus its 1 s poll. Under a 100/s
    flood every quiet item still arrived, 2.5–8 s late.
@@ -31,12 +32,13 @@ Headline numbers (ronan, aarch64, every process at `nice -n 19`; they don't carr
    a push, whatever is offered. A1 offered 12 600 items and pushed 300; A3 offered 11.7 M and pushed 300.
    The §2.8 quiet stream alone (one item every 10 s) reaches that cap after 10 minutes, and the rest of its
    hour expires unpushed without a word to the session (A4).
-5. **Memory stayed bounded in every cell**: daemon ≤ 53 MiB, frond-ear ≤ 134 MiB, shim ≤ 109 MiB.
+5. **Memory stayed bounded in every cell**: daemon ≤ 52 MiB, frond-ear ≤ 146 MiB (a garbage-collection
+   sawtooth under steady pushing), shim ≤ 110 MiB.
 
-Four findings are written up with reproductions: silent loss at the first hop; one captured frame,
-replayed, is enough to black out reception; a push can promise "N more records wait for the next push"
-and then go silent; and untuned streams can fill frond-ear's 4 096-record live set, so tuned items are
-refused (5 of 20 lost at only 15 items/s).
+Five findings are written up with reproductions: silent loss at the first hop; repeats of one valid
+frame are enough to black out reception; a push can promise "N more records wait for the next push" and
+then go silent; untuned streams can fill frond-ear's 4 096-record live set, so tuned items are refused
+(5 of 20 lost at only 15 items/s); and the hourly push budget cuts a quiet stream off without a word.
 
 ## What was measured, and at which SHAs
 
@@ -62,7 +64,7 @@ unit's node (v26.12.1), and its shim on the live session's node (v26.9.0).
 | RAM | 122 GiB |
 | disk | ext4 on NVMe (`nvme0n1`, scheduler `none`). Scratch state lived on this same filesystem as the live daemon's `~/.local/state/canticle/daemon`, so a fsync costs what it costs the seat |
 | loopback | `lo`, MTU 65 536. `net.core.rmem_default` 212 992 B (the daemon sets no `SO_RCVBUF`), `rmem_max` 4 MiB |
-| niceness | every process of this lane ran under `nice -n 19 ionice -c3`, in this session's cgroup (`app.slice/scribe-rez.service`), never in `openclaw-gateway.service`. With the NVMe scheduler at `none`, the kernel does not arbitrate I/O by ionice class, so `-c3` is recorded but had no effect |
+| niceness | every process of this lane ran under `nice -n 19 ionice -c3`, in this session's cgroup (`app.slice/scribe-rez.service`), never in `openclaw-gateway.service`. With the NVMe scheduler at `none`, the kernel does not arbitrate I/O by ionice class, so `-c3` is recorded but had no effect. The daemon under test therefore ran at nice 19 beside nice-0 neighbours (load up to 17 of 20 cores in F1); the part of its per-item cost that is CPU (the JSON rewrite) may run slower than the live, un-niced daemon's, so the ceilings here are a floor for this host, not a forecast |
 | neighbours | 🌊's live gateway and an unrelated uid's CI-like node jobs shared the host. The 1-minute load average is in every sampler row (`samples.csv`, column `loadavg1`) and in each table below; it stayed under `nproc` (20) except where a table says otherwise |
 
 **Do not extrapolate.** The two costs that set every ceiling below are an Ed25519 verify (CPU) and a
@@ -105,9 +107,10 @@ delivery shape, `tune: ["quiet:quiet"]`, `wakeKeys: [<quiet key>]`, `delivery: {
 stream** is a real `canticle station` (`--stream quiet:chatter`, unicast to the daemon) driven through its
 control socket with one 64-byte item every 10 s ([`singer.py`](harness/singer.py) `--interval 10`); the
 station sends each item at once, then a 3-copy burst at +1, +2 and +4 s, then loops it until its 60 s TTL
-runs out. The **flood** is untuned (not in the tune, not on `wakeKeys`) and comes from a key the manifest
+runs out. The **flood** is untuned (not in the tune; not on `wakeKeys` either, except in F6, where it shares
+the quiet stream's station and key) and comes from a key the manifest
 licenses unless the cell says otherwise. The flood producers and the quiet singer run for the cell's
-duration, then the lab keeps listening for the drain (8 s for F0 and F1, 60 s or more for later cells),
+duration, then the lab keeps listening for the drain (8 s for F0, F1 and F9; 60 s or more for the others),
 so items the carousel recovers after the flood stops are seen. Command:
 `nice -n 19 ionice -c3 python run_cells.py ../results/flood @../results/flood/cells-rest.json` (F0 and F1
 from `cells.json`, F1b to F9 from `../results/flood2/cells.json`); every cell's parameters are in its
@@ -119,19 +122,21 @@ from `cells.json`, F1b to F9 from `../results/flood2/cells.json`); every cell's 
 
 | criterion | verdict | evidence |
 |---|---|---|
-| the quiet tuned stream keeps arriving | **FAIL** | Whenever the flood exceeded the daemon's capacity by more than an order of magnitude, the quiet stream all but stopped while it ran. Valid-key flood: 0 of 60 arrived while it ran (F1; 3 arrived in the 8 s after it stopped, too late to be pushed before the cell ended), 1 of 18 (F1b). Real station flooded through its own control socket: 1 of 30 (F5); the quiet stream on that same station: 2 of 30, neither pushed (F6). One captured frame replayed: 1 of 30 (F4). Forged signatures: 5 of 30 (F2b). Unknown key at 1 M datagrams/s: 23 of 30 arrived, 19 pushed (F3b). A flood the daemon could keep up with still cost quiet items at the ear once it filled frond-ear's live set: 5 of the 20 sung after that point (F9, Finding 4). The stream survived only where the daemon kept up and the live set had room: unknown key at 73 k/s (F3, 30 of 30, within 71 ms), or a valid flood at 100/s (F7) and 40/s (F8), where every quiet item arrived but up to 8 s late |
-| memory stays bounded | **PASS**, for these durations | No process grew without bound in any cell: daemon at most 53 MiB, frond-ear at most 112 MiB, shim at most 108 MiB (tables above; traces below). The daemon grows with its dedup set (32 → 53 MiB in F9 at about 4 500 entries), which its per-key quota (100 000 / keys in the manifest) caps; no cell drove it there. frond-ear rose 100 → 106 MiB over F1's 10 minutes and 103 → 112 MiB in F9 while its live set filled to its 4 096-record bound; nothing here says where it levels off past that |
+| the quiet tuned stream keeps arriving | **FAIL** | When the flood offered about 60 times or more what the daemon processed of it (overload, offered ÷ processed per second of that kind: F1 ≈ 4 200×, F1b ≈ 2 100×, F6 ≈ 150×, F5 ≈ 130×, F4 ≈ 78×, F2b ≈ 63×), the quiet stream all but stopped while it ran. Valid-key flood: 0 of 60 arrived while it ran (F1; 3 arrived in the 8 s after it stopped, one of them already 43 s old and routed late, and none was pushed before the cell ended), 1 of 18 (F1b). Real station flooded through its own control socket: 1 of 30 (F5); the quiet stream on that same station: 2 of 30, neither pushed (F6). Repeats of one valid frame: 1 of 30 (F4). Forged signatures: 5 of 30 (F2b). Unknown key at 1 M datagrams/s: 23 of 30 arrived, 19 pushed (F3b). A flood the daemon could keep up with still cost quiet items at the ear once it filled frond-ear's live set: 5 of the 20 sung after that point (F9, Finding 4). At about 5× the stream degraded (F3b, above). At 1–2× it survived: unknown key at 73 k/s (F3, 30 of 30, within 71 ms), a valid flood at 40/s (F8), and at 100/s (F7, ≈ 2.2×), where the daemon processed 46/s and the kernel dropped 54 % of the flood, yet every quiet item arrived, up to 8.2 s late |
+| memory stays bounded | **PASS**, for these durations | No process grew without bound in any flood cell: daemon at most 52 MiB, frond-ear at most 110 MiB, shim at most 108 MiB (tables above; traces below). The daemon grows with its dedup set, about 4.5 KB per live entry (32 → 52 MiB in F9 at about 4 500 entries), so its per-key quota (100 000 / keys in the manifest) would allow about 450 MB with one key; no cell got near it, and both it and frond-ear were still at their maximum at F9's last sample. frond-ear rose 100 → 106 MiB over F1's 10 minutes and 100 → 110 MiB in F9 while its live set filled to its 4 096-record bound; under steady pushing (§4) it swung between about 100 and 146 MiB with garbage collection |
 | model admission stays bounded | **PASS** | The untuned flood never reached the session in any cell: it isn't tuned and isn't on `wakeKeys`. The session got at most one push per quiet item, at most 3 records a push |
-| the push rate stays under the cap | **PASS** in every flood cell, but see §4 | The most pushes in any flood cell was 30 in 300 s (F3), under `maxPushesPerHour` 60. The quiet stream alone (360 items an hour) is six times that cap, so on the live settings it reaches the cap after about 10 minutes without any flood (§4, cell A4) |
-| loss, lag and gaps for the flood are reported, not silent | **FAIL** | In every cell the daemon's health said `ok` with no reasons, and frond-ear's receive health said `ok`. Kernel drops (13.9 M to 323 M per cell) appear in no record, status or push. A forged or unknown-key flood is visible in the daemon's counters (`bad_signature`, `unknown_key`, and the D34 key-id table naming the impersonated key ids), but nothing reports what it cost. A valid-key flood looks like ordinary traffic. For what did arrive, lag is honest per record (`age=33s` in the push), but a hole in the quiet stream shows only as a jump in item numbers (`item=…/3`, then `…/17`), and records promised to "the next push" can expire with no push to say so (Finding 3) |
+| the push rate stays under the cap | **PASS** in every flood cell, but see §4 | The most pushes in any flood cell was 43 in 480 s (F9), under `maxPushesPerHour` 60. The quiet stream alone (360 items an hour) is six times that cap: on the live settings it reached the cap at 597 s with no flood at all, and the rest of its items expired unpushed (§4, cell A4; Finding 5) |
+| loss, lag and gaps for the flood are reported, not silent | **FAIL** | In every cell the daemon's health said `ok` with no reasons, and frond-ear's receive health said `ok`. Kernel drops (120 to 323 M per cell; 1.6 M to 323 M in the cells where the quiet stream failed) appear in no record, status or push. A forged or unknown-key flood is visible in the daemon's counters (`bad_signature`, `unknown_key`, and the D34 key-id table naming the impersonated key ids), but nothing reports what it cost. A valid-key flood looks like ordinary traffic. For what did arrive, lag is honest per record (`age=33s` in the push), but in `immediate` pushes (the live setting) a hole in the quiet stream shows only as a jump in item numbers (`item=…/3`, then `…/17`; digest reports would say `N seqs skipped`), and records promised to "the next push" can expire with no push to say so (Findings 3 and 5) |
 
 **Verdict: FAIL.** The prince was not overwhelmed (admission stayed bounded), but the quiet tuned stream
-stopped arriving under any flood the daemon couldn't keep up with, and nothing said so.
+all but stopped arriving under floods of 60× or more what the daemon could process, arrived seconds late
+at about 2×, and nothing reported the loss.
 
 ## 2. Verify cost, per item (and why it isn't the ceiling)
 
 Method: [`harness/verify_bench.py`](harness/verify_bench.py), one process pinned with `sched_setaffinity`
-to cpu 19 (Cortex-X925) and then cpu 14 (Cortex-A725), 3 000 frames per step, `perf_counter_ns` around
+to cpu 19 (Cortex-X925) and then cpu 14 (Cortex-A725), 3 000 frames per step (300 for sign, 1 000 for the
+duplicate, 250 per step of the save curve), `perf_counter_ns` around
 each call; frames are chatter ITEMs signed by a throwaway key, bodies of 64 B, 512 B and the largest that
 fits the frame. Raw: [`results/verify/verify.json`](results/verify/verify.json). Command:
 `nice -n 19 ionice -c3 python verify_bench.py ../results/verify/verify.json`.
@@ -157,7 +162,8 @@ That is what "max" means everywhere in this report.
 | `Listener.hear`, duplicate (a carousel repeat) | 186 B | 61.7 (64.7) | 16 196 | 146.1 (160.0) | 6 843 |
 
 Verify is flat in payload size: SHA-512 over 1 KB costs nothing next to the curve arithmetic. An A725
-core is 2.3–2.5 × slower than an X925 core at every step.
+core is 1.9–2.5 × slower than an X925 core at every CPU-bound step (1.9 × for CBOR, 2.2 × for sign, 2.3–2.5 ×
+for verify and parse); the save at 0 entries, which is mostly fsync, is the same on both.
 
 **What a new item actually costs the daemon.** The daemon's `Receptor.hear` is write-ahead (RFC §14.18.2;
 `records.py` `Receptor._batch`): before it emits a new item's record, it saves the whole safety state,
@@ -168,10 +174,14 @@ fsynced, renamed and the directory fsynced. The same call with its state on the 
 | live dedup entries before | state file after | X925, ext4/NVMe: ms per new item mean (p99) | X925, tmpfs | A725, ext4/NVMe | A725, tmpfs |
 |---|---|---|---|---|---|
 | 0 | 56 KB | 8.2 (26.2) | 0.6 | 8.1 (12.3) | 1.2 |
+| 500 | 168 KB | 26.2 (194.1) | 2.4 | 11.9 (17.1) | 5.0 |
 | 1 000 | 280 KB | 12.5 (20.9) | 4.3 | 16.2 (22.4) | 9.1 |
 | 2 000 | 506 KB | 16.1 (20.4) | 8.2 | 26.9 (88.2) | 17.2 |
 | 3 000 | 732 KB | 20.7 (27.8) | 12.2 | 40.6 (100.8) | 24.8 |
 | 3 500 | 845 KB | 22.7 (30.5) | 14.2 | 44.5 (57.8) | 29.6 |
+
+(The 500-entry X925 step on disk caught one long stall: a 194 ms p99 and a 26 ms mean. The steps either
+side of it are 8 and 12 ms.)
 
 A durable save of a tiny file alone (`atomic_write_json`, two fsyncs) took 7.4 ms mean, 13.8 ms p99,
 500 samples. So a new item costs about **7 ms of fsync plus about 4 µs per live dedup entry on an X925
@@ -201,7 +211,7 @@ read of the push carrying it (send→push). CPU% is of one core; RSS is the maxi
 [`results/ingest/`](results/ingest/); command:
 `nice -n 19 ionice -c3 python run_cells.py ../results/ingest @../results/ingest/cells.json`.
 
-| ears | streams | payload (frame B) | saturated: offered/s → verified/s, kernel drops | 40/s: send→record p50 / p99 ms | 40/s: send→push p50 / p99 ms (n) | daemon CPU % sat / 40 | daemon RSS MiB | frond-ear CPU % / RSS MiB (mean of ears) | shim RSS MiB | probe gaps sat / 40 | frond-ear loss counts (ear0) |
+| ears | streams | payload (frame B) | saturated: offered/s → verified/s, kernel drops | 40/s: send→record p50 / p99 ms | 40/s: send→push p50 / p99 ms (n) | daemon CPU % sat / 40 | daemon RSS MiB | frond-ear CPU % (mean of ears) / RSS MiB (max of ears), saturated cell | shim RSS MiB | probe gaps sat / 40 | frond-ear loss counts: receive side (all ears, both cells); delivery (ear0, 40/s cell) |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 1 | 64 (190) | 38,729 → 79.9, 772,785 | 11.4 / 20.8 | 778 / 6,842 (35) | 32.0 / 13.7 | 39 | 1.4 / 120 | 100 | 0 / 0 | receive none; 40/s delivery: pushed 35, dropped 1143, late 0 |
 | 1 | 1 | 512 (639) | 37,365 → 80.5, 745,531 | 10.7 / 17.4 | 776 / 6,848 (35) | 32.0 / 13.1 | 40 | 1.5 / 117 | 100 | 0 / 0 | receive none; 40/s delivery: pushed 35, dropped 1143, late 0 |
@@ -237,7 +247,7 @@ read of the push carrying it (send→push). CPU% is of one core; RSS is the maxi
 **What this says.**
 
 - **The ceiling is the daemon, and nothing else in the matrix moves it.** Over 20 s from fresh state,
-  one flat-out producer got 75–88 items/s verified, at 1 or 10 000 streams, at 64 B or 1 100 B, with 1 or
+  one flat-out producer got 74–88 items/s verified, at 1 or 10 000 streams, at 64 B or 1 100 B, with 1 or
   4 ears; the kernel dropped the other 99.7–99.8 % of what was sent. Stream count changes nothing because the daemon keeps no
   per-stream queue; payload changes nothing because verify is flat in size and the save writes dedup
   rows, not bodies. Four ears add four record connections, which at these rates cost the daemon nothing
@@ -245,7 +255,8 @@ read of the push carrying it (send→push). CPU% is of one core; RSS is the maxi
 - **At 40 items/s on fresh state, send→record is 10–13 ms at p50 and 17–26 ms at p99** in every cell:
   that is the save, not the network (loopback) or verify (0.06 ms). Over a longer run the same rate stops
   fitting (F8, §1). Saturated, latency is whatever the socket buffer holds: 0.8–1.1 s at 1 100 B frames,
-  1.8–2.5 s at 190 B ones, because the fixed 212 992-byte buffer holds fewer big datagrams. Same drops.
+  1.8–3.1 s at 190 B ones (p50 of the 5–12 sampled items that survived in each cell), because the fixed
+  212 992-byte buffer holds fewer big datagrams. Same drops.
 - **Send→push is set by frond-ear's delivery policy, not the path.** One quiet item: 5.1–6.0 s (the 5 s
   debounce plus the 1 s poll; F0). A busy tuned stream: each push carries at most 5 records (3 at 1 100 B,
   the 6 000-character limit), at most one push per debounce, and each stream holds 32 waiting records, so
@@ -263,8 +274,11 @@ read of the push carrying it (send→push). CPU% is of one core; RSS is the maxi
 | 1,000 | 40.0 | 40.0 | 10,804 / 25,730 (35) | 7 (35) | 2.1 / 10.0 | 133 | {"pushes": 7, "records_pushed": 35, "routed_late": 279} |
 | 10,000 | 40.0 | 40.0 | 20,713 / 30,019 (35) | 7 (35) | 2.1 / 8.0 | 134 | {"pushes": 7, "records_pushed": 35, "routed_late": 267} |
 
-frond-ear checks every live record against every pattern on each 1 s poll; at 10 000 patterns and about
-1 200 live records that cost 2 % of a core. The push path is what saturates: 5 records per 5 s cannot carry
+frond-ear matches each live record against the tune on each 1 s poll, stopping at the first pattern that
+fits. Here the 1 200 or so live records all matched within the first 1 200 patterns (the tune lists the
+streams in the producer's round-robin order), so the 1 000- and 10 000-pattern cells did about the same
+work: 2 % of a core. What a long tune costs against untuned records, which scan every pattern, was not
+measured. The push path is what saturates: 5 records per 5 s cannot carry
 40 records/s, so records age past `maxAgeMs` and are routed late (about 270 in 30 s), and send→push grows
 to 11–21 s at p50.
 
@@ -324,7 +338,8 @@ throwaway lab from `harness/`, niced, and touches nothing live.
 ### Finding 1: silent loss at the first hop (TROUBLE posted)
 
 **What happens.** The daemon reads datagrams one at a time on one event loop. A new valid item costs
-8–25 ms (§2: two fsyncs plus a JSON rewrite of every live dedup entry), so on ronan it sustains about 40
+8–25 ms on an X925 core and 8–48 ms on an A725 core (§2: two fsyncs plus a JSON rewrite of every live
+dedup entry), so on ronan, at `nice -n 19` beside busier nice-0 neighbours, it sustained about 40
 new items/s, falling as its dedup set grows. Anything faster fills the socket's receive buffer (212 992 B,
 the kernel default; the daemon sets no `SO_RCVBUF`), and the kernel drops what doesn't fit, quiet stream
 and flood alike. Those drops are counted only in `/proc/net/udp` and `RcvbufErrors`. The daemon's health
@@ -342,23 +357,28 @@ nice -n 19 ionice -c3 ~/.venvs/canticle-measure-2/bin/python run_cells.py /tmp/r
 Expected on ronan: `kernel_drops` in the millions, quiet items reaching the daemon during the flood in
 single digits or zero, daemon `health.state` `ok`, frond-ear `receiveHealth` `ok`.
 
-### Finding 2: one captured frame, replayed, is enough (no key needed)
+### Finding 2: repeats of one valid frame are enough
 
 A valid frame resent unchanged is a duplicate: the daemon still verifies it before dedup finds the
-repeat, at about 70 µs each in the path (F4: 13 941 duplicates/s at a mean of 80 % of a core). Replaying
-one frame from two processes (1.09 M datagrams/s) dropped 98.7 % of everything at the kernel, and 1 of 30
-quiet items arrived while it ran. A frame stays replayable until it expires (60 s for chatter), and live
-traffic supplies fresh ones. The pilot-host kit's nft table (`docs/pilot-host/canticle-pilot.nft`) admits
-only listed peer addresses and has no per-source rate meter; whether a seat runs it was not checked (that
-needs root, and it's the host owner's). Reproduction: as Finding 1 with `"mode":"dup"`.
+repeat, at about 70 µs each in the path (F4: 13 941 duplicates/s with the daemon at 97 % of a core while
+the flood ran). Two producers sending duplicates (1.09 M datagrams/s) dropped 98.7 % of everything at the
+kernel, and 1 of 30 quiet items arrived while it ran. Method note: each F4 producer re-signed its frame
+once a second (so it never aged into the cheaper `expired` rejection), which adds 2 new items/s in all,
+about 2 % of the daemon's time; every other datagram was an exact duplicate. A sender without a key who
+replays frames captured from live traffic would send the same duplicates; that keyless case itself was
+not run. The pilot-host kit's nft table (`docs/pilot-host/canticle-pilot.nft`) admits only listed peer
+addresses and has no per-source rate meter; whether a seat runs it was not checked (that needs root, and
+it's the host owner's). Reproduction: as Finding 1 with `"mode":"dup"`.
 
 ### Finding 3: "N more records wait for the next push", and then nothing
 
 When the carousel recovered quiet items after a flood, frond-ear pushed the fresh ones and routed the ones
-older than `maxAgeMs` (30 s) to the next digest report, which is due a `windowMs` (60 s) later. With 10–30 s
-of life left they expired first. The push that went out said `(3 more records wait for the next push.)`;
-no later push came, so the session was never told they went off air. Only `ear_status`
-(`off_air_unpushed: 3`) knows. Seen in F1b, F4, F5 and F6. Reproduction: as Finding 1; read the last
+older than `maxAgeMs` (30 s) to the next digest report, which is due a `windowMs` (60 s) later. With
+0.8–25 s of life left they expired first. When a later push came, it said so (`… 4 went off air
+unpushed`; F5 at 315 s, F6 at 314 s, F3b). The push that went out said `(3 more records wait for the next push.)`;
+when no later push comes, as at the end of F1b and F4, the session is never told they went off air, and
+only `ear_status` (`off_air_unpushed: 3`) knows. Routed-late records expired in F1b, F2b, F3b, F4, F5 and
+F6. Reproduction: as Finding 1; read the last
 push in `session0.pushes.jsonl` and `frond_ear.ear0.canticleDelivery.counts` in `result.json`.
 
 ### Finding 4: untuned streams can starve the ear's live set (TROUBLE posted)
@@ -371,7 +391,8 @@ is never offered to the ear again, even though its station keeps looping it.
 
 F9: an untuned producer at **15 chatter items/s with a 300 s TTL** (chatter's class maximum), well inside
 the daemon's capacity (0 kernel drops, every item verified), filled the set after about 273 s. From then
-on 5 of the 20 quiet tuned items sung (n = 28, 29, 34, 40, 46) reached the daemon within 60 ms and were
+on 5 of the 20 quiet tuned items sung (the singer's 0-based n = 28, 29, 34, 40, 46; seq = n + 1) reached the
+daemon within 0.1 s and were
 never pushed. frond-ear's `receiveHealth` stayed `ok` with no reasons; only `counts.live_overflow` (414)
 in its status shows it, and nothing reaches the session. Reproduction (9 minutes):
 
@@ -400,16 +421,20 @@ For 🍃 and 🌿 (§2) and 🌫, to weigh. Nothing here was changed.
 - **§2.4 step 2 ("bound the receiver first … before any token budget") is the step that failed.** The
   built daemon has no per-source byte, queue or work cap; it serves datagrams in arrival order until the
   kernel buffer overflows, so whoever sends most decides what everyone hears. The most expensive thing a
-  sender can hand this receiver is a *new valid item* (8–25 ms of durable save), not a forged one (60–70 µs
+  sender can hand this receiver is a *new valid item* (8–48 ms of durable save), not a forged one (60–70 µs
   in the path, F2b and F4). So the cheapest blackout comes from a licensed key, or a station gone wrong: <!-- BRACKET -->;
-  without a key, replaying one captured frame does it at about 1 M datagrams/s (F4).
+  duplicates of one valid frame do it at about 1 M datagrams/s (F4), which needs no key once a frame has
+  been heard.
 - **The write-ahead save sets the host's new-item ceiling.** Rewriting the whole state with two fsyncs per
   item caps ronan at about 40 new items/s, and lower as the dedup set grows (≈16/s predicted for 900 s
   live-state items). Any ring or carriage that wants more items per second through this daemon meets this
   first.
 - **§2.4 step 6 ("gaps are reported, never silently skipped") has a source available**: the kernel counts
   every datagram it drops for the socket (`SO_RXQ_OVFL`, `/proc/net/udp`), and today nothing reads it. The
-  per-stream sequence hole is computed only in `style: counts` digests.
+  per-stream sequence hole (`N seqs skipped`) appears only in digest reports, not in the `immediate`
+  pushes the live seats use. And the station already beacons `trail_seq` (amendment A1, `station.py`),
+  which the RFC names as the source of record v1's per-item `gap`; the receptor still emits
+  `"unavailable"` (`records.py`).
 - **The ear's bound is shared across tuned and untuned streams** (Finding 4). §2.4 step 1 ("untuned streams
   never reach the ear where avoidable") isn't the case on the built path: the daemon has no tune, so every
   verified item becomes a record every binding parses and holds.
@@ -434,9 +459,9 @@ For 🍃 and 🌿 (§2) and 🌫, to weigh. Nothing here was changed.
 | Layer | Counter or signal | Where it shows | Sees kernel socket drops? |
 |---|---|---|---|
 | kernel | per-socket `drops` and `rx_queue` (`/proc/net/udp`); host-wide `RcvbufErrors` (`/proc/net/snmp`) | nowhere in canticle; only this harness reads it | it is them |
-| host daemon | `health.counters.admission` (verified, duplicate, over_quota, …) and `.unverified` (unknown_key, bad_signature, expired, …), the D34 key-id table, `records.dropped` and `peers_closed` (a slow binding's queue), reasons `no_datagrams`, `records_lost`, `clock_skew` | `health` records every 10 s (1 s here) | **no**: it only counts what `recvfrom` returned. Record v1's per-item `gap` is `"unavailable"` (RFC §14.18.3 table: not until beacons carry `trail_seq`) |
+| host daemon | `health.counters.admission` (verified, duplicate, over_quota, …) and `.unverified` (unknown_key, bad_signature, expired, …), the D34 key-id table, `records.dropped` and `peers_closed` (a slow binding's queue), reasons `no_datagrams`, `records_lost`, `clock_skew` | `health` records every 10 s (1 s here) | **no**: it only counts what `recvfrom` returned. Record v1's per-item `gap` is always `"unavailable"` (`records.py`), though the RFC's §14.18.3 table makes it `trail_seq`-based once beacons carry `trail_seq`, which the built station's beacons now do |
 | record v1 binding (frond-ear `RecordConsumer`, this harness's probe) | `rec_seq` gaps → `records_lost` (and the live set cleared), `exit_without_bye`, `joined_late`, join-snapshot `truncated`/`omitted`, `live_overflow`, `malformed_record` | frond-ear `status` → `canticle.receiveHealth`, `reasons`, `counts`; `ear_status` | no |
-| frond-ear delivery | per-ear `counts`: `dropped` (per-stream buffer full), `off_air_unpushed`, `routed_late`, `not_allowlisted`, `muted`, `push_budget` (as `held`) | `ear_status` → `canticleDelivery`; and **in the push itself**: footer lines such as `prod:s00000: 380 dropped from a full buffer.` and `(27 more records wait for the next push.)`, and a `late` line on a record past `maxAgeMs` | no |
+| frond-ear delivery | per-ear `counts`: `dropped` (per-stream buffer full), `off_air_unpushed`, `routed_late`, `not_allowlisted`, `muted`, `push_budget` (as `held`) | `ear_status` → `canticleDelivery`; and **in the push itself**: footer lines such as `prod:s00000: 380 dropped from a full buffer.`, `… 4 went off air unpushed` and `(27 more records wait for the next push.)`, a `late` line on a record past `maxAgeMs`, and in digest reports `N seqs skipped` | no |
 | the session | what the push says | the channel event | no |
 
 ## Harness
