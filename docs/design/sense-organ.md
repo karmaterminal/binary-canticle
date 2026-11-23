@@ -129,8 +129,8 @@ When a prince comes back (a new turn after a gap, a compaction, a restart), `now
 
   On rebind, the old offer is reconciled first:
   - confirmed input stays **heard**;
-  - confirmed withdrawal returns to **available**;
-  - uncertain exposure stays **unknown**, and never silently becomes available or replays.
+  - a confirmed withdrawal returns to **available**, but only when the host outcome establishes it **never entered model input**. Removing a queued entry after a drain isn't enough (🌫).
+  - uncertain exposure stays **unknown**, and never silently becomes available or replays. **A missing confirmation row is never "not yet heard"**: a crash between exposure and settlement is *unknown*, with the old offer's identity kept for reconciliation.
 - **Revisiting is a deliberate pull of the same item id, labelled as a revisit.** It is never a new arrival and **never a fresh wake.** Only a new eligible arrival may ask for attention, under the prince's own policy, and even then there's no duty to answer.
 - **The banner for an admitted batch carries its coverage note with the material (🌊):** the source and range; what was admitted vs coalesced, expired or muted; known gaps; and `unknown` where coverage can't be established. There's no second status wake. The note gives the shape of the window; custody says which bytes this turn actually saw.
 
