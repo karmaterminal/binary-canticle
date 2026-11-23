@@ -48,22 +48,27 @@ import heapq
 import os
 import socket
 import struct
+import sys
 import threading
 import time
-from collections import OrderedDict, deque
+from collections import Counter, OrderedDict, deque
 from hashlib import sha256
 from typing import Callable, Optional
 
 from . import wire
 
-KEY_RATE, KEY_BURST = 64.0, 128.0           # verified frames a second, and at once, per key (beacons apart)
-STREAM_RATE, STREAM_BURST = 48.0, 96.0      # the same for one stream of it: below the key's, so a sibling has room
+# Verified frames a second, and at once, per key (beacons apart) and per stream of it. B_station (§7.5: 16 kbit/s)
+# carries about 10 frames of 190 B a second, repeats included, and repeats cost nothing here. A stream's cap is below
+# its key's, so its siblings have room.
+KEY_RATE, KEY_BURST = 16.0, 64.0
+STREAM_RATE, STREAM_BURST = 12.0, 48.0
 BEACON_RATE, BEACON_BURST = 8.0, 16.0       # verified beacons per key
 KNOWN_RATE, KNOWN_BURST = 50.0, 50.0        # failed checks per key and known source
 STRANGER_RATE, STRANGER_BURST = 50.0, 50.0  # failed checks per key, all other sources together
 UNLISTED_RATE, UNLISTED_BURST = 500.0, 500.0  # datagrams of no listed key examined a second, all together
 KNOWN_MAX, KNOWN_DEPTH = 4, 64              # known sources per key; datagrams waiting per stream and known source
 STRANGERS_MAX, STRANGER_DEPTH = 12, 8       # other sources per key that queue apart; datagrams waiting for each
+STRANGERS_PER_HOST = 4                      # of them, at one address: ports are free, so they must not fill the table
 CROWD_DEPTH = 16                            # datagrams waiting per stream for every source beyond those
 UNLISTED_DEPTH = 64
 RECLAIM_S = 0.1                             # how often a full table of strangers is searched for idle ones
@@ -105,12 +110,20 @@ class Bucket:
 
 
 class Source:
-    """One address claiming one key, or (``crowd``) every address beyond the table's bound."""
+    """One address and port claiming one key, or (``crowd``) every one beyond the table's bound."""
 
     __slots__ = ("budget", "depth", "queued")
 
     def __init__(self, budget: Bucket, depth: int):
         self.budget, self.depth, self.queued = budget, depth, 0
+
+
+def host_of(addr):
+    """The host of a source, as the reader gives it: the sockaddr_in's first 8 bytes as an integer (family, port,
+    address), or recvmsg's tuple."""
+    if isinstance(addr, tuple):
+        return addr[0]
+    return addr >> 32 if sys.byteorder == "little" else addr & 0xFFFFFFFF
 
 
 class Lane:
@@ -150,7 +163,7 @@ class StreamQueue:
 class KeyQueue:
     """Everything that waits under one listed key."""
 
-    __slots__ = ("bucket", "streams", "ready", "known", "strangers", "stranger_budget", "crowd", "reclaimed")
+    __slots__ = ("bucket", "streams", "ready", "known", "strangers", "hosts", "stranger_budget", "crowd", "reclaimed")
 
     def __init__(self, stream_ids):
         self.bucket = Bucket(KEY_RATE, KEY_BURST)
@@ -159,6 +172,7 @@ class KeyQueue:
         self.ready: deque = deque()
         self.known: OrderedDict = OrderedDict()   # address -> Source, oldest first
         self.strangers: dict = {}                 # address -> Source
+        self.hosts: Counter = Counter()           # host -> how many of the strangers are there
         self.stranger_budget = Bucket(STRANGER_RATE, STRANGER_BURST)
         self.crowd = Source(self.stranger_budget, CROWD_DEPTH)
         self.reclaimed = 0.0
@@ -167,28 +181,45 @@ class KeyQueue:
         got = self.known.get(addr) or self.strangers.get(addr)
         if got is not None:
             return got
-        if len(self.strangers) >= STRANGERS_MAX and now - self.reclaimed >= RECLAIM_S:
+        host = host_of(addr)
+        if not self._room(host) and now - self.reclaimed >= RECLAIM_S:
             self.reclaimed = now
             for a in [a for a, s in self.strangers.items() if not s.queued]:
-                del self.strangers[a]
-        if len(self.strangers) >= STRANGERS_MAX:
+                self._leave(a)
+        if not self._room(host):
             return self.crowd
-        got = self.strangers[addr] = Source(self.stranger_budget, STRANGER_DEPTH)
+        return self._enter(addr, Source(self.stranger_budget, STRANGER_DEPTH))
+
+    def _room(self, host) -> bool:
+        return len(self.strangers) < STRANGERS_MAX and self.hosts[host] < STRANGERS_PER_HOST
+
+    def _enter(self, addr, source: Source) -> Source:
+        self.hosts[host_of(addr)] += 1
+        self.strangers[addr] = source
+        return source
+
+    def _leave(self, addr) -> Optional[Source]:
+        got = self.strangers.pop(addr, None)
+        if got is not None:
+            host = host_of(addr)
+            self.hosts[host] -= 1
+            if not self.hosts[host]:
+                del self.hosts[host]
         return got
 
     def know(self, addr) -> int:
         """A new frame of this key was verified from ``addr``. Returns how many waiting datagrams that displaced."""
         got = self.known.pop(addr, None)
         if got is None:
-            got = self.strangers.pop(addr, None) or Source(None, 0)
+            got = self._leave(addr) or Source(self.stranger_budget, STRANGER_DEPTH)
             got.budget, got.depth = Bucket(KNOWN_RATE, KNOWN_BURST), KNOWN_DEPTH
         self.known[addr] = got
         if len(self.known) <= KNOWN_MAX:
             return 0
         old_addr, old = self.known.popitem(last=False)
-        if len(self.strangers) < STRANGERS_MAX:
+        if self._room(host_of(old_addr)):
             old.budget, old.depth = self.stranger_budget, STRANGER_DEPTH
-            self.strangers[old_addr] = old
+            self._enter(old_addr, old)
             return 0
         # No room to keep it apart: what it had waiting goes, so lanes stay bounded by the two tables.
         gone = old.queued
@@ -246,14 +277,13 @@ class Ticket:
 
 
 class Repeat:
-    """A frame whose exact bytes are a no-op until ``until``, and the copies heard of it."""
+    """A frame whose exact bytes are a no-op until ``until``, and the copies of it that came."""
 
-    __slots__ = ("ident", "until", "count", "noted", "last_ms", "touched")
+    __slots__ = ("ident", "until", "copies", "last_ms")
 
     def __init__(self, ident: Optional[tuple], until: int):
         self.ident, self.until = ident, until      # ident: the item's or PLUCK's tuple, None for a beacon
-        self.count = self.noted = self.last_ms = 0
-        self.touched = False
+        self.copies = self.last_ms = 0             # since the event loop last asked, and when the last one came
 
 
 def peek_stream(data: bytes) -> Optional[int]:
@@ -262,13 +292,13 @@ def peek_stream(data: bytes) -> Optional[int]:
     encoding puts them (a frame with ``crit``, or no frame at all)."""
     try:
         p = 14 if data[12] == 0xB8 else 13
-        if data[p] != 1:
+        ai = data[p + 1]           # the head of key 1's value: an unsigned integer is 0x00-0x1b
+        if data[p] != 1 or ai > 0x1B:
             return None
-        ai = data[p + 1]
         p += 2 if ai < 24 else 2 + (1 << (ai - 24))
-        if data[p] != 2:
-            return None
         ai = data[p + 1]
+        if data[p] != 2 or ai > 0x1B:
+            return None
         return ai if ai < 24 else int.from_bytes(data[p + 2:p + 2 + (1 << (ai - 24))], "big")
     except IndexError:
         return None
@@ -422,7 +452,7 @@ class Intake:
         keys, repeats = self.keys, self.repeats
         claims: list = []
         strange: list = []
-        repeated = 0
+        copies: dict = {}
         for data, addr in batch:
             key = keys.get(data[4:12])
             if (key is None or data[:3] != _HEAD or not _MIN_FRAME <= len(data) <= wire.MAX_FRAME
@@ -432,15 +462,15 @@ class Intake:
             digest = sha256(data).digest()
             rep = repeats.get(digest)
             if rep is not None and rep.until > now_ms:
-                repeated += 1
-                self._copy(rep, now_ms)
+                copies[rep] = copies.get(rep, 0) + 1
             else:
                 claims.append((key, data, digest, addr))
         fresh = False
         with self._lock:
             self.read += len(batch)
-            self.repeated += repeated
             self.last_datagram_at = now_ms
+            for rep, n in copies.items():
+                self._copy(rep, now_ms, n)
             for key, data, digest, addr in claims:
                 fresh |= self._place(key, data, digest, addr, now)
             if strange:
@@ -449,11 +479,11 @@ class Intake:
             self.wake()
 
     def _copy(self, rep: Repeat, now_ms: int, n: int = 1) -> None:
-        rep.count += n
-        rep.last_ms = now_ms
-        if not rep.touched:
-            rep.touched = True
+        self.repeated += n
+        if not rep.copies:
             self._touched.append(rep)
+        rep.copies += n
+        rep.last_ms = now_ms
 
     def _place(self, key: KeyQueue, data: bytes, digest: bytes, addr, now: float) -> bool:
         """Queue one claim, or refuse it. True when its stream had nothing waiting from that source."""
@@ -502,7 +532,6 @@ class Intake:
                     break
                 rep = self.repeats.get(t.digest)
                 if rep is not None and rep.until > now_ms:
-                    self.repeated += 1
                     self._copy(rep, now_ms)
                     self._release(t)
                 elif t.digest in seen and t.digest is not None:
@@ -542,26 +571,31 @@ class Intake:
     def settle(self, t: Ticket, verified: bool, fresh: bool) -> None:
         """The verdict on a ticket. A verified frame pays from its station's buckets, anything else from its source's
         budget for failed checks. ``fresh`` (a verified frame not accepted before, at the key's current epoch) makes
-        its address a known source of the key: an old frame replayed from elsewhere does not."""
+        its address a known source of the key: an old frame replayed from elsewhere does not. Copies that had their
+        turn beside the ticket were not looked at: they are repeats of a frame that verified, or refused with one
+        that did not."""
         with self._lock:
             self._release(t, verified)
             if not verified:
                 self.unverified += 1
-                if t.copies:
-                    self.refused["unverified"] += t.copies
+                self.refused["unverified"] += t.copies
                 return
+            rep = self.repeats.get(t.digest)
+            if rep is not None and t.copies:
+                self._copy(rep, self.now_ms(), t.copies)
+            else:
+                self.repeated += t.copies
             self.verified += 1
-            self.repeated += t.copies
             if fresh and t.key is not None:
                 self.refused["unverified"] += t.key.know(t.addr)
+                if not t.key.ready and t.key in self._ready:
+                    self._ready.remove(t.key)
 
     def remember(self, t: Ticket, ident: Optional[tuple], until: int) -> None:
         """From now until ``until``, a copy of this verified, accepted and durably saved frame is a repeat. There is
         one entry per live dedup entry (``until`` is inside its retention), so the listener's per-key quotas bound
         them and no key can push out another's, plus the latest BEACON_REPEATS beacons of each key."""
         rep = self.repeats[t.digest] = Repeat(ident, until)
-        if t.copies:
-            self._copy(rep, self.now_ms(), t.copies)
         if ident is not None:
             heapq.heappush(self._due, (until, t.digest))
             return
@@ -575,14 +609,13 @@ class Intake:
             self.repeats.pop(heapq.heappop(self._due)[1], None)
 
     def copies(self) -> list:
-        """[(ident or None for a beacon, copies since the last call, when the last was heard)]"""
+        """[(ident or None for a beacon, copies since the last call, when the last one came)]"""
         out = []
-        for _ in range(len(self._touched)):
-            rep = self._touched.popleft()
-            rep.touched = False                    # before the count is read: a copy after this touches it again
-            n, rep.noted = rep.count - rep.noted, rep.count
-            if n:
-                out.append((rep.ident, n, rep.last_ms))
+        with self._lock:
+            while self._touched:
+                rep = self._touched.popleft()
+                out.append((rep.ident, rep.copies, rep.last_ms))
+                rep.copies = 0
         return out
 
     # ------------------------------------------------------------ what was lost, and where

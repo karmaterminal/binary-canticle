@@ -39,7 +39,7 @@ RECEPTOR_STATE_VERSION = 1
 HEALTH_INTERVAL_MS = 10_000   # §14.18.3 [PROPOSED DEFAULT]
 NO_DATAGRAMS_MS = 30_000      # §14.18.3 [PROPOSED DEFAULT]
 KEY_TABLE_SIZE = 16           # unverified key ids kept by count (D34)
-BEACON_REPEAT_MS = 86_400_000 # a beacon has no expiry: its copies are no-ops for the run, so only the intake's count ends this
+BEACON_REPEAT_MS = 86_400_000 # a beacon has no expiry; the intake keeps the digests of a key's latest few anyway
 CLOCK_SKEW_MS = SKEW_MS       # a station offset beyond this marks health `clock_skew`
 
 # Records that a full queue may drop (their rec_seq is then a gap); the rest are never dropped (§14.18.2).
@@ -351,9 +351,11 @@ class Receptor:
     def _heard(self, f: Optional[wire.Frame], dedup: Optional[str], now_ms: int) -> Heard:
         if f is None:
             return Heard()
-        current = f.body.epoch == self.lst.stations[f.key_id].epoch_hwm if f.key_id in self.lst.stations else False
+        st = self.lst.stations.get(f.key_id)
+        current = st is not None and f.body.epoch == st.epoch_hwm
         if f.kind == wire.KIND_BEACON:
-            return Heard(True, current and dedup == "first", current, now_ms + BEACON_REPEAT_MS)
+            new = current and dedup == "first"
+            return Heard(True, new, new, now_ms + BEACON_REPEAT_MS)
         row = self.lst.dedup.get(f.identity)
         if row is None or row[0] != hashlib.sha256(f.raw).digest():
             return Heard(True)         # refused at steps 3-4: a copy is judged again, and may be admitted then
@@ -578,7 +580,7 @@ class Receptor:
         if self.failed is not None:
             raise StateNotDurable(self.failed)
         reasons = []
-        receive = self._receive_health(reasons)
+        lost, receive = self._receive_health(reasons)
         since = self.last_datagram_at if self.last_datagram_at is not None else self.started_at
         if now_ms - since >= NO_DATAGRAMS_MS:
             reasons.append("no_datagrams")
@@ -597,17 +599,16 @@ class Receptor:
             counters=self.counters, unverified=self.keys.to_json(),
             dedup={"entries": len(self.lst.dedup), "capacity": self.lst.dedup_capacity},
             beacon_age_ms=ages, surfaced=len(self.surfaced), quarantined=sorted(k.hex() for k in self.quarantined),
-            records={"emitted": self.em.rec_seq, "dropped": self.records_dropped, "peers_closed": self.peers_closed,
-                     **receive.pop("records", {})},
+            records={"emitted": self.em.rec_seq, "dropped": self.records_dropped, "peers_closed": self.peers_closed, **lost},
             **receive, **({"snapshots": dict(self.snapshots)} if self.snapshots is not None else {}))
 
-    def _receive_health(self, reasons: list) -> dict:
+    def _receive_health(self, reasons: list) -> tuple:
         """What was lost before it was heard, in optional fields beside the frozen ones (§14.18.3, #171): the kernel's
         drops at the socket as ``records.socket_dropped``, and what the intake refused, by reason, in ``receive``.
         ``records.dropped`` keeps its meaning: records dropped for a connection. A loss since the last health marks
         it degraded; refusing what claims no listed key loses nothing a station sang, so it does not."""
         if self.intake is None:
-            return {}
+            return {}, {}
         self.note_repeats()
         at, stats, dropped = self.intake.last_datagram_at, self.intake.stats(), self.intake.socket_drops()
         if at is not None and (self.last_datagram_at is None or at > self.last_datagram_at):
@@ -618,7 +619,7 @@ class Receptor:
         if refused > self._lost_at_health[1]:
             reasons.append("datagrams_refused")
         self._lost_at_health = (dropped, refused)
-        return {"records": {"socket_dropped": dropped}, "receive": stats}
+        return {"socket_dropped": dropped}, {"receive": stats}
 
     # ------------------------------------------------------------ join snapshot (amendment BC-1b, D36)
 
