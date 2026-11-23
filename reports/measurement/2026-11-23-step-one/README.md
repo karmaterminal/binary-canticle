@@ -172,13 +172,15 @@ socket and, as far as these counts can show, nowhere else.
 | F10-valid-flood-400ps | ≈ 8.6× | 18 | 13 / 2 | 12 / 1 | 11 (2) | 48 | 101 → 104 | 100 |
 | F11-valid-flood-1000ps | ≈ 24× | 18 | 3 / 5 | 3 / 2 | 4 (2) | 46 | 99 → 102 | 102 |
 
-Overload is what the flood offered per second divided by what the daemon processed of that kind per
-second (its own health counters: verified, duplicate, bad_signature or unknown_key). F0 and F1 have no
-per-item timing (it was added to the collector after them; see *Run history*). F1's "3 in all" were
-nonetheless all after the flood: the probe stopped listening at about 609 s, so of the three latencies
-(15.9, 23.5, 43.5 s) the item sung at 592 s can only be the 15.9 s one, which leaves the other two arriving at
-605.6 s; the flood stopped at 600 s. Every cell's parameters, per-item quiet timing (`quiet_items`), the
-daemon's health records, frond-ear's status timeline and the pushes are in its directory.
+Overload is what the flood offered per second divided by what the daemon processed of that kind per second
+(its own health counters: verified, duplicate, bad_signature or unknown_key), to two significant figures;
+where the daemon's socket dropped nothing (F9), the daemon read the whole flood, and the cell says < 1×.
+F0 and F1 have no per-item timing (it was added to the collector after them; see *Run history*). F1's "3
+in all" were nonetheless all after the flood: the probe stopped listening at about 609 s, so of the three
+latencies (15.9, 23.5, 43.5 s) the item sung at 592 s can only be the 15.9 s one, which leaves the other
+two arriving at 605.6 s; the flood stopped at 600 s. Every cell's parameters, per-item quiet timing
+(`quiet_items`), the daemon's health records, frond-ear's status timeline and the pushes are in its
+directory.
 
 ![F1 RSS over 10 minutes](charts/F1-rss.svg)
 
@@ -569,8 +571,8 @@ are in the next section, kept apart from these observations and marked as candid
 ## Candidate cures (not implemented, not proven)
 
 The reviewers (🍃, 🌫, 🌻, 🪨, 🌊 and 🩸) named these cures in the room after reading the findings; the
-pass-2 workorder added the replay row of the rerun, and 🍃's approval of pass 2 added 5 (replays of
-genuine frames) and moved that row onto the quiet key's own frames. They are recorded here as
+pass-2 workorder added the replay row of the rerun, and 🍃's approval of pass 2 (#171) added 5 (replays
+of genuine frames) and moved that row onto the quiet key's own frames. They are recorded here as
 candidates. Nobody has implemented any of them, this lane included, and none of them is a decision. Each
 stays a candidate until the flood test passes when rerun on a changed path (the rows at the end of this
 section). A change
@@ -707,17 +709,25 @@ items need. Neither check in 4 stops it: a house MAC covers the same bytes, and 
 can be spoofed. F4 measured what exact repeats cost, though of another key's frame (Finding 2).
 
 **The candidate.** Before verify, look each datagram up by its digest among the frames verified
-recently, and drop an exact repeat: count it, don't verify it, don't debit it. It belongs in the drain
-(1), before the datagram takes a place in its key's queue.
+recently and the frames still waiting in a queue to be verified, and drop an exact repeat: count it,
+don't verify it, don't debit it. It belongs in the drain (1), before the datagram takes a place in its
+key's queue.
 
 - *Why a digest is enough.* A frame has no unsigned bytes: the whole datagram, at most `MAX_FRAME`, is the
   signed bytes and the signature. Its encoding is deterministic (§9.4), and `wire.py` refuses a
   non-canonical S. So a replay of a genuine frame is the original's bytes, and an altered copy fails
-  verify.
-- *Why it is safe.* Only frames that verified and were admitted enter the set, so a sender without the
-  key can't plant a digest there, and a hit is a copy of a frame already admitted: dropping it changes nothing derived
-  (§7.4, I-4). A frame with the same identity and different bytes misses, goes on to verify, and dedup
-  reports the equivocation as it does today (§10.8).
+  verify. (If the house MAC of 4 rides outside the frame, as §10.2 puts it, the digest covers the frame,
+  not the tag.)
+- *Why the waiting frames count too.* A replayer can capture a frame and resend it before the original
+  reaches verify. Checked against verified frames only, those copies would take places in the quiet
+  key's queue and each be verified in turn. Identical bytes get the same verdict, so a copy of a frame
+  already waiting adds nothing, and the station's next loop sends it again if the waiting copy is lost.
+- *Why it is safe.* Only frames that verified and were admitted, or are waiting for verify, enter the
+  set. A sender without the key can't plant a genuine frame's digest there, and a hit is a copy of a
+  frame already admitted or already queued: dropping it loses no item and leaves every derived quantity
+  as it was (I-4, §12.1). Presence, which §7.4 lets a benign repeat refresh, is taken up below. A frame
+  with the same identity and different bytes misses, goes on to verify, and dedup reports the
+  equivocation as it does today (§10.8).
 - *What it counts.* The station's carousel resends the same bytes (§7.2), so its own repeats hit the
   check too, and §7.4 says an identical repeat is a benign no-op that MUST NOT be reported as a replay.
   The count is of repeats dropped before verify, not of attacks.
@@ -728,27 +738,34 @@ recently, and drop an exact repeat: count it, don't verify it, don't debit it. I
 **Its bound.** A recent-digest window sized to the frame TTL, with bounded memory. Each digest is kept
 exactly as long as its frame's dedup entry, which §7.4 keeps until the item's local expiry plus 5 s and
 never evicts early, and is admitted under the same per-key capacity (in the spike, 100 000 entries shared
-equally among the manifest's keys). The window costs one digest per live dedup entry, and another key's
-new items can't evict the quiet key's digests.
+equally among the manifest's keys). The window costs one digest per live dedup entry, plus one per
+frame waiting in a queue, which the drain's bounded queues (1) limit. Another key's new items can't
+evict the quiet key's digests.
 
 **Its limits.**
 
 - It doesn't stop a replay older than the window. The frame's own expiry covers that: past its local
-  expiry, an ITEM or PLUCK is refused as `expired` before verify (§7.4, §14.6.3). In `wire.py` that costs
-  about a CBOR decode and re-encode (12–24 µs for a 1 098 B frame on ronan's two core types) against a
-  verify's 41–102 µs (§2).
+  expiry (§7.4, §14.6.3), an ITEM or PLUCK is refused as `expired` among the cheap checks before crypto
+  (§14.1 step 1). In `wire.py` that costs the parse up to the signature, about 18 and 36 µs for a
+  1 098 B frame on ronan's two core types, against a verify's 41 and 102 µs (§2: the whole parse less the
+  verify alone). It inherits dedup's own edge case: `wire.py` checks expiry with the current clock-offset
+  estimate δ̂, so if δ̂ rises by more than the 5 s skew after an item was first heard, a copy can outlast
+  the window and still be inside its expiry (§7.4 notes the same for PLUCKs).
 - A beacon has neither: it has no time window (§14.1 step 1, §12.2 step 3) and no dedup entry, and its
-  `(epoch, bseq)` is checked only after verify (§12.2 step 10; `listener.py`). How the check treats
-  replayed beacons is open; the room didn't raise it.
+  `(epoch, bseq)` is checked only after verify (§12.2 step 10; `listener.py`). So once a beacon has been
+  verified, a replayed copy of it verifies again and, under debit after verify, is charged to the quiet
+  key: the gap 5 closes for items stays open for beacons. §12.2 step 3 leaves beacon floods to the
+  per-key rate at step 4, and a replayer of the quiet key's beacons spends the quiet key's rate either
+  way. How to close it is open; the room didn't raise it.
 - It doesn't keep replays out of the socket buffer. It still reads and hashes every datagram, and F3b's
   refusal at the header (about 205 000/s) still saturated at 1 M/s offered, so the drop count (2) still
   matters. What the hash and lookup cost per datagram was not measured.
 - The window has to start empty after a restart. An item accepted before the restart surfaces on the
   first copy heard after it (`listener.py` `_restored`; record v1's `dedup: "resurfaced"`, §14.18.3). A
   window rebuilt from the saved state would drop that copy, and the item would never surface.
-- Today a repeat still refreshes its stream's presence (§8.6, `listener.py` `_heard_on`) and the held
-  item's `copies`. Dropped before verify, the station's own repeats would stop doing that, unless the
-  check notes them from the digest's entry. That gives a replayer nothing it lacks today: a replayed
+- Today a repeat still refreshes its stream's presence (§7.4, §8.6; `listener.py` `_heard_on`) and the
+  on-air item's `copies`. Dropped before verify, the station's own repeats would stop doing that, unless
+  the check notes them from the digest's entry. That gives a replayer nothing it lacks today: a replayed
   genuine frame verifies and counts now.
 - Like 1, it changes the order of the receptor's checks (§14.1 puts dedup after crypto, and §12.2 does
   the same for relays), so it starts as an amendment.
@@ -826,7 +843,8 @@ Notes for whoever builds the rerun:
   F4's producers did once a second, so the replayer resends each quiet item as captured and moves to the
   next as it is sung, keeping every copy inside its item's life; a copy past it is refused as `expired`,
   which is not what the row tests. At F4's rate the socket buffer can still fill (F3b: refusing at the
-  header still saturated at 1 M/s), and the drop count (2) has to show that.
+  header still saturated at 1 M/s), and the drop count (2) has to show that. The row replays items;
+  replaying the quiet station's beacons as well would test the beacon gap in 5's limits.
 - **Latency.** The room set no latency bar. F0's 5.1–6.0 s (frond-ear's 5 s debounce plus its 1 s poll,
   with no flood) is the reference.
 
@@ -866,7 +884,7 @@ Notes for whoever builds the rerun:
 | [`harness/verify_bench.py`](harness/verify_bench.py) | Isolated verify and admission costs, pinned per core type |
 | [`harness/scenario_reconnect.py`](harness/scenario_reconnect.py) | The restart storm |
 | [`harness/reconnect_report.py`](harness/reconnect_report.py) | The per-restart analysis of the storm (`results/reconnect/R1-reconnect-storm/reconnect-analysis.json`) |
-| [`harness/summarize.py`](harness/summarize.py), [`harness/plot_svg.py`](harness/plot_svg.py) | The tables in §1, §3 and §4 and the charts, from the result files (`results/summary.json` is its aggregate). On the committed results, `python summarize.py ../results --check ../README.md` exits non-zero unless every table it prints appears here byte for byte |
+| [`harness/summarize.py`](harness/summarize.py), [`harness/plot_svg.py`](harness/plot_svg.py) | The tables in §1, §3 and §4 and the charts, from the result files (`results/summary.json` is its aggregate). On the committed results, `python summarize.py ../results --check ../README.md` exits non-zero unless every table it prints appears here byte for byte, as the only table under its header |
 | [`harness/queue.sh`](harness/queue.sh), [`harness/queue2.sh`](harness/queue2.sh), [`harness/smoke.py`](harness/smoke.py) | The run order used after F1 (one suite at a time); a 40-second end-to-end check |
 
 To rerun (from `reports/measurement/2026-11-23-step-one/`, with frond-ear cloned beside the worktree as
@@ -924,12 +942,13 @@ flood `cells-rest.json`; `flood2`; ingest; admission; reconnect; `flood3`.
   78.27 % → 87.82 %, F11 87.98 % → 95.61 %, F5 98.86 % → 99.17 % and F6 98.71 % → 99.30 %. The F7
   sentence that said the kernel dropped "54 % of the flood" (drops ÷ flood datagrams sent) now gives the
   socket-local 52 %.
-- **Pass 3 (2026-11-23, docs and `summarize.py` only; no new measurement).** From 🍃's approval notes.
-  Candidate 5 (replays of genuine frames) was added, frond-ear's candidates became 6, and the rerun's
-  replay row now replays the quiet key's own frames. `summarize.py` now computes what pass 2 wrote by
-  hand: §1 as one table pair in cell order, the socket-local share, the attribution of each drop count to
-  the socket's own `drops`, the overload column, and §3's ingest header. Rerun on the committed results,
-  every table it prints for §1, §3 and §4 appears in this README byte for byte (`--check`), and
+- **Pass 3 (2026-11-23, docs and `summarize.py` only; no new measurement).** From 🍃's approval of pass 2
+  (#171). Candidate 5 (replays of genuine frames) was added, frond-ear's candidates became 6, and the
+  rerun's replay row now replays the quiet key's own frames. `summarize.py` now computes what passes 1 and
+  2 wrote by hand: §1 as one table pair in cell order with its overload column (pass 1); the socket-local
+  share, the attribution of each drop count to the socket's own `drops`, and F9's overload cell (pass 2);
+  and §3's ingest header (both). Rerun on the committed results, every table it prints for §1, §3 and §4
+  appears in this README byte for byte, as the only table under its header (`--check`), and
   `results/summary.json` came out unchanged. Computing overload by its stated definition changed three
   cells pass 1 had worked out by hand: F5 ≈ 127× → ≈ 130× (two significant figures, like the other
   cells), and F10 ≈ 8.4× → ≈ 8.6× and F11 ≈ 23.5× → ≈ 24×, which pass 1 had divided by the probe's

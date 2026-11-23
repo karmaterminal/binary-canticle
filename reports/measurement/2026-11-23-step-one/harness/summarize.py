@@ -1,6 +1,6 @@
 """Turn results/<scenario>/<cell>/result.json into the README's §1, §3 and §4 tables (markdown on
 stdout) and results/summary.json. Every number in those tables comes from here; --check confirms that
-each table it prints appears in the README byte for byte.
+each table it prints appears in the README byte for byte, as the only table under its header.
 
     python summarize.py <results dir> [--check <README.md>]
 """
@@ -117,8 +117,8 @@ def drops_cell(r: dict) -> str:
     """The daemon socket's own kernel drops, with their socket-local share: drops ÷ (drops + the
     datagrams the daemon read), the share of the datagrams that reached that socket."""
     drops = r.get("kernel_drops")
-    if not drops:
-        return num(drops)
+    if not drops or not health_delta(r)[1]:
+        return num(drops)  # no share without the daemon's own counters
     return f"{num(drops)} ({100 * drops / (drops + daemon_reads(r)):.2f} %)"
 
 
@@ -143,7 +143,7 @@ def overload_cell(r: dict) -> str:
         return "–"
     if r.get("kernel_drops") == 0:
         return "< 1× (0 socket drops)"
-    processed = (r.get("health_rates") or {}).get(PROCESSED_AS[r["params"].get("mode", "valid")])
+    processed = (r.get("health_rates") or {}).get(PROCESSED_AS.get(r["params"].get("mode", "valid")))
     return f"≈ {two_figures(offered / processed)}×" if processed else "–"
 
 
@@ -278,7 +278,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("results", type=Path)
     ap.add_argument("--check", type=Path, metavar="README",
-                    help="exit 1 unless every table printed appears in this file byte for byte")
+                    help="exit 1 unless every table printed appears in this file byte for byte, as the "
+                         "only table under its header")
     args = ap.parse_args()
     root = args.results
     summary = {}
@@ -316,10 +317,18 @@ def main() -> int:
         {k: [{kk: vv for kk, vv in r.items() if kk not in ("tap_events", "stderr")} for r in v] for k, v in summary.items()},
         indent=1, default=str))
     if args.check:
-        readme = "\n" + args.check.read_text() + "\n"
-        missing = [t.split("\n", 1)[0][:100] for _, tables in sections for t in tables if f"\n{t}\n" not in readme]
+        readme = "\n\n" + args.check.read_text() + "\n\n"
+        missing = []
+        for _, tables in sections:
+            for t in tables:
+                header = t.split("\n", 1)[0]
+                # The whole table, between blank lines (so no extra or missing rows), and the only table
+                # under its header (so no stale copy elsewhere).
+                if f"\n\n{t}\n\n" not in readme or readme.count(f"\n{header}\n") != 1:
+                    missing.append(header[:100])
         for header in missing:
-            print(f"not in {args.check} byte for byte: {header}…", file=sys.stderr)
+            print(f"not in {args.check} byte for byte, or not the only table with this header: {header}…",
+                  file=sys.stderr)
         if missing:
             return 1
         print(f"\nall {sum(len(t) for _, t in sections)} tables appear in {args.check} byte for byte", file=sys.stderr)
