@@ -164,14 +164,79 @@ frond-ear daemon with a fake session; the probe tap is one more binding, so 2 or
 daemon socket). Each combination ran twice, each time in a fresh lab: **saturated** (one producer flat
 out, 20 s) for the ceiling, and **40 items/s** (30 s, below the ceiling on fresh state) for latency.
 Each ear tuned the producer's first stream, with the producer on `wakeKeys` and `immediate` delivery,
-so pushes happened on the live settings. Then three cells tuned every stream (100, 1 000 and 10  000
+so pushes happened on the live settings. Then three cells tuned every stream (100, 1 000 and 10 000
 patterns) to show what a large tune costs frond-ear. Latency is CLOCK_MONOTONIC from the producer's
 `sendto` to the probe's receipt of the item's `frame` record (send→record), and to the fake session's
 read of the push carrying it (send→push). CPU% is of one core; RSS is the maximum over the cell. Raw:
 [`results/ingest/`](results/ingest/); command:
 `nice -n 19 ionice -c3 python run_cells.py ../results/ingest @../results/ingest/cells.json`.
 
-<!-- INGEST-TABLES -->
+| ears | streams | payload (frame B) | saturated: offered/s → verified/s, kernel drops | 40/s: send→record p50 / p99 ms | 40/s: send→push p50 / p99 ms (n) | daemon CPU % sat / 40 | daemon RSS MiB | frond-ear CPU % / RSS MiB (mean of ears) | shim RSS MiB | probe gaps sat / 40 | frond-ear loss counts (ear0) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 1 | 64 (190) | 38,729 → 79.9, 772,785 | 11.4 / 20.8 | 778 / 6,842 (35) | 32.0 / 13.7 | 39 | 1.4 / 120 | 100 | 0 / 0 | receive none; 40/s delivery: pushed 35, dropped 1143, late 0 |
+| 1 | 1 | 512 (639) | 37,365 → 80.5, 745,531 | 10.7 / 17.4 | 776 / 6,848 (35) | 32.0 / 13.1 | 40 | 1.5 / 117 | 100 | 0 / 0 | receive none; 40/s delivery: pushed 35, dropped 1143, late 0 |
+| 1 | 1 | max (1100) | 36,084 → 79.6, 720,012 | 11.3 / 18.2 | 793 / 6,845 (21) | 30.9 / 13.0 | 40 | 1.4 / 122 | 99 | 0 / 0 | receive none; 40/s delivery: pushed 21, dropped 1153, late 0 |
+| 1 | 10 | 64 (190) | 37,777 → 77.9, 753,798 | 11.1 / 20.2 | 7,526 / 12,781 (35) | 31.3 / 12.9 | 38 | 1.2 / 110 | 101 | 0 / 0 | receive none; 40/s delivery: pushed 35, dropped 63, late 0 |
+| 1 | 10 | 512 (639) | 36,572 → 77.5, 729,768 | 11.1 / 18.8 | 7,535 / 12,755 (35) | 31.0 / 12.4 | 39 | 1.2 / 103 | 98 | 0 / 0 | receive none; 40/s delivery: pushed 35, dropped 63, late 0 |
+| 1 | 10 | max (1100) | 36,529 → 79.2, 728,932 | 11.2 / 19.6 | 7,751 / 13,312 (21) | 29.2 / 13.2 | 40 | 1.2 / 103 | 99 | 0 / 0 | receive none; 40/s delivery: pushed 21, dropped 73, late 0 |
+| 1 | 100 | 64 (188) | 38,842 → 80.5, 775,051 | 10.9 / 17.0 | 3,257 / 6,013 (12) | 33.3 / 11.7 | 38 | 1.2 / 108 | 101 | 0 / 0 | receive none; 40/s delivery: pushed 12, dropped 0, late 0 |
+| 1 | 100 | 512 (637) | 37,457 → 80.2, 747,378 | 11.5 / 18.3 | 3,241 / 5,997 (12) | 33.9 / 13.7 | 40 | 1.1 / 101 | 101 | 0 / 0 | receive none; 40/s delivery: pushed 12, dropped 0, late 0 |
+| 1 | 100 | max (1098) | 36,476 → 79.0, 727,859 | 11.3 / 19.1 | 3,045 / 5,958 (12) | 29.4 / 13.4 | 41 | 1.2 / 103 | 103 | 0 / 0 | receive none; 40/s delivery: pushed 12, dropped 0, late 0 |
+| 1 | 1,000 | 64 (188) | 39,152 → 75.8, 781,349 | 11.0 / 18.3 | 6,012 / 6,031 (2) | 30.1 / 13.2 | 38 | 1.1 / 101 | 104 | 0 / 0 | receive none; 40/s delivery: pushed 2, dropped 0, late 0 |
+| 1 | 1,000 | 512 (637) | 37,667 → 88.4, 751,450 | 10.7 / 18.1 | 5,998 / 6,015 (2) | 28.7 / 11.9 | 41 | 1.1 / 103 | 101 | 0 / 0 | receive none; 40/s delivery: pushed 2, dropped 0, late 0 |
+| 1 | 1,000 | max (1098) | 35,605 → 75.0, 710,523 | 11.1 / 22.1 | 5,971 / 5,984 (2) | 27.5 / 13.1 | 40 | 1.0 / 108 | 100 | 0 / 0 | receive none; 40/s delivery: pushed 2, dropped 0, late 0 |
+| 1 | 10,000 | 64 (187) | 38,606 → 84.9, 770,217 | 11.0 / 19.1 | 5,972 / 5,972 (1) | 33.0 / 13.3 | 40 | 1.1 / 102 | 103 | 0 / 0 | receive none; 40/s delivery: pushed 1, dropped 0, late 0 |
+| 1 | 10,000 | 512 (636) | 37,419 → 86.2, 746,495 | 10.6 / 16.9 | 5,984 / 5,984 (1) | 31.8 / 13.3 | 41 | 1.2 / 109 | 99 | 0 / 0 | receive none; 40/s delivery: pushed 1, dropped 0, late 0 |
+| 1 | 10,000 | max (1097) | 36,385 → 85.0, 725,922 | 10.7 / 18.5 | 5,979 / 5,979 (1) | 30.1 / 13.8 | 42 | 1.1 / 110 | 99 | 0 / 0 | receive none; 40/s delivery: pushed 1, dropped 0, late 0 |
+| 4 | 1 | 64 (190) | 39,028 → 77.5, 778,824 | 10.3 / 16.8 | 782 / 6,833 (140) | 29.2 / 12.3 | 38 | 1.5 / 115 | 107 | 0 / 0 | receive none; 40/s delivery: pushed 35, dropped 1143, late 0 |
+| 4 | 1 | 512 (639) | 37,283 → 77.2, 743,981 | 10.7 / 18.9 | 783 / 6,774 (140) | 27.5 / 12.4 | 39 | 1.3 / 119 | 109 | 0 / 0 | receive none; 40/s delivery: pushed 35, dropped 1143, late 0 |
+| 4 | 1 | max (1100) | 36,267 → 82.0, 723,619 | 11.3 / 22.1 | 800 / 6,877 (84) | 29.7 / 13.5 | 41 | 1.5 / 119 | 106 | 0 / 0 | receive none; 40/s delivery: pushed 21, dropped 1153, late 0 |
+| 4 | 10 | 64 (190) | 38,627 → 75.4, 770,853 | 12.1 / 21.9 | 7,529 / 12,707 (140) | 29.6 / 13.2 | 38 | 1.4 / 109 | 103 | 0 / 0 | receive none; 40/s delivery: pushed 35, dropped 63, late 0 |
+| 4 | 10 | 512 (639) | 37,348 → 77.3, 745,287 | 11.7 / 20.1 | 7,538 / 12,752 (140) | 29.1 / 13.5 | 40 | 1.2 / 107 | 108 | 0 / 0 | receive none; 40/s delivery: pushed 35, dropped 63, late 0 |
+| 4 | 10 | max (1100) | 36,159 → 77.5, 721,552 | 11.5 / 26.3 | 7,753 / 13,352 (84) | 28.8 / 13.3 | 41 | 1.4 / 108 | 107 | 0 / 0 | receive none; 40/s delivery: pushed 21, dropped 73, late 0 |
+| 4 | 100 | 64 (188) | 39,074 → 74.3, 779,790 | 11.1 / 18.0 | 3,026 / 5,986 (48) | 30.2 / 13.3 | 38 | 1.4 / 109 | 102 | 0 / 0 | receive none; 40/s delivery: pushed 12, dropped 0, late 0 |
+| 4 | 100 | 512 (637) | 37,513 → 79.2, 748,527 | 11.4 / 20.9 | 3,122 / 6,030 (48) | 29.4 / 13.0 | 39 | 1.4 / 109 | 107 | 0 / 0 | receive none; 40/s delivery: pushed 12, dropped 0, late 0 |
+| 4 | 100 | max (1098) | 36,462 → 85.8, 727,444 | 10.3 / 19.0 | 3,055 / 6,027 (48) | 28.7 / 12.2 | 42 | 1.3 / 111 | 101 | 0 / 0 | receive none; 40/s delivery: pushed 12, dropped 0, late 0 |
+| 4 | 1,000 | 64 (188) | 38,515 → 86.8, 768,397 | 10.6 / 19.9 | 5,685 / 6,017 (8) | 31.5 / 13.1 | 39 | 1.2 / 110 | 108 | 0 / 0 | receive none; 40/s delivery: pushed 2, dropped 0, late 0 |
+| 4 | 1,000 | 512 (637) | 37,095 → 75.8, 740,224 | 11.1 / 19.4 | 5,751 / 5,990 (8) | 29.2 / 13.2 | 40 | 1.3 / 104 | 107 | 0 / 0 | receive none; 40/s delivery: pushed 2, dropped 0, late 0 |
+| 4 | 1,000 | max (1098) | 36,314 → 78.2, 724,634 | 12.7 / 22.8 | 5,680 / 6,017 (8) | 30.6 / 13.4 | 41 | 1.2 / 103 | 108 | 0 / 0 | receive none; 40/s delivery: pushed 2, dropped 0, late 0 |
+| 4 | 10,000 | 64 (187) | 38,971 → 81.0, 777,629 | 11.0 / 16.7 | 5,535 / 5,978 (4) | 30.7 / 12.2 | 40 | 1.1 / 101 | 109 | 0 / 0 | receive none; 40/s delivery: pushed 1, dropped 0, late 0 |
+| 4 | 10,000 | 512 (636) | 37,911 → 85.5, 756,364 | 10.5 / 18.7 | 5,538 / 5,995 (4) | 29.6 / 11.9 | 41 | 1.0 / 110 | 107 | 0 / 0 | receive none; 40/s delivery: pushed 1, dropped 0, late 0 |
+| 4 | 10,000 | max (1097) | 36,240 → 80.5, 723,092 | 10.8 / 18.4 | 5,809 / 5,972 (4) | 30.6 / 12.6 | 42 | 1.2 / 110 | 106 | 0 / 0 | receive none; 40/s delivery: pushed 1, dropped 0, late 0 |
+
+**What this says.**
+
+- **The ceiling is the daemon, and nothing else in the matrix moves it.** Over 20 s from fresh state,
+  one flat-out producer got 75–88 items/s verified, at 1 or 10 000 streams, at 64 B or 1 100 B, with 1 or
+  4 ears; the kernel dropped the other 99.7–99.8 % of what was sent. Stream count changes nothing because the daemon keeps no
+  per-stream queue; payload changes nothing because verify is flat in size and the save writes dedup
+  rows, not bodies. Four ears add four record connections, which at these rates cost the daemon nothing
+  measurable (0 gaps on every connection: no binding ever fell 1 024 records behind).
+- **At 40 items/s on fresh state, send→record is 10–13 ms at p50 and 17–26 ms at p99** in every cell:
+  that is the save, not the network (loopback) or verify (0.06 ms). Over a longer run the same rate stops
+  fitting (F8, §1). Saturated, latency is whatever the socket buffer holds: 0.8–1.1 s at 1 100 B frames,
+  1.8–2.5 s at 190 B ones, because the fixed 212 992-byte buffer holds fewer big datagrams. Same drops.
+- **Send→push is set by frond-ear's delivery policy, not the path.** One quiet item: 5.1–6.0 s (the 5 s
+  debounce plus the 1 s poll; F0). A busy tuned stream: each push carries at most 5 records (3 at 1 100 B,
+  the 6 000-character limit), at most one push per debounce, and each stream holds 32 waiting records, so
+  at 40/s on one stream the push carries the newest records (p50 0.8 s) and the rest are dropped from the
+  buffer (1 143 in 30 s) and said so in the push footer. Spread over 10 streams, records wait longer (p50
+  7.5 s).
+- **frond-ear and the shim are not the bottleneck at these rates:** about 1 % of a core and 100–122 MiB
+  for frond-ear, 98–109 MiB for the shim, in every cell.
+
+**A large tune.** Every stream of the producer tuned (one `station:stream` pattern each), 40 items/s:
+
+| tuned streams (all of the producer's) | offered/s | verified/s | send→push p50 / p99 ms (n) | pushes (records) | frond-ear CPU % mean / max | frond-ear RSS MiB | delivery counts |
+|---|---|---|---|---|---|---|---|
+| 100 | 40.0 | 40.0 | 15,990 / 28,531 (35) | 7 (35) | 1.2 / 6.0 | 116 | {"pushes": 7, "records_pushed": 35, "routed_late": 270} |
+| 1,000 | 40.0 | 40.0 | 10,804 / 25,730 (35) | 7 (35) | 2.1 / 10.0 | 133 | {"pushes": 7, "records_pushed": 35, "routed_late": 279} |
+| 10,000 | 40.0 | 40.0 | 20,713 / 30,019 (35) | 7 (35) | 2.1 / 8.0 | 134 | {"pushes": 7, "records_pushed": 35, "routed_late": 267} |
+
+frond-ear checks every live record against every pattern on each 1 s poll; at 10 000 patterns and about
+1 200 live records that cost 2 % of a core. The push path is what saturates: 5 records per 5 s cannot carry
+40 records/s, so records age past `maxAgeMs` and are routed late (about 270 in 30 s), and send→push grows
+to 11–21 s at p50.
 
 ## 4. Admission bound: what reaches the session under load, on the live settings
 

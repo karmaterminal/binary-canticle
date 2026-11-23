@@ -1,0 +1,678 @@
+{
+ "params": {
+  "streams": 1,
+  "payload": "512",
+  "ears": 4,
+  "ear_tune": "stream0",
+  "prod_wake": true,
+  "producers": 1,
+  "mode": "valid",
+  "name": "I-lat-e4-s1-p512",
+  "rate": 40,
+  "duration": 30,
+  "sample_every": 1,
+  "waited_for_load_s": 0
+ },
+ "lab": "/home/figs/.cache/canticle-measure-2/I-2771466-79087610",
+ "t_start_mono_ns": 2551440119406585,
+ "producers": [
+  {
+   "mode": "valid",
+   "key_id": "d2a3ee342479923c",
+   "epoch": 1795418667,
+   "streams": 1,
+   "payload_body_bytes": 512,
+   "frame_bytes": 637,
+   "rate_asked": 40.0,
+   "sent": 1200,
+   "send_errors": 0,
+   "elapsed_s": 30.002,
+   "rate_achieved": 40.0,
+   "samples": 1200,
+   "proc_index": 0,
+   "proc_count": 1,
+   "t0_mono_ns": 2551440119408047
+  }
+ ],
+ "offered": 1200,
+ "offered_rate": 40.0,
+ "frame_bytes": 637,
+ "kernel_drops": 0,
+ "snmp_delta": {
+  "InDatagrams": 1708,
+  "OutDatagrams": 1590,
+  "IgnoredMulti": 60
+ },
+ "daemon_health_last": {
+  "v": "canticle-receptor-record/1",
+  "type": "health",
+  "rec_seq": 1248,
+  "run": "b20e2d003bdf264aa401f5f84e6a5931",
+  "state": "ok",
+  "reasons": [],
+  "last_datagram_at": 1795418698881,
+  "counters": {
+   "admission": {
+    "verified": 1200,
+    "duplicate": 0,
+    "capability_exceeded": 0,
+    "scope_violation": 0,
+    "hop_limit": 0,
+    "over_quota": 0,
+    "pluck_mismatch": 0,
+    "plucked": 0,
+    "superseded": 0,
+    "class_change": 0,
+    "equivocation": 0
+   },
+   "disposition": {
+    "surface": 1200,
+    "ringbuffer_only": 0,
+    "drop": 0,
+    "quarantine_set": 0,
+    "no_op": 0
+   },
+   "retract": {
+    "plucked": 0,
+    "superseded": 0,
+    "expired": 0,
+    "revoked": 0,
+    "quarantined": 0,
+    "held_expired": 0,
+    "held_plucked": 0,
+    "held_superseded": 0
+   },
+   "beacon": {
+    "verified": 0,
+    "duplicate": 0,
+    "epoch_regression": 0
+   },
+   "unverified": {
+    "unknown_key": 0,
+    "bad_signature": 0,
+    "revoked": 0,
+    "expired": 0,
+    "not_yet_valid": 0,
+    "malformed": 0,
+    "crit_unknown": 0,
+    "version": 0
+   }
+  },
+  "unverified": {
+   "key_ids": [],
+   "other": 0
+  },
+  "dedup": {
+   "entries": 1200,
+   "capacity": 100000
+  },
+  "beacon_age_ms": {},
+  "surfaced": 1200,
+  "quarantined": [],
+  "records": {
+   "emitted": 1247,
+   "dropped": 0,
+   "peers_closed": 0
+  },
+  "snapshots": {
+   "requested": 5,
+   "served": 5,
+   "truncated": 0,
+   "deferred": 0,
+   "closed": 0,
+   "ignored": 0
+  },
+  "t_ns": 2551478600022818,
+  "conn": 1
+ },
+ "tap": {
+  "connections": 1,
+  "lines": 1248,
+  "bytes": 2146903,
+  "counts": {
+   "hello": 1,
+   "landing_state": 1,
+   "snapshot_end": 1,
+   "health": 44,
+   "frame": 1200,
+   "presence": 1
+  },
+  "rec_seq_gaps": 0,
+  "rec_seq_gap_records": 0,
+  "rec_seq_regressions": 0
+ },
+ "tap_events": [
+  {
+   "t_ns": 2551435131782843,
+   "event": "connected",
+   "conn": 1
+  },
+  {
+   "t_ns": 2551435132153390,
+   "event": "hello",
+   "conn": 1,
+   "run": "b20e2d003bdf264aa401f5f84e6a5931",
+   "pid": 2974118
+  },
+  {
+   "t_ns": 2551435132247055,
+   "event": "snapshot_end",
+   "conn": 1,
+   "watermark": 3,
+   "count": 0,
+   "truncated": false,
+   "omitted": 0
+  }
+ ],
+ "probe_frames_by_admission": {
+  "verified/surface": 1200
+ },
+ "probe_verified_frames": 1200,
+ "probe_verified_rate_in_window": 40.0,
+ "probe_verified_per_s": [
+  0,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  40,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0
+ ],
+ "latency_send_to_record_ms": {
+  "n": 1200,
+  "p50": 10.680922,
+  "p90": 15.734106500000001,
+  "p99": 18.948491549999996,
+  "max": 27.195774
+ },
+ "pushes": {
+  "ear0": {
+   "pushes": 7,
+   "records": 35,
+   "records_per_push_max": 5,
+   "late_lines": 0,
+   "loss_lines": 13,
+   "other_events": 0
+  },
+  "ear1": {
+   "pushes": 7,
+   "records": 35,
+   "records_per_push_max": 5,
+   "late_lines": 0,
+   "loss_lines": 13,
+   "other_events": 0
+  },
+  "ear2": {
+   "pushes": 7,
+   "records": 35,
+   "records_per_push_max": 5,
+   "late_lines": 0,
+   "loss_lines": 13,
+   "other_events": 0
+  },
+  "ear3": {
+   "pushes": 7,
+   "records": 35,
+   "records_per_push_max": 5,
+   "late_lines": 0,
+   "loss_lines": 13,
+   "other_events": 0
+  }
+ },
+ "latency_send_to_push_ms": {
+  "n": 140,
+  "p50": 782.872815,
+  "p99": 6774.26561396,
+  "max": 6808.990808
+ },
+ "frond_ear": {
+  "ear0": {
+   "receiveHealth": "ok",
+   "reasons": [],
+   "counts": {
+    "joined_late": 1
+   },
+   "joinSnapshot": "complete",
+   "canticleDelivery": {
+    "ceiling": "off",
+    "mode": "off",
+    "style": "records",
+    "stations": {
+     "prod": {
+      "ceiling": "immediate",
+      "mode": "immediate"
+     }
+    },
+    "choices": [],
+    "wakeKeys": 1,
+    "windowMs": 60000,
+    "debounceMs": 5000,
+    "maxAgeMs": 30000,
+    "waiting": 22,
+    "nextPushAt": 1795418709871,
+    "held": null,
+    "lastPushAt": 1795418704871,
+    "pushesLastHour": 7,
+    "maxPushesPerHour": 60,
+    "reports": 0,
+    "counts": {
+     "dropped": 1143,
+     "pushes": 7,
+     "records_pushed": 35
+    }
+   },
+   "canticleCustody": {
+    "windowMs": 3600000,
+    "history": "unknown",
+    "reasons": [
+     "no session holds the ear",
+     "35 records offered, never echoed"
+    ],
+    "counts": {
+     "records": 35,
+     "echoed": 0,
+     "echoedBoundaryUnknown": 0,
+     "echoedBeforeBoundary": 0,
+     "offered": 35,
+     "claimed": 0
+    }
+   },
+   "attached": false
+  },
+  "ear1": {
+   "receiveHealth": "ok",
+   "reasons": [],
+   "counts": {
+    "joined_late": 1
+   },
+   "joinSnapshot": "complete",
+   "canticleDelivery": {
+    "ceiling": "off",
+    "mode": "off",
+    "style": "records",
+    "stations": {
+     "prod": {
+      "ceiling": "immediate",
+      "mode": "immediate"
+     }
+    },
+    "choices": [],
+    "wakeKeys": 1,
+    "windowMs": 60000,
+    "debounceMs": 5000,
+    "maxAgeMs": 30000,
+    "waiting": 22,
+    "nextPushAt": 1795418709228,
+    "held": null,
+    "lastPushAt": 1795418704228,
+    "pushesLastHour": 7,
+    "maxPushesPerHour": 60,
+    "reports": 0,
+    "counts": {
+     "dropped": 1143,
+     "pushes": 7,
+     "records_pushed": 35
+    }
+   },
+   "canticleCustody": {
+    "windowMs": 3600000,
+    "history": "unknown",
+    "reasons": [
+     "no compaction boundary from this session's pressure hook yet (frond-ear pressure --hook --ear)",
+     "35 records offered, never echoed"
+    ],
+    "counts": {
+     "records": 35,
+     "echoed": 0,
+     "echoedBoundaryUnknown": 0,
+     "echoedBeforeBoundary": 0,
+     "offered": 35,
+     "claimed": 0
+    }
+   },
+   "attached": true
+  },
+  "ear2": {
+   "receiveHealth": "ok",
+   "reasons": [],
+   "counts": {
+    "joined_late": 1
+   },
+   "joinSnapshot": "complete",
+   "canticleDelivery": {
+    "ceiling": "off",
+    "mode": "off",
+    "style": "records",
+    "stations": {
+     "prod": {
+      "ceiling": "immediate",
+      "mode": "immediate"
+     }
+    },
+    "choices": [],
+    "wakeKeys": 1,
+    "windowMs": 60000,
+    "debounceMs": 5000,
+    "maxAgeMs": 30000,
+    "waiting": 22,
+    "nextPushAt": 1795418709616,
+    "held": null,
+    "lastPushAt": 1795418704616,
+    "pushesLastHour": 7,
+    "maxPushesPerHour": 60,
+    "reports": 0,
+    "counts": {
+     "dropped": 1143,
+     "pushes": 7,
+     "records_pushed": 35
+    }
+   },
+   "canticleCustody": {
+    "windowMs": 3600000,
+    "history": "unknown",
+    "reasons": [
+     "no compaction boundary from this session's pressure hook yet (frond-ear pressure --hook --ear)",
+     "35 records offered, never echoed"
+    ],
+    "counts": {
+     "records": 35,
+     "echoed": 0,
+     "echoedBoundaryUnknown": 0,
+     "echoedBeforeBoundary": 0,
+     "offered": 35,
+     "claimed": 0
+    }
+   },
+   "attached": true
+  },
+  "ear3": {
+   "receiveHealth": "ok",
+   "reasons": [],
+   "counts": {
+    "joined_late": 1
+   },
+   "joinSnapshot": "complete",
+   "canticleDelivery": {
+    "ceiling": "off",
+    "mode": "off",
+    "style": "records",
+    "stations": {
+     "prod": {
+      "ceiling": "immediate",
+      "mode": "immediate"
+     }
+    },
+    "choices": [],
+    "wakeKeys": 1,
+    "windowMs": 60000,
+    "debounceMs": 5000,
+    "maxAgeMs": 30000,
+    "waiting": 22,
+    "nextPushAt": 1795418710032,
+    "held": null,
+    "lastPushAt": 1795418705032,
+    "pushesLastHour": 7,
+    "maxPushesPerHour": 60,
+    "reports": 0,
+    "counts": {
+     "dropped": 1143,
+     "pushes": 7,
+     "records_pushed": 35
+    }
+   },
+   "canticleCustody": {
+    "windowMs": 3600000,
+    "history": "unknown",
+    "reasons": [
+     "no compaction boundary from this session's pressure hook yet (frond-ear pressure --hook --ear)",
+     "35 records offered, never echoed"
+    ],
+    "counts": {
+     "records": 35,
+     "echoed": 0,
+     "echoedBoundaryUnknown": 0,
+     "echoedBeforeBoundary": 0,
+     "offered": 35,
+     "claimed": 0
+    }
+   },
+   "attached": true
+  }
+ },
+ "processes": {
+  "canticle-daemon": {
+   "n": 90,
+   "cpu_max": 41.9,
+   "rss_max_kb": 37288,
+   "rss_first_kb": 32936,
+   "rss_last_kb": 37288,
+   "cpu_mean": 12.4
+  },
+  "frond-ear-ear0": {
+   "n": 90,
+   "cpu_max": 4.0,
+   "rss_max_kb": 109668,
+   "rss_first_kb": 100184,
+   "rss_last_kb": 109668,
+   "cpu_mean": 0.9
+  },
+  "session0": {
+   "n": 88,
+   "cpu_max": 2.0,
+   "rss_max_kb": 11992,
+   "rss_first_kb": 11992,
+   "rss_last_kb": 11992,
+   "cpu_mean": 0.0
+  },
+  "frond-ear-ear1": {
+   "n": 90,
+   "cpu_max": 54.0,
+   "rss_max_kb": 115396,
+   "rss_first_kb": 109304,
+   "rss_last_kb": 115396,
+   "cpu_mean": 1.5
+  },
+  "session1": {
+   "n": 87,
+   "cpu_max": 2.0,
+   "rss_max_kb": 11992,
+   "rss_first_kb": 11992,
+   "rss_last_kb": 11992,
+   "cpu_mean": 0.0
+  },
+  "frond-ear-ear2": {
+   "n": 89,
+   "cpu_max": 6.0,
+   "rss_max_kb": 108844,
+   "rss_first_kb": 102300,
+   "rss_last_kb": 108652,
+   "cpu_mean": 1.0
+  },
+  "session2": {
+   "n": 87,
+   "cpu_max": 2.0,
+   "rss_max_kb": 11992,
+   "rss_first_kb": 11992,
+   "rss_last_kb": 11992,
+   "cpu_mean": 0.0
+  },
+  "frond-ear-ear3": {
+   "n": 88,
+   "cpu_max": 6.0,
+   "rss_max_kb": 110960,
+   "rss_first_kb": 102848,
+   "rss_last_kb": 110960,
+   "cpu_mean": 0.9
+  },
+  "session3": {
+   "n": 87,
+   "cpu_max": 2.0,
+   "rss_max_kb": 12028,
+   "rss_first_kb": 12028,
+   "rss_last_kb": 12028,
+   "cpu_mean": 0.0
+  },
+  "tap": {
+   "n": 87,
+   "cpu_max": 4.0,
+   "rss_max_kb": 11836,
+   "rss_first_kb": 11356,
+   "rss_last_kb": 0,
+   "cpu_mean": 0.2
+  },
+  "shim0": {
+   "n": 77,
+   "cpu_max": 0.0,
+   "rss_max_kb": 103204,
+   "rss_first_kb": 103044,
+   "rss_last_kb": 103204,
+   "cpu_mean": 0.0
+  },
+  "shim1": {
+   "n": 77,
+   "cpu_max": 0.0,
+   "rss_max_kb": 104068,
+   "rss_first_kb": 104068,
+   "rss_last_kb": 104068,
+   "cpu_mean": 0.0
+  },
+  "shim2": {
+   "n": 78,
+   "cpu_max": 2.0,
+   "rss_max_kb": 103364,
+   "rss_first_kb": 102884,
+   "rss_last_kb": 103364,
+   "cpu_mean": 0.0
+  },
+  "shim3": {
+   "n": 79,
+   "cpu_max": 0.0,
+   "rss_max_kb": 104416,
+   "rss_first_kb": 104096,
+   "rss_last_kb": 104416,
+   "cpu_mean": 0.0
+  },
+  "blast0": {
+   "n": 79,
+   "cpu_max": 4.0,
+   "rss_max_kb": 26292,
+   "rss_first_kb": 26292,
+   "rss_last_kb": 0,
+   "cpu_mean": 1.1
+  }
+ },
+ "stderr": {
+  "blast0.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "canticle-daemon.err": {
+   "lines": 3,
+   "tail": [
+    "{\"daemon\": {\"manifest\": \"/home/figs/.cache/canticle-measure-2/I-2771466-79087610/fleet.json\", \"bind\": \"127.0.0.1:33662\", \"multicast\": false, \"socket\": \"/home/figs/.cache/canticle-measure-2/I-2771466-79087610/run/canticle/daemon.sock\", \"state_dir\": \"/home/figs/.cache/canticle-measure-2/I-2771466-79087610/state/canticle-daemon\", \"allowed_uids\": [1000], \"stations\": null}}",
+    "{\"v\":\"canticle-receptor-record/1\",\"type\":\"hello\",\"rec_seq\":1,\"run\":\"b20e2d003bdf264aa401f5f84e6a5931\",\"wire_version\":2,\"record_version\":\"canticle-receptor-record/1\",\"pid\":2974118,\"bind\":\"127.0.0.1:33662\",\"multicast\":null,\"transport\":\"lan\",\"manifest_sha256\":\"7cbbc7cdead2179045c147bfc7611c3f17cf1e8ecbf9a3a073d73e94342fe4c5\",\"manifest_label\":\"canticle-fleet/spike-0\",\"state_version\":3,\"receptor_state_version\":1,\"rule_version\":\"canticle-station/0.1.0+bc2\",\"join_snapshot\":true}",
+    "{\"v\":\"canticle-receptor-record/1\",\"type\":\"bye\",\"rec_seq\":1249,\"run\":\"b20e2d003bdf264aa401f5f84e6a5931\"}"
+   ]
+  },
+  "frond-ear-ear0.err": {
+   "lines": 19,
+   "tail": [
+    "{\"time\":\"2026-11-23T07:25:06.895Z\",\"level\":\"info\",\"event\":\"ear.detached\",\"ear\":\"ear0\",\"reverted\":0}",
+    "{\"time\":\"2026-11-23T07:25:08.130Z\",\"level\":\"info\",\"event\":\"daemon.draining\",\"inFlight\":0}",
+    "{\"time\":\"2026-11-23T07:25:08.137Z\",\"level\":\"info\",\"event\":\"daemon.stopped\",\"code\":0,\"drained\":true}"
+   ]
+  },
+  "frond-ear-ear1.err": {
+   "lines": 19,
+   "tail": [
+    "{\"time\":\"2026-11-23T07:25:07.264Z\",\"level\":\"info\",\"event\":\"ear.detached\",\"ear\":\"ear1\",\"reverted\":0}",
+    "{\"time\":\"2026-11-23T07:25:08.161Z\",\"level\":\"info\",\"event\":\"daemon.draining\",\"inFlight\":0}",
+    "{\"time\":\"2026-11-23T07:25:08.167Z\",\"level\":\"info\",\"event\":\"daemon.stopped\",\"code\":0,\"drained\":true}"
+   ]
+  },
+  "frond-ear-ear2.err": {
+   "lines": 19,
+   "tail": [
+    "{\"time\":\"2026-11-23T07:25:07.642Z\",\"level\":\"info\",\"event\":\"ear.detached\",\"ear\":\"ear2\",\"reverted\":0}",
+    "{\"time\":\"2026-11-23T07:25:08.193Z\",\"level\":\"info\",\"event\":\"daemon.draining\",\"inFlight\":0}",
+    "{\"time\":\"2026-11-23T07:25:08.198Z\",\"level\":\"info\",\"event\":\"daemon.stopped\",\"code\":0,\"drained\":true}"
+   ]
+  },
+  "frond-ear-ear3.err": {
+   "lines": 19,
+   "tail": [
+    "{\"time\":\"2026-11-23T07:25:08.057Z\",\"level\":\"info\",\"event\":\"ear.detached\",\"ear\":\"ear3\",\"reverted\":0}",
+    "{\"time\":\"2026-11-23T07:25:08.225Z\",\"level\":\"info\",\"event\":\"daemon.draining\",\"inFlight\":0}",
+    "{\"time\":\"2026-11-23T07:25:08.231Z\",\"level\":\"info\",\"event\":\"daemon.stopped\",\"code\":0,\"drained\":true}"
+   ]
+  },
+  "session0.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "session0.shim.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "session1.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "session1.shim.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "session2.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "session2.shim.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "session3.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "session3.shim.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "tap.err": {
+   "lines": 0,
+   "tail": []
+  }
+ }
+}

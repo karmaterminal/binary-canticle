@@ -144,7 +144,7 @@ def flood_tables(rows) -> str:
 def ingest_table(rows) -> str:
     out = ["| ears | streams | payload (frame B) | saturated: offered/s → verified/s, kernel drops | 40/s: send→record p50 / p99 ms | "
            "40/s: send→push p50 / p99 ms (n) | daemon CPU % sat / 40 | daemon RSS MiB | frond-ear CPU % / RSS MiB (mean of ears) | "
-           "shim RSS MiB | probe gaps | frond-ear counts |",
+           "shim RSS MiB | probe gaps sat / 40 | frond-ear loss counts (ear0) |",
            "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     by = {}
     for r in rows:
@@ -158,12 +158,15 @@ def ingest_table(rows) -> str:
         ls = l.get("latency_send_to_record_ms") or {}
         lp = l.get("latency_send_to_push_ms") or {}
         shim = [v.get("rss_max_kb") for k, v in (s.get("processes") or {}).items() if k.startswith("shim")]
-        fe_counts = {}
+        recv = {}
         for rr in (s, l):
             for ear, v in (rr.get("frond_ear") or {}).items():
                 for k2, n in (v.get("counts") or {}).items():
                     if k2 != "joined_late":
-                        fe_counts[k2] = fe_counts.get(k2, 0) + n
+                        recv[k2] = recv.get(k2, 0) + n
+        dl = ((((l.get("frond_ear") or {}).get("ear0") or {}).get("canticleDelivery") or {}).get("counts") or {})
+        fe_counts = f"receive {json.dumps(recv) if recv else 'none'}; 40/s delivery: pushed {dl.get('records_pushed', 0)}, " \
+                    f"dropped {dl.get('dropped', 0)}, late {dl.get('routed_late', 0)}"
         out.append("| " + " | ".join([
             str(key[0]), num(key[1]), f"{key[2]} ({s.get('frame_bytes')})",
             f"{num(s.get('offered_rate'), 0)} → {num(s.get('probe_verified_rate_in_window'), 1)}, {num(s.get('kernel_drops'))}",
@@ -174,7 +177,7 @@ def ingest_table(rows) -> str:
             f"{num(ears_avg(s, 'cpu_mean'), 1)} / {mb(ears_max(s, 'rss_max_kb'))}",
             mb(max(shim) if shim else None),
             f"{(s.get('tap') or {}).get('rec_seq_gap_records')} / {(l.get('tap') or {}).get('rec_seq_gap_records')}",
-            json.dumps(fe_counts) if fe_counts else "{}",
+            fe_counts,
         ]) + " |")
     return "\n".join(out)
 
