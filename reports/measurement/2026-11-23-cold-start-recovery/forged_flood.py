@@ -24,13 +24,14 @@ p.add_argument("--epoch", type=int, default=7)
 p.add_argument("--rate", type=float, required=True)
 p.add_argument("--ports", type=int, required=True)
 p.add_argument("--churn", action="store_true")
+p.add_argument("--smooth", action="store_true", help="each datagram when it is due, spinning between, not in 1 ms chunks")
 p.add_argument("--index", type=int, default=0, help="which producer this is: its forgeries are its own")
 p.add_argument("--duration", type=float, required=True)
 a = p.parse_args()
 sys.path.insert(0, a.tests)
 from flood import SEQ0, Pace, forged_parts      # noqa: E402
 
-BATCH = 50 if a.rate >= 50_000 else 10          # datagrams between looks at the clock: at most 1 ms of the flood
+BATCH = 1 if a.smooth else 50 if a.rate >= 50_000 else 10      # datagrams between looks at the clock: at most 1 ms of the flood
 FIRST = SEQ0 + (a.index << 34)                  # no two producers forge the same bytes; still 8 bytes wide
 
 
@@ -67,7 +68,11 @@ while (now := time.monotonic()) < end:
             print(json.dumps({"t0": start}), flush=True)
     s_ = int(now - start) if now >= start else 0
     per_s[s_] = per_s.get(s_, 0) + BATCH
-    pace.wait(sent)
+    if a.smooth:
+        while sent >= (time.monotonic() - pace.t0) * a.rate:
+            pass
+    else:
+        pace.wait(sent)
 stop = time.monotonic()
 print(json.dumps({"t0": start, "t1": stop, "sent": sent, "opened": opened, "sources": len(seen),
                   "per_s": [per_s.get(i, 0) for i in range(int(stop - start))]}), flush=True)

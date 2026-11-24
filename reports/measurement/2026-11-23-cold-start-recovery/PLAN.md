@@ -88,3 +88,15 @@ kernel drops at the socket and the daemon's own report of them; refusals by reas
 - **(c)** debit-after-verify off: a claim debits its key and stream before the signature is checked.
 
 Smoke runs of the harness (a few seconds, to see that it works) are not evidence and are not kept.
+
+## Added 2026-11-24 00:30Z, after row 0 had run and while row 1 was running
+
+Rows 0-2 are unchanged. Three diagnostics are added, because row 0 raised a question it can't answer: on the head, a copy of the
+newcomer's is verified about as often at 100 000/s (1 in 41) as at 20 000/s (1 in 29), where the code reads as if it should be
+five times rarer. The paced producers send in millisecond bursts with silence between, and that may be what hides it.
+
+| # | row | rates, /s | ports | offset, s | runs, head |
+|---|---|---|---|---|---|
+| 1s | saturation, evenly spaced sender | 20 000, 100 000 | `smooth-40`: `churn-40`, each datagram sent when it is due, the producer spinning between | 1 | 5 |
+| 1r | saturation, rate | 200 000 (four producers; about what four can churn) | `churn-40` | 1 | 5 |
+| 1m | model: the head's own `Intake` in virtual time (`newcomer_model.py`), no sockets, no signatures | 5 000 – 400 000 | churn and fixed, even and in bursts | – | – |

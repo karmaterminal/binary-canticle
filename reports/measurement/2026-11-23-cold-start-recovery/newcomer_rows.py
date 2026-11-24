@@ -2,7 +2,7 @@
 
 Usage: newcomer_rows.py <out.json> <name=tree:runs,...> <row,...>
   e.g. newcomer_rows.py rows.json head=/scratch/head:5,base=/scratch/base:3 churn-40-20000-0,churn-40-100000-120
-A tree is a ``git archive`` of prototype/canticle-station; a row is <churn|fixed>-<ports>-<rate>-<offset>. ``canticle`` comes
+A tree is a ``git archive`` of prototype/canticle-station; a row is <churn|smooth|fixed>-<ports>-<rate>-<offset>. ``canticle`` comes
 from the tree, and everything else from this repository (the daemon, the tap and the carousel are ``test_fair_admission``'s), so
 every tree is measured by the same code. Runs are interleaved over the trees; what <out.json> already has is not run again.
 Nothing is asserted. Run it under nice -n 19 ionice -c3, and nothing beside it."""
@@ -66,7 +66,7 @@ def one(tree: str, row: str, after: float) -> dict:
             argv = [sys.executable, str(HERE / "forged_flood.py"), "--tests", str(TESTS), "--port", str(c.port), "--kid",
                     c.kid("quiet"), "--stream", "quiet", "--rate", str(rate / n), "--ports",
                     str(ports // n + (i < ports % n)), "--index", str(i), "--duration", str(offset + after)]
-            p = subprocess.Popen(argv + ["--churn"] * (kind == "churn"), env=c.env(), stdout=subprocess.PIPE)
+            p = subprocess.Popen(argv + ["--churn"] * (kind != "fixed") + ["--smooth"] * (kind == "smooth"), env=c.env(), stdout=subprocess.PIPE)
             c.addCleanup(c._reap, p)
             procs.append(p)
         t0 = max(json.loads(p.stdout.readline())["t0"] for p in procs)
