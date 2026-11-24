@@ -89,7 +89,7 @@ kernel drops at the socket and the daemon's own report of them; refusals by reas
 
 Smoke runs of the harness (a few seconds, to see that it works) are not evidence and are not kept.
 
-## Added 2026-11-24 00:30Z, after row 0 had run and while row 1 was running
+## Added 2026-11-24 00:20Z, after row 0 had run and while row 1 was running
 
 Rows 0-2 are unchanged. Four diagnostics are added. Three, because row 0 raised a question it can't answer: on the head, a copy of the
 newcomer's is verified about as often at 100 000/s (1 in 41) as at 20 000/s (1 in 29), where the code reads as if it should be
