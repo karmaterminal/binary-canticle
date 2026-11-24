@@ -430,7 +430,7 @@ record per line.
   and the first `landing_state`, then the socket. A failure emits `fatal` (`state_locked`, `manifest_invalid`,
   `state_corrupt`, `state_not_durable`, `bind_failed`, `socket_failed`) and exits 1. SIGTERM or SIGINT emits
   `bye`, waits up to 2 s for it to reach each connection, closes them and removes the socket.
-- **Durable publish (write-ahead, #79 review).** Each tick, and each turn of at most 32 datagrams (group commit,
+- **Durable publish (write-ahead, #79 review).** Each tick, and each turn of at most 48 datagrams (group commit,
   #171), is one batch. The records it implies are held, the safety state is saved (one atomic replace), and only
   then are the records numbered and sent: nothing a datagram says counts as received until the save that covers
   it has landed. If the save fails, none of that batch is sent, retracts included, and no `rec_seq` is spent. The run

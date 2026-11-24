@@ -1096,6 +1096,19 @@ class SlotTest(IntakeCase):
         self.assertEqual(self.waits(), frames[:1])
         self.assertEqual([d for d in self.serve(32) if d in frames], [*frames[1:], frames[0]])
 
+    def test_a_lane_of_the_crowd_is_nobodys_own(self):
+        """A port that shares a lane with another's datagrams is not alone, though no other lane of the stream is open."""
+        for n in range(intake.STRANGERS_PER_HOST):             # the host's places are taken, by what waits in another stream
+            self.offer(item(B, n + 1), src=udp(40_000 + n))
+        key = self.intake.keys[KID_B]
+        with self.intake._lock:
+            lanes = {port: key.source(udp(port), self.now) for port in range(50_000, 50_400)}
+        one, other = next((a, b) for a in lanes for b in lanes if a < b and lanes[a] is lanes[b])
+        self.offer(*[forge(beacon(B, 1), n) for n in range(3)], src=udp(one))
+        f = beacon(B, 2)
+        self.offer(f, src=udp(other))
+        self.assertIn(f, self.waits(key=key))
+
     def test_a_copy_of_what_waits_there_is_one(self):
         f = item(A, 1)
         self.offer(f, f, f, src=HERE)
@@ -1901,8 +1914,10 @@ class DaemonIntakeTest(DaemonCase):
             return len(d.intake.keys[kid].known)
         async def second(d, port):
             resurfaced = await first(d, port)
-            self.send(port, beacon(SK, 1))
+            self.assertEqual(d.intake.repeats[hashlib.sha256(f).digest()].at, 0.0)     # nor renews a place by its repeats
+            self.send(port, b := beacon(SK, 1))
             await until(lambda: d.intake.keys[kid].known)
+            self.assertGreater(d.intake.repeats[hashlib.sha256(b).digest()].at, 0.0)
             return resurfaced
         self.assertEqual([self.run_with(x)[0] for x in (first, second)], [1, 0])
 
