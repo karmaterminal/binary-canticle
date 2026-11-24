@@ -33,6 +33,8 @@ What is spent, and by whom:
 - in a stream, the known sources get every other turn however many strangers claim it. Strangers queue apart too, in
   a pool the stream's longest queue pays for: a flood can fill it, but a source that queues apart still gets a place
   and its turn;
+- a known place is a lease: it ends LEASE_S after the daemon first verified the newest frame that its source delivered, by the
+  daemon's own clock. An exact repeat renews it to that frame's age and no further, and gives a place to nobody;
 - whatever churns its sources, a key has at most KNOWN_MAX + STRANGERS_MAX of them and CROWD_LANES lanes for the rest, a
   stream has at most STRANGER_POOL datagrams waiting for strangers and as many for each known source, and a pick looks
   at each lane of a stream once at most. A source that gains a share of its own, or loses it to a newer one, is counted.
@@ -102,6 +104,8 @@ UNLISTED_RATE, UNLISTED_BURST = 500.0, 500.0  # datagrams of no listed key exami
 UNLISTED_DEPTH = 64
 KNOWN_MAX, KNOWN_DEPTH = 4, 64              # known sources per key; datagrams waiting per stream and known source, or
                                             # more when it became known with more of them waiting (<= STRANGER_POOL)
+LEASE_S = 60.0                              # a known place ends this long after the first verification of the newest frame
+                                            # its source delivered: 60 default beacons, 12 of a relay's slowest (§8.3)
 STRANGERS_MAX = 64                          # other sources per key that queue apart
 STRANGERS_PER_HOST = 16                     # of them, at one address: ports are free, so they must not fill the table
 CROWD_LANES = 64                            # lanes the sources beyond those bounds share, by a salted hash
@@ -150,10 +154,11 @@ class Bucket:
 class Source:
     """One address and port claiming one key, or (``crowd``) those beyond the tables' bounds that share a lane."""
 
-    __slots__ = ("budget", "known", "queued", "crowd")
+    __slots__ = ("budget", "known", "queued", "crowd", "newest")
 
     def __init__(self, budget: Bucket, crowd: bool = False):
         self.budget, self.known, self.queued, self.crowd = budget, False, 0, crowd
+        self.newest = 0.0      # when the newest frame that a known source delivered was first verified, whoever it came from
 
 
 def host_of(addr):
@@ -271,7 +276,7 @@ class KeyQueue:
     """Everything that waits under one listed key."""
 
     __slots__ = ("bucket", "streams", "ready", "known", "strangers", "hosts", "stranger_budget", "crowd", "salt",
-                 "reclaimed", "shares", "displaced", "slot", "slot_due", "tried")
+                 "reclaimed", "shares", "displaced", "lapsed", "slot", "slot_due", "tried")
 
     def __init__(self, stream_ids):
         self.bucket = Bucket(KEY_RATE, KEY_BURST)
@@ -286,6 +291,7 @@ class KeyQueue:
         self.salt = secrets.randbits(64)          # so a sender can't choose to share a station's lane
         self.reclaimed = 0.0
         self.shares = self.displaced = 0          # sources that became known, and those a newer one displaced
+        self.lapsed = 0                           # and those whose lease ended
         self.slot: Optional[tuple] = None         # (entry, stream, source): the one datagram that waits for the slice
         self.slot_due = 0.0                       # no turn of the slice before this
         self.tried: OrderedDict = OrderedDict()   # address -> when a check of its came to nothing, oldest first
@@ -342,10 +348,26 @@ class KeyQueue:
             for s in self.streams.values():
                 s.change(got)
         self.known[addr] = got
+        got.newest = time.monotonic()
         if len(self.known) <= KNOWN_MAX:
             return 0
-        old_addr, old = self.known.popitem(last=False)
         self.displaced += 1
+        return self._forfeit(next(iter(self.known)))
+
+    def renew(self, addr, verified_at: float) -> None:
+        """An exact repeat, from a source that has a place, of a frame first verified then. It gives no place."""
+        got = self.known.get(addr)
+        if got is not None and got.newest < verified_at:
+            got.newest = verified_at
+
+    def lapse(self, now: float) -> int:
+        """End the places whose lease is over. Returns how many waiting datagrams that displaced."""
+        over = [a for a, s in self.known.items() if now - s.newest > LEASE_S]
+        self.lapsed += len(over)
+        return sum(self._forfeit(a) for a in over)
+
+    def _forfeit(self, old_addr) -> int:
+        old = self.known.pop(old_addr)
         old.budget, old.known = self.stranger_budget, False
         if self._room(host_of(old_addr)):
             self._enter(old_addr, old)
@@ -408,10 +430,11 @@ class Ticket:
 class Repeat:
     """A frame whose exact bytes are a no-op until ``until``, and the copies of it that came."""
 
-    __slots__ = ("ident", "until", "copies", "last_ms")
+    __slots__ = ("ident", "until", "at", "copies", "last_ms")
 
     def __init__(self, ident: tuple, until: int):
         self.ident, self.until = ident, until      # ident: an item's or PLUCK's tuple, a beacon's (key id, epoch)
+        self.at = time.monotonic()                 # when it was first verified
         self.copies = self.last_ms = 0             # since the event loop last asked, and when the last one came
 
 
@@ -603,6 +626,7 @@ class Intake:
         claims: list = []
         strange: list = []
         copies: dict = {}
+        renewed: list = []
         for data, addr in batch:
             key = keys.get(data[4:12])
             if (key is None or data[:3] != _HEAD or not _MIN_FRAME <= len(data) <= wire.MAX_FRAME
@@ -613,6 +637,8 @@ class Intake:
             rep = repeats.get(digest)
             if rep is not None and rep.until > now_ms:
                 copies[rep] = copies.get(rep, 0) + 1
+                if addr in key.known:
+                    renewed.append((key, addr, rep.at))
             else:
                 claims.append((key, (data, digest, addr, now_ms)))
         fresh = False
@@ -621,6 +647,8 @@ class Intake:
             self.last_datagram_at = now_ms
             for rep, n in copies.items():
                 self._copy(rep, now_ms, n)
+            for key, addr, at in renewed:
+                key.renew(addr, at)
             for key, entry in claims:
                 fresh |= self._place(key, entry, now)
             if strange:
@@ -701,6 +729,7 @@ class Intake:
                     rep = self.repeats.get(t.digest)
                     if rep is not None and rep.until > now_ms:
                         self._copy(rep, now_ms)
+                        t.key.renew(t.addr, rep.at)
                         self._release(t)
                     elif t.digest in seen:
                         self.copied += 1
@@ -784,8 +813,20 @@ class Intake:
             self.verified += 1
             if fresh and t.key is not None:
                 self.refused["backlog"] += t.key.know(t.addr)
-                if not t.key.ready and t.key in self._ready:
-                    self._ready.remove(t.key)
+                self._unready(t.key)
+
+    def _unready(self, key: KeyQueue) -> None:
+        """A source that lost its place may have taken the last of what waited for its key with it."""
+        if not key.ready and key in self._ready:
+            self._ready.remove(key)
+
+    def lapse(self) -> None:
+        """End the known places whose lease is over."""
+        with self._lock:
+            now = time.monotonic()
+            for key in self.keys.values():
+                self.refused["backlog"] += key.lapse(now)
+                self._unready(key)
 
     def remember(self, t: Ticket, ident: tuple, until: int) -> None:
         """From now until ``until``, a copy of this verified, accepted and durably saved frame is a repeat. There is
@@ -842,4 +883,5 @@ class Intake:
             return {"read": self.read, "repeats": self.repeated, "copies": self.copied, "verified": self.verified,
                     "unverified": self.unverified, "reserved": self.reserved, "queued": queued,
                     "known": sum(k.shares for k in self.keys.values()),
-                    "displaced": sum(k.displaced for k in self.keys.values()), "refused": dict(self.refused)}
+                    "displaced": sum(k.displaced for k in self.keys.values()),
+                    "lapsed": sum(k.lapsed for k in self.keys.values()), "refused": dict(self.refused)}

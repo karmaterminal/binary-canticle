@@ -488,7 +488,8 @@ since the last `health`) or `datagrams_refused` (the intake refused one that cla
 daemon's `health` also carries what was lost before it was heard, in two optional additions (#171):
 `records.socket_dropped`, the kernel's drop count for the daemon's socket, exact; and `receive`, the intake's
 fixed counters (`read`, `repeats`, `copies`, `verified`, `unverified`, `reserved`, the checks the newcomers' slice
-paid for, `queued`, `known` and `displaced`, the sources that gained a share of their own and those that lost it to a newer one, and `refused` by reason).
+paid for, `queued`, `known`, `displaced` and `lapsed`, the sources that gained a share of their own, those that lost it to a
+newer one and those whose lease ended, and `refused` by reason).
 `records.dropped` keeps its meaning: records dropped for a connection. The receptor keeps which tuples it surfaced, and which
 keys it quarantined, in the listener's state file (`"receptor"`), written with the listener's guards in one
 atomic replace per batch. At start, after `hello` and before the first `landing_state` (so before any
@@ -510,7 +511,8 @@ lower-epoch tuples as above. `canticle listen` behaves as before; `canticle tune
 - **Fair admission is ahead of the RFC (#171).** §14.1 puts the per-key rate among the cheap checks, before crypto,
   and dedup after it. The daemon debits a key only after its signature verifies, and drops exact copies of verified
   frames before it. §7.4 and §10.9 hold as written (a repeat is still a counted no-op). The per-source and per-key
-  queues are step 1's "per-key and per-source rate", with sizes the RFC does not give. `health` has two optional
+  queues are step 1's "per-key and per-source rate", with sizes the RFC does not give; so are the newcomers' slice and
+  the lease of a known place. `health` has two optional
   additions and two reasons that §14.18.3 does not list. An amendment has to say all of this, or the code goes.
 - `quarantine_strengthen` / `quarantine_rescind`: reserved in the RFC, not emitted. A local quarantine has no
   rescind here; it lasts until the daemon's state is removed with the daemon stopped.
@@ -573,6 +575,11 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
   the keys, **K/500 s, whatever the flood's rate**, where its key is not forged, or is forged from at most 512 sources that stay
   (and no more than the key has checked in 2 s). A verified ITEM or PLUCK out of a slot that changes nothing costs its own key
   nine turns, never another key's. `receive.reserved` counts what the slice checked.
+- **A known place is a lease.** It ends 60 s after the daemon first verified the newest frame that its source delivered: the clock is the
+  daemon's monotonic one, and having nothing waiting means nothing. An exact repeat from a source that has a place renews it up to the
+  age of the frame it repeats and no further, so a source that stopped and replays one cached frame keeps its place no longer than if it were silent. A repeat
+  never gives a place. A new frame displaces the source whose last new frame is the oldest, as before. The end of a lease is counted
+  (`receive.lapsed`). A station that sends nothing new for 60 s (60 of the default beacons) is a stranger again. None of it authenticates a source.
 - **Beacons are timed when they arrive**, not when their turn comes, so the clock offset (§8.2) absorbs no queueing.
 - **A copy takes no second place.** The same bytes already waiting in the same queue get the same verdict, so a copy is
   counted (`receive.copies`) and not queued. It is neither a repeat (nothing has verified yet) nor refused.

@@ -619,6 +619,7 @@ class Daemon:
     def _tick(self, now_ms: int) -> None:
         self.receptor.tick(now_ms)
         self.intake.forget(now_ms)
+        self.intake.lapse()
 
     async def _every(self, period_ms: int, fn) -> None:
         while True:

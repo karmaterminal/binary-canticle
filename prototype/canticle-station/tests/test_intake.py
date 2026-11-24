@@ -1206,7 +1206,8 @@ class LeaseTest(IntakeCase):
         before = self.intake.stats()["queued"]
         self.assertEqual(self.known(0.01), [])
         self.assertEqual((before - self.intake.stats()["queued"], self.refused["backlog"]), (5, 5))
-        self.serve(200, verified=lambda t: False)
+        for _ in range(2):                                     # a stream's bucket holds 48 at once
+            self.serve(200, verified=lambda t: False)
         self.assertEqual((self.intake.stats()["queued"], self.intake.waiting()), (0, False))
 
     def test_four_relays_that_were_first_hold_no_place_against_the_station_that_starts(self):
@@ -1267,7 +1268,7 @@ class ConsistencyTest(IntakeCase):
             for s in key.streams.values():
                 self.assertLessEqual(s.pool, intake.STRANGER_POOL)
                 self.assertLessEqual(max((len(lane.queue) for lane in s.known), default=0), intake.STRANGER_POOL)
-        self.assertEqual(i.stats().get("known", 0) - i.stats().get("displaced", 0),
+        self.assertEqual(i.stats()["known"] - i.stats()["displaced"] - i.stats()["lapsed"],
                          sum(len(k.known) for k in i.keys.values()))
         self.assertEqual(i.read, i.repeated + i.copied + i.verified + i.unverified + sum(i.refused.values()) + waiting
                          + in_flight)
@@ -1283,7 +1284,7 @@ class ConsistencyTest(IntakeCase):
             junk = [b"x", item(Ed25519PrivateKey.generate(), 1)]
             spent: Counter = Counter()
             with mock.patch.multiple(intake, STRANGERS_MAX=10, STRANGERS_PER_HOST=3, STRANGER_POOL=40, CROWD_LANES=6,
-                                     KNOWN_DEPTH=5, **never):
+                                     KNOWN_DEPTH=5, LEASE_S=8.0, TRIED_MAX=20, **never):
                 self.intake = self.make()
 
                 def turn(limit, verdict):
@@ -1306,6 +1307,9 @@ class ConsistencyTest(IntakeCase):
 
                 for _ in range(250):
                     self.now += r.choice((0, 0.001, 0.02, 0.2, 3))
+                    if r.random() < 0.1:
+                        self.intake.lapse()
+                        self.check()
                     if r.random() < 0.6:
                         self.intake.offer([(r.choice(r.choice((good, bad, junk))), addr(r.randrange(8), r.randrange(6)))
                                            for _ in range(r.randrange(1, 40))])
@@ -1603,6 +1607,64 @@ class DaemonIntakeTest(DaemonCase):
         (saves, types, kept), code = self.run_with(scenario)
         self.assertEqual((saves, types, kept, code), (1, ["frame"] * 8 + ["fatal"], 8, 1))
 
+    def test_a_known_place_lapses_with_the_daemons_tick_whatever_is_replayed(self):
+        """Row I-b through a daemon: a station's own socket replays its one beacon until the lease is over, and after it."""
+        b, sock = beacon(SK, 1), socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.addCleanup(sock.close)
+        async def scenario(d, port):
+            c = await self.joined(d)
+            stats = []
+            started = time.monotonic()
+            while time.monotonic() - started < 1.0:
+                sock.sendto(b, ("127.0.0.1", port))
+                await asyncio.sleep(0.02)
+                s = d.intake.stats()
+                stats.append((time.monotonic() - started, s["known"], s["lapsed"], s["repeats"]))
+            return stats
+        with mock.patch.object(intake, "LEASE_S", 0.4):
+            stats, _ = self.run_with(scenario, tick_ms=20)
+        at = next(t for t, _, lapsed, _ in stats if lapsed)
+        self.assertTrue(0.4 <= at <= 0.8, at)
+        self.assertEqual(stats[-1][1:3], (1, 1))
+        self.assertGreater(stats[-1][3], 20)
+
+    def test_a_newcomer_whose_lane_forgers_share_is_heard_at_once(self):
+        """Through a daemon: 40 ports forge the station's key faster than its strangers' checks, and its first frame is
+        heard before it repeats it."""
+        socks = [socket.socket(socket.AF_INET, socket.SOCK_DGRAM) for _ in range(40)]
+        for s in socks:
+            self.addCleanup(s.close)
+        f, at = item(SK, 1), item(SK, 2, body=b"a newcomer")
+        async def scenario(d, port):
+            c, n = await self.joined(d), 0
+            key = d.intake.keys[f[4:12]]
+            async def flood():
+                nonlocal n
+                while True:
+                    for _ in range(40):
+                        n += 1
+                        socks[n % 40].sendto(forge(f, n), ("127.0.0.1", port))
+                    await asyncio.sleep(0.005)
+            task = asyncio.create_task(flood())
+            await until(lambda: len(key.tried) == 40)
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                while True:                                    # a port that shares a lane with a forger's
+                    s.bind(("127.0.0.1", 0))
+                    me = udp(s.getsockname()[1])
+                    lanes = {id(key.source(udp(x.getsockname()[1]), 0.0)) for x in socks} & {id(x) for x in key.crowd}
+                    if id(key.source(me, 0.0)) in lanes:
+                        break
+                    s.close()
+                    s.__init__(socket.AF_INET, socket.SOCK_DGRAM)
+                sent = time.monotonic()
+                s.sendto(at, ("127.0.0.1", port))
+                await until(lambda: self.frames(c))
+            task.cancel()
+            return time.monotonic() - sent, d.intake.stats()["reserved"]
+        (took, reserved), _ = self.run_with(scenario)
+        self.assertLess(took, 0.5)
+        self.assertGreater(reserved, 0)
+
     def test_health_tells_the_kinds_of_loss_apart(self):
         async def scenario(d, port):
             health = lambda: json.loads(d.receptor.health(runner.now_ms()))
@@ -1616,7 +1678,7 @@ class DaemonIntakeTest(DaemonCase):
         (quiet, junk, refused, later), _ = self.run_with(scenario)
         self.assertEqual((quiet["state"], quiet["records"]["socket_dropped"]), ("ok", 0))
         self.assertEqual(set(quiet["receive"]), {"read", "repeats", "copies", "verified", "unverified", "reserved", "queued",
-                                                 "known", "displaced", "refused"})
+                                                 "known", "displaced", "lapsed", "refused"})
         self.assertEqual(tuple(quiet["receive"]["refused"]), intake.REFUSED)
         self.assertGreater(junk["receive"]["refused"]["unlisted"], 0)
         self.assertEqual((junk["state"], junk["reasons"]), ("ok", []))
