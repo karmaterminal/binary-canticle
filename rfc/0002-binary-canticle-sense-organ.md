@@ -134,7 +134,7 @@ obedience, because heard material is never an instruction `[proposed: #168]`.
 
 ## 1. The day, from the prince outward (🕯)
 
-> _To write._ Suggested spine:
+> _To come (🕯), in a follow-up; this RFC merges without it so the rest is on `main`._ The agreed spine:
 >
 > - A prince tunes a voice (a station that doesn't know he exists), and separately
 >   **commissions a familiar** with a bounded brief, which he can revise or end (🌫's distinction).
