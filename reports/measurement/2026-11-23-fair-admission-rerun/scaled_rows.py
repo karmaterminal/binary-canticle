@@ -1,11 +1,16 @@
 """The scaled rows 🌫's conditions on #173 ask for (exact-source spoof, source churn, cold start), several runs each, on
 the classes of test_fair_admission. Usage: scaled_rows.py <prototype/canticle-station> <out.json> <row,row|all> <runs>
 A row is measured while its flood runs; nothing is asserted. Run it under nice -n 19 ionice -c3."""
-import json, os, sys, time
+import json, os, platform, sys, time
+from importlib.metadata import version
 from pathlib import Path
 station, out, rows, runs = Path(sys.argv[1]).resolve(), Path(sys.argv[2]), sys.argv[3], int(sys.argv[4])
 sys.path[:0] = [str(station), str(station / "tests")]
 import test_fair_admission as F
+
+LOCKED = "50.0.1"                               # .github/ci/requirements-station.txt
+if version("cryptography") != LOCKED:
+    sys.exit(f"cryptography {version('cryptography')}, not the locked {LOCKED}: not a run of these rows")
 
 RATE = F.FLOOD_RATE
 #        items, seconds of flood, the station's start (s after the flood's; None: established before it), flood rate and arguments
@@ -103,7 +108,7 @@ for name, p in ROWS.items():
         c = Case()
         c.setUp()
         try:
-            r = {"row": name, "run": run, **c.go(p)}
+            r = {"row": name, "run": run, "python": platform.python_version(), "cryptography": version("cryptography"), **c.go(p)}
         finally:
             c.doCleanups()
         got.append(r)
