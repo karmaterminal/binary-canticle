@@ -103,7 +103,7 @@ CHECK_RATE, CHECK_BURST = 2_000.0, 200.0
 # station's first frame may take.
 STRANGE_RATE, STRANGE_BURST = 1_500.0, 150.0
 SLICE_RATE, SLICE_BURST = 500.0, 50.0
-SLICE_PAUSE_S = (NO_OP_COST - 1) / SLICE_RATE    # what such an ITEM or PLUCK out of a slot costs: turns of its own key only
+SLICE_PAUSE_S = (NO_OP_COST - 1) / SLICE_RATE    # what such an ITEM or PLUCK out of a slot costs its key's demoted sources: turns
 SLOT_MAX, SLOT_M = 64, 4                    # sources with a datagram in a key's slot, of each kind; a demoted one's turns, one in M
 DEMOTED_MAX = 256                           # sources a key holds demoted, for as long as a newcomer may wait for them all: RETAIN
 RETAIN = 2.0 * (DEMOTED_MAX + 1) / SLICE_RATE    # rounds of the slice it takes to try them, twice over, in seconds per key
@@ -188,13 +188,14 @@ class Lane:
 class StreamQueue:
     """What waits for one stream of a key: a lane per source, the known ones and the strangers in turn."""
 
-    __slots__ = ("bucket", "beacon", "lanes", "known", "strange", "pool", "known_next")
+    __slots__ = ("bucket", "beacon", "lanes", "known", "strange", "pool", "known_next", "bytes")
 
     def __init__(self, bucket: Bucket, beacon: bool = False):
         self.bucket, self.beacon = bucket, beacon
         self.lanes: dict = {}                           # Source -> Lane: every lane of the two rings below
         self.known, self.strange = deque(), deque()
         self.pool = 0                                   # datagrams waiting in the strangers' lanes
+        self.bytes: dict = {}                           # digest -> how many of the lanes it waits in
         self.known_next = True
 
     def put(self, source: Source, entry: tuple) -> Optional[tuple]:
@@ -218,9 +219,19 @@ class StreamQueue:
             (self.known if source.known else self.strange).append(lane)
         lane.queue.append(entry)
         lane.digests.add(entry[1])
+        self.bytes[entry[1]] = self.bytes.get(entry[1], 0) + 1
         source.queued += 1
         self.pool += not source.known
         return new, out
+
+    def _out(self, lane: Lane, entry: tuple) -> None:
+        """Its place in the lane is gone."""
+        digest = entry[1]
+        lane.digests.remove(digest)
+        lane.source.queued -= 1
+        n = self.bytes.pop(digest)
+        if n > 1:
+            self.bytes[digest] = n - 1
 
     def contended(self, source: Source) -> bool:
         """Whether datagrams of strangers other than ``source`` wait here (a lane of the crowd is anybody's)."""
@@ -231,8 +242,7 @@ class StreamQueue:
         """The newest datagram of the strangers' longest lane loses its place. Returns it, and whose it was."""
         longest = max(self.strange, key=lambda o: len(o.queue))
         entry = longest.queue.pop()
-        longest.digests.remove(entry[1])
-        longest.source.queued -= 1
+        self._out(longest, entry)
         self.pool -= 1
         return entry, longest.source
 
@@ -245,8 +255,7 @@ class StreamQueue:
                 if not source.budget.ready(now):
                     continue
                 entry = lane.queue.popleft()
-                lane.digests.remove(entry[1])
-                source.queued -= 1
+                self._out(lane, entry)
                 source.budget.take()
                 self.pool -= ring is self.strange
                 self.known_next = ring is self.strange
@@ -260,8 +269,7 @@ class StreamQueue:
         """Take one datagram out of its source's lane: it is served by another way."""
         lane = self.lanes[source]
         lane.queue.remove(entry)
-        lane.digests.remove(entry[1])
-        source.queued -= 1
+        self._out(lane, entry)
         ring = self.known if source.known else self.strange
         self.pool -= ring is self.strange
         if not lane.queue:
@@ -286,7 +294,8 @@ class StreamQueue:
         if lane is None:
             return []
         self.known.remove(lane)
-        source.queued -= len(lane.queue)
+        for entry in lane.queue:
+            self._out(lane, entry)
         return list(lane.queue)
 
 
@@ -306,7 +315,7 @@ class Slot:
 
     def __init__(self):
         self.untried, self.demoted = OrderedDict(), OrderedDict()
-        self.turns, self.due = 0, 0.0           # turns it had; no turn before ``due``
+        self.turns, self.due = 0, 0.0           # turns it had; none of the demoted before ``due``
 
     def __len__(self) -> int:
         return len(self.untried) + len(self.demoted)
@@ -323,11 +332,13 @@ class Slot:
         if addr in old and len(new) < SLOT_MAX:
             new[addr] = old.pop(addr)
 
-    def pick(self, ready: Callable[[StreamQueue], bool]) -> Optional[Claim]:
+    def pick(self, now: float, ready: Callable[[StreamQueue], bool]) -> Optional[Claim]:
         """The next one whose stream is ``ready``; the others keep their turns."""
         last = self.turns % SLOT_M == SLOT_M - 1
         streams: dict = {}
         for ring in ((self.demoted, self.untried) if last else (self.untried, self.demoted)):
+            if ring is self.demoted and now < self.due:
+                continue
             for addr, claim in ring.items():
                 if claim.stream not in streams:
                     streams[claim.stream] = ready(claim.stream)
@@ -458,16 +469,15 @@ class KeyQueue:
         return n
 
     def pick(self, now: float, strangers: bool) -> Optional["Ticket"]:
-        for _ in range(len(self.ready)):
-            s = self.ready[0]
-            self.ready.rotate(-1)
+        for s in list(self.ready):                # one that can't be served now keeps its turn
             if not s.bucket.ready(now) or not (s.beacon or self.bucket.ready(now)):
                 continue
             got = s.pick(now, strangers)
             if got is None:
                 continue
-            if not s.lanes:
-                self.ready.pop()
+            self.ready.remove(s)
+            if s.lanes:
+                self.ready.append(s)
             s.bucket.take()
             if not s.beacon:
                 self.bucket.take()
@@ -634,6 +644,7 @@ class Intake:
         self._beacons = {kid: deque() for kid in self.keys}
         self._touched: deque = deque()             # Repeats with copies the event loop has not been told of
         self._ready: deque = deque()               # keys (and the unlisted queue) with something waiting, in turn
+        self._passed: list = []                    # those of them that couldn't be served in this take
         self._slots: deque = deque()               # keys whose slot holds something, in turn
         self.retain = RETAIN * max(1, len(self.keys))    # seconds a demotion lasts
         self._lock = threading.Lock()
@@ -788,7 +799,7 @@ class Intake:
                 slot.move(addr, slot.demoted, slot.untried)
             return None if held.entry[1] == entry[1] else False
         ring = slot.demoted if demoted else slot.untried
-        if len(ring) >= SLOT_MAX or any(entry[1] in lane.digests for lane in stream.lanes.values()):
+        if len(ring) >= SLOT_MAX or entry[1] in stream.bytes:
             return False
         if not slot:
             self._slots.append(key)
@@ -824,6 +835,8 @@ class Intake:
             for pick, got, most, looks in ((self._pick_slot, slots, half, half * TURN), (self._pick, out, limit, (limit + half) * TURN),
                                            (self._pick_slot, slots, limit + half, (limit + half) * TURN)):
                 self._draw(pick, got, most - len(out) * (got is slots), looks, seen, now_ms, now)
+                self._ready.extendleft(reversed(self._passed))
+                self._passed.clear()
         return out + [t for t in slots if not t.dropped]
 
     def _draw(self, pick: Callable, out: list, most: int, looks: int, seen: dict, now_ms: int, now: float) -> None:
@@ -854,42 +867,41 @@ class Intake:
             out.append(t)
 
     def _pick(self, now: float) -> Optional[Ticket]:
+        """The next key's turn. One that can't be served now keeps it: ``take`` puts it back in front, so nothing that is served
+        meanwhile comes between."""
         strangers = self.strange.ready(now)
-        for _ in range(len(self._ready)):
-            key = self._ready[0]
-            self._ready.rotate(-1)
-            if key is not self.unlisted and not self.checks.ready(now):
+        while self._ready:
+            key = self._ready.popleft()
+            t = key.pick(now, strangers) if key is self.unlisted or self.checks.ready(now) else None
+            if t is None:
+                self._passed.append(key)
                 continue
-            t = key.pick(now, strangers)
-            if not key.ready:
-                self._ready.pop()
-            if t is not None:
-                if t.key is not None:
-                    self.checks.take()
-                    if t.strange:
-                        self.strange.take()
-                    claim = key.slot.get(t.addr)
-                    if claim is not None and claim.entry[1] == t.digest:     # its turn in the queues came first
-                        key.slot.remove(t.addr)
-                        if not key.slot:
-                            self._slots.remove(key)
-                return t
+            if key.ready:
+                self._ready.append(key)
+            if t.key is not None:
+                self.checks.take()
+                if t.strange:
+                    self.strange.take()
+                claim = key.slot.get(t.addr)
+                if claim is not None and claim.entry[1] == t.digest:     # its turn in the queues came first
+                    key.slot.remove(t.addr)
+                    self.copied += not claim.queued    # what it stood for waited there alone, and this is its copy
+                    if not key.slot:
+                        self._slots.remove(key)
+            return t
         return None
 
     def _pick_slot(self, now: float) -> Optional[Ticket]:
         """The next key's slot, in turn over the keys, on the slice's own bucket."""
         if not self.slice.ready(now):
             return None
-        for _ in range(len(self._slots)):
-            key = self._slots[0]
-            self._slots.rotate(-1)
-            if now < key.slot.due:
-                continue
-            claim = key.slot.pick(lambda s: s.bucket.ready(now) and (s.beacon or key.bucket.ready(now)))
+        for key in list(self._slots):
+            claim = key.slot.pick(now, lambda s: s.bucket.ready(now) and (s.beacon or key.bucket.ready(now)))
             if claim is None:
-                continue
-            if not key.slot:
-                self._slots.pop()
+                continue                               # it keeps its turn
+            self._slots.remove(key)
+            if key.slot:
+                self._slots.append(key)
             if claim.queued:
                 claim.stream.remove(claim.source, claim.entry)
                 if not claim.stream.lanes:
@@ -934,13 +946,15 @@ class Intake:
             if verified and not fresh and not t.stream.beacon:
                 if t.budget is not self.slice:
                     t.budget.take(NO_OP_COST - 1)
-                elif t.digest not in self.repeats:     # turns of its own key, never another's; what is kept was that only once
+                elif t.digest not in self.repeats:     # turns of its key's that were tried; what is kept was that only once
                     t.key.slot.due = max(now, t.key.slot.due) + SLICE_PAUSE_S
             if t.key is not None:
                 if fresh:
                     t.key.clear(t.addr)
-                elif t.addr not in t.key.known:
-                    t.key.demote(t.addr, now)
+                else:
+                    for addr in (t.addr, *t.copies):
+                        if addr not in t.key.known:
+                            t.key.demote(addr, now)
             if not verified:
                 self.unverified += 1
                 return

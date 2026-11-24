@@ -192,3 +192,14 @@ a station that goes on over a daemon restart is then known after 1.6 s in a fixe
 
 It also says that a verified replay "counts as neither a failure nor a recovery". It is not counted as a failure here, and its source is nevertheless **no longer untried**, so it goes behind those that are (the same place as a demoted one). *Why not left where it was:* 64 sources with one old beacon
 each would have all 64 untried places at every moment. With 100 more that forge (164 that stay, within the 256), 22 of 80 newcomers were never checked at K = 1 and 51 of 80 at K = 16 (virtual time; base 57 and 60 of 80); as it is here, 0 and 0, all within one round (`test_sources_that_only_replay_hold_no_untried_place_for_good`, RED under the letter). For 🍃 and 🌫 to agree or amend.
+
+## Added 2026-11-24 19:33Z, before any run: the third review
+
+Nothing has been measured. A third independent review, with 5.2 million fuzz steps, found five defects, each a RED before its fix. No row, threshold or run count changes.
+
+- **A key or a stream that couldn't be served lost its turn** to whatever was served meanwhile. It is on #173 too, and there it starves *established* stations: in a flood that is half junk (no frames) and half forgeries of other keys, 392 of 784 frames of four established stations were never served (virtual time, K = 64), and 313 of 784 at K = 16. Here a
+  key keeps its turn: none is lost, and the longest wait is 1 ms for them and 33 ms for a newcomer of a key that nobody forges (base 147 ms). **(B1) rests on this**, and on the base it held only while nothing else was served.
+- Replayed records held up untried newcomers: they now put off only their key's demoted sources.
+- A source whose forged bytes shared another's verdict stayed untried (RED: of 200 that send the same bytes, 60 of 60 newcomers never checked; here 0).
+- A datagram counted nowhere (the same bytes again in a lane while a claim held them alone).
+- A digest scan per datagram under the lock (5.1 µs against 1.1 µs on the base; here 1.2 µs, and 1.5 µs where a churned flood is placed, against 1.2 µs).

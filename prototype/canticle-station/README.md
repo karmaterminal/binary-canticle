@@ -577,7 +577,8 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
   key holds 256 sources demoted, for twice the rounds it takes to try them all. So a newcomer is checked within **(S + 1) rounds of the keys, K/500 s each (a third
   more where demoted ones wait), whatever the flood's rate**, S being the sources of its own key that are not tried yet: 0 where its key is not forged, and each
   costs its turn once. That holds for at most 63 sources that start with it, and for 256 that stay. An echo of a frame that waits takes no slot, and a known
-  source's copy stands for a slot's. A verified ITEM or PLUCK out of a slot that changes nothing costs its own key nine turns, never another key's. `receive.reserved` counts what the
+  source's copy stands for a slot's. A verified ITEM or PLUCK out of a slot that changes nothing costs its key's demoted sources nine turns, and nobody else. A key or a stream that
+  can't be served keeps its turn, so nothing that is served meanwhile comes between. `receive.reserved` counts what the
   slice checked.
 - **A known place is a lease.** It ends 60 s after the daemon first verified the newest frame that its source delivered: the clock is the
   daemon's monotonic one, and having nothing waiting means nothing. An exact repeat from a source that has a place renews it up to the
