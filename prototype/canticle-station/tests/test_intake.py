@@ -1058,6 +1058,17 @@ class NewcomerTest(NewcomerCase):
                           copies=[(0.1 * n, item(self.sks[k], 2 + n), udp(60_000 + k)) for n in range(4) for k in range(self.K)])
         self.assertChecked(waits, 4 * self.K / (C_ALL - C_SLICE) + RETRY_S + TURN_S, "established")
 
+    def test_the_slice_is_paid_for_by_strangers_and_not_by_established_stations(self):
+        """One established station among 64 keys that are all forged at, singing seven items a second: it has its turn of each
+        fourth round of the keys, which is in time while a round costs what it did."""
+        self.stations(64)
+        self.offer(item(self.sks[0], 1), src=udp(60_000))
+        self.serve(64)
+        self.play(0.5, keys=range(64), churn=True, rate=100_000)
+        waits = self.play(5.0, keys=range(64), churn=True, rate=100_000,
+                          copies=[(0.14 * n, item(self.sks[0], 2 + n), udp(60_000)) for n in range(34)])
+        self.assertChecked(waits, 4 * 64 / C_ALL + RETRY_S + 2 * TURN_S, "an established station")
+
     def test_a_key_that_is_not_listed_never_reaches_the_slice(self):
         stranger = Ed25519PrivateKey.generate()
         f = item(stranger, 1)
