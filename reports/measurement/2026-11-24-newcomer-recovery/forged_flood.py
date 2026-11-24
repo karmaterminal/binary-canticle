@@ -2,7 +2,7 @@
 of totals at the end. Usage: PYTHONPATH=<prototype/canticle-station> forged_flood.py (see --help)
 
 Pass 3's (codeagent/bc-173-pass3c, reports/measurement/2026-11-23-cold-start-recovery/), with one addition: ``--kid`` may be several
-key ids, comma-joined, claimed in turn (each port claims every one of them). With one it sends what pass 3's sent.
+key ids, comma-joined, claimed in turn (each port claims every one of them). With one it sends what pass 3's sent. ``--junk`` (row J): every other datagram is no frame.
 
 ``--churn``: N sockets open at once, and each datagram from a newly opened one that replaces the oldest (pass 2's churn,
 spread over N). Without it: N sockets held open and used in turn. The frames are ``tests/flood.py``'s forgeries: distinct,
@@ -30,6 +30,7 @@ p.add_argument("--churn", action="store_true")
 p.add_argument("--smooth", action="store_true", help="each datagram when it is due, spinning between, not in 1 ms chunks")
 p.add_argument("--index", type=int, default=0, help="which producer this is: its forgeries are its own")
 p.add_argument("--duration", type=float, required=True)
+p.add_argument("--junk", action="store_true", help="every other datagram is no frame at all")
 a = p.parse_args()
 sys.path.insert(0, a.tests)
 from flood import SEQ0, Pace, forged_parts      # noqa: E402
@@ -66,7 +67,10 @@ while (now := time.monotonic()) < end:
         else:
             s = socks.popleft()
         socks.append(s)
-        s.sendto(head + (FIRST + sent).to_bytes(8, "big") + tail + os.urandom(32) + sent.to_bytes(8, "little") + bytes(24), dest)
+        if a.junk and sent % 2:
+            s.sendto(b"junk %d" % sent, dest)
+        else:
+            s.sendto(head + (FIRST + sent).to_bytes(8, "big") + tail + os.urandom(32) + sent.to_bytes(8, "little") + bytes(24), dest)
         if start is None:
             start = time.monotonic()
             print(json.dumps({"t0": start}), flush=True)

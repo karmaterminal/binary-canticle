@@ -203,3 +203,13 @@ Nothing has been measured. A third independent review, with 5.2 million fuzz ste
 - A source whose forged bytes shared another's verdict stayed untried (RED: of 200 that send the same bytes, 60 of 60 newcomers never checked; here 0).
 - A datagram counted nowhere (the same bytes again in a lane while a claim held them alone).
 - A digest scan per datagram under the lock (5.1 µs against 1.1 µs on the base; here 1.2 µs, and 1.5 µs where a churned flood is placed, against 1.2 µs).
+
+## Added 2026-11-24 19:45Z, before any run: row J
+
+Row J asks over sockets what the third review found in virtual time: #173's scheduler makes established stations lose their turns while junk is served.
+
+| # | row | what | runs | pass |
+|---|---|---|---|---|
+| **J** | established stations in a flood of junk and other keys' forgeries (`junk_rows.py`) | 16 stations; four established ones sing 57 items each, 150 ms apart; the flood is half junk (no frames, so the unlisted queue) and half forgeries of the 12 others' keys, from 40 ports held open, 20 000/s and 100 000/s, 13.6 s | 5 `slice`, 3 `base` | each of the four 57 of 57 during the flood in every run, p50 ≤ 250 ms, none later than 4.5 s, drops reported |
+
+Prediction: `base` fails at 20 000/s or above, `slice` passes. J runs after W, and it gates nothing of the newcomers' rows; it is a finding about #173.
