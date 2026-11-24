@@ -1,0 +1,1059 @@
+{
+ "params": {
+  "payload": "64",
+  "prod_wake": false,
+  "ear_tune": "none",
+  "quiet_interval": 10,
+  "duration": 300.0,
+  "drain": 15.0,
+  "status_every": 5,
+  "sample_every": 0,
+  "name": "F5-real-station-flood",
+  "producers": 0,
+  "flood_station_rate": 0,
+  "waited_for_load_s": 0
+ },
+ "lab": "/home/figs/.cache/canticle-measure-2/F5-3408405-90113302",
+ "t_start_mono_ns": 2667056470274552,
+ "producers": [],
+ "offered": 0,
+ "offered_rate": 0,
+ "frame_bytes": null,
+ "kernel_drops": 0,
+ "snmp_delta": {
+  "InDatagrams": 1916112,
+  "OutDatagrams": 1914427,
+  "IgnoredMulti": 497
+ },
+ "daemon_health_last": {
+  "v": "canticle-receptor-record/1",
+  "type": "health",
+  "rec_seq": 161163,
+  "run": "473a4318da6d40919e5d4289b40c323d",
+  "state": "ok",
+  "reasons": [],
+  "last_datagram_at": 1795534599760,
+  "counters": {
+   "admission": {
+    "verified": 86150,
+    "duplicate": 43,
+    "capability_exceeded": 0,
+    "scope_violation": 0,
+    "hop_limit": 0,
+    "over_quota": 0,
+    "pluck_mismatch": 0,
+    "plucked": 0,
+    "superseded": 0,
+    "class_change": 0,
+    "equivocation": 0
+   },
+   "disposition": {
+    "surface": 86150,
+    "ringbuffer_only": 0,
+    "drop": 0,
+    "quarantine_set": 0,
+    "no_op": 43
+   },
+   "retract": {
+    "plucked": 0,
+    "superseded": 0,
+    "expired": 74696,
+    "revoked": 0,
+    "quarantined": 0,
+    "held_expired": 0,
+    "held_plucked": 0,
+    "held_superseded": 0
+   },
+   "beacon": {
+    "verified": 61,
+    "duplicate": 0,
+    "epoch_regression": 0
+   },
+   "unverified": {
+    "unknown_key": 0,
+    "bad_signature": 0,
+    "revoked": 0,
+    "expired": 1,
+    "not_yet_valid": 0,
+    "malformed": 0,
+    "crit_unknown": 0,
+    "version": 0
+   }
+  },
+  "unverified": {
+   "key_ids": [
+    {
+     "key_id": "d7572337e5a5d494",
+     "count": 1,
+     "error": 0
+    }
+   ],
+   "other": 0
+  },
+  "dedup": {
+   "entries": 12638,
+   "capacity": 100000
+  },
+  "beacon_age_ms": {
+   "d7572337e5a5d494": 986,
+   "23ec8f5aa0594ef4": 514
+  },
+  "surfaced": 11454,
+  "quarantined": [],
+  "records": {
+   "emitted": 161162,
+   "dropped": 160,
+   "peers_closed": 7,
+   "socket_dropped": 0
+  },
+  "receive": {
+   "read": 1911331,
+   "repeats": 43,
+   "copies": 483,
+   "verified": 86211,
+   "unverified": 1,
+   "queued": 0,
+   "refused": {
+    "backlog": 1824593
+   }
+  },
+  "snapshots": {
+   "requested": 9,
+   "served": 9,
+   "truncated": 7,
+   "deferred": 1,
+   "closed": 4,
+   "ignored": 0
+  },
+  "t_ns": 2667371489621643,
+  "conn": 4
+ },
+ "tap": {
+  "connections": 4,
+  "lines": 154250,
+  "bytes": 134104191,
+  "counts": {
+   "hello": 4,
+   "landing_state": 4,
+   "snapshot_end": 3,
+   "health": 250,
+   "presence": 62,
+   "frame": 85382,
+   "snapshot": 1319,
+   "retract": 67226
+  },
+  "rec_seq_gaps": 0,
+  "rec_seq_gap_records": 0,
+  "rec_seq_regressions": 0
+ },
+ "tap_events": [
+  {
+   "t_ns": 2667051284784013,
+   "event": "connected",
+   "conn": 1
+  },
+  {
+   "t_ns": 2667051285137632,
+   "event": "hello",
+   "conn": 1,
+   "run": "473a4318da6d40919e5d4289b40c323d",
+   "pid": 3408409
+  },
+  {
+   "t_ns": 2667051285204305,
+   "event": "snapshot_end",
+   "conn": 1,
+   "watermark": 2,
+   "count": 0,
+   "truncated": false,
+   "omitted": 0
+  },
+  {
+   "t_ns": 2667117411207803,
+   "event": "eof",
+   "conn": 1
+  },
+  {
+   "t_ns": 2667117411273484,
+   "event": "connected",
+   "conn": 2
+  },
+  {
+   "t_ns": 2667118440279027,
+   "event": "hello",
+   "conn": 2,
+   "run": "473a4318da6d40919e5d4289b40c323d",
+   "pid": 3408409
+  },
+  {
+   "t_ns": 2667118943115649,
+   "event": "eof",
+   "conn": 2
+  },
+  {
+   "t_ns": 2667118943210082,
+   "event": "connected",
+   "conn": 3
+  },
+  {
+   "t_ns": 2667119995585378,
+   "event": "hello",
+   "conn": 3,
+   "run": "473a4318da6d40919e5d4289b40c323d",
+   "pid": 3408409
+  },
+  {
+   "t_ns": 2667120614977182,
+   "event": "snapshot_end",
+   "conn": 3,
+   "watermark": 31424,
+   "count": 511,
+   "truncated": true,
+   "omitted": 19009
+  },
+  {
+   "t_ns": 2667122023677876,
+   "event": "eof",
+   "conn": 3
+  },
+  {
+   "t_ns": 2667122023733717,
+   "event": "connected",
+   "conn": 4
+  },
+  {
+   "t_ns": 2667122960123866,
+   "event": "hello",
+   "conn": 4,
+   "run": "473a4318da6d40919e5d4289b40c323d",
+   "pid": 3408409
+  },
+  {
+   "t_ns": 2667123494237098,
+   "event": "snapshot_end",
+   "conn": 4,
+   "watermark": 34368,
+   "count": 511,
+   "truncated": true,
+   "omitted": 17026
+  }
+ ],
+ "probe_frames_by_admission": {
+  "verified/surface": 85382
+ },
+ "probe_verified_frames": 85382,
+ "probe_verified_rate_in_window": 280.2,
+ "probe_verified_per_s": [
+  0,
+  2113,
+  1472,
+  1056,
+  926,
+  800,
+  799,
+  704,
+  672,
+  640,
+  576,
+  544,
+  544,
+  480,
+  480,
+  480,
+  448,
+  416,
+  416,
+  416,
+  416,
+  384,
+  384,
+  352,
+  352,
+  320,
+  320,
+  320,
+  320,
+  320,
+  288,
+  288,
+  288,
+  320,
+  256,
+  288,
+  288,
+  288,
+  288,
+  256,
+  288,
+  256,
+  256,
+  256,
+  224,
+  256,
+  256,
+  224,
+  224,
+  224,
+  224,
+  224,
+  192,
+  224,
+  192,
+  224,
+  224,
+  192,
+  224,
+  191,
+  224,
+  96,
+  32,
+  0,
+  32,
+  32,
+  0,
+  32,
+  288,
+  224,
+  160,
+  320,
+  160,
+  279,
+  328,
+  192,
+  288,
+  191,
+  288,
+  320,
+  256,
+  255,
+  288,
+  288,
+  288,
+  288,
+  320,
+  288,
+  288,
+  320,
+  288,
+  288,
+  288,
+  256,
+  320,
+  255,
+  256,
+  288,
+  288,
+  256,
+  287,
+  288,
+  255,
+  224,
+  320,
+  287,
+  288,
+  288,
+  287,
+  256,
+  256,
+  320,
+  256,
+  256,
+  288,
+  192,
+  320,
+  288,
+  256,
+  224,
+  288,
+  224,
+  256,
+  256,
+  256,
+  224,
+  256,
+  256,
+  224,
+  256,
+  224,
+  224,
+  256,
+  192,
+  256,
+  192,
+  256,
+  192,
+  256,
+  224,
+  288,
+  224,
+  256,
+  224,
+  256,
+  256,
+  224,
+  288,
+  256,
+  255,
+  256,
+  224,
+  256,
+  224,
+  224,
+  256,
+  256,
+  256,
+  256,
+  256,
+  256,
+  288,
+  224,
+  288,
+  192,
+  256,
+  224,
+  160,
+  320,
+  224,
+  224,
+  288,
+  256,
+  223,
+  224,
+  256,
+  256,
+  255,
+  287,
+  224,
+  255,
+  256,
+  224,
+  288,
+  223,
+  224,
+  256,
+  256,
+  224,
+  256,
+  224,
+  256,
+  224,
+  256,
+  255,
+  256,
+  256,
+  224,
+  223,
+  224,
+  288,
+  256,
+  256,
+  255,
+  224,
+  256,
+  256,
+  255,
+  256,
+  256,
+  256,
+  224,
+  256,
+  256,
+  256,
+  256,
+  256,
+  256,
+  256,
+  224,
+  288,
+  224,
+  256,
+  224,
+  256,
+  192,
+  256,
+  255,
+  256,
+  288,
+  224,
+  256,
+  224,
+  256,
+  224,
+  256,
+  256,
+  224,
+  288,
+  224,
+  288,
+  224,
+  224,
+  256,
+  224,
+  224,
+  224,
+  288,
+  256,
+  255,
+  224,
+  223,
+  256,
+  224,
+  256,
+  255,
+  288,
+  192,
+  288,
+  192,
+  256,
+  224,
+  256,
+  224,
+  224,
+  256,
+  256,
+  256,
+  256,
+  256,
+  256,
+  224,
+  287,
+  256,
+  256,
+  256,
+  224,
+  288,
+  224,
+  256,
+  223,
+  255,
+  224,
+  288,
+  256,
+  256,
+  288,
+  256,
+  224,
+  288,
+  256,
+  256,
+  288,
+  192,
+  288,
+  192,
+  256,
+  224,
+  256,
+  224,
+  224,
+  192,
+  288,
+  224,
+  192,
+  191,
+  226,
+  0,
+  0
+ ],
+ "latency_send_to_record_ms": {
+  "n": 0,
+  "p50": null,
+  "p90": null,
+  "p99": null,
+  "max": null
+ },
+ "pushes": {
+  "ear0": {
+   "pushes": 0,
+   "records": 0,
+   "records_per_push_max": 0,
+   "late_lines": 0,
+   "loss_lines": 0,
+   "other_events": 0
+  }
+ },
+ "latency_send_to_push_ms": {
+  "n": 0,
+  "p50": null,
+  "p99": null,
+  "max": null
+ },
+ "quiet_items": [
+  {
+   "n": 0,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:1",
+   "sung_at_s": 2.024,
+   "at_daemon_s": 3.005,
+   "pushed_at_s": null
+  },
+  {
+   "n": 1,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:2",
+   "sung_at_s": 12.024,
+   "at_daemon_s": 15.246,
+   "pushed_at_s": null
+  },
+  {
+   "n": 2,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:3",
+   "sung_at_s": 22.024,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 3,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:4",
+   "sung_at_s": 32.024,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 4,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:5",
+   "sung_at_s": 42.024,
+   "at_daemon_s": 100.96,
+   "pushed_at_s": null
+  },
+  {
+   "n": 5,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:6",
+   "sung_at_s": 52.024,
+   "at_daemon_s": 59.009,
+   "pushed_at_s": null
+  },
+  {
+   "n": 6,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:7",
+   "sung_at_s": 62.024,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 7,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:8",
+   "sung_at_s": 72.024,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 8,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:9",
+   "sung_at_s": 82.024,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 9,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:10",
+   "sung_at_s": 92.024,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 10,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:11",
+   "sung_at_s": 102.024,
+   "at_daemon_s": 109.856,
+   "pushed_at_s": null
+  },
+  {
+   "n": 11,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:12",
+   "sung_at_s": 112.024,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 12,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:13",
+   "sung_at_s": 122.024,
+   "at_daemon_s": 174.774,
+   "pushed_at_s": null
+  },
+  {
+   "n": 13,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:14",
+   "sung_at_s": 132.024,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 14,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:15",
+   "sung_at_s": 142.024,
+   "at_daemon_s": 187.571,
+   "pushed_at_s": null
+  },
+  {
+   "n": 15,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:16",
+   "sung_at_s": 152.024,
+   "at_daemon_s": 160.131,
+   "pushed_at_s": null
+  },
+  {
+   "n": 16,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:17",
+   "sung_at_s": 162.025,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 17,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:18",
+   "sung_at_s": 172.024,
+   "at_daemon_s": 205.552,
+   "pushed_at_s": null
+  },
+  {
+   "n": 18,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:19",
+   "sung_at_s": 182.024,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 19,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:20",
+   "sung_at_s": 192.024,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 20,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:21",
+   "sung_at_s": 202.024,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 21,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:22",
+   "sung_at_s": 212.024,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 22,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:23",
+   "sung_at_s": 222.024,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 23,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:24",
+   "sung_at_s": 232.025,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 24,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:25",
+   "sung_at_s": 242.025,
+   "at_daemon_s": null,
+   "pushed_at_s": null
+  },
+  {
+   "n": 25,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:26",
+   "sung_at_s": 252.025,
+   "at_daemon_s": 305.789,
+   "pushed_at_s": null
+  },
+  {
+   "n": 26,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:27",
+   "sung_at_s": 262.024,
+   "at_daemon_s": 294.671,
+   "pushed_at_s": null
+  },
+  {
+   "n": 27,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:28",
+   "sung_at_s": 272.024,
+   "at_daemon_s": 308.475,
+   "pushed_at_s": null
+  },
+  {
+   "n": 28,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:29",
+   "sung_at_s": 282.024,
+   "at_daemon_s": 285.954,
+   "pushed_at_s": null
+  },
+  {
+   "n": 29,
+   "idem": "canticle:d7572337e5a5d494:1795534284:f21e2af1:30",
+   "sung_at_s": 292.024,
+   "at_daemon_s": 300.633,
+   "pushed_at_s": null
+  }
+ ],
+ "quiet": {
+  "sung": 30,
+  "sing_errors": 0,
+  "reached_daemon": 14,
+  "pushed_per_ear": {
+   "ear0": 0
+  },
+  "send_to_record_ms": [
+   980.927035,
+   3222.303439,
+   3930.022871,
+   6985.166328,
+   7831.753472,
+   8106.396377,
+   8608.928555,
+   32646.351562,
+   33527.313528,
+   36450.451902,
+   45547.344241,
+   52749.467283,
+   53764.66462,
+   58935.960235
+  ],
+  "send_to_push_ms": {},
+  "missing_at_daemon": [
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:3",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:4",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:7",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:8",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:9",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:10",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:12",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:14",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:17",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:19",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:20",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:21",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:22",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:23",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:24",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:25"
+  ],
+  "missing_in_push": [
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:1",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:2",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:3",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:4",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:5",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:6",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:7",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:8",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:9",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:10",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:11",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:12",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:13",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:14",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:15",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:16",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:17",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:18",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:19",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:20",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:21",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:22",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:23",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:24",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:25",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:26",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:27",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:28",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:29",
+   "canticle:d7572337e5a5d494:1795534284:f21e2af1:30"
+  ]
+ },
+ "frond_ear": {
+  "ear0": {
+   "receiveHealth": "degraded",
+   "reasons": [
+    "joined_late",
+    "records_lost"
+   ],
+   "counts": {
+    "joined_late": 5,
+    "live_overflow": 60899,
+    "exit_without_bye": 4,
+    "records_lost": 7,
+    "snapshot_frames": 509
+   },
+   "joinSnapshot": "truncated",
+   "canticleDelivery": {
+    "ceiling": "off",
+    "mode": "off",
+    "style": "records",
+    "stations": {
+     "quiet": {
+      "ceiling": "immediate",
+      "mode": "immediate"
+     }
+    },
+    "choices": [],
+    "wakeKeys": 1,
+    "windowMs": 60000,
+    "debounceMs": 5000,
+    "maxAgeMs": 30000,
+    "waiting": 1,
+    "nextPushAt": 1795534651368,
+    "held": null,
+    "lastPushAt": null,
+    "pushesLastHour": 0,
+    "maxPushesPerHour": 60,
+    "reports": 0,
+    "counts": {
+     "routed_late": 3,
+     "off_air_unpushed": 2
+    }
+   },
+   "canticleCustody": {
+    "windowMs": 3600000,
+    "history": "unknown",
+    "reasons": [
+     "no compaction boundary from this session's pressure hook yet (frond-ear pressure --hook --ear)"
+    ],
+    "counts": {
+     "records": 0,
+     "echoed": 0,
+     "echoedBoundaryUnknown": 0,
+     "echoedBeforeBoundary": 0,
+     "offered": 0,
+     "claimed": 0
+    }
+   },
+   "attached": true
+  }
+ },
+ "processes": {
+  "canticle-daemon": {
+   "n": 641,
+   "cpu_max": 101.9,
+   "rss_max_kb": 161060,
+   "rss_first_kb": 34360,
+   "rss_last_kb": 161060,
+   "cpu_mean": 91.6
+  },
+  "frond-ear-ear0": {
+   "n": 641,
+   "cpu_max": 8.0,
+   "rss_max_kb": 174924,
+   "rss_first_kb": 101568,
+   "rss_last_kb": 137476,
+   "cpu_mean": 1.5
+  },
+  "session0": {
+   "n": 641,
+   "cpu_max": 2.0,
+   "rss_max_kb": 12400,
+   "rss_first_kb": 12400,
+   "rss_last_kb": 12400,
+   "cpu_mean": 0.0
+  },
+  "tap": {
+   "n": 641,
+   "cpu_max": 4.0,
+   "rss_max_kb": 19676,
+   "rss_first_kb": 11668,
+   "rss_last_kb": 0,
+   "cpu_mean": 0.3
+  },
+  "shim0": {
+   "n": 633,
+   "cpu_max": 2.0,
+   "rss_max_kb": 97988,
+   "rss_first_kb": 97988,
+   "rss_last_kb": 97988,
+   "cpu_mean": 0.0
+  },
+  "station-quiet": {
+   "n": 633,
+   "cpu_max": 10.0,
+   "rss_max_kb": 33440,
+   "rss_first_kb": 33440,
+   "rss_last_kb": 33440,
+   "cpu_mean": 0.1
+  },
+  "station-floodst": {
+   "n": 632,
+   "cpu_max": 101.9,
+   "rss_max_kb": 33432,
+   "rss_first_kb": 33432,
+   "rss_last_kb": 33432,
+   "cpu_mean": 94.6
+  },
+  "floodsinger": {
+   "n": 632,
+   "cpu_max": 99.9,
+   "rss_max_kb": 1693224,
+   "rss_first_kb": 17500,
+   "rss_last_kb": 0,
+   "cpu_mean": 18.4
+  },
+  "quietsinger": {
+   "n": 632,
+   "cpu_max": 2.0,
+   "rss_max_kb": 17500,
+   "rss_first_kb": 17500,
+   "rss_last_kb": 0,
+   "cpu_mean": 0.1
+  }
+ },
+ "flood_station": {
+  "sung": 1909664,
+  "errors": 0,
+  "elapsed_s": 300.0,
+  "rate": 6365.5
+ },
+ "stderr": {
+  "canticle-daemon.err": {
+   "lines": 3,
+   "tail": [
+    "{\"daemon\": {\"manifest\": \"/home/figs/.cache/canticle-measure-2/F5-3408405-90113302/fleet.json\", \"bind\": \"127.0.0.1:44793\", \"multicast\": false, \"socket\": \"/home/figs/.cache/canticle-measure-2/F5-3408405-90113302/run/canticle/daemon.sock\", \"state_dir\": \"/home/figs/.cache/canticle-measure-2/F5-3408405-90113302/state/canticle-daemon\", \"allowed_uids\": [1000], \"stations\": null}}",
+    "{\"v\":\"canticle-receptor-record/1\",\"type\":\"hello\",\"rec_seq\":1,\"run\":\"473a4318da6d40919e5d4289b40c323d\",\"wire_version\":2,\"record_version\":\"canticle-receptor-record/1\",\"pid\":3408409,\"bind\":\"127.0.0.1:44793\",\"multicast\":null,\"transport\":\"lan\",\"manifest_sha256\":\"37c9758ab75dfa6c14ddb9011c323705a9330dba85d198ceaf577dd49fbc0240\",\"manifest_label\":\"canticle-fleet/spike-0\",\"state_version\":3,\"receptor_state_version\":1,\"rule_version\":\"canticle-station/0.1.0+bc2\",\"join_snapshot\":true}",
+    "{\"v\":\"canticle-receptor-record/1\",\"type\":\"bye\",\"rec_seq\":161356,\"run\":\"473a4318da6d40919e5d4289b40c323d\"}"
+   ]
+  },
+  "floodsinger.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "frond-ear-ear0.err": {
+   "lines": 25,
+   "tail": [
+    "{\"time\":\"2026-11-24T15:36:41.126Z\",\"level\":\"info\",\"event\":\"ear.detached\",\"ear\":\"ear0\",\"reverted\":0}",
+    "{\"time\":\"2026-11-24T15:36:41.250Z\",\"level\":\"info\",\"event\":\"daemon.draining\",\"inFlight\":0}",
+    "{\"time\":\"2026-11-24T15:36:41.264Z\",\"level\":\"info\",\"event\":\"daemon.stopped\",\"code\":0,\"drained\":true}"
+   ]
+  },
+  "quietsinger.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "session0.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "session0.shim.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "station-floodst.err": {
+   "lines": 2,
+   "tail": [
+    "{\"station\": \"23ec8f5aa0594ef4\", \"epoch\": 1795534284, \"control\": \"/home/figs/.cache/canticle-measure-2/F5-3408405-90113302/run/station-floodst.sock\", \"dests\": [\"127.0.0.1:44793\"], \"streams\": [\"flood\"]}",
+    "control socket /home/figs/.cache/canticle-measure-2/F5-3408405-90113302/run/station-floodst.sock"
+   ]
+  },
+  "station-quiet.err": {
+   "lines": 2,
+   "tail": [
+    "{\"station\": \"d7572337e5a5d494\", \"epoch\": 1795534284, \"control\": \"/home/figs/.cache/canticle-measure-2/F5-3408405-90113302/run/station-quiet.sock\", \"dests\": [\"127.0.0.1:44793\"], \"streams\": [\"quiet\"]}",
+    "control socket /home/figs/.cache/canticle-measure-2/F5-3408405-90113302/run/station-quiet.sock"
+   ]
+  },
+  "tap.err": {
+   "lines": 0,
+   "tail": []
+  }
+ }
+}

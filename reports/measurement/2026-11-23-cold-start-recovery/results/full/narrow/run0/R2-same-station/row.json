@@ -1,0 +1,55 @@
+{
+ "row": "R2-same-station",
+ "python": "3.12.3",
+ "cryptography": "50.0.1",
+ "offered_per_s": 5855.2,
+ "sung": 57,
+ "at_daemon": 20,
+ "at_daemon_during_flood": 15,
+ "pushed": 3,
+ "send_to_record_ms": {
+  "p50": 26804.6,
+  "p90": 54110.1,
+  "p99": 58430.1,
+  "max": 59159.3
+ },
+ "send_to_push_ms": {
+  "p50": 25206.7,
+  "p90": 31109.5,
+  "p99": 32437.6,
+  "max": 32585.2
+ },
+ "kernel_drops": 0,
+ "reported_socket_dropped": 0,
+ "receive": {
+  "read": 3339318,
+  "repeats": 56,
+  "copies": 486,
+  "verified": 151349,
+  "unverified": 2,
+  "queued": 0,
+  "refused": {
+   "backlog": 3187425
+  }
+ },
+ "health_reasons_seen": [
+  "datagrams_refused",
+  "records_lost"
+ ],
+ "admission": {
+  "verified": 151309,
+  "duplicate": 56
+ },
+ "unverified": {
+  "expired": 2
+ },
+ "ear_live_overflow": 107113,
+ "daemon_cpu_rss": {
+  "cpu_max": 103.9,
+  "rss_max_kb": 160476,
+  "cpu_mean": 93.7
+ },
+ "load_at_start": 4.23,
+ "duration_s": 570.0,
+ "drain_s": 15.0
+}

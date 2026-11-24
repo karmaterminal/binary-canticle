@@ -1,0 +1,54 @@
+{
+ "row": "R3c-forged-churned-sources-2x-max",
+ "python": "3.12.3",
+ "cryptography": "50.0.1",
+ "offered_per_s": 195902.1,
+ "sung": 57,
+ "at_daemon": 34,
+ "at_daemon_during_flood": 29,
+ "pushed": 28,
+ "send_to_record_ms": {
+  "p50": 4088.9,
+  "p90": 39881.4,
+  "p99": 56761.9,
+  "max": 59513.9
+ },
+ "send_to_push_ms": {
+  "p50": 7740.1,
+  "p90": 29040.7,
+  "p99": 35035.7,
+  "max": 35499.4
+ },
+ "kernel_drops": 0,
+ "reported_socket_dropped": 0,
+ "receive": {
+  "read": 111645801,
+  "repeats": 164,
+  "copies": 0,
+  "verified": 88,
+  "unverified": 8026993,
+  "queued": 0,
+  "refused": {
+   "backlog": 103618556
+  }
+ },
+ "health_reasons_seen": [
+  "datagrams_refused"
+ ],
+ "admission": {
+  "verified": 34,
+  "duplicate": 164
+ },
+ "unverified": {
+  "bad_signature": 8026993
+ },
+ "ear_live_overflow": null,
+ "daemon_cpu_rss": {
+  "cpu_max": 157.9,
+  "rss_max_kb": 35412,
+  "cpu_mean": 144.0
+ },
+ "load_at_start": 2.41,
+ "duration_s": 570.0,
+ "drain_s": 15.0
+}

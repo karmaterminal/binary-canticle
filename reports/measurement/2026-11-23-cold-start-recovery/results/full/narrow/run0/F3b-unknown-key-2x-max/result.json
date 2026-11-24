@@ -1,0 +1,1134 @@
+{
+ "params": {
+  "payload": "64",
+  "prod_wake": false,
+  "ear_tune": "none",
+  "quiet_interval": 10,
+  "duration": 300.0,
+  "drain": 15.0,
+  "status_every": 5,
+  "sample_every": 0,
+  "name": "F3b-unknown-key-2x-max",
+  "prod_keys": 2,
+  "mode": "unknown-fixed",
+  "rate": 0,
+  "waited_for_load_s": 0
+ },
+ "lab": "/home/figs/.cache/canticle-measure-2/F3b-3403848-16894780",
+ "t_start_mono_ns": 2666412294132470,
+ "producers": [
+  {
+   "mode": "unknown-fixed",
+   "key_id": "7a4bfb88ebfaa73c",
+   "epoch": 1795533640,
+   "streams": 1,
+   "payload_body_bytes": 64,
+   "frame_bytes": 188,
+   "rate_asked": 0.0,
+   "sent": 134054837,
+   "send_errors": 0,
+   "elapsed_s": 300.0,
+   "rate_achieved": 446849.5,
+   "samples": 0,
+   "proc_index": 0,
+   "proc_count": 1,
+   "t0_mono_ns": 2666412294771854
+  },
+  {
+   "mode": "unknown-fixed",
+   "key_id": "7d86d98564bb999b",
+   "epoch": 1795533640,
+   "streams": 1,
+   "payload_body_bytes": 64,
+   "frame_bytes": 188,
+   "rate_asked": 0.0,
+   "sent": 133260130,
+   "send_errors": 0,
+   "elapsed_s": 300.0,
+   "rate_achieved": 444200.4,
+   "samples": 0,
+   "proc_index": 0,
+   "proc_count": 1,
+   "t0_mono_ns": 2666412294282937
+  }
+ ],
+ "offered": 267314967,
+ "offered_rate": 891049.9,
+ "frame_bytes": 188,
+ "kernel_drops": 177436443,
+ "snmp_delta": {
+  "InDatagrams": 89883780,
+  "InErrors": 177436443,
+  "OutDatagrams": 267318982,
+  "RcvbufErrors": 177436443,
+  "IgnoredMulti": 496
+ },
+ "daemon_health_last": {
+  "v": "canticle-receptor-record/1",
+  "type": "health",
+  "rec_seq": 443,
+  "run": "159b5110d27cd3ca904874b712548933",
+  "state": "ok",
+  "reasons": [],
+  "last_datagram_at": 1795533955107,
+  "counters": {
+   "admission": {
+    "verified": 30,
+    "duplicate": 80,
+    "capability_exceeded": 0,
+    "scope_violation": 0,
+    "hop_limit": 0,
+    "over_quota": 0,
+    "pluck_mismatch": 0,
+    "plucked": 0,
+    "superseded": 0,
+    "class_change": 0,
+    "equivocation": 0
+   },
+   "disposition": {
+    "surface": 30,
+    "ringbuffer_only": 0,
+    "drop": 0,
+    "quarantine_set": 0,
+    "no_op": 80
+   },
+   "retract": {
+    "plucked": 0,
+    "superseded": 0,
+    "expired": 26,
+    "revoked": 0,
+    "quarantined": 0,
+    "held_expired": 0,
+    "held_plucked": 0,
+    "held_superseded": 0
+   },
+   "beacon": {
+    "verified": 132,
+    "duplicate": 0,
+    "epoch_regression": 0
+   },
+   "unverified": {
+    "unknown_key": 88568908,
+    "bad_signature": 0,
+    "revoked": 0,
+    "expired": 0,
+    "not_yet_valid": 0,
+    "malformed": 0,
+    "crit_unknown": 0,
+    "version": 0
+   }
+  },
+  "unverified": {
+   "key_ids": [
+    {
+     "key_id": "7a4bfb88ebfaa73c",
+     "count": 44345307,
+     "error": 0
+    },
+    {
+     "key_id": "7d86d98564bb999b",
+     "count": 44223601,
+     "error": 0
+    }
+   ],
+   "other": 0
+  },
+  "dedup": {
+   "entries": 5,
+   "capacity": 100000
+  },
+  "beacon_age_ms": {
+   "5189b91a2a9c99b2": 592
+  },
+  "surfaced": 4,
+  "quarantined": [],
+  "records": {
+   "emitted": 442,
+   "dropped": 0,
+   "peers_closed": 0,
+   "socket_dropped": 177436443
+  },
+  "receive": {
+   "read": 89879104,
+   "repeats": 80,
+   "copies": 0,
+   "verified": 162,
+   "unverified": 88568908,
+   "queued": 0,
+   "refused": {
+    "backlog": 1309954
+   }
+  },
+  "snapshots": {
+   "requested": 2,
+   "served": 2,
+   "truncated": 0,
+   "deferred": 0,
+   "closed": 0,
+   "ignored": 0
+  },
+  "t_ns": 2666726914094800,
+  "conn": 1
+ },
+ "tap": {
+  "connections": 1,
+  "lines": 444,
+  "bytes": 504182,
+  "counts": {
+   "hello": 1,
+   "landing_state": 1,
+   "snapshot_end": 1,
+   "health": 320,
+   "presence": 65,
+   "frame": 30,
+   "retract": 26
+  },
+  "rec_seq_gaps": 0,
+  "rec_seq_gap_records": 0,
+  "rec_seq_regressions": 0
+ },
+ "tap_events": [
+  {
+   "t_ns": 2666407212526758,
+   "event": "connected",
+   "conn": 1
+  },
+  {
+   "t_ns": 2666407212943339,
+   "event": "hello",
+   "conn": 1,
+   "run": "159b5110d27cd3ca904874b712548933",
+   "pid": 3403852
+  },
+  {
+   "t_ns": 2666407213058956,
+   "event": "snapshot_end",
+   "conn": 1,
+   "watermark": 2,
+   "count": 0,
+   "truncated": false,
+   "omitted": 0
+  }
+ ],
+ "probe_frames_by_admission": {
+  "verified/surface": 30
+ },
+ "probe_verified_frames": 30,
+ "probe_verified_rate_in_window": 0.1,
+ "probe_verified_per_s": [
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0
+ ],
+ "latency_send_to_record_ms": {
+  "n": 0,
+  "p50": null,
+  "p90": null,
+  "p99": null,
+  "max": null
+ },
+ "pushes": {
+  "ear0": {
+   "pushes": 25,
+   "records": 29,
+   "records_per_push_max": 2,
+   "late_lines": 0,
+   "loss_lines": 3,
+   "other_events": 0
+  }
+ },
+ "latency_send_to_push_ms": {
+  "n": 0,
+  "p50": null,
+  "p99": null,
+  "max": null
+ },
+ "quiet_items": [
+  {
+   "n": 0,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:1",
+   "sung_at_s": 2.022,
+   "at_daemon_s": 2.065,
+   "pushed_at_s": {
+    "ear0": 7.885
+   }
+  },
+  {
+   "n": 1,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:2",
+   "sung_at_s": 12.022,
+   "at_daemon_s": 33.97,
+   "pushed_at_s": {
+    "ear0": 37.988
+   }
+  },
+  {
+   "n": 2,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:3",
+   "sung_at_s": 22.022,
+   "at_daemon_s": 24.068,
+   "pushed_at_s": {
+    "ear0": 29.947
+   }
+  },
+  {
+   "n": 3,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:4",
+   "sung_at_s": 32.023,
+   "at_daemon_s": 32.066,
+   "pushed_at_s": {
+    "ear0": 37.988
+   }
+  },
+  {
+   "n": 4,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:5",
+   "sung_at_s": 42.023,
+   "at_daemon_s": 42.067,
+   "pushed_at_s": {
+    "ear0": 48.032
+   }
+  },
+  {
+   "n": 5,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:6",
+   "sung_at_s": 52.023,
+   "at_daemon_s": 52.064,
+   "pushed_at_s": {
+    "ear0": 58.079
+   }
+  },
+  {
+   "n": 6,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:7",
+   "sung_at_s": 62.022,
+   "at_daemon_s": 99.28,
+   "pushed_at_s": null
+  },
+  {
+   "n": 7,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:8",
+   "sung_at_s": 72.022,
+   "at_daemon_s": 72.066,
+   "pushed_at_s": {
+    "ear0": 77.143
+   }
+  },
+  {
+   "n": 8,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:9",
+   "sung_at_s": 82.023,
+   "at_daemon_s": 83.064,
+   "pushed_at_s": {
+    "ear0": 88.187
+   }
+  },
+  {
+   "n": 9,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:10",
+   "sung_at_s": 92.022,
+   "at_daemon_s": 92.064,
+   "pushed_at_s": {
+    "ear0": 97.23
+   }
+  },
+  {
+   "n": 10,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:11",
+   "sung_at_s": 102.023,
+   "at_daemon_s": 103.07,
+   "pushed_at_s": {
+    "ear0": 108.276
+   }
+  },
+  {
+   "n": 11,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:12",
+   "sung_at_s": 112.022,
+   "at_daemon_s": 113.064,
+   "pushed_at_s": {
+    "ear0": 118.332
+   }
+  },
+  {
+   "n": 12,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:13",
+   "sung_at_s": 122.023,
+   "at_daemon_s": 123.06,
+   "pushed_at_s": {
+    "ear0": 128.381
+   }
+  },
+  {
+   "n": 13,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:14",
+   "sung_at_s": 132.023,
+   "at_daemon_s": 134.067,
+   "pushed_at_s": {
+    "ear0": 139.436
+   }
+  },
+  {
+   "n": 14,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:15",
+   "sung_at_s": 142.023,
+   "at_daemon_s": 144.068,
+   "pushed_at_s": {
+    "ear0": 149.487
+   }
+  },
+  {
+   "n": 15,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:16",
+   "sung_at_s": 152.022,
+   "at_daemon_s": 156.057,
+   "pushed_at_s": {
+    "ear0": 161.553
+   }
+  },
+  {
+   "n": 16,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:17",
+   "sung_at_s": 162.022,
+   "at_daemon_s": 174.358,
+   "pushed_at_s": {
+    "ear0": 178.581
+   }
+  },
+  {
+   "n": 17,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:18",
+   "sung_at_s": 172.022,
+   "at_daemon_s": 173.07,
+   "pushed_at_s": {
+    "ear0": 178.581
+   }
+  },
+  {
+   "n": 18,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:19",
+   "sung_at_s": 182.023,
+   "at_daemon_s": 186.067,
+   "pushed_at_s": {
+    "ear0": 191.608
+   }
+  },
+  {
+   "n": 19,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:20",
+   "sung_at_s": 192.022,
+   "at_daemon_s": 192.066,
+   "pushed_at_s": {
+    "ear0": 197.633
+   }
+  },
+  {
+   "n": 20,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:21",
+   "sung_at_s": 202.022,
+   "at_daemon_s": 203.065,
+   "pushed_at_s": {
+    "ear0": 208.662
+   }
+  },
+  {
+   "n": 21,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:22",
+   "sung_at_s": 212.022,
+   "at_daemon_s": 214.067,
+   "pushed_at_s": {
+    "ear0": 219.693
+   }
+  },
+  {
+   "n": 22,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:23",
+   "sung_at_s": 222.023,
+   "at_daemon_s": 236.444,
+   "pushed_at_s": {
+    "ear0": 237.732
+   }
+  },
+  {
+   "n": 23,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:24",
+   "sung_at_s": 232.023,
+   "at_daemon_s": 232.065,
+   "pushed_at_s": {
+    "ear0": 237.732
+   }
+  },
+  {
+   "n": 24,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:25",
+   "sung_at_s": 242.023,
+   "at_daemon_s": 242.065,
+   "pushed_at_s": {
+    "ear0": 247.765
+   }
+  },
+  {
+   "n": 25,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:26",
+   "sung_at_s": 252.022,
+   "at_daemon_s": 252.065,
+   "pushed_at_s": {
+    "ear0": 257.798
+   }
+  },
+  {
+   "n": 26,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:27",
+   "sung_at_s": 262.022,
+   "at_daemon_s": 263.069,
+   "pushed_at_s": {
+    "ear0": 268.835
+   }
+  },
+  {
+   "n": 27,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:28",
+   "sung_at_s": 272.022,
+   "at_daemon_s": 276.068,
+   "pushed_at_s": {
+    "ear0": 281.876
+   }
+  },
+  {
+   "n": 28,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:29",
+   "sung_at_s": 282.023,
+   "at_daemon_s": 294.538,
+   "pushed_at_s": {
+    "ear0": 298.926
+   }
+  },
+  {
+   "n": 29,
+   "idem": "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:30",
+   "sung_at_s": 292.022,
+   "at_daemon_s": 293.067,
+   "pushed_at_s": {
+    "ear0": 298.926
+   }
+  }
+ ],
+ "quiet": {
+  "sung": 30,
+  "sing_errors": 0,
+  "reached_daemon": 30,
+  "pushed_per_ear": {
+   "ear0": 29
+  },
+  "send_to_record_ms": [
+   41.377986,
+   41.618865,
+   42.098939,
+   42.460559,
+   42.663552,
+   42.909717,
+   43.313959,
+   43.471221,
+   43.642254,
+   44.419313,
+   1037.144662,
+   1041.753602,
+   1041.973241,
+   1043.116643,
+   1044.69886,
+   1046.26071,
+   1047.868821,
+   1047.949079,
+   2044.621742,
+   2044.73299,
+   2045.243982,
+   2045.996891,
+   4034.305347,
+   4044.19289,
+   4045.687372,
+   12335.402287,
+   12515.453284,
+   14420.840825,
+   21947.812716,
+   37257.949694
+  ],
+  "send_to_push_ms": {
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:1": {
+    "ear0": 5862.651477
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:3": {
+    "ear0": 7924.404478
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:2": {
+    "ear0": 25965.196859
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:4": {
+    "ear0": 5965.051305
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:5": {
+    "ear0": 6009.809773
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:6": {
+    "ear0": 6056.405765
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:8": {
+    "ear0": 5120.31399
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:9": {
+    "ear0": 6164.494288
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:10": {
+    "ear0": 5207.463188
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:11": {
+    "ear0": 6253.333033
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:12": {
+    "ear0": 6310.045386
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:13": {
+    "ear0": 6358.93534
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:14": {
+    "ear0": 7413.224363
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:15": {
+    "ear0": 7464.504388
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:16": {
+    "ear0": 9530.875525
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:17": {
+    "ear0": 16558.066219
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:18": {
+    "ear0": 6558.127202
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:19": {
+    "ear0": 9585.626005
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:20": {
+    "ear0": 5610.606207
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:21": {
+    "ear0": 6639.703927
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:22": {
+    "ear0": 7670.048254
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:23": {
+    "ear0": 15709.529253
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:24": {
+    "ear0": 5709.457086
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:25": {
+    "ear0": 5742.325243
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:26": {
+    "ear0": 5776.040082
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:27": {
+    "ear0": 6812.365918
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:28": {
+    "ear0": 9853.840103
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:29": {
+    "ear0": 16903.618124
+   },
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:30": {
+    "ear0": 6904.080884
+   }
+  },
+  "missing_at_daemon": [],
+  "missing_in_push": [
+   "canticle:5189b91a2a9c99b2:1795533640:f21e2af1:7"
+  ]
+ },
+ "frond_ear": {
+  "ear0": {
+   "receiveHealth": "ok",
+   "reasons": [],
+   "counts": {
+    "joined_late": 1
+   },
+   "joinSnapshot": "complete",
+   "canticleDelivery": {
+    "ceiling": "off",
+    "mode": "off",
+    "style": "records",
+    "stations": {
+     "quiet": {
+      "ceiling": "immediate",
+      "mode": "immediate"
+     }
+    },
+    "choices": [],
+    "wakeKeys": 1,
+    "windowMs": 60000,
+    "debounceMs": 5000,
+    "maxAgeMs": 30000,
+    "waiting": 0,
+    "nextPushAt": null,
+    "held": null,
+    "lastPushAt": 1795533939991,
+    "pushesLastHour": 25,
+    "maxPushesPerHour": 60,
+    "reports": 0,
+    "counts": {
+     "pushes": 25,
+     "records_pushed": 29,
+     "routed_late": 1,
+     "off_air_unpushed": 1
+    }
+   },
+   "canticleCustody": {
+    "windowMs": 3600000,
+    "history": "unknown",
+    "reasons": [
+     "no compaction boundary from this session's pressure hook yet (frond-ear pressure --hook --ear)",
+     "29 records offered, never echoed"
+    ],
+    "counts": {
+     "records": 29,
+     "echoed": 0,
+     "echoedBoundaryUnknown": 0,
+     "echoedBeforeBoundary": 0,
+     "offered": 29,
+     "claimed": 0
+    }
+   },
+   "attached": true
+  }
+ },
+ "processes": {
+  "canticle-daemon": {
+   "n": 641,
+   "cpu_max": 113.9,
+   "rss_max_kb": 35092,
+   "rss_first_kb": 34900,
+   "rss_last_kb": 35092,
+   "cpu_mean": 103.0
+  },
+  "frond-ear-ear0": {
+   "n": 641,
+   "cpu_max": 4.0,
+   "rss_max_kb": 106100,
+   "rss_first_kb": 102380,
+   "rss_last_kb": 101688,
+   "cpu_mean": 0.1
+  },
+  "session0": {
+   "n": 641,
+   "cpu_max": 2.0,
+   "rss_max_kb": 12404,
+   "rss_first_kb": 12404,
+   "rss_last_kb": 12404,
+   "cpu_mean": 0.0
+  },
+  "tap": {
+   "n": 641,
+   "cpu_max": 2.0,
+   "rss_max_kb": 11988,
+   "rss_first_kb": 11668,
+   "rss_last_kb": 0,
+   "cpu_mean": 0.0
+  },
+  "shim0": {
+   "n": 633,
+   "cpu_max": 2.0,
+   "rss_max_kb": 98016,
+   "rss_first_kb": 97856,
+   "rss_last_kb": 98016,
+   "cpu_mean": 0.0
+  },
+  "station-quiet": {
+   "n": 633,
+   "cpu_max": 10.0,
+   "rss_max_kb": 33444,
+   "rss_first_kb": 33444,
+   "rss_last_kb": 33444,
+   "cpu_mean": 0.1
+  },
+  "blast0": {
+   "n": 632,
+   "cpu_max": 101.9,
+   "rss_max_kb": 27112,
+   "rss_first_kb": 27112,
+   "rss_last_kb": 0,
+   "cpu_mean": 94.8
+  },
+  "blast1": {
+   "n": 632,
+   "cpu_max": 101.9,
+   "rss_max_kb": 27112,
+   "rss_first_kb": 27112,
+   "rss_last_kb": 0,
+   "cpu_mean": 94.8
+  },
+  "quietsinger": {
+   "n": 632,
+   "cpu_max": 2.0,
+   "rss_max_kb": 17500,
+   "rss_first_kb": 17500,
+   "rss_last_kb": 0,
+   "cpu_mean": 0.1
+  }
+ },
+ "stderr": {
+  "blast0.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "blast1.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "canticle-daemon.err": {
+   "lines": 3,
+   "tail": [
+    "{\"daemon\": {\"manifest\": \"/home/figs/.cache/canticle-measure-2/F3b-3403848-16894780/fleet.json\", \"bind\": \"127.0.0.1:39421\", \"multicast\": false, \"socket\": \"/home/figs/.cache/canticle-measure-2/F3b-3403848-16894780/run/canticle/daemon.sock\", \"state_dir\": \"/home/figs/.cache/canticle-measure-2/F3b-3403848-16894780/state/canticle-daemon\", \"allowed_uids\": [1000], \"stations\": null}}",
+    "{\"v\":\"canticle-receptor-record/1\",\"type\":\"hello\",\"rec_seq\":1,\"run\":\"159b5110d27cd3ca904874b712548933\",\"wire_version\":2,\"record_version\":\"canticle-receptor-record/1\",\"pid\":3403852,\"bind\":\"127.0.0.1:39421\",\"multicast\":null,\"transport\":\"lan\",\"manifest_sha256\":\"b2c1170d05d7ef98274c594d502eeab82f664d246f22cc9b299ff816e0927b43\",\"manifest_label\":\"canticle-fleet/spike-0\",\"state_version\":3,\"receptor_state_version\":1,\"rule_version\":\"canticle-station/0.1.0+bc2\",\"join_snapshot\":true}",
+    "{\"v\":\"canticle-receptor-record/1\",\"type\":\"bye\",\"rec_seq\":445,\"run\":\"159b5110d27cd3ca904874b712548933\"}"
+   ]
+  },
+  "frond-ear-ear0.err": {
+   "lines": 46,
+   "tail": [
+    "{\"time\":\"2026-11-24T15:25:57.126Z\",\"level\":\"info\",\"event\":\"ear.detached\",\"ear\":\"ear0\",\"reverted\":0}",
+    "{\"time\":\"2026-11-24T15:25:57.201Z\",\"level\":\"info\",\"event\":\"daemon.draining\",\"inFlight\":0}",
+    "{\"time\":\"2026-11-24T15:25:57.216Z\",\"level\":\"info\",\"event\":\"daemon.stopped\",\"code\":0,\"drained\":true}"
+   ]
+  },
+  "quietsinger.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "session0.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "session0.shim.err": {
+   "lines": 0,
+   "tail": []
+  },
+  "station-quiet.err": {
+   "lines": 2,
+   "tail": [
+    "{\"station\": \"5189b91a2a9c99b2\", \"epoch\": 1795533640, \"control\": \"/home/figs/.cache/canticle-measure-2/F3b-3403848-16894780/run/station-quiet.sock\", \"dests\": [\"127.0.0.1:39421\"], \"streams\": [\"quiet\"]}",
+    "control socket /home/figs/.cache/canticle-measure-2/F3b-3403848-16894780/run/station-quiet.sock"
+   ]
+  },
+  "tap.err": {
+   "lines": 0,
+   "tail": []
+  }
+ }
+}
