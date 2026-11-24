@@ -15,7 +15,7 @@ import sys
 import threading
 import time
 import unittest
-from collections import Counter
+from collections import Counter, deque
 from unittest import mock
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -1150,8 +1150,8 @@ class SlotTest(IntakeCase):
         self.assertEqual(self.intake.stats()["queued"] + sum(self.refused.values()), 4 + 6 * intake.SLOT_MAX)
 
     def test_a_source_whose_frame_failed_waits_behind_those_that_were_not_tried(self):
-        self.offer(forge(item(A, 1), 100), src=HERE)
-        self.assertEqual(self.serve(2, verified=lambda t: False)[-1], forge(item(A, 1), 100))
+        self.offer(bad := forge(item(A, 1), 100), src=HERE)
+        self.assertEqual(self.serve(2, verified=lambda t: False)[-1], bad)
         late, untried = item(A, 2), [item(A, 10 + n) for n in range(3)]
         self.offer(late, src=HERE)
         self.assertEqual((self.waits(), self.waits("demoted")), ([], [late]))
@@ -1257,9 +1257,20 @@ class SlotTest(IntakeCase):
         self.assertLessEqual(set(first.values()), set(served) | set(self.serve(32)))
 
     def test_what_the_queues_leave_of_a_turn_is_the_slots(self):
+        """Frames that no lane took wait in the slot only: 40 of them, and the queues are empty."""
+        self.offer(*[forge(item(A, 1), 100 + n) for n in range(2 * intake.STRANGER_POOL)], src=THERE)
         for n in range(40):
             self.offer(item(A, n + 1), src=addr(20 + n))
-        self.assertEqual((len(self.intake.take(32)), len(self.waits())), (4 + 40, 0))
+        key = self.key
+        with self.intake._lock:                                # every lane loses what it holds, as when its source is displaced
+            for s in key.streams.values():
+                for source in list(s.lanes):
+                    s.known, s.strange, s.pool = deque([*s.known, *s.strange]), deque(), 0
+                    key.lost(s.drop(source))
+                    key.ready.clear()
+            self.intake._ready.clear()
+        self.assertEqual(self.intake.stats()["queued"], 40)
+        self.assertEqual(len(self.intake.take(32)), 40)
 
     def test_no_queue_full_of_copies_keeps_the_slots_from_their_places(self):
         """The same forgery from every port: a turn looks at a bounded number of places, and the slots' come first."""
