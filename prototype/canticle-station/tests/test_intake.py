@@ -5,6 +5,7 @@ Two kinds of test. ``IntakeCase`` drives an ``Intake`` with no thread and no soc
 over loopback UDP. The floods are in ``test_fair_admission``.
 """
 
+import asyncio
 import errno
 import hashlib
 import json
@@ -21,7 +22,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from canticle import intake, listener, runner, wire
 from canticle.ids import stream_id
-from canticle.intake import BEACON, OTHER, Intake, peek_stream
+from canticle.intake import BEACON, OTHER, Intake, READ_BATCH, peek_stream
+from canticle.daemon import Daemon
 from canticle.manifest import Manifest, StationEntry
 from test_daemon import SK, DaemonCase, until
 
@@ -93,6 +95,65 @@ class IntakeCase(unittest.TestCase):
     @property
     def refused(self):
         return {k: v for k, v in self.intake.stats()["refused"].items() if v}
+
+
+class ReaderWakeTest(DaemonCase):
+    def test_thirty_seconds_of_flood_batches_leave_one_turn_ahead_of_a_newcomer(self):
+        """#177 RED: lifted check budgets must not expose a callback backlog that grows with flood age.
+
+        At 20k datagrams/s the reader can hand off at least this many full batches in 30 seconds.  Model each queued
+        intake turn as only 1 ms of event-loop work (less than the measured pass-3 cost), then put the newcomer's
+        client-publication marker behind them.  It must keep the predeclared one-second first-frame deadline.  The
+        wake is a level trigger for the ready set, so all of those handoffs need exactly one pending turn.
+        """
+        batches = (20_000 * 30 + READ_BATCH - 1) // READ_BATCH
+
+        async def run():
+            d = Daemon(self.cfg())
+            calls = 0
+
+            def drain_one_batch():
+                nonlocal calls
+                calls += 1
+                time.sleep(0.001)
+
+            d._hear_queued = drain_one_batch
+            loop = asyncio.get_running_loop()
+            started = time.monotonic()
+            for _ in range(batches):
+                d._wake_from_reader(loop)
+            published = asyncio.Event()
+            loop.call_soon(published.set)
+            await asyncio.wait_for(published.wait(), 5.0)
+            return time.monotonic() - started, calls
+
+        elapsed, calls = asyncio.run(run())
+        self.assertLessEqual(elapsed, 1.0)
+        self.assertEqual(calls, 1)
+
+    def test_a_wake_may_be_posted_again_after_the_pending_turn_starts(self):
+        async def run():
+            d = Daemon(self.cfg())
+            called = asyncio.Event()
+            d._hear_queued = called.set
+            loop = asyncio.get_running_loop()
+            d._wake_from_reader(loop)
+            await asyncio.wait_for(called.wait(), 1.0)
+            called.clear()
+            d._wake_from_reader(loop)
+            await asyncio.wait_for(called.wait(), 1.0)
+
+        asyncio.run(run())
+
+    def test_a_closed_loop_does_not_leave_the_wake_latched(self):
+        class Closed:
+            @staticmethod
+            def call_soon_threadsafe(fn, *args):
+                raise RuntimeError("closed")
+
+        d = Daemon(self.cfg())
+        d._wake_from_reader(Closed())
+        self.assertFalse(d._reader_wake_pending)
 
 
 class PeekTest(unittest.TestCase):
