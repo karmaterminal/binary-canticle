@@ -218,6 +218,31 @@ class OrderTest(IntakeCase):
         self.offer(quiet, src=HERE)
         self.assertIn(quiet, self.serve(4))                    # it has a place in the key's slot, beside its turn in the queue
 
+    def test_a_key_or_stream_that_is_passed_over_keeps_its_turn(self):
+        """Strangers' checks are spent, and an established station is served meanwhile: the first token there is again is for
+        whoever waited longest, not for whoever comes behind what was served."""
+        sks = [A, B, Ed25519PrivateKey.generate()]
+        self.intake = self.make(Manifest([StationEntry(f"s{n}", wire.public_key_bytes(sk), frozenset({1}), ("chatter",))
+                                          for n, sk in enumerate(sks)]))
+        self.offer(item(sks[2], 1), src=HERE)                  # established
+        self.serve()
+        strange = self.intake.strange
+        strange.tokens, strange.at = 0.0, self.now
+        first = forge(item(sks[0], 1))
+        self.offer(first, src=THERE)
+        waited = 0
+        for n in range(20):
+            self.offer(item(sks[2], 2 + n), src=HERE)
+            self.offer(forge(item(sks[1], 1), n), src=THERE)
+            self.serve(32, verified=lambda t: t.addr == HERE)  # the station's, and no stranger's
+            strange.tokens = 1.0
+            got = self.serve(32, verified=lambda t: t.addr == HERE)
+            strange.tokens = 0.0
+            if first in got:
+                break
+            waited += 1
+        self.assertEqual(waited, 0)
+
     def test_one_source_of_one_stream_is_served_in_order(self):
         frames = [item(A, n) for n in range(1, 6)]
         self.offer(*frames)
@@ -799,6 +824,7 @@ class NewcomerCase(IntakeCase):
         self.kids = [wire.key_id(wire.public_key_bytes(sk)) for sk in self.sks]
         self.frames = [(item(sk, 1), beacon(sk, 1)) for sk in self.sks]      # to forge from
         self.old = [[beacon(sk, 1_000 + n) for n in range(4)] for sk in self.sks]    # captured: they verify, and change nothing
+        self.noop = [[item(sk, 10**6 + n) for n in range(0)] for sk in self.sks]
         self.fresh()
 
     def fresh(self):
@@ -818,6 +844,10 @@ class NewcomerCase(IntakeCase):
         kind = self.n // len(keys) // self.PORTS % 2
         if churn == "replay" and self.n // len(keys) // self.PORTS % 2:
             return self.old[k][self.n % 4], udp(40_000 + self.n // len(keys) % self.PORTS)
+        if churn == "noop":                     # captured items that verify, and change nothing
+            return self.noop[k][self.n // len(keys) % self.PORTS], udp(40_000 + self.n // len(keys) % self.PORTS)
+        if churn == "junk" and self.n % 2:
+            return b"junk %d" % self.n, udp(39_000)
         if churn == "hold" and self.n // len(keys) % 4 == 0:
             m = self.n // len(keys) // 4 % len(self.old[k])
             return self.old[k][m], udp(39_000 + m)
@@ -863,7 +893,8 @@ class NewcomerCase(IntakeCase):
             if t.key is not None:
                 self.checked[t.data[4:12], ok] += 1
                 self.slots[t.data[4:12]] += t.budget is getattr(self.intake, "slice", None)
-            self.intake.settle(t, ok or t.data in self.old[self.kids.index(t.data[4:12])], ok)
+            k = self.kids.index(t.data[4:12]) if t.key is not None else None
+            self.intake.settle(t, ok or k is not None and (t.data in self.old[k] or t.data in self.noop[k]), ok)
         self.flight, self.due = [], self.now if self.intake.waiting() else float("inf")
 
     def shares_a_lane(self, k, src) -> bool:
@@ -969,6 +1000,33 @@ class NewcomerTest(NewcomerCase):
                 waits = self.play(3.5, keys=(0,), churn="replay",
                                   copies=[(0.041 * n, item(self.sks[0], n + 1), udp(50_001 + n)) for n in range(80)])
                 self.assertChecked(waits, self.within(1, 16), f"{sources} sources that stay and replay")
+
+    def test_replayed_records_keep_no_newcomer_waiting(self):
+        """Items that verify, change nothing and make a record cost ten turns each: the turns of those that were tried."""
+        for sources in (63, 200):
+            with self.subTest(sources=sources):
+                self.PORTS = sources
+                self.stations(1)
+                self.noop = [[item(sk, 10**6 + n) for n in range(sources)] for sk in self.sks]
+                self.play(4.0, keys=(0,), churn="noop")
+                waits = self.play(3.5, keys=(0,), churn="noop",
+                                  copies=[(0.041 * n, item(self.sks[0], n + 1), udp(50_001 + n)) for n in range(80)])
+                self.assertChecked(waits, self.within(1, 16), f"{sources} sources that stay and replay items")
+
+    def test_junk_and_established_stations_take_no_turn_of_a_newcomers(self):
+        """64 keys, 59 of them forged at, half the flood no frames at all, four stations established and singing: a newcomer of a
+        key that nobody forges waits for a round of the keys, whatever is served between."""
+        self.stations(64)
+        for k in range(4):
+            self.offer(item(self.sks[k], 1), src=udp(60_000 + k))
+            self.serve(64)
+        flood = range(4, 60)
+        self.play(1.0, keys=flood, churn="junk")
+        new = [(0.029 * n, item(self.sks[60 + n % 4], 1 + n), udp(50_001 + n)) for n in range(100)]
+        sung = [(0.14 * n + 0.01 * k, item(self.sks[k], 2 + n), udp(60_000 + k)) for n in range(21) for k in range(4)]
+        self.play(3.2, keys=flood, churn="junk", copies=[*new, *sung])
+        for what, copies in (("newcomers", new), ("established", sung)):
+            self.assertChecked([self.waits[f] for _, f, _ in copies], self.within(64), what)
 
     def test_sources_that_only_replay_hold_no_untried_place_for_good(self):
         """64 sources with an old beacon each, and 100 that forge, all of them staying: within what a key can hold demoted. Were
@@ -1355,20 +1413,46 @@ class SlotTest(IntakeCase):
         self.now += 1.501 / intake.SLICE_RATE
         self.assertEqual(self.serve(32), [f])
 
-    def test_a_record_that_changes_nothing_costs_turns_of_its_own_key_only(self):
-        """A verified ITEM that is not new makes a record, so from a queue it costs its sender ten checks. From a slot its key
-        waits for nine more, and another key's slot doesn't."""
+    def test_a_record_that_changes_nothing_costs_turns_of_its_keys_demoted_sources_only(self):
+        """A verified ITEM that is not new makes a record, so from a queue it costs its sender ten checks. From a slot, what its
+        key's tried sources have waiting waits for nine more turns: neither an untried one nor another key does."""
         self.offer(*[forge(item(B, 1), n) for n in range(4)], src=THERE)
         self.offer(item(A, 1), src=HERE)
         (t,) = [t for t in self.intake.take(2) if t.budget is self.intake.slice]
         self.intake.settle(t, True, False)
-        a, b = item(A, 2), item(B, 2)
-        self.offer(a, src=addr(31))
+        a, b, new = item(A, 2), item(B, 2), item(A, 3)
+        self.offer(*[forge(item(A, 1), 50 + n) for n in range(4)], src=THERE)
+        self.offer(a, src=HERE)                                # the same source again
         self.offer(b, src=addr(32))
+        self.offer(new, src=addr(33))
         self.intake.checks.tokens, self.intake.checks.at = -1e9, self.now     # so that the queues serve nothing
-        self.assertEqual((self.serve(32), self.waits()), ([b], [a]))
+        self.assertEqual((set(self.serve(32)), self.waits("demoted")), ({b, new}, [a]))
         self.now += intake.SLICE_PAUSE_S
         self.assertEqual(self.serve(32), [a])
+
+    def test_whoever_sends_the_bytes_that_fail_has_been_tried(self):
+        bad = forge(item(A, 1), 70)
+        for n in range(3):
+            self.offer(bad, src=addr(40 + n))
+        self.assertEqual(self.serve(32, verified=lambda t: False).count(bad), 1)
+        self.assertEqual([addr(40 + n) in self.key.demotions for n in range(3)], [True] * 3)
+
+    def test_the_same_bytes_again_in_a_lane_while_they_wait_in_the_slot_are_a_copy(self):
+        """Its lane lost the first, its source has become known since, and sends it again."""
+        f = item(A, 1)
+        self.offer(f, src=HERE)
+        stream = self.key.streams[stream_id("chatter")]
+        with self.intake._lock:
+            for lane in list(stream.strange):
+                if lane.source is self.key.strangers[HERE]:
+                    stream.remove(lane.source, f_entry := lane.queue[0])
+                    self.key.lost([f_entry])
+            self.key.know(HERE)
+        self.offer(f, src=HERE)
+        self.intake.slice.tokens, self.intake.slice.at = -100.0, self.now
+        self.assertEqual(self.serve(32, verified=lambda t: t.data == f).count(f), 1)
+        s = self.intake.stats()
+        self.assertEqual(s["read"], s["repeats"] + s["copies"] + s["verified"] + s["unverified"] + sum(s["refused"].values()) + s["queued"])
 
     def test_every_one_of_them_costs_turns_however_many_come_in_a_turn(self):
         for n in range(3):
@@ -1808,6 +1892,7 @@ class ConsistencyTest(IntakeCase):
                 for ring, known in ((s.known, True), (s.strange, False)):
                     self.assertTrue(all(lane.queue and lane.source.known is known for lane in ring))
                     self.assertTrue(all(sorted(lane.digests) == sorted(e[1] for e in lane.queue) for lane in ring))
+                self.assertEqual(getattr(s, "bytes", None), Counter(e[1] for lane in s.lanes.values() for e in lane.queue))
                 for source, lane in s.lanes.items():
                     self.assertIs(lane.source, source)
                     queued[source] += len(lane.queue)
@@ -1855,6 +1940,9 @@ class ConsistencyTest(IntakeCase):
                 def turn(limit, verdict):
                     batch = self.intake.take(limit)
                     self.check(len(batch))
+                    if r.random() < 0.3:                                 # the reader goes on while they are being verified
+                        offer()
+                        self.check(len(batch))
                     for t in batch:
                         verified, fresh = verdict(t)
                         if fresh and r.random() < 0.8:
@@ -1871,20 +1959,24 @@ class ConsistencyTest(IntakeCase):
                     for b in (*station, self.intake.checks, self.intake.strange, self.intake.slice):
                         self.assertEqual(1e6 - b.tokens, spent[b])
 
+                def offer():
+                    self.intake.offer([(r.choice(r.choice((good, bad, junk))), addr(r.randrange(8), r.randrange(6)))
+                                       for _ in range(r.randrange(1, 40))])
+
                 for _ in range(250):
                     self.now += r.choice((0, 0.001, 0.02, 0.2, 3))
                     if r.random() < 0.1:
                         self.intake.lapse()
                         self.check()
                     if r.random() < 0.6:
-                        self.intake.offer([(r.choice(r.choice((good, bad, junk))), addr(r.randrange(8), r.randrange(6)))
-                                           for _ in range(r.randrange(1, 40))])
+                        offer()
                         self.check()
                     else:
                         turn(r.choice((1, 4, 32)),
                              lambda t: (v := t.data in good, v and r.random() < 0.7))
                 self.now += 1                                        # a key's turns of the slice may be due later
                 for _ in range(1_000):
+                    r.random = lambda: 1.0                               # nothing more comes
                     turn(32, lambda t: (False, False))
                 self.assertEqual((self.intake.stats()["queued"], self.intake.waiting()), (0, False))
 
