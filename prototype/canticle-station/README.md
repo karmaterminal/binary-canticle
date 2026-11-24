@@ -541,7 +541,9 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
   places each one: in a bounded queue, among the repeats, or among the refused. It holds no state a sender can
   grow: a queue exists only for a key and a stream the manifest lists. Everything else shares: a listed key's
   other streams one queue, and all datagrams that name no listed key (or are not frames) one queue of 64,
-  examined at 500 a second.
+  examined at 500 a second. Its notification is a level trigger: at most one reader wake waits in the event loop,
+  and that turn keeps scheduling itself while the ready set is non-empty. Reader batches therefore cannot build a
+  second event-loop backlog ahead of client publication (#177).
 - **An exact repeat is dropped before verify.** A datagram whose SHA-256 is that of a frame already verified and
   accepted in this run is counted (`receive.repeats`, and `duplicate` as before) and dropped: no verify, no save, no
   debit. It still refreshes its stream's presence and the on-air item's count, as a repeat heard does. The digest is

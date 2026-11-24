@@ -51,6 +51,7 @@ import os
 import socket
 import stat
 import sys
+import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -230,6 +231,12 @@ class Daemon:
         self.udp: Optional[socket.socket] = None
         self.intake: Optional[Intake] = None
         self._hear_at: Optional[asyncio.Handle] = None   # when the queued datagrams are heard next
+        # The reader may empty and reopen a lane several thousand times while the event loop is busy.  One wake is
+        # enough to start draining the whole ready set: posting one callback for every reopen lets those callbacks
+        # themselves become the backlog (#177).  This flag crosses the reader/event-loop boundary under its own lock;
+        # the event-loop callback clears it before it drains, so a genuinely new ready set can wake the loop again.
+        self._reader_wake_lock = threading.Lock()
+        self._reader_wake_pending = False
         self.server: Optional[asyncio.base_events.Server] = None
         self._lease = None
         self._stop: Optional[asyncio.Event] = None
@@ -437,7 +444,7 @@ class Daemon:
     def _make_intake(self, loop) -> Intake:
         try:
             return Intake(self.udp, self.receptor.lst.manifest, now_ms=runner.now_ms, rcvbuf=self.cfg.rcvbuf,
-                          wake=lambda: self._from_reader(loop, self._hear_queued),
+                          wake=lambda: self._wake_from_reader(loop),
                           failed=lambda e: self._from_reader(loop, self._fail, "internal", type(e).__name__))
         except OSError as e:
             raise StartError("bind_failed", f"{self.cfg.bind}: {e.strerror or e}") from None
@@ -537,6 +544,30 @@ class Daemon:
             loop.call_soon_threadsafe(fn, *args)
         except RuntimeError:
             pass    # the loop has closed: the run is over
+
+    def _wake_from_reader(self, loop) -> None:
+        """Post at most one reader wake until the event loop takes it.
+
+        ``Intake`` already wakes only when a queue changes from empty to ready.  Under a flood the event loop can
+        empty that queue between reader batches, though, and each reopen used to append another
+        ``call_soon_threadsafe`` turn.  Those turns ran ahead of the socket clients and made publication latency grow
+        with the flood's age.  A single pending turn is sufficient: ``_hear_queued`` keeps scheduling itself while
+        anything remains ready.
+        """
+        with self._reader_wake_lock:
+            if self._reader_wake_pending:
+                return
+            self._reader_wake_pending = True
+        try:
+            loop.call_soon_threadsafe(self._reader_wake)
+        except RuntimeError:
+            with self._reader_wake_lock:
+                self._reader_wake_pending = False
+
+    def _reader_wake(self) -> None:
+        with self._reader_wake_lock:
+            self._reader_wake_pending = False
+        self._hear_queued()
 
     def _hear_queued(self) -> None:
         """Hear one batch of what the intake has waiting, in its order, as one durable save. The loop gets its turn
