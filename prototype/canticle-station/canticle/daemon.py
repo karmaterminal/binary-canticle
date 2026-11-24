@@ -590,7 +590,7 @@ class Daemon:
         heard = self.receptor.hear_all([(t.data, t.at) for t in batch], runner.now_ms())
         for t, h in zip(batch, heard):           # the save that covers them has landed
             if h.kept and t.digest is not None:
-                self.intake.remember(t, h.ident, h.until)
+                self.intake.remember(t, h.ident, h.until, h.fresh)
             self.intake.settle(t, h.verified, h.fresh)
 
     def _call(self, fn, *args) -> None:

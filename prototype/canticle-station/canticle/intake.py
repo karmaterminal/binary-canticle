@@ -456,13 +456,14 @@ class Ticket:
     """A datagram whose turn has come. It holds one token of each bucket it might pay from until ``settle``; one out of a slot
     holds one of the slice's, and none of its station's: they are asked for when it has verified."""
 
-    __slots__ = ("data", "digest", "addr", "at", "budget", "key", "stream")
+    __slots__ = ("data", "digest", "addr", "at", "budget", "key", "stream", "copies", "dropped")
 
     def __init__(self, data: bytes, digest: Optional[bytes], addr, at: int, source: Optional[Source],
                  key: Optional[KeyQueue], stream: Optional[StreamQueue]):
         self.data, self.digest, self.addr, self.at = data, digest, addr, at    # at: when it arrived
         self.budget = source.budget if source is not None else None
         self.key, self.stream = key, stream
+        self.copies, self.dropped = [], False      # where copies of it came from that share its verdict; that it is one itself
 
 
 class Repeat:
@@ -470,9 +471,9 @@ class Repeat:
 
     __slots__ = ("ident", "until", "at", "copies", "last_ms")
 
-    def __init__(self, ident: tuple, until: int):
+    def __init__(self, ident: tuple, until: int, at: float):
         self.ident, self.until = ident, until      # ident: an item's or PLUCK's tuple, a beacon's (key id, epoch)
-        self.at = time.monotonic()                 # when it was first verified
+        self.at = at                               # when it was first verified, and 0 when it was not new then
         self.copies = self.last_ms = 0             # since the event loop last asked, and when the last one came
 
 
@@ -743,8 +744,8 @@ class Intake:
             self.copied += 1
             return False
         ring = slot.demoted if demoted else slot.untried
-        if len(ring) >= SLOT_MAX:
-            return None
+        if len(ring) >= SLOT_MAX or any(entry[1] in lane.digests for lane in stream.lanes.values()):
+            return None                            # no room, or an echo of what waits already, which must not go round it
         if not slot:
             self._slots.append(key)
         ring[addr] = entry, stream, source
@@ -767,11 +768,12 @@ class Intake:
         """Up to ``limit`` tickets of the queues in fair order, each holding its budgets, then up to half as many of the slots, or
         as many as the queues left room for. The slots are asked first, so that what the queues hold of a station's buckets
         in this turn doesn't keep them waiting. The same bytes never appear twice: a copy of a frame accepted since it was
-        queued is a repeat, and one of a ticket already in the list shares its verdict. At most TURN times as many places are
+        queued is a repeat, and one of a ticket already in the list shares its verdict (a known source's stands for a slot's
+        of the same bytes: an echo of a station's frame never goes round it). At most TURN times as many places are
         looked at, so a turn never holds the lock for long, and whatever the queues are full of, the slots get their part."""
         slots: list = []
         out: list = []
-        seen: set = set()
+        seen: dict = {}                            # digest -> its ticket
         now_ms, now = self.now_ms(), time.monotonic()
         half = limit // 2
         self.took = 0
@@ -779,9 +781,9 @@ class Intake:
             for pick, got, most, looks in ((self._pick_slot, slots, half, half * TURN), (self._pick, out, limit, (limit + half) * TURN),
                                            (self._pick_slot, slots, limit + half, (limit + half) * TURN)):
                 self._draw(pick, got, most - len(out) * (got is slots), looks, seen, now_ms, now)
-        return out + slots
+        return out + [t for t in slots if not t.dropped]
 
-    def _draw(self, pick: Callable, out: list, most: int, looks: int, seen: set, now_ms: int, now: float) -> None:
+    def _draw(self, pick: Callable, out: list, most: int, looks: int, seen: dict, now_ms: int, now: float) -> None:
         """Fill ``out`` up to ``most``, having looked at ``looks`` places at most in this turn."""
         while len(out) < most and self.took < looks:
             t = pick(now)
@@ -793,13 +795,20 @@ class Intake:
                 self._copy(rep, now_ms)
                 t.key.renew(t.addr, rep.at)
                 self._release(t)
-            elif t.digest in seen:
+                continue
+            twin = seen.get(t.digest)
+            if twin is not None:
                 self.copied += 1
-                self._release(t)
-            else:
-                if t.digest is not None:
-                    seen.add(t.digest)
-                out.append(t)
+                if twin.budget is not self.slice or t.addr not in t.key.known:
+                    twin.copies.append(t.addr)
+                    self._release(t)
+                    continue
+                t.copies = [*twin.copies, twin.addr]
+                self._release(twin)
+                twin.dropped = True
+            if t.digest is not None:
+                seen[t.digest] = t
+            out.append(t)
 
     def _pick(self, now: float) -> Optional[Ticket]:
         for _ in range(len(self._ready)):
@@ -833,7 +842,6 @@ class Intake:
             entry, stream, source = got
             source.queued -= 1
             self.slice.take()
-            self.reserved += 1
             return Ticket(*entry, self._slice, key, stream)
         return None
 
@@ -865,22 +873,26 @@ class Intake:
         an ITEM or PLUCK that changes nothing costs more, for the record it makes (§14.18.3)."""
         with self._lock:
             self._release(t, fresh)
+            now = time.monotonic()
+            self.reserved += t.budget is self.slice
             if verified and not fresh and not t.stream.beacon:
-                if t.budget is self.slice:         # turns of its own key, never another's
-                    t.key.slot.due = time.monotonic() + SLICE_PAUSE_S
-                else:
+                if t.budget is not self.slice:
                     t.budget.take(NO_OP_COST - 1)
+                elif t.digest not in self.repeats:     # turns of its own key, never another's; what is kept was that only once
+                    t.key.slot.due = now + SLICE_PAUSE_S
             if t.key is not None:
                 if verified:
                     t.key.clear(t.addr)
                 elif t.addr not in t.key.known:
-                    t.key.demote(t.addr, time.monotonic())
+                    t.key.demote(t.addr, now)
             if not verified:
                 self.unverified += 1
                 return
             self.verified += 1
             if fresh and t.key is not None:
                 self.refused["backlog"] += t.key.know(t.addr)
+                for addr in t.copies:
+                    t.key.renew(addr, now)
                 self._unready(t.key)
 
     def _unready(self, key: KeyQueue) -> None:
@@ -896,11 +908,11 @@ class Intake:
                 self.refused["backlog"] += key.lapse(now)
                 self._unready(key)
 
-    def remember(self, t: Ticket, ident: tuple, until: int) -> None:
+    def remember(self, t: Ticket, ident: tuple, until: int, fresh: bool = True) -> None:
         """From now until ``until``, a copy of this verified, accepted and durably saved frame is a repeat. There is
         one entry per live dedup entry (``until`` is inside its retention), so the listener's per-key quotas bound
         them and no key can push out another's, plus the latest BEACON_REPEATS beacons of each key."""
-        self.repeats[t.digest] = Repeat(ident, until)
+        self.repeats[t.digest] = Repeat(ident, until, time.monotonic() if fresh else 0.0)
         if t.stream is not None and t.stream.beacon:
             kept = self._beacons[t.data[4:12]]
             kept.append(t.digest)

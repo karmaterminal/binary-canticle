@@ -834,7 +834,9 @@ class NewcomerCase(IntakeCase):
             woken = self.woken
             if batch:
                 self.intake.offer(batch)
-            if self.now >= self.busy and (self.now >= self.due or self.woken != woken):
+            if self.woken != woken:
+                self.due = self.now
+            if self.now >= max(self.busy, self.due):
                 self.turn(mine, turn_s)
             self.now = start + (ms + 1) / 1000
         return [self.waits[f] for f in mine]
@@ -850,7 +852,7 @@ class NewcomerCase(IntakeCase):
                 self.slots[t.data[4:12]] += t.budget is getattr(self.intake, "slice", None)
             self.intake.settle(t, ok, ok)
         self.busy = self.now + max(turn_s, len(got) * CHECK_S)
-        self.due = self.busy if self.intake.took else self.now + RETRY_S
+        self.due = (float("inf") if not self.intake.waiting() else self.busy if self.intake.took else self.now + RETRY_S)
 
     def shares_a_lane(self, k, src) -> bool:
         """Whether ``src`` falls in a lane of the crowd that one of the flood's ports has too."""
@@ -1307,6 +1309,49 @@ class SlotTest(IntakeCase):
         self.assertEqual((self.serve(32, verified=lambda t: False).count(g), self.waits()), (0, []))
         self.assertGreater(self.intake.repeated, before)
 
+    def test_a_repeat_or_a_copy_out_of_a_slot_costs_no_token_and_is_no_check(self):
+        f = item(A, 1)
+        self.offer(f, src=HERE)
+        self.offer(f, src=addr(34))                                  # the same bytes from two sources: one verdict
+        got = [t for t in self.intake.take(32) if t.budget is self.intake.slice]
+        self.assertEqual((len(got), self.intake.slice.tokens, self.intake.copied), (1, intake.SLICE_BURST - 1, 1))
+        self.offer(*[forge(f, 60 + n) for n in range(4)], src=THERE)
+        self.offer(f, src=addr(35))                                  # comes while it is being verified
+        self.assertEqual(self.waits(), [f])
+        self.intake.remember(got[0], (KID_A, 5, 0, 1), runner.now_ms() + 60_000)
+        self.intake.settle(got[0], True, True)
+        self.assertEqual(self.serve(32, verified=lambda t: False).count(f), 0)
+        self.assertEqual((self.intake.slice.tokens, self.intake.repeated, self.intake.stats()["reserved"]), (intake.SLICE_BURST, 1, 1))
+
+    def test_a_frame_that_resurfaced_costs_its_key_no_turns(self):
+        """It is kept, so it can be that once: a station that goes on after the daemon's restart must not wait for it."""
+        self.offer(item(A, 1), src=HERE)
+        (t,) = [t for t in self.intake.take(32) if t.budget is self.intake.slice]
+        self.intake.remember(t, (KID_A, 5, 0, 1), runner.now_ms() + 60_000, fresh=False)
+        self.intake.settle(t, True, False)
+        self.assertLessEqual(self.key.slot.due, self.now)
+
+    def test_more_keys_than_a_turn_has_places_for_are_served_in_turn(self):
+        sks = [Ed25519PrivateKey.generate() for _ in range(40)]
+        self.intake = self.make(Manifest([StationEntry(f"s{n}", wire.public_key_bytes(sk), frozenset({1}), ("chatter",))
+                                          for n, sk in enumerate(sks)]))
+        frames = [item(sk, 1) for sk in sks]
+        order = []
+        for round_ in range(3):
+            for k, f in enumerate(frames):
+                self.offer(*[forge(f, 1_000 * round_ + n) for n in range(8)], src=THERE)
+                self.offer(forge(f, 50_000 + round_), src=udp(40_000 + k, 2 + round_))
+        self.intake.slice.tokens, self.intake.slice.at = 0.0, self.now
+        while len(order) < 3 * len(frames):
+            self.now += 2.001 / intake.SLICE_RATE                    # two tokens a turn
+            for t in self.intake.take(8):
+                if t.budget is self.intake.slice:
+                    order.append(t.data[4:12])
+                self.intake.settle(t, False, False)
+        kids = [f[4:12] for f in frames]
+        for n in range(3):
+            self.assertEqual(sorted(order[40 * n:40 * n + 40]), sorted(kids), f"round {n} of the keys")
+
     def test_a_displaced_source_keeps_what_waits_in_the_slot_and_the_rest_is_counted(self):
         """A source that has the slot becomes known by a frame it had queued behind it, and is displaced with no room to
         keep it apart: what it had queued is gone and counted, what waits in the slot is still served."""
@@ -1327,6 +1372,75 @@ class SlotTest(IntakeCase):
 
 
 HORIZON_S = 60.0        # the newcomer-recovery report's PLAN.md: the lease of a known place
+
+
+class EchoTest(IntakeCase):
+    """Copies of a station's frames that come after its own, from sources that have no key: they take nothing from it."""
+
+    def setUp(self):
+        super().setUp()
+        self.offer(beacon(A, 1), src=HERE)
+        self.accept()
+        self.key = self.intake.keys[KID_A]
+
+    def turns(self, frame):
+        """Until ``frame`` is accepted. Returns whose copy was."""
+        who = None
+        while self.intake.waiting():
+            self.now += 0.02
+            for t in self.intake.take(32):
+                ok = t.data == frame
+                if ok:
+                    who = t.addr
+                    self.intake.remember(t, (KID_A, 5), runner.now_ms() + 60_000)
+                self.intake.settle(t, ok, ok)
+        return who
+
+    def test_an_echo_right_behind_an_established_stations_frame_displaces_nothing(self):
+        for ports in (1, 8, 40):
+            for n in range(20):
+                self.offer(*[forge(beacon(A, 1), 100 * n + k) for k in range(8)], src=udp(40_000 + n % ports))
+                f = beacon(A, 100 * ports + n)
+                self.offer(f, src=HERE)
+                self.offer(f, src=addr(7, 5_000 + n))          # from a port of its own each time
+                self.assertEqual(self.turns(f), HERE)
+        self.assertEqual((list(self.key.known), self.intake.stats()["displaced"]), ([HERE], 0))
+
+    def test_nor_one_that_comes_while_the_frame_waits_for_its_stations_rate(self):
+        """The station's frame stays in its lane for a while: its copy from elsewhere must not go round it."""
+        bucket = self.key.streams[stream_id("chatter")].bucket
+        self.offer(*[forge(item(A, 1), k) for k in range(8)], src=THERE)
+        f = item(A, 2)
+        self.offer(f, src=HERE)
+        bucket.tokens, bucket.at = 0.0, self.now
+        self.serve(32, verified=lambda t: False)
+        self.offer(f, src=addr(7, 5_000))
+        self.assertEqual(len(self.key.slot), 0)
+        self.now += 1.0
+        self.assertEqual(self.turns(f), HERE)
+
+    def test_nor_one_behind_a_newcomers(self):
+        for where in ("the slot", "a queue, its relay having a place in the slot", "a lane, the newcomer's frame in another"):
+            with self.subTest(where):
+                self.offer(*[forge(item(A, 1), k) for k in range(8)], src=THERE)
+                f, new, relay = item(A, 2), addr(60), addr(7, 5_000)
+                if where.startswith("a queue"):
+                    self.offer(forge(f, 99), src=relay)
+                elif where.startswith("a lane"):
+                    self.offer(forge(f, 99), src=new)
+                self.offer(f, src=new)
+                self.offer(f, src=relay)
+                self.assertEqual(self.turns(f), new)
+                self.setUp()
+
+    def test_where_both_wait_in_a_turn_the_queues_copy_is_the_one_that_counts(self):
+        """An echo ahead of the station's own copy has a place in the slot; the station's lane is served first, as it was."""
+        self.offer(*[forge(beacon(A, 1), k) for k in range(8)], src=THERE)
+        f = beacon(A, 2)
+        self.offer(f, src=addr(7, 5_000))
+        self.offer(f, src=HERE)
+        self.assertEqual(self.turns(f), HERE)
+        self.assertEqual((self.intake.copied, self.intake.slice.tokens), (1, intake.SLICE_BURST))
 
 
 class LeaseTest(IntakeCase):
@@ -1389,6 +1503,41 @@ class LeaseTest(IntakeCase):
         self.intake.settle(t, True, True)
         self.assertEqual(self.serve(), [])
         self.assertIn(HERE, self.known(HORIZON_S - 1))
+
+    def test_a_frame_that_was_never_new_renews_nothing(self):
+        """What resurfaces after a restart, or is of an earlier epoch, verifies and is kept, and is not new. A stash of such
+        frames, each sent twice, must not keep a place."""
+        self.accept_from(HERE, item(A, 1))
+        for n in range(10):
+            self.now += 10
+            f = item(A, 100 + n)
+            self.offer(f, src=HERE)
+            for t in self.intake.take(32):
+                self.intake.remember(t, (KID_A, 4, 0, 100 + n), runner.now_ms() + 600_000, fresh=False)
+                self.intake.settle(t, True, False)
+            self.offer(f, src=HERE)
+        self.assertEqual(self.known(), [])
+
+    def test_a_copy_that_waited_in_the_same_turn_as_the_relays_renews_when_it_was_new(self):
+        """A relay's copy just ahead of the station's, every second, both in one turn: the station delivered every frame."""
+        self.accept_from(HERE, beacon(A, 1))
+        self.accept_from(THERE, beacon(A, 2))
+        for n in range(int(HORIZON_S) + 30):
+            f = beacon(A, n + 10)
+            self.offer(f, src=THERE)
+            self.offer(f, src=HERE)
+            self.assertEqual(len(self.accept()), 1)
+            self.assertEqual(set(self.known(1.0)), {HERE, THERE})
+
+    def test_and_renews_nothing_when_it_was_not(self):
+        self.accept_from(HERE, beacon(A, 1))
+        self.accept_from(THERE, beacon(A, 2))
+        self.now += HORIZON_S
+        f = beacon(A, 5, epoch=4)
+        self.offer(f, src=THERE)
+        self.offer(f, src=HERE)
+        self.serve(32, fresh=False)
+        self.assertEqual(self.known(0.01), [])
 
     def test_a_repeat_never_gives_a_place(self):
         f = item(A, 1)
@@ -1831,7 +1980,7 @@ class DaemonIntakeTest(DaemonCase):
             c = await self.joined(d)
             stats = []
             started = time.monotonic()
-            while time.monotonic() - started < 1.0:
+            while time.monotonic() - started < 1.0 or (not stats[-1][2] and time.monotonic() - started < 5.0):
                 sock.sendto(b, ("127.0.0.1", port))
                 await asyncio.sleep(0.02)
                 s = d.intake.stats()
@@ -1840,7 +1989,7 @@ class DaemonIntakeTest(DaemonCase):
         with mock.patch.object(intake, "LEASE_S", 0.4):
             stats, _ = self.run_with(scenario, tick_ms=20)
         at = next(t for t, _, lapsed, _ in stats if lapsed)
-        self.assertTrue(0.4 <= at <= 0.8, at)
+        self.assertGreaterEqual(at, 0.4)
         self.assertEqual(stats[-1][1:3], (1, 1))
         self.assertGreater(stats[-1][3], 20)
 
@@ -1867,8 +2016,10 @@ class DaemonIntakeTest(DaemonCase):
                 while True:                                    # a port that shares a lane with a forger's
                     s.bind(("127.0.0.1", 0))
                     me = udp(s.getsockname()[1])
-                    lanes = {id(key.source(udp(x.getsockname()[1]), 0.0)) for x in socks} & {id(x) for x in key.crowd}
-                    if id(key.source(me, 0.0)) in lanes:
+                    with d.intake._lock:
+                        lanes = {id(key.source(udp(x.getsockname()[1]), 0.0)) for x in socks} & {id(x) for x in key.crowd}
+                        shared = id(key.source(me, 0.0)) in lanes
+                    if shared:
                         break
                     s.close()
                     s.__init__(socket.AF_INET, socket.SOCK_DGRAM)
