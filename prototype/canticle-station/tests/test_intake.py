@@ -23,7 +23,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from canticle import intake, listener, runner, wire
 from canticle.ids import stream_id
 from canticle.intake import BEACON, OTHER, Intake, READ_BATCH, peek_stream
-from canticle.daemon import Daemon
+from canticle.daemon import RETRY_S, Daemon
 from canticle.manifest import Manifest, StationEntry
 from test_daemon import SK, DaemonCase, until
 
@@ -757,6 +757,186 @@ class ChurnTest(IntakeCase):
     def cheap(self, n: int) -> bytes:
         self._one = getattr(self, "_one", None) or item(A, 1)
         return forge(self._one, n)
+
+
+def udp(port: int, host: int = 1) -> int:
+    """A source as ``recvmmsg`` gives it (a sockaddr_in's first 8 bytes), so that the salted lanes depend on the salt alone."""
+    return int.from_bytes(bytes((2, 0)) + port.to_bytes(2, "big") + bytes((127, 0, 0, host)), sys.byteorder)
+
+
+C_SLICE, C_ALL = 500.0, 2_000.0     # the newcomer-recovery report's PLAN.md: the slice's checks a second, and the daemon's
+CHECK_S = 0.00014                   # the dearest check of #171 (60-140 µs on ronan)
+TURN_S = 32 * CHECK_S               # a turn of the event loop, its durable save apart
+
+
+class NewcomerCase(IntakeCase):
+    """A flood and a newcomer in virtual time: each millisecond the reader places what came, and the event loop, when it is not
+    busy with the checks of its last turn, runs at most one turn, as ``Daemon._hear_queued`` would: at once when the last one
+    looked at something, RETRY_S later when it did not, and when it is woken."""
+
+    K, RATE, PORTS = 16, 20_000, 40
+
+    def setUp(self):
+        super().setUp()
+        self.sks = [Ed25519PrivateKey.generate() for _ in range(self.K)]
+        self.kids = [wire.key_id(wire.public_key_bytes(sk)) for sk in self.sks]
+        self.frames = [(item(sk, 1), beacon(sk, 1)) for sk in self.sks]      # to forge from
+        self.fresh()
+
+    def fresh(self):
+        """A new intake of K stations, at a time of its own. ``checked``: the verdicts so far, by key id."""
+        self.now += 100
+        self.intake = self.make(Manifest([StationEntry(f"s{n}", wire.public_key_bytes(sk), frozenset({1}), ("chatter",))
+                                          for n, sk in enumerate(self.sks)]))
+        self.n, self.rng, self.busy, self.due, self.checked = 0, random.Random(7), self.now, self.now, Counter()
+        self.waits: dict = {}           # newcomer's frame -> when it was sent, then how long it waited for its check
+
+    def forged(self, keys, churn=False):
+        """The next datagram of the flood: distinct, claiming ``keys`` in turn, items and beacons, from a port of its own or one
+        of PORTS in turn."""
+        self.n += 1
+        k = keys[self.n % len(keys)]
+        kind = self.n // len(keys) // self.PORTS % 2
+        port = self.rng.randrange(32_768, 61_000) if churn else 40_000 + self.n // len(keys) % self.PORTS
+        return forge(self.frames[k][kind], self.n), udp(port)
+
+    def play(self, seconds, keys=(), churn=False, copies=(), rate=None):
+        """``seconds`` of a flood over ``keys`` and of ``copies`` [(when, frame, source)] of stations. Returns how long each of
+        them waited for its check: negative when it had none."""
+        start, copies = self.now, sorted(copies, key=lambda c: c[0])
+        mine = {f for _, f, _ in copies}
+        for ms in range(round(seconds * 1000)):
+            batch = [self.forged(keys, churn) for _ in range((rate or self.RATE) // 1000)] if keys else []
+            while copies and copies[0][0] * 1000 <= ms:
+                _, frame, src = copies.pop(0)
+                self.waits[frame] = -self.now
+                batch.insert(self.rng.randrange(len(batch) + 1), (frame, src))
+            woken = self.woken
+            if batch:
+                self.intake.offer(batch)
+            if self.now >= self.busy and (self.now >= self.due or self.woken != woken):
+                self.turn(mine)
+            self.now = start + (ms + 1) / 1000
+        return [self.waits[f] for f in mine]
+
+    def turn(self, mine):
+        got = self.intake.take(32)
+        for t in got:
+            ok = t.data in mine
+            if ok and self.waits.get(t.data, 1) < 0:
+                self.waits[t.data] += self.now
+            if t.key is not None:
+                self.checked[t.data[4:12], ok] += 1
+            self.intake.settle(t, ok, ok)
+        self.busy = self.now + len(got) * CHECK_S
+        self.due = self.busy if self.intake.took else self.now + RETRY_S
+
+    def shares_a_lane(self, k, src) -> bool:
+        """Whether ``src`` falls in a lane of the crowd that one of the flood's ports has too."""
+        key = self.intake.keys[self.kids[k]]
+        mine = key.source(src, self.now)
+        return mine in key.crowd and any(key.source(udp(40_000 + p), self.now) is mine for p in range(self.PORTS))
+
+    def salted(self, want, tries=60):
+        """Intakes, one per salt, after a second of a flood of key 0 from PORTS ports, until ``want`` of them have put the
+        newcomer's port (50 001) in a lane that the flood shares."""
+        shared = 0
+        for salt in range(tries):
+            self.fresh()
+            self.intake.keys[self.kids[0]].salt = salt
+            self.play(0.3, keys=(0,))
+            one = self.shares_a_lane(0, udp(50_001))
+            shared += one
+            yield one
+            if shared == want:
+                return
+        self.fail(f"{shared} salts of {tries} made the newcomer share a lane: nothing was shown")
+
+    def assertChecked(self, waits, within, why):
+        late = [w for w in waits if not 0 <= w <= within + 0.002]     # two steps of the clock
+        self.assertEqual(late, [], f"{why}: {len(late)} of {len(waits)} not checked within {within * 1000:.0f} ms")
+
+
+class NewcomerTest(NewcomerCase):
+    """The time to a newcomer's first check in a flood that goes on (#173's newcomer recovery; PLAN.md's B1-B3)."""
+
+    def within(self, keys):
+        return keys / C_SLICE + RETRY_S + TURN_S
+
+    def test_a_flood_over_the_other_keys_does_not_delay_a_newcomer(self):
+        """A guard, not a RED: the round-robin over keys already gives this (K picks of the general budget)."""
+        for churn in (False, True):                             # fixed ports; and churned ones of the newcomer's own host
+            for rate in (20_000, 100_000):
+                self.fresh()
+                self.play(0.3, keys=range(1, self.K), churn=churn, rate=rate)
+                waits = self.play(0.4, keys=range(1, self.K), churn=churn, rate=rate,
+                                  copies=[(0.0, item(self.sks[0], 1), udp(50_001))])
+                self.assertChecked(waits, self.within(self.K), f"churn={churn}, {rate}/s")
+
+    def test_ports_that_stay_and_forge_its_key_do_not_delay_a_newcomer_whatever_the_salt(self):
+        """The fixed-40 companion of pass 3: 16 ports of its host have places of their own, 24 share salted lanes, and a
+        newcomer whose lane one of them shares was verified as chance had it, up to 49 s late."""
+        late = []
+        for shared in self.salted(want=4):
+            waits = self.play(0.4, keys=(0,), copies=[(0.0, item(self.sks[0], 1), udp(50_001))])
+            late += [(shared, w) for w in waits if not 0 <= w <= self.within(1) + 0.002]
+        self.assertEqual(late, [], "(lane shared, wait): checked later than the slice's one round, or not at all (< 0)")
+
+    def test_newcomers_of_every_key_at_once_wait_for_one_round_of_the_keys(self):
+        """Every key is forged from the 40 ports, and on every key a station starts at the same moment, in a shared lane."""
+        self.play(1.0, keys=range(self.K))
+        for k in range(self.K):                                  # in every key, a salt that makes the newcomer share
+            key = self.intake.keys[self.kids[k]]
+            key.salt = next(s for s in range(500) if (setattr(key, "salt", s), self.shares_a_lane(k, udp(50_001 + k)))[1])
+        waits = self.play(0.6, keys=range(self.K),
+                          copies=[(0.0, item(self.sks[k], 1), udp(50_001 + k)) for k in range(self.K)])
+        self.assertChecked(waits, self.within(self.K), "a newcomer on each of 16 keys")
+
+    def test_two_hundred_ports_that_stay_do_not_delay_a_newcomer_either(self):
+        self.PORTS = 200
+        self.play(1.0, keys=(0,))
+        waits = self.play(0.4, keys=(0,), copies=[(0.0, item(self.sks[0], 1), udp(50_001))])
+        self.assertChecked(waits, self.within(1), "200 ports")
+
+    def test_a_churned_forgery_of_its_own_key_stays_a_lottery_with_a_slightly_better_chance(self):
+        """The honest limit: distinct forgeries of the newcomer's own key, each from a port of its own, look like it in
+        everything that is read before the signature. What is checked of them a second is bounded below by what the key's
+        strangers and the slice have, and above, so no copy's chance is better than that over the flood's rate."""
+        self.play(1.0, keys=(0,), churn=True)                    # the buckets' bursts are spent
+        before = self.checked.total()
+        self.play(4.0, keys=(0,), churn=True)
+        done = (self.checked.total() - before) / 4.0
+        self.assertGreater(done, intake.SOURCE_RATE + 0.3 * C_SLICE)
+        self.assertLessEqual(done, 1.01 * (intake.SOURCE_RATE + C_SLICE))
+
+    def test_what_comes_to_nothing_is_bounded_as_before_and_the_slice_by_itself(self):
+        """Every key forged, every slot contended, for two seconds: the daemon's checks stay within 2 000 a second."""
+        for churn in (False, True):
+            self.fresh()
+            self.play(0.5, keys=range(self.K), churn=churn, rate=100_000)
+            before = self.checked.total()
+            self.play(2.0, keys=range(self.K), churn=churn, rate=100_000)
+            self.assertLessEqual(self.checked.total() - before, 2.0 * C_ALL + 250)
+        spare = getattr(intake, "SLICE_RATE", 0.0)
+        self.assertEqual((intake.CHECK_RATE + spare, spare), (C_ALL, C_SLICE))
+
+    def test_established_sources_are_served_as_before_while_every_slot_is_contended(self):
+        """A guard: a known source of each key, its key forged at from churned ports, is served within a round of the keys and
+        its own two turns."""
+        for k, sk in enumerate(self.sks):
+            self.offer(item(sk, 1), src=udp(60_000 + k))
+        self.serve(64)
+        self.play(0.5, keys=range(self.K), churn=True, rate=100_000)
+        waits = self.play(0.5, keys=range(self.K), churn=True, rate=100_000,
+                          copies=[(0.1 * n, item(self.sks[k], 2 + n), udp(60_000 + k)) for n in range(4) for k in range(self.K)])
+        self.assertChecked(waits, 4 * self.K / (C_ALL - C_SLICE) + RETRY_S + TURN_S, "established")
+
+    def test_a_key_that_is_not_listed_never_reaches_the_slice(self):
+        stranger = Ed25519PrivateKey.generate()
+        f = item(stranger, 1)
+        for n in range(2_000):
+            self.offer(forge(f, n), src=udp(40_000 + n))
+        self.assertEqual((len(self.intake.unlisted.ready), self.intake.stats()["queued"]), (intake.UNLISTED_DEPTH, intake.UNLISTED_DEPTH))
 
 
 class ConsistencyTest(IntakeCase):
