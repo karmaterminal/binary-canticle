@@ -136,3 +136,36 @@ After the gate opens: E1 (cheap, and it gates), N0, N1, N0c, N1c, N2, I-a, I-a�
 | lease: I-a and I-b's unit halves, dup renewal bounded, lapse counted, queues consistent, random-traffic conservation | RED (no lease) | passes |
 
 Each part undone alone must fail its own test (patch-revert), 🕯's `0f55b1d` included: reverting it must turn #177's RED red.
+
+## Added 2026-11-24 18:10Z, before any run: the room's answer, and what changed in the slice
+
+Nothing has been measured. The fork above (own-key floods) was posted at 17:15Z and answered on #173 by 🍃 with 🌫's amendments
+([7138942171](https://github.com/karmaterminal/binary-canticle/pull/173#issuecomment-7138942171), [7138973579](https://github.com/karmaterminal/binary-canticle/pull/173#issuecomment-7138973579)): **A** (churned own-key
+floods are outside the guarantee, with their numbers), plus a rule inside each key's slot; B stays an option, C a separate design. **Pass 3's original own-key failures stay failures in the verdict.** No row,
+threshold or run count above changes, except that one diagnostic is added (W). The slice as first built (`ea633f2`, the latest datagram has the slot, a failed source stands aside for 2 s) is superseded by:
+
+- **One pending frame per source** in a key's slot, at most 64 sources. It keeps its place until its turn: nothing that comes later replaces or sheds it. ("The latest" above is withdrawn: what is replaced has no bound.)
+- **Untried sources first, in the order they came. A source whose frame failed is demoted** behind them: one turn in **M = 4** of the key's slot, so retries are bounded and nobody is banned. The next frame of its that verifies clears it, new or not.
+- A key holds at most **256** sources demoted (and 64 of them waiting), for **2 × 257 · K / 500 s** (16.4 s for 16 stations): twice the rounds it takes to try them all, so that no demotion ends before the turn of a newcomer that waits for them.
+- A ticket out of a slot holds none of its station's tokens until it has verified, and a turn has **16 places for slots beside its 32**, so neither what the queues hold nor how many copies they are full of keeps a key from its turns.
+
+**The bound, restated** (S: sources claiming the newcomer's key that are not tried, or whose demotion has ended, when its copy arrives; K_f: keys whose slots are contended; T: a turn, at most 48 checks of 140 µs and one save of 40 ms = 47 ms; C_eff = min(500, 16/T) = 500/s, or 340/s when every turn carries a save):
+
+| | its first copy is checked within | in numbers for the rows, delivery allowance of 0.1 s included |
+|---|---|---|
+| (B1) its key isn't forged | K/C_eff + 20 ms + T | K = 16: **0.22 s** |
+| (B2) it is forged from S ≤ 63 sources that stay | (S + 1) · 4/3 · K_f/C_eff + 20 ms + T | K_f = 1: S = 40 (offset 0): **0.33 s**; S = 0 (all tried): **0.17 s**. K_f = 16, S = 0 (N2): **0.23 s** |
+| the same, 63 < S ≤ 256 | not at once: a full slot has no place for its first copy. Once each was tried (S/C_eff) it is the row above, from its next copy | not a row |
+| (B3) sources used once, or more than 256, or cycling faster than they are retained | **none** | N0: p ≤ (1 000 + 500)/R a copy |
+| its exact source is spoofed | **none** (outside) | - |
+
+It is a deadline from arrival to check, not only of rounds, because (i) a place: a contended newcomer's frame gets one when fewer than 64 untried sources wait; (ii) survival: nothing takes it away (`SlotTest`, `NewcomerTest`); (iii) service: a turn asks the slots first, 16 places of its own, one key after the other, and the loop turns while anything waits; the bucket is theirs alone. What it assumes is unchanged.
+
+**The REDs of the answer**, on `f21eae8` (the rejected form, the two renamed pieces of state shimmed) and on this form: demotions retained for the claimed wait, and lost to nobody, with as many sources as a key can hold (RED, 2 of 80 newcomers never checked); more than that (RED by the cap; outside, nothing claimed); a demoted source's valid frame while untried ones keep coming (RED: 161 ms against 8 + 27 ms);
+the pending frame's survival (RED); every key's service under a full flood, with a save in every turn too (RED: 44 of 640 turns for one key alone). S = 1, 4, 16, 40, 63 sources that start with the newcomer: checked within (S + 1) turns at both rates (RED on `base`).
+
+| # | row | what | runs |
+|---|---|---|---|
+| **W** | #177 at the daemon (a diagnostic) | `nobudget` (pass 3's `toggles/a-budgets.patch`: the head's two check budgets lifted) on `a0862c3` and on 🕯's `0f55b1d`: `churn-40-20000-30` and `-120`. Pass 3's finding was 16.4 and 56.8 s there. 🕯's passes if its first frame is ≤ 1.0 s in every run; reverting his commit must miss it | 5 with `0f55b1d`, 3 without |
+
+W runs after E1. It decides nothing about the slice.

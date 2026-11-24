@@ -567,14 +567,16 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
   the key share 1 000, and everything together may spend 1 500, beside the slice's 500 (next). That covers a forgery, and a replay that verifies and
   changes nothing: an old beacon (it has no expiry, so it verifies whenever it is replayed), or a frame refused at steps
   3-4, which costs ten, because it makes a record each time. So neither spends the station's bucket.
-- **A slice of the checks is reserved for newcomers, per key** (#173's newcomer recovery). Beside its queues a listed key has one slot: the latest datagram of
-  a source that has no known place, when others already wait in the stream it claims; what it replaces queues like anything
-  else. The slots are served in turn over the keys, before the queues and for at most half of a turn, on 500 checks a second
-  of their own, so the daemon's total stays 2 000. A source whose check came to nothing takes no slot for 2 s: the latest 512
-  of a key are remembered, by address and port, whatever lane they share. So a newcomer is checked within one round of
-  the keys, **K/500 s, whatever the flood's rate**, where its key is not forged, or is forged from at most 512 sources that stay
-  (and no more than the key has checked in 2 s). A verified ITEM or PLUCK out of a slot that changes nothing costs its own key
-  nine turns, never another key's. `receive.reserved` counts what the slice checked.
+- **A slice of the checks is reserved for newcomers, per key** (#173's newcomer recovery; the order is 🍃's and 🌫's). Beside its queues a listed key has
+  one slot, where a source that has no known place has one datagram, when others already wait in the stream it claims; what else it
+  sends queues like anything else. The slots are served in turn over the keys, 500 checks a second on a bucket of their own (the daemon's total stays 2 000), in places of
+  a turn that the queues cannot take. In a key's turn, sources that were not found wrong come first, in the order they came; nothing that comes later
+  takes a place from one. A source whose frame failed is demoted behind them, and has one turn in four: a failed frame is evidence against
+  the frame, and no proof against its source. The next frame of its that verifies clears it. A key holds 256 sources demoted, for as long as twice the
+  rounds it takes to try them all. So a newcomer is checked within **(S + 1) rounds of the keys, K/500 s each (a third more where demoted ones wait), whatever the flood's
+  rate**, S being the sources of its own key that are not tried yet: 0 where its key is not forged, and each costs a turn once. That holds for at most 64 sources that
+  start with it, and for 256 that stay. `receive.reserved` counts what the slice checked. A verified ITEM or PLUCK out of a slot that changes nothing costs its own
+  key nine turns, never another key's.
 - **A known place is a lease.** It ends 60 s after the daemon first verified the newest frame that its source delivered: the clock is the
   daemon's monotonic one, and having nothing waiting means nothing. An exact repeat from a source that has a place renews it up to the
   age of the frame it repeats and no further, so a source that stopped and replays one cached frame keeps its place no longer than if it were silent. A repeat
@@ -612,8 +614,8 @@ What it does not do:
   is heard after the station displaces nothing.
 - **A station that is still a stranger, among many.** Until one of its frames verifies from a new source (a cold
   start, or its restart on a new port) it competes with every other stranger claiming its key. **A flood that forges its own key and
-  opens a new port for every datagram is a FAIL, outside the supported guarantee:** each copy of the station's is verified with chance
-  (1 000 + 500) / the flood's rate at best, and no deadline follows. Other keys' newcomers are unaffected. What follows was measured on
+  opens a new port for every datagram is a FAIL, outside the supported guarantee**, and so is one from more sources than the key can hold demoted: each copy of the station's
+  is verified with chance (1 000 + 500) / the flood's rate at best, and no deadline follows. Other keys' newcomers are unaffected. What follows was measured on
   #173 before the slice (above); the rows with it are in `reports/measurement/2026-11-24-newcomer-recovery/`. Flooded at 20 000 a second from 12 or 40 ports of its own
   host, its first valid frame was admitted within 0.1 s; from 200 ports its first items came up to 16 s late in one run,
   and in five others its first frame took up to 1,065 ms and its items up to 2,015 ms, a FAIL of the ≤1 s / ≤2 s deadline
