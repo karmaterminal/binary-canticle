@@ -30,7 +30,7 @@
   "cpu9": 3900
  },
  "mem_total_kb": 127598768,
- "loadavg_at_start": "3.86 4.37 3.90 1/1765 3635931",
+ "loadavg_at_start": "5.60 4.99 4.20 3/1769 3653700",
  "python": "3.12.3",
  "net.core.rmem_default": 212992,
  "net.core.rmem_max": 4194304,

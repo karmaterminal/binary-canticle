@@ -1,0 +1,54 @@
+{
+ "row": "R4b-replay-latest-item-2x-max",
+ "python": "3.12.3",
+ "cryptography": "50.0.1",
+ "offered_per_s": 998546.6,
+ "sung": 57,
+ "at_daemon": 57,
+ "at_daemon_during_flood": 57,
+ "pushed": 57,
+ "send_to_record_ms": {
+  "p50": 18.1,
+  "p90": 19.0,
+  "p99": 24.1,
+  "max": 29.5
+ },
+ "send_to_push_ms": {
+  "p50": 5530.1,
+  "p90": 5971.1,
+  "p99": 6104.8,
+  "max": 6168.7
+ },
+ "kernel_drops": 98222,
+ "reported_socket_dropped": 98222,
+ "receive": {
+  "read": 568974877,
+  "repeats": 568012670,
+  "copies": 961448,
+  "verified": 646,
+  "unverified": 113,
+  "queued": 0,
+  "refused": {
+   "backlog": 0
+  }
+ },
+ "health_reasons_seen": [
+  "socket_drops"
+ ],
+ "admission": {
+  "verified": 57,
+  "duplicate": 568012670
+ },
+ "unverified": {
+  "expired": 113
+ },
+ "ear_live_overflow": null,
+ "daemon_cpu_rss": {
+  "cpu_max": 101.9,
+  "rss_max_kb": 34728,
+  "cpu_mean": 94.7
+ },
+ "load_at_start": 3.86,
+ "duration_s": 570.0,
+ "drain_s": 15.0
+}
