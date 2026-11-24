@@ -1,0 +1,57 @@
+{
+ "row": "F5-real-station-flood",
+ "python": "3.12.3",
+ "cryptography": "50.0.1",
+ "offered_per_s": 6388.7,
+ "sung": 30,
+ "at_daemon": 30,
+ "at_daemon_during_flood": 30,
+ "pushed": 30,
+ "send_to_record_ms": {
+  "p50": 12.9,
+  "p90": 14.9,
+  "p99": 24.2,
+  "max": 25.5
+ },
+ "send_to_push_ms": {
+  "p50": 5510.1,
+  "p90": 5953.3,
+  "p99": 6003.3,
+  "max": 6008.8
+ },
+ "kernel_drops": 0,
+ "reported_socket_dropped": 0,
+ "receive": {
+  "read": 1918276,
+  "repeats": 237,
+  "copies": 36,
+  "verified": 4423,
+  "unverified": 0,
+  "queued": 0,
+  "known": 2,
+  "displaced": 0,
+  "refused": {
+   "unlisted": 0,
+   "unverified": 0,
+   "over_rate": 1913417,
+   "backlog": 163
+  }
+ },
+ "health_reasons_seen": [
+  "datagrams_refused"
+ ],
+ "admission": {
+  "verified": 3789,
+  "duplicate": 237
+ },
+ "unverified": {},
+ "ear_live_overflow": null,
+ "daemon_cpu_rss": {
+  "cpu_max": 36.0,
+  "rss_max_kb": 37256,
+  "cpu_mean": 21.7
+ },
+ "load_at_start": 3.77,
+ "duration_s": 300.0,
+ "drain_s": 15.0
+}
