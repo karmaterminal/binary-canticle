@@ -1,7 +1,7 @@
-"""Row J of PLAN.md: four established stations, each singing 57 items, in a flood that is half junk (no frames) and half forgeries of 12
-other keys. Measured, never asserted.
+"""Row J of PLAN.md: four established stations, each singing 57 items, in a flood that is half junk (no frames) and half forgeries: of the 12
+other keys (junk-...), or of all 16, theirs too (junkall-...). Measured, never asserted.
 
-Usage: junk_rows.py <out.json> <name=tree:runs,...> <junk-<ports>-<rate>,...>        (nice -n 19 ionice -c3, nothing beside it)
+Usage: junk_rows.py <out.json> <name=tree:runs,...> <junk|junkall>-<ports>-<rate>,...        (nice -n 19 ionice -c3, nothing beside it)
 A run passes as #171's rows do, for each of the four: 57 of 57 during the flood, p50 at most 250 ms, none later than 4.5 s, the kernel's
 drops reported. A run whose flood fell under 95 % of its rate in its lowest whole second, or on another cryptography, is no run."""
 
@@ -39,7 +39,7 @@ def one(tree: str, row: str) -> dict:
                                             ).to_json()["stations"]
             Path(self.manifest).write_text(json.dumps(m))
 
-    _, ports, rate = row.split("-")
+    kind, ports, rate = row.split("-")
     ports, rate = int(ports), int(rate)
     c = Case()
     c.setUp()
@@ -52,7 +52,7 @@ def one(tree: str, row: str) -> dict:
                 raise RuntimeError("the daemon never heard all of them")
             time.sleep(0.02)
         n = -(-rate // PER_PRODUCER)
-        kids = ",".join(c.kid(k) for k in c.keys if k not in ESTABLISHED)
+        kids = ",".join(c.kid(k) for k in c.keys if kind == "junkall" or k not in ESTABLISHED)
         procs = []
         for i in range(n):
             p = subprocess.Popen(

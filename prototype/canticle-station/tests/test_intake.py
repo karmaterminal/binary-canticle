@@ -218,6 +218,27 @@ class OrderTest(IntakeCase):
         self.offer(quiet, src=HERE)
         self.assertIn(quiet, self.serve(4))                    # it has a place in the key's slot, beside its turn in the queue
 
+    def test_junk_that_is_served_takes_no_keys_turn(self):
+        """Checks are spent, and datagrams that are no frames are served meanwhile, on their own budget. (It reads no state that #173
+        has not: on a0862c3 the first token there is again is always for B, whose turn came after A's.)"""
+        checks = [b for b in (self.intake.checks, getattr(self.intake, "strange", None)) if b is not None]
+        for b in checks:
+            b.tokens, b.at = 0.0, self.now
+        first = forge(item(A, 1))
+        self.offer(first, src=THERE)
+        for n in range(20):
+            self.offer(b"junk %d" % n, src=addr(5))
+            self.offer(forge(item(B, 1), n), src=THERE)
+            self.assertEqual(self.serve(32, verified=lambda t: False), [b"junk %d" % n])
+            for b in checks:
+                b.tokens = 1.0
+            got = self.serve(32, verified=lambda t: False)
+            for b in checks:
+                b.tokens = 0.0
+            if first in got:
+                break
+        self.assertEqual(n, 0, "turns that A's datagram lost")
+
     def test_a_key_or_stream_that_is_passed_over_keeps_its_turn(self):
         """Strangers' checks are spent, and an established station is served meanwhile: the first token there is again is for
         whoever waited longest, not for whoever comes behind what was served."""

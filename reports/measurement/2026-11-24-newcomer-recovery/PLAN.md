@@ -224,3 +224,17 @@ moves a source up, and an admitted new frame moves one from the third tier to th
 - A source that loses its known place is marked as tried.
 
 (B1) and (B2) are unchanged.
+
+## Added 2026-11-24 22:04Z, before any run: row J corrected, and `a0862c3` as a column of it
+
+Nothing has been measured over sockets. 🌿 asked ([7145087471](https://github.com/karmaterminal/binary-canticle/pull/173#issuecomment-7145087471)) that row J run on #173's own head `a0862c3` as well, and found no control that tells the two trees apart. Making one showed that **what this file and the lane's report of 19:44Z said about the finding was imprecise, and is corrected here**:
+
+- The third review's flood forges *every key but the newcomers'*, the established stations' own among them. With that, and half of it junk, 216 of 784 frames of four established stations are never served on `a0862c3` at K = 16 and 392 of 784 at K = 64. **With forgeries of other keys only, or without junk, none is lost there.** On this lane none is lost in any of the eight cells ([`results/junk-model.md`](results/junk-model.md), `junk_model.py`: the trees' own `Intake` in virtual time, any tree).
+- The same mechanism at its smallest, in state both trees have: `OrderTest.test_junk_that_is_served_takes_no_keys_turn`. On `a0862c3` a datagram whose turn it is loses it 19 times of 20; here never.
+
+Row J is therefore two rows, on three trees (`head` is `a0862c3`; `base` is it with 🕯's `0f55b1d`; the intake is the same in both):
+
+| # | row | the forgeries claim | runs `slice` / `head` / `base` | prediction |
+|---|---|---|---|---|
+| J | `junk-40-20000`, `junk-40-100000` | the 12 other keys | 5 / 3 / 3 | all pass |
+| **J-all** | `junkall-40-20000`, `junkall-40-100000` | all 16, the four established ones' too | 5 / 3 / 3 | `head` and `base` fail, `slice` passes |

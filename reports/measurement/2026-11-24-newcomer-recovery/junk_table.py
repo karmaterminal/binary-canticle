@@ -9,7 +9,7 @@ for r in json.load(open(sys.argv[1])):
     cells[r["row"], r["tree"]].append(r)
 print("| row | tree | runs | items of each station during the flood, of 57, per run | worst latency, ms | offered /s | drops: kernel (reported) | verdict |")
 print("|---|---|---|---|---|---|---|---|")
-for (row, tree), rs in sorted(cells.items(), key=lambda kv: (int(kv[0][0].split("-")[2]), kv[0][1])):
+for (row, tree), rs in sorted(cells.items(), key=lambda kv: (kv[0][0].split("-")[0], int(kv[0][0].split("-")[2]), kv[0][1])):
     per = "; ".join("/".join(str(s["during_the_flood"]) for s in r["stations"].values()) for r in rs)
     worst = max((s["latency_ms"]["max"] for r in rs for s in r["stations"].values() if s["latency_ms"]), default=None)
     ok = sum(r["pass"] and r["told"] and r["driven"] for r in rs)
