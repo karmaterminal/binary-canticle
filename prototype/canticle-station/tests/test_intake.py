@@ -243,6 +243,33 @@ class OrderTest(IntakeCase):
             waited += 1
         self.assertEqual(waited, 0)
 
+    def test_so_does_one_that_is_passed_over_in_a_turn_that_fills_up(self):
+        sks = [Ed25519PrivateKey.generate() for _ in range(3)]
+        self.intake = self.make(Manifest([StationEntry(f"s{n}", wire.public_key_bytes(sk), frozenset({1}), ("chatter",))
+                                          for n, sk in enumerate(sks)]))
+        for sk in sks[1:]:
+            self.offer(item(sk, 1), src=HERE)                  # established
+        self.serve()
+        self.intake.strange.tokens, self.intake.strange.at = 0.0, self.now
+        self.offer(first := forge(item(sks[0], 1)), src=THERE)
+        self.offer(*[item(sk, 2 + n) for n in range(4) for sk in sks[1:]], src=HERE)
+        self.assertEqual(len(self.serve(3, verified=lambda t: t.addr == HERE)), 3)       # the turn is full, and more waits
+        self.intake.strange.tokens = 1.0
+        self.assertEqual(self.serve(1, verified=lambda t: False), [first])
+
+    def test_and_a_stream_within_its_key(self):
+        key = self.intake.keys[KID_A]
+        self.offer(item(A, 1, "other"), src=HERE)              # established
+        self.serve()
+        self.intake.strange.tokens, self.intake.strange.at = 0.0, self.now
+        self.offer(first := forge(item(A, 1)), src=THERE)
+        self.offer(*[item(A, 2 + n, "other") for n in range(3)], src=HERE)
+        self.offer(forge(beacon(A, 1)), src=THERE)             # behind it
+        self.assertEqual(len(self.serve(2, verified=lambda t: t.addr == HERE)), 2)
+        self.intake.strange.tokens = 1.0
+        self.assertEqual(self.serve(1, verified=lambda t: False), [first])
+        self.assertTrue(key.ready)
+
     def test_one_source_of_one_stream_is_served_in_order(self):
         frames = [item(A, n) for n in range(1, 6)]
         self.offer(*frames)
@@ -1381,6 +1408,20 @@ class SlotTest(IntakeCase):
             self.offer(f, src=addr(50 + n))
         served = [t.data for t in self.intake.take(32) if t.budget is self.intake.slice]
         self.assertEqual([served.index(f) for f in late], [1, 3, 5])
+
+    def test_a_key_whose_station_is_over_its_rate_keeps_its_turn_of_the_slots(self):
+        for sk in (A, B):
+            self.offer(*[forge(item(sk, 1), 90 + n) for n in range(4)], src=THERE)
+        self.offer(a := item(A, 1), src=HERE)
+        late = [item(B, n + 1) for n in range(3)]
+        for n, f in enumerate(late):
+            self.offer(f, src=addr(50 + n))
+        self.intake.checks.tokens, self.intake.checks.at = -1e9, self.now      # the queues serve nothing
+        bucket = self.key.streams[stream_id("chatter")].bucket
+        bucket.tokens, bucket.at = 0.0, self.now
+        self.assertEqual([self.serve(1), self.serve(1)], [late[:1], late[1:2]])
+        bucket.tokens = 2.0
+        self.assertEqual(self.serve(1), [a])
 
     def test_a_turn_of_one_still_comes_to_it(self):
         f = item(A, 1)
