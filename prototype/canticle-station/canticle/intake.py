@@ -29,8 +29,8 @@ What is spent, and by whom:
   queues' part of theirs). A key has one slot beside its queues, where a source that is not known has a claim on one datagram
   of its that waits in its lane too, when others already wait in the stream that claims. The slots are served in turn over
   the keys, on a bucket of their own, so no flood of other keys or of the queues spends it. In a key's turn the sources that
-  were not found wrong come first, in the order they came; one whose frame failed, or changed nothing, is demoted behind them:
-  it has one turn in SLOT_M, and the next frame of its that is new or kept clears it. A newcomer is then checked within (S + 1)
+  were not found wrong come first, in the order they came; one whose frame failed, or was not new, is demoted behind them: it
+  has one turn in SLOT_M, and the next frame of its that is new clears it. A newcomer is then checked within (S + 1)
   rounds of the keys, S being the sources that were not tried before it, whatever the flood's rate: once, since each is then
   behind it;
 - in a stream, the known sources get every other turn however many strangers claim it. Strangers queue apart too, in
@@ -391,8 +391,8 @@ class KeyQueue:
         return got
 
     def demote(self, addr, now: float) -> None:
-        """A frame from ``addr`` failed, or verified and changed nothing. That is evidence against the frame, and no proof against
-        its source, so it costs it its place in the order and no more."""
+        """A frame from ``addr`` failed, or verified and was not new. That is evidence against the frame, and no proof against its
+        source, so it costs it its place in the order and no more: it has been tried, and others have not."""
         self.demotions[addr] = now
         self.demotions.move_to_end(addr)
         if len(self.demotions) > DEMOTED_MAX:
@@ -400,7 +400,7 @@ class KeyQueue:
         self.slot.move(addr, self.slot.untried, self.slot.demoted)
 
     def clear(self, addr) -> None:
-        """A frame from ``addr`` was new, or is kept."""
+        """A frame from ``addr`` was new: a signature alone clears nothing, since a replay has one."""
         if self.demotions.pop(addr, None) is not None:
             self.slot.move(addr, self.slot.demoted, self.slot.untried)
 
@@ -937,7 +937,7 @@ class Intake:
                 elif t.digest not in self.repeats:     # turns of its own key, never another's; what is kept was that only once
                     t.key.slot.due = max(now, t.key.slot.due) + SLICE_PAUSE_S
             if t.key is not None:
-                if fresh or t.digest in self.repeats:
+                if fresh:
                     t.key.clear(t.addr)
                 elif t.addr not in t.key.known:
                     t.key.demote(t.addr, now)

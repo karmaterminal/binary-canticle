@@ -818,6 +818,9 @@ class NewcomerCase(IntakeCase):
         kind = self.n // len(keys) // self.PORTS % 2
         if churn == "replay" and self.n // len(keys) // self.PORTS % 2:
             return self.old[k][self.n % 4], udp(40_000 + self.n // len(keys) % self.PORTS)
+        if churn == "hold" and self.n // len(keys) % 4 == 0:
+            m = self.n // len(keys) // 4 % len(self.old[k])
+            return self.old[k][m], udp(39_000 + m)
         if churn == "once":                     # never the same source twice
             return forge(self.frames[k][kind], self.n), udp(1_024 + self.n % 60_000, 10 + self.n // 60_000)
         port = self.rng.randrange(32_768, 61_000) if churn is True else 40_000 + self.n // len(keys) % self.PORTS
@@ -966,6 +969,20 @@ class NewcomerTest(NewcomerCase):
                 waits = self.play(3.5, keys=(0,), churn="replay",
                                   copies=[(0.041 * n, item(self.sks[0], n + 1), udp(50_001 + n)) for n in range(80)])
                 self.assertChecked(waits, self.within(1, 16), f"{sources} sources that stay and replay")
+
+    def test_sources_that_only_replay_hold_no_untried_place_for_good(self):
+        """64 sources with an old beacon each, and 100 that forge, all of them staying: within what a key can hold demoted. Were
+        a replay to leave its source untried, the 64 would have every untried place at every moment, and a newcomer whose
+        lane the forgers fill would have none (22 of 80 never checked at K = 1, 51 of 80 at K = 16)."""
+        for keys in (1, 16):
+            with self.subTest(keys=keys):
+                self.PORTS = 100
+                self.stations(keys)
+                self.old = [[beacon(sk, 1_000 + n) for n in range(PENDING)] for sk in self.sks]
+                self.play(3.0, keys=range(keys), churn="hold")
+                waits = self.play(3.5, keys=range(keys), churn="hold",
+                                  copies=[(0.041 * n, item(self.sks[0], n + 1), udp(50_001 + n)) for n in range(80)])
+                self.assertChecked(waits, self.within(keys, 16), "64 that replay, 100 that forge")
 
     def test_a_source_that_is_being_checked_takes_no_place_meanwhile(self):
         """In a long turn a source's next frame comes before the verdict on its last one. It would be untried again: with every
@@ -1172,19 +1189,28 @@ class SlotTest(IntakeCase):
         self.assertEqual([n for n, a in enumerate(served) if a[0] in {addr(60 + k)[0] for k in range(3)}],
                          [intake.SLOT_M - 1, 2 * intake.SLOT_M - 1, 3 * intake.SLOT_M - 1])
 
-    def test_a_frame_that_is_new_or_kept_clears_its_source_and_one_that_changes_nothing_demotes_it(self):
-        """New, or kept though not new (it resurfaced after a restart of the daemon): the signature stands for the sender. A replay
-        that changes nothing (an old beacon verifies for ever) stands for nobody."""
+    def test_only_a_new_frame_clears_its_source(self):
+        """🍃 (#173 issuecomment-7140567401): a valid signature alone doesn't. A replayed old beacon verifies for ever, and what
+        resurfaced after a restart is kept and is not new: the demotion stays in place."""
         for kept, fresh in ((True, True), (True, False), (False, False)):
             src = addr(70 + 2 * kept + fresh)
+            self.demote(src)
+            self.offer(*[forge(item(A, 1), 200 + n) for n in range(4)], src=THERE)
             self.offer(f := item(A, 10 + 2 * kept + fresh), src=src)
-            if kept:
-                self.demote(src)
             (t,) = [t for t in self.intake.take(32) if t.data == f]
             if kept:
                 self.intake.remember(t, (KID_A, 5, 0, 1), runner.now_ms() + 60_000, fresh)
             self.intake.settle(t, True, fresh)
-            self.assertEqual(src in self.key.demotions, not kept, (kept, fresh))
+            self.assertEqual(src in self.key.demotions, not fresh, (kept, fresh))
+
+    def test_a_source_whose_replay_changed_nothing_is_no_longer_untried(self):
+        """It is no failure. But the first places are the untried sources', and it has been tried."""
+        self.offer(f := beacon(A, 1), src=HERE)
+        (t,) = [t for t in self.intake.take(32) if t.data == f]
+        self.intake.settle(t, True, False)
+        self.offer(*[forge(item(A, 1), 300 + n) for n in range(4)], src=THERE)
+        self.offer(g := item(A, 2), src=HERE)
+        self.assertEqual((self.waits(), self.waits("demoted")), ([], [g]))
 
     def test_what_waits_in_the_slot_waits_in_its_lane_as_well_and_is_served_once(self):
         """So the slot is never a worse place to wait than the queues are: whichever comes first serves it."""

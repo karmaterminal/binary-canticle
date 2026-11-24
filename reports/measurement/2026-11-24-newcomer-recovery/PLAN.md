@@ -184,3 +184,11 @@ Nothing has been measured. No row, threshold or run count changes; three points 
 - A verified ITEM or PLUCK that changes nothing counts as **ten** turns of its own key. The second review's numbers (virtual time, base / the form before / this one): S = 200 sources that stay and replay, newcomers within the S = 0 bound 0 / 0 / 79 of 79; K = 64, S = 63, all keys, first frame 0.189 / 10.758 / 0.007 s; an established station's echo credited 0 / 20 / 0 of 20.
 
 (B2)'s "S" counts sources not tried yet **or whose demotion has ended** (retained 1.03 s · K).
+
+## Added 2026-11-24 19:17Z, before any run: 🍃's restatement of what clears a demotion
+
+Nothing has been measured. [7140567401](https://github.com/karmaterminal/binary-canticle/pull/173#issuecomment-7140567401) (18:23Z): a demotion clears only on a frame **admitted as new**. Taken as it is: what resurfaced after a daemon restart no longer clears (the last section's "or is kept" is withdrawn; in virtual time
+a station that goes on over a daemon restart is then known after 1.6 s in a fixed-40 own-key flood, median of 12 salts, against 0.5 s had it cleared and 15 s on the base).
+
+It also says that a verified replay "counts as neither a failure nor a recovery". It is not counted as a failure here, and its source is nevertheless **no longer untried**, so it goes behind those that are (the same place as a demoted one). *Why not left where it was:* 64 sources with one old beacon
+each would have all 64 untried places at every moment. With 100 more that forge (164 that stay, within the 256), 22 of 80 newcomers were never checked at K = 1 and 51 of 80 at K = 16 (virtual time; base 57 and 60 of 80); as it is here, 0 and 0, all within one round (`test_sources_that_only_replay_hold_no_untried_place_for_good`, RED under the letter). For 🍃 and 🌫 to agree or amend.

@@ -572,8 +572,8 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
   waits in its lane as before, and whichever comes first serves it; what a lane refuses or sheds still waits in the slot. The slots are
   served in turn over the keys, 500 checks a second on a bucket of their own, in 16 places of a turn beside the queues' 32. Strangers pay for it: of the daemon's 2 000
   their queues have 1 500, so what strangers cost is 2 000 as before, and an established station loses no turn to it. In a key's turn, sources that were not found wrong come
-  first, in the order they came. A source whose frame failed, or verified and changed nothing (a replayed old beacon verifies for ever), is demoted behind
-  them, and has one turn in four: that is evidence against the frame, and no proof against its source. The next frame of its that is new, or is kept, clears it. A
+  first, in the order they came. A source whose frame failed, or verified and was not new (a replayed old beacon verifies for ever), is demoted behind
+  them, and has one turn in four: it has been tried, and that is evidence against the frame, and no proof against its source. The next frame of its that is admitted as new clears it. A
   key holds 256 sources demoted, for twice the rounds it takes to try them all. So a newcomer is checked within **(S + 1) rounds of the keys, K/500 s each (a third
   more where demoted ones wait), whatever the flood's rate**, S being the sources of its own key that are not tried yet: 0 where its key is not forged, and each
   costs its turn once. That holds for at most 63 sources that start with it, and for 256 that stay. An echo of a frame that waits takes no slot, and a known
