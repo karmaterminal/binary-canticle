@@ -6,10 +6,12 @@ A run passes as the tests do: 57 of 57 during the flood, p50 at most 250 ms, non
 
 import json
 import os
+import platform
 import socket
 import subprocess
 import sys
 import time
+from importlib.metadata import version
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -100,7 +102,8 @@ def main() -> None:
                 if p.returncode:
                     print(name, row, run, "FAILED TO RUN", p.returncode, flush=True)
                     continue
-                r = {"tree": name, "row": row, "run": run, **json.loads(p.stdout)}
+                r = {"tree": name, "row": row, "run": run, "python": platform.python_version(),
+                     "cryptography": version("cryptography"), **json.loads(p.stdout)}
                 got.append(r)
                 out.write_text("[\n" + ",\n".join(json.dumps(x) for x in got) + "\n]\n")
                 print(time.strftime("%H:%M:%SZ", time.gmtime()), name, row, run, r["during_the_flood"], "of", r["sung"], r["latency_ms"],

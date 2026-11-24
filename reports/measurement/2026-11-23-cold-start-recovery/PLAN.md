@@ -114,3 +114,26 @@ neither its address nor more than three others: then it gets a stranger's place 
   head and base.
 - The rest of the #171 suite (pass 2's `scaled_rows.py`: cold start, exact-source spoof, relay-first) runs 5 times on the candidate.
 - Neither gate stands in for the other.
+
+## Added 2026-11-24 02:30Z: rows 0, 1 and 2 are rerun on the pinned runtime
+
+**What went wrong.** Rows 0, 1 and 2 ran on the host's system `cryptography` 41.0.7, which the repository's own doctor refuses, and
+not on the 50.0.1 that `.github/ci/requirements-station.txt` locks and pass 1 and 2 used. A signature check costs 39 µs on the
+one and 35 µs on the other (`Ed25519PublicKey.verify` of a bad signature), so a tree that checks as fast as it can
+(base) is measured slower than it is. Those runs are kept as `results-cryptography-41/` and are **superseded**: no verdict
+rests on them. Rows 0, 1 and 2 run again, whole, on Python 3.12.3 with `cryptography` 50.0.1. Thresholds, rows, run counts and
+the workload are unchanged. The harness now refuses to run on another version and records it with every run.
+
+**What was known when this was written**, from the superseded runs: the head failed 7 of 8 deciding cells and base all 8; the delay
+grows with the rate; the two budgets for checks that come to nothing own it (toggle a-budgets passed both rates, the other toggles
+made it worse). Nothing in the rerun is chosen by those results, except one thing, which is:
+
+**A second candidate.** The attribution is not what the workorder expected, so the parts that don't cause the delay are more than
+its list. Both readings of "the parts that do not cause the delay" are measured on both gates, with the same runs:
+
+| name | what | where |
+|---|---|---|
+| `narrow` | the workorder's list: drain, repeats, drop counts, accounting, group commit; no scheduling | `codeagent/bc-173-narrow` `f8a91c1f19d1a990b376ff287436fd519b0126b9` |
+| `nobudget` | the head with only the two budgets lifted (toggle `a-budgets`): all its scheduling, no cap on checks that come to nothing | `toggles/a-budgets.patch` on `ab61baf2`; no branch |
+
+Rows 0 and gate 1 run on `head`, `base`, `narrow` and `nobudget`, interleaved: 5, 3, 5 and 5 runs.

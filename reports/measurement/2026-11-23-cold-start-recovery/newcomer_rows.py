@@ -9,9 +9,11 @@ Nothing is asserted. Run it under nice -n 19 ionice -c3, and nothing beside it."
 
 import json
 import os
+import platform
 import subprocess
 import sys
 import time
+from importlib.metadata import version
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -19,6 +21,7 @@ TESTS = HERE.parents[2] / "prototype" / "canticle-station" / "tests"
 FIRST_S, ITEM_S, LOOP_S = 1.0, 2.0, 10.0        # PLAN.md: the two deadlines, and the severity label
 ITEMS, AFTER_S = 20, 64.0                       # past the end of the last item's life: sung at 2.85 s, 60 s long
 PER_PRODUCER = 50_000                           # datagrams/s one flood process is asked for at most
+LOCKED = "50.0.1"                               # .github/ci/requirements-station.txt
 
 
 def one(tree: str, row: str, after: float) -> dict:
@@ -123,6 +126,8 @@ def one(tree: str, row: str, after: float) -> dict:
 
 
 def main() -> None:
+    if version("cryptography") != LOCKED:
+        sys.exit(f"cryptography {version('cryptography')}, not the locked {LOCKED}: not a run of these rows")
     out, rows = Path(sys.argv[1]), sys.argv[3].split(",")
     trees = []
     for t in sys.argv[2].split(","):
@@ -146,7 +151,8 @@ def main() -> None:
                 if p.returncode:
                     print(name, row, run, "FAILED TO RUN", p.returncode, flush=True)
                     continue
-                r = {"tree": name, "row": row, "run": run, "load_before": load, **json.loads(p.stdout)}
+                r = {"tree": name, "row": row, "run": run, "load_before": load, "python": platform.python_version(),
+                     "cryptography": version("cryptography"), **json.loads(p.stdout)}
                 got.append(r)
                 out.write_text("[\n" + ",\n".join(json.dumps(x) for x in got) + "\n]\n")
                 lat = sorted(float("inf") if x["latency_s"] is None else x["latency_s"] for x in r["items"])
