@@ -1410,18 +1410,19 @@ class SlotTest(IntakeCase):
         self.assertEqual([served.index(f) for f in late], [1, 3, 5])
 
     def test_a_key_whose_station_is_over_its_rate_keeps_its_turn_of_the_slots(self):
-        for sk in (A, B):
-            self.offer(*[forge(item(sk, 1), 90 + n) for n in range(4)], src=THERE)
-        self.offer(a := item(A, 1), src=HERE)
-        late = [item(B, n + 1) for n in range(3)]
-        for n, f in enumerate(late):
-            self.offer(f, src=addr(50 + n))
+        sks = [Ed25519PrivateKey.generate() for _ in range(3)]
+        self.intake = self.make(Manifest([StationEntry(f"s{n}", wire.public_key_bytes(sk), frozenset({1}), ("chatter",))
+                                          for n, sk in enumerate(sks)]))
+        frames = [item(sk, 1) for sk in sks]
+        for f in frames:
+            self.offer(*[forge(f, 90 + n) for n in range(4)], src=THERE)
+            self.offer(f, src=HERE)
         self.intake.checks.tokens, self.intake.checks.at = -1e9, self.now      # the queues serve nothing
-        bucket = self.key.streams[stream_id("chatter")].bucket
+        bucket = self.intake.keys[frames[0][4:12]].streams[stream_id("chatter")].bucket
         bucket.tokens, bucket.at = 0.0, self.now
-        self.assertEqual([self.serve(1), self.serve(1)], [late[:1], late[1:2]])
+        self.assertEqual(self.serve(1), [frames[1]])
         bucket.tokens = 2.0
-        self.assertEqual(self.serve(1), [a])
+        self.assertEqual([self.serve(1), self.serve(1)], [[frames[0]], [frames[2]]])
 
     def test_a_turn_of_one_still_comes_to_it(self):
         f = item(A, 1)
