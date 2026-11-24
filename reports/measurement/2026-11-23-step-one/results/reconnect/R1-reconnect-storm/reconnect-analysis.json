@@ -1,0 +1,3364 @@
+{
+ "outages": [
+  {
+   "action": "kill_daemon",
+   "at_s": 30,
+   "restarted_at_s": 33,
+   "probe_saw_new_run_at_s": 37.02,
+   "probe_outage_s": 7.02,
+   "items_sent_while_down": 90,
+   "of_those_reached_daemon": 0
+  },
+  {
+   "action": "term_daemon",
+   "at_s": 70,
+   "restarted_at_s": 72,
+   "probe_saw_new_run_at_s": 73.16,
+   "probe_outage_s": 3.16,
+   "items_sent_while_down": 60,
+   "of_those_reached_daemon": 2
+  },
+  {
+   "action": "kill_daemon",
+   "at_s": 150,
+   "restarted_at_s": 151,
+   "probe_saw_new_run_at_s": 153.1,
+   "probe_outage_s": 3.1,
+   "items_sent_while_down": 30,
+   "of_those_reached_daemon": 0
+  },
+  {
+   "action": "kill_daemon",
+   "at_s": 154,
+   "restarted_at_s": 155,
+   "probe_saw_new_run_at_s": 157.16,
+   "probe_outage_s": 3.16,
+   "items_sent_while_down": 30,
+   "of_those_reached_daemon": 0
+  },
+  {
+   "action": "kill_daemon",
+   "at_s": 158,
+   "restarted_at_s": 159,
+   "probe_saw_new_run_at_s": 161.03,
+   "probe_outage_s": 3.03,
+   "items_sent_while_down": 30,
+   "of_those_reached_daemon": 0
+  },
+  {
+   "action": "kill_daemon",
+   "at_s": 162,
+   "restarted_at_s": 163,
+   "probe_saw_new_run_at_s": 165.2,
+   "probe_outage_s": 3.2,
+   "items_sent_while_down": 30,
+   "of_those_reached_daemon": 0
+  },
+  {
+   "action": "kill_daemon",
+   "at_s": 166,
+   "restarted_at_s": 167,
+   "probe_saw_new_run_at_s": 169.15,
+   "probe_outage_s": 3.15,
+   "items_sent_while_down": 30,
+   "of_those_reached_daemon": 0
+  },
+  {
+   "action": "kill_all",
+   "at_s": 200,
+   "restarted_at_s": 203,
+   "probe_saw_new_run_at_s": 207.07,
+   "probe_outage_s": 7.07,
+   "items_sent_while_down": 90,
+   "of_those_reached_daemon": 1
+  }
+ ],
+ "transitions": {
+  "ear0": [
+   {
+    "t_s": -0.99,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "joined_late": 1
+    }
+   },
+   {
+    "t_s": 30.01,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 1
+    }
+   },
+   {
+    "t_s": 34.01,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 2,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 17
+    }
+   },
+   {
+    "t_s": 70.01,
+    "state": "backoff",
+    "receiveHealth": "stopped",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 2,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 17
+    }
+   },
+   {
+    "t_s": 75.01,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 3,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 79
+    }
+   },
+   {
+    "t_s": 114.02,
+    "state": "connected",
+    "receiveHealth": "degraded",
+    "reasons": [
+     "joined_late"
+    ],
+    "counts": {
+     "joined_late": 1,
+     "snapshot_frames": 509
+    }
+   },
+   {
+    "t_s": 150.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "joined_late",
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 1,
+     "snapshot_frames": 509
+    }
+   },
+   {
+    "t_s": 152.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 2,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 529
+    }
+   },
+   {
+    "t_s": 154.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 2,
+     "joined_late": 2,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 529
+    }
+   },
+   {
+    "t_s": 156.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 2,
+     "joined_late": 3,
+     "run_restarted_without_bye": 2,
+     "snapshot_frames": 543
+    }
+   },
+   {
+    "t_s": 158.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 3,
+     "joined_late": 3,
+     "run_restarted_without_bye": 2,
+     "snapshot_frames": 543
+    }
+   },
+   {
+    "t_s": 162.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 4,
+     "joined_late": 4,
+     "run_restarted_without_bye": 3,
+     "snapshot_frames": 618
+    }
+   },
+   {
+    "t_s": 164.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 4,
+     "joined_late": 5,
+     "run_restarted_without_bye": 4,
+     "snapshot_frames": 624
+    }
+   },
+   {
+    "t_s": 166.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 5,
+     "joined_late": 5,
+     "run_restarted_without_bye": 4,
+     "snapshot_frames": 624
+    }
+   },
+   {
+    "t_s": 168.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 5,
+     "joined_late": 6,
+     "run_restarted_without_bye": 5,
+     "snapshot_frames": 650
+    }
+   },
+   {
+    "t_s": 204.03,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "joined_late": 1,
+     "snapshot_frames": 6
+    }
+   }
+  ],
+  "ear1": [
+   {
+    "t_s": -0.99,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "joined_late": 1
+    }
+   },
+   {
+    "t_s": 30.01,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 1
+    }
+   },
+   {
+    "t_s": 34.01,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 2,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 19
+    }
+   },
+   {
+    "t_s": 70.01,
+    "state": "backoff",
+    "receiveHealth": "stopped",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 2,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 19
+    }
+   },
+   {
+    "t_s": 75.01,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 3,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 91
+    }
+   },
+   {
+    "t_s": 150.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 2,
+     "joined_late": 3,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 91
+    }
+   },
+   {
+    "t_s": 152.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 2,
+     "joined_late": 4,
+     "run_restarted_without_bye": 2,
+     "snapshot_frames": 116
+    }
+   },
+   {
+    "t_s": 154.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 3,
+     "joined_late": 4,
+     "run_restarted_without_bye": 2,
+     "snapshot_frames": 116
+    }
+   },
+   {
+    "t_s": 156.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 3,
+     "joined_late": 5,
+     "run_restarted_without_bye": 3,
+     "snapshot_frames": 138
+    }
+   },
+   {
+    "t_s": 158.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 4,
+     "joined_late": 5,
+     "run_restarted_without_bye": 3,
+     "snapshot_frames": 138
+    }
+   },
+   {
+    "t_s": 160.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 4,
+     "joined_late": 6,
+     "run_restarted_without_bye": 4,
+     "snapshot_frames": 147
+    }
+   },
+   {
+    "t_s": 162.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 5,
+     "joined_late": 6,
+     "run_restarted_without_bye": 4,
+     "snapshot_frames": 147
+    }
+   },
+   {
+    "t_s": 164.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 5,
+     "joined_late": 7,
+     "run_restarted_without_bye": 5,
+     "snapshot_frames": 155
+    }
+   },
+   {
+    "t_s": 166.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 6,
+     "joined_late": 7,
+     "run_restarted_without_bye": 5,
+     "snapshot_frames": 155
+    }
+   },
+   {
+    "t_s": 167.02,
+    "state": "connecting",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 6,
+     "joined_late": 7,
+     "run_restarted_without_bye": 5,
+     "snapshot_frames": 155
+    }
+   },
+   {
+    "t_s": 168.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 6,
+     "joined_late": 7,
+     "run_restarted_without_bye": 5,
+     "snapshot_frames": 155
+    }
+   },
+   {
+    "t_s": 170.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 6,
+     "joined_late": 8,
+     "run_restarted_without_bye": 6,
+     "snapshot_frames": 219
+    }
+   },
+   {
+    "t_s": 204.03,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "joined_late": 1,
+     "snapshot_frames": 7
+    }
+   }
+  ],
+  "ear2": [
+   {
+    "t_s": -0.99,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "joined_late": 1
+    }
+   },
+   {
+    "t_s": 30.01,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 1
+    }
+   },
+   {
+    "t_s": 34.01,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 2,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 21
+    }
+   },
+   {
+    "t_s": 70.01,
+    "state": "backoff",
+    "receiveHealth": "stopped",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 2,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 21
+    }
+   },
+   {
+    "t_s": 75.01,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 3,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 85
+    }
+   },
+   {
+    "t_s": 150.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 2,
+     "joined_late": 3,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 85
+    }
+   },
+   {
+    "t_s": 152.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 2,
+     "joined_late": 4,
+     "run_restarted_without_bye": 2,
+     "snapshot_frames": 105
+    }
+   },
+   {
+    "t_s": 154.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 3,
+     "joined_late": 4,
+     "run_restarted_without_bye": 2,
+     "snapshot_frames": 105
+    }
+   },
+   {
+    "t_s": 156.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 3,
+     "joined_late": 5,
+     "run_restarted_without_bye": 3,
+     "snapshot_frames": 118
+    }
+   },
+   {
+    "t_s": 158.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 4,
+     "joined_late": 5,
+     "run_restarted_without_bye": 3,
+     "snapshot_frames": 118
+    }
+   },
+   {
+    "t_s": 160.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 4,
+     "joined_late": 6,
+     "run_restarted_without_bye": 4,
+     "snapshot_frames": 122
+    }
+   },
+   {
+    "t_s": 162.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 5,
+     "joined_late": 6,
+     "run_restarted_without_bye": 4,
+     "snapshot_frames": 122
+    }
+   },
+   {
+    "t_s": 164.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 5,
+     "joined_late": 7,
+     "run_restarted_without_bye": 5,
+     "snapshot_frames": 136
+    }
+   },
+   {
+    "t_s": 166.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 6,
+     "joined_late": 7,
+     "run_restarted_without_bye": 5,
+     "snapshot_frames": 136
+    }
+   },
+   {
+    "t_s": 168.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 6,
+     "joined_late": 8,
+     "run_restarted_without_bye": 6,
+     "snapshot_frames": 164
+    }
+   },
+   {
+    "t_s": 204.03,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "joined_late": 1,
+     "snapshot_frames": 5
+    }
+   }
+  ],
+  "ear3": [
+   {
+    "t_s": -0.99,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "joined_late": 1
+    }
+   },
+   {
+    "t_s": 30.01,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 1
+    }
+   },
+   {
+    "t_s": 35.01,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 2,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 37
+    }
+   },
+   {
+    "t_s": 70.01,
+    "state": "backoff",
+    "receiveHealth": "stopped",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 2,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 37
+    }
+   },
+   {
+    "t_s": 75.01,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 1,
+     "joined_late": 3,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 106
+    }
+   },
+   {
+    "t_s": 150.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 2,
+     "joined_late": 3,
+     "run_restarted_without_bye": 1,
+     "snapshot_frames": 106
+    }
+   },
+   {
+    "t_s": 152.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 2,
+     "joined_late": 4,
+     "run_restarted_without_bye": 2,
+     "snapshot_frames": 126
+    }
+   },
+   {
+    "t_s": 154.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 3,
+     "joined_late": 4,
+     "run_restarted_without_bye": 2,
+     "snapshot_frames": 126
+    }
+   },
+   {
+    "t_s": 156.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 3,
+     "joined_late": 5,
+     "run_restarted_without_bye": 3,
+     "snapshot_frames": 151
+    }
+   },
+   {
+    "t_s": 158.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 4,
+     "joined_late": 5,
+     "run_restarted_without_bye": 3,
+     "snapshot_frames": 151
+    }
+   },
+   {
+    "t_s": 160.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 4,
+     "joined_late": 6,
+     "run_restarted_without_bye": 4,
+     "snapshot_frames": 173
+    }
+   },
+   {
+    "t_s": 162.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 5,
+     "joined_late": 6,
+     "run_restarted_without_bye": 4,
+     "snapshot_frames": 173
+    }
+   },
+   {
+    "t_s": 164.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 5,
+     "joined_late": 7,
+     "run_restarted_without_bye": 5,
+     "snapshot_frames": 178
+    }
+   },
+   {
+    "t_s": 166.02,
+    "state": "backoff",
+    "receiveHealth": "failed",
+    "reasons": [
+     "exit_without_bye"
+    ],
+    "counts": {
+     "exit_without_bye": 6,
+     "joined_late": 7,
+     "run_restarted_without_bye": 5,
+     "snapshot_frames": 178
+    }
+   },
+   {
+    "t_s": 168.02,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "exit_without_bye": 6,
+     "joined_late": 8,
+     "run_restarted_without_bye": 6,
+     "snapshot_frames": 202
+    }
+   },
+   {
+    "t_s": 204.03,
+    "state": "connected",
+    "receiveHealth": "ok",
+    "reasons": [],
+    "counts": {
+     "joined_late": 1,
+     "snapshot_frames": 6
+    }
+   }
+  ]
+ },
+ "pushes": {
+  "ear0": [
+   {
+    "t_s": 5.93,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 10.94,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 16.02,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 149 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 21.04,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 26.06,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 36.1,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 176 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 41.12,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 46.14,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 51.16,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 56.17,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 61.2,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 66.23,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 76.29,
+    "records": 5,
+    "late": [
+     "late: heard 3s ago (snapshot)"
+    ],
+    "loss": [
+     "prod:s00000: 212 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 81.32,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 86.38,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 91.42,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 96.45,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 101.49,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 106.53,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 119.16,
+    "records": 5,
+    "late": [
+     "canticle: joined the host daemon's run late (joined_late) and its join snapshot was truncated (729 omitted), so items and station presence from before the join may be missing here.",
+     "late: heard 7s ago (snapshot)"
+    ],
+    "loss": [
+     "prod:s00000: 645 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 124.19,
+    "records": 5,
+    "late": [
+     "canticle: joined the host daemon's run late (joined_late) and its join snapshot was truncated (729 omitted), so items and station presence from before the join may be missing here."
+    ],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 129.23,
+    "records": 5,
+    "late": [
+     "canticle: joined the host daemon's run late (joined_late) and its join snapshot was truncated (729 omitted), so items and station presence from before the join may be missing here."
+    ],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 134.26,
+    "records": 5,
+    "late": [
+     "canticle: joined the host daemon's run late (joined_late) and its join snapshot was truncated (729 omitted), so items and station presence from before the join may be missing here."
+    ],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 139.3,
+    "records": 5,
+    "late": [
+     "canticle: joined the host daemon's run late (joined_late) and its join snapshot was truncated (729 omitted), so items and station presence from before the join may be missing here."
+    ],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 144.43,
+    "records": 5,
+    "late": [
+     "canticle: joined the host daemon's run late (joined_late) and its join snapshot was truncated (729 omitted), so items and station presence from before the join may be missing here."
+    ],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 149.45,
+    "records": 5,
+    "late": [
+     "canticle: joined the host daemon's run late (joined_late) and its join snapshot was truncated (729 omitted), so items and station presence from before the join may be missing here."
+    ],
+    "loss": [
+     "prod:s00000: 151 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 164.52,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 177 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 169.56,
+    "records": 5,
+    "late": [
+     "late: heard 1s ago (resurfaced)"
+    ],
+    "loss": [
+     "prod:s00000: 97 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 174.61,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 148 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 179.65,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 142 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 184.69,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 118 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 189.77,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 166 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 194.8,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 161 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 199.83,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 209.33,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 154 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 214.37,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 219.43,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 148 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 224.47,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 229.51,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 234.54,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 239.59,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 244.62,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 249.66,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 254.69,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 259.74,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 148 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 264.78,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 3 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   }
+  ],
+  "ear1": [
+   {
+    "t_s": 5.24,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 125 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 10.26,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 15.28,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 20.31,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 25.33,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 35.37,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 184 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 40.38,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 45.41,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 50.42,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 55.44,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 60.47,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 65.5,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 75.57,
+    "records": 5,
+    "late": [
+     "late: heard 3s ago (snapshot)"
+    ],
+    "loss": [
+     "prod:s00000: 220 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 80.6,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 85.62,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 90.67,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 95.71,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 100.74,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 105.76,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 110.79,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 144 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 115.83,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 148 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 120.86,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 125.9,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 130.94,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 148 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 135.98,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 141.02,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 146.09,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 139 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 156.14,
+    "records": 5,
+    "late": [
+     "canticle: the listener has heard no datagram lately, so every station reads unknown, not offline.",
+     "late: heard 0s ago (resurfaced)",
+     "late: heard 1s ago (snapshot)",
+     "late: heard 1s ago (snapshot)",
+     "late: heard 1s ago (snapshot)",
+     "late: heard 1s ago (snapshot)"
+    ],
+    "loss": [
+     "canticle: the listener has heard no datagram lately, so every station reads unknown, not offline.",
+     "prod:s00000: 183 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 161.17,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 87 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 171.22,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 175 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 176.27,
+    "records": 5,
+    "late": [
+     "late: heard 2s ago (resurfaced)"
+    ],
+    "loss": [
+     "prod:s00000: 148 dropped from a full buffer.",
+     "(29 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 181.33,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 131 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 186.36,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 191.39,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 163 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 196.42,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 149 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 209.35,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 154 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 214.39,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 148 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 219.42,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 224.45,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 229.49,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 234.53,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 239.57,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 244.6,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 249.63,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 254.68,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 259.72,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 148 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 264.78,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 3 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   }
+  ],
+  "ear2": [
+   {
+    "t_s": 5.56,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 135 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 10.58,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 15.6,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 20.62,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 25.66,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 35.7,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 195 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 40.71,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 45.74,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 50.75,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 55.78,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 60.8,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 65.85,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 75.91,
+    "records": 5,
+    "late": [
+     "late: heard 3s ago (snapshot)"
+    ],
+    "loss": [
+     "prod:s00000: 231 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 80.93,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 85.96,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 90.99,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 96.02,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 101.05,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 148 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 106.11,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 111.16,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 116.21,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 148 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 121.24,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 126.27,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 131.3,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 136.33,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 141.37,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 146.42,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 139 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 156.47,
+    "records": 5,
+    "late": [
+     "late: heard 0s ago (resurfaced)",
+     "late: heard 1s ago (snapshot)",
+     "late: heard 1s ago (snapshot)",
+     "late: heard 1s ago (snapshot)",
+     "late: heard 1s ago (snapshot)"
+    ],
+    "loss": [
+     "prod:s00000: 205 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 161.5,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 97 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 171.56,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 194 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 176.6,
+    "records": 5,
+    "late": [
+     "late: heard 2s ago (resurfaced)"
+    ],
+    "loss": [
+     "prod:s00000: 149 dropped from a full buffer.",
+     "(29 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 181.64,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 123 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 186.66,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 153 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 191.69,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 162 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 196.72,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 209.3,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 153 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 214.34,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 219.37,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 224.39,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 229.42,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 234.45,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 239.5,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 244.53,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 249.57,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 254.61,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 259.64,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 264.69,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 6 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   }
+  ],
+  "ear3": [
+   {
+    "t_s": 5.91,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 10.93,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 15.97,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 20.99,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 26.01,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 36.05,
+    "records": 5,
+    "late": [
+     "late: heard 2s ago (snapshot)"
+    ],
+    "loss": [
+     "prod:s00000: 175 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 41.06,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 46.08,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 51.1,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 56.12,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 145 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 61.14,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 66.2,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 76.26,
+    "records": 5,
+    "late": [
+     "late: heard 3s ago (snapshot)"
+    ],
+    "loss": [
+     "prod:s00000: 212 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 81.29,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 86.31,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 91.36,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 96.39,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 101.43,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 106.47,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 111.5,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 116.55,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 148 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 121.62,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 148 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 126.68,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 131.73,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 136.76,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 141.8,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 144 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 146.84,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 140 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 151.88,
+    "records": 5,
+    "late": [
+     "canticle: the listener has heard no datagram lately, so every station reads unknown, not offline.",
+     "late: heard 1s ago (snapshot)",
+     "late: heard 1s ago (snapshot)",
+     "late: heard 1s ago (snapshot)",
+     "late: heard 1s ago (snapshot)",
+     "late: heard 1s ago (snapshot)"
+    ],
+    "loss": [
+     "canticle: the listener has heard no datagram lately, so every station reads unknown, not offline.",
+     "prod:s00000: 115 dropped from a full buffer.",
+     "(16 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 156.97,
+    "records": 5,
+    "late": [
+     "late: heard 1s ago (resurfaced)",
+     "late: heard 2s ago (snapshot)",
+     "late: heard 2s ago (snapshot)",
+     "late: heard 2s ago (snapshot)"
+    ],
+    "loss": [
+     "prod:s00000: 107 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 162.03,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 113 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 172.1,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 199 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 177.14,
+    "records": 5,
+    "late": [
+     "late: heard 2s ago (resurfaced)"
+    ],
+    "loss": [
+     "prod:s00000: 149 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 182.18,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 116 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 187.23,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 162 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 192.29,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 163 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 197.32,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 209.31,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 154 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 214.35,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 219.38,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 148 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 224.41,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 229.46,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 234.5,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 239.53,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 244.57,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 249.59,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 254.63,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 146 dropped from a full buffer.",
+     "(28 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 259.67,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 147 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   },
+   {
+    "t_s": 264.7,
+    "records": 5,
+    "late": [],
+    "loss": [
+     "prod:s00000: 6 dropped from a full buffer.",
+     "(27 more records wait for the next push.)"
+    ]
+   }
+  ]
+ },
+ "pushed_twice": {
+  "ear0": 0,
+  "ear1": 0,
+  "ear2": 0,
+  "ear3": 0
+ },
+ "quiet_items": [
+  {
+   "n": 0,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:1",
+   "sung_at_s": 2.025,
+   "at_daemon_s": 2.032,
+   "pushed_at_s": {
+    "ear0": 10.943,
+    "ear1": 10.263,
+    "ear2": 10.58,
+    "ear3": 10.928
+   }
+  },
+  {
+   "n": 1,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:2",
+   "sung_at_s": 12.025,
+   "at_daemon_s": 12.049,
+   "pushed_at_s": {
+    "ear0": 16.021,
+    "ear1": 15.283,
+    "ear2": 15.6,
+    "ear3": 15.969
+   }
+  },
+  {
+   "n": 2,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:3",
+   "sung_at_s": 22.025,
+   "at_daemon_s": 22.039,
+   "pushed_at_s": {
+    "ear0": 26.064,
+    "ear1": 25.332,
+    "ear2": 25.659,
+    "ear3": 26.013
+   }
+  },
+  {
+   "n": 3,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:4",
+   "sung_at_s": 32.025,
+   "at_daemon_s": null,
+   "pushed_at_s": {
+    "ear0": 36.103,
+    "ear1": 35.367,
+    "ear2": 35.697,
+    "ear3": 36.048
+   }
+  },
+  {
+   "n": 4,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:5",
+   "sung_at_s": 42.025,
+   "at_daemon_s": 42.041,
+   "pushed_at_s": {
+    "ear0": 46.136,
+    "ear1": 45.405,
+    "ear2": 45.735,
+    "ear3": 46.082
+   }
+  },
+  {
+   "n": 5,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:6",
+   "sung_at_s": 52.025,
+   "at_daemon_s": 52.04,
+   "pushed_at_s": {
+    "ear0": 56.174,
+    "ear1": 55.442,
+    "ear2": 55.776,
+    "ear3": 56.12
+   }
+  },
+  {
+   "n": 6,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:7",
+   "sung_at_s": 62.026,
+   "at_daemon_s": 62.147,
+   "pushed_at_s": {
+    "ear0": 66.232,
+    "ear1": 65.504,
+    "ear2": 65.847,
+    "ear3": 66.202
+   }
+  },
+  {
+   "n": 7,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:8",
+   "sung_at_s": 72.025,
+   "at_daemon_s": null,
+   "pushed_at_s": {
+    "ear0": 76.286,
+    "ear1": 75.569,
+    "ear2": 75.907,
+    "ear3": 76.263
+   }
+  },
+  {
+   "n": 8,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:9",
+   "sung_at_s": 82.024,
+   "at_daemon_s": 82.051,
+   "pushed_at_s": {
+    "ear0": 86.381,
+    "ear1": 85.619,
+    "ear2": 85.955,
+    "ear3": 86.312
+   }
+  },
+  {
+   "n": 9,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:10",
+   "sung_at_s": 92.025,
+   "at_daemon_s": 92.044,
+   "pushed_at_s": {
+    "ear0": 96.452,
+    "ear1": 95.713,
+    "ear2": 96.018,
+    "ear3": 96.387
+   }
+  },
+  {
+   "n": 10,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:11",
+   "sung_at_s": 102.025,
+   "at_daemon_s": 102.093,
+   "pushed_at_s": {
+    "ear0": 106.528,
+    "ear1": 105.765,
+    "ear2": 106.114,
+    "ear3": 106.472
+   }
+  },
+  {
+   "n": 11,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:12",
+   "sung_at_s": 112.025,
+   "at_daemon_s": 112.054,
+   "pushed_at_s": {
+    "ear0": 119.161,
+    "ear1": 115.833,
+    "ear2": 116.206,
+    "ear3": 116.554
+   }
+  },
+  {
+   "n": 12,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:13",
+   "sung_at_s": 122.025,
+   "at_daemon_s": 122.06,
+   "pushed_at_s": {
+    "ear0": 124.193,
+    "ear1": 125.896,
+    "ear2": 126.269,
+    "ear3": 126.682
+   }
+  },
+  {
+   "n": 13,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:14",
+   "sung_at_s": 132.025,
+   "at_daemon_s": 132.059,
+   "pushed_at_s": {
+    "ear0": 134.264,
+    "ear1": 135.978,
+    "ear2": 136.335,
+    "ear3": 136.764
+   }
+  },
+  {
+   "n": 14,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:15",
+   "sung_at_s": 142.025,
+   "at_daemon_s": 142.18,
+   "pushed_at_s": {
+    "ear0": 144.425,
+    "ear1": 146.086,
+    "ear2": 146.42,
+    "ear3": 146.839
+   }
+  },
+  {
+   "n": 15,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:16",
+   "sung_at_s": 152.025,
+   "at_daemon_s": null,
+   "pushed_at_s": {
+    "ear0": 169.559,
+    "ear1": 156.14,
+    "ear2": 156.47,
+    "ear3": 156.965
+   }
+  },
+  {
+   "n": 16,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:17",
+   "sung_at_s": 162.025,
+   "at_daemon_s": 174.714,
+   "pushed_at_s": {
+    "ear0": 164.522,
+    "ear1": 176.266,
+    "ear2": 176.602,
+    "ear3": 177.135
+   }
+  },
+  {
+   "n": 17,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:18",
+   "sung_at_s": 172.025,
+   "at_daemon_s": 172.078,
+   "pushed_at_s": {
+    "ear0": 174.606,
+    "ear1": 176.266,
+    "ear2": 176.602,
+    "ear3": 172.101
+   }
+  },
+  {
+   "n": 18,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:19",
+   "sung_at_s": 182.025,
+   "at_daemon_s": 183.501,
+   "pushed_at_s": {
+    "ear0": 184.691,
+    "ear1": 186.357,
+    "ear2": 186.662,
+    "ear3": 187.234
+   }
+  },
+  {
+   "n": 19,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:20",
+   "sung_at_s": 192.025,
+   "at_daemon_s": 192.047,
+   "pushed_at_s": {
+    "ear0": 194.8,
+    "ear1": 196.422,
+    "ear2": 196.718,
+    "ear3": 192.287
+   }
+  },
+  {
+   "n": 20,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:21",
+   "sung_at_s": 202.025,
+   "at_daemon_s": null,
+   "pushed_at_s": {
+    "ear0": 209.326,
+    "ear1": 209.346,
+    "ear2": 209.295,
+    "ear3": 209.311
+   }
+  },
+  {
+   "n": 21,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:22",
+   "sung_at_s": 212.025,
+   "at_daemon_s": 212.043,
+   "pushed_at_s": {
+    "ear0": 214.37,
+    "ear1": 214.387,
+    "ear2": 214.335,
+    "ear3": 214.35
+   }
+  },
+  {
+   "n": 22,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:23",
+   "sung_at_s": 222.025,
+   "at_daemon_s": 222.051,
+   "pushed_at_s": {
+    "ear0": 224.47,
+    "ear1": 224.454,
+    "ear2": 224.392,
+    "ear3": 224.414
+   }
+  },
+  {
+   "n": 23,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:24",
+   "sung_at_s": 232.025,
+   "at_daemon_s": 232.051,
+   "pushed_at_s": {
+    "ear0": 234.543,
+    "ear1": 234.529,
+    "ear2": 234.453,
+    "ear3": 234.5
+   }
+  },
+  {
+   "n": 24,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:25",
+   "sung_at_s": 242.025,
+   "at_daemon_s": 242.047,
+   "pushed_at_s": {
+    "ear0": 244.624,
+    "ear1": 244.603,
+    "ear2": 244.534,
+    "ear3": 244.565
+   }
+  },
+  {
+   "n": 25,
+   "idem": "canticle:094e96655cef973f:1795421731:f21e2af1:26",
+   "sung_at_s": 252.025,
+   "at_daemon_s": 252.053,
+   "pushed_at_s": {
+    "ear0": 254.693,
+    "ear1": 254.676,
+    "ear2": 254.607,
+    "ear3": 254.63
+   }
+  }
+ ],
+ "tap_events": [
+  {
+   "t_ns": 2554498563791008,
+   "event": "connected",
+   "conn": 1,
+   "t_s": -5.09
+  },
+  {
+   "t_ns": 2554498565360351,
+   "event": "hello",
+   "conn": 1,
+   "run": "b60e9e9d8358e1d1558a3a1f208f32ab",
+   "pid": 3763486,
+   "t_s": -5.08
+  },
+  {
+   "t_ns": 2554498565360351,
+   "event": "snapshot_end",
+   "conn": 1,
+   "watermark": 3,
+   "count": 0,
+   "truncated": false,
+   "omitted": 0,
+   "t_s": -5.08
+  },
+  {
+   "t_ns": 2554533664513367,
+   "event": "eof",
+   "conn": 1,
+   "t_s": 30.02
+  },
+  {
+   "t_ns": 2554533664603400,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 30.02
+  },
+  {
+   "t_ns": 2554534664755712,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 31.02
+  },
+  {
+   "t_ns": 2554536664904504,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 33.02
+  },
+  {
+   "t_ns": 2554540665069577,
+   "event": "connected",
+   "conn": 2,
+   "t_s": 37.02
+  },
+  {
+   "t_ns": 2554540667700909,
+   "event": "hello",
+   "conn": 2,
+   "run": "78abe7d82183033a12acbb1a9fa53eea",
+   "pid": 3768022,
+   "t_s": 37.02
+  },
+  {
+   "t_ns": 2554540671288042,
+   "event": "snapshot_end",
+   "conn": 2,
+   "watermark": 129,
+   "count": 123,
+   "truncated": false,
+   "omitted": 0,
+   "t_s": 37.02
+  },
+  {
+   "t_ns": 2554573706494065,
+   "event": "bye",
+   "conn": 2,
+   "t_s": 70.06
+  },
+  {
+   "t_ns": 2554573716727731,
+   "event": "eof",
+   "conn": 2,
+   "t_s": 70.07
+  },
+  {
+   "t_ns": 2554573716790675,
+   "event": "connect_failed",
+   "error": "No such file or directory",
+   "t_s": 70.07
+  },
+  {
+   "t_ns": 2554574716933805,
+   "event": "connect_failed",
+   "error": "No such file or directory",
+   "t_s": 71.07
+  },
+  {
+   "t_ns": 2554576717054342,
+   "event": "connected",
+   "conn": 3,
+   "t_s": 73.07
+  },
+  {
+   "t_ns": 2554576810913120,
+   "event": "hello",
+   "conn": 3,
+   "run": "e9dca7b0e1bc1e208710ea3baebb7601",
+   "pid": 3775119,
+   "t_s": 73.16
+  },
+  {
+   "t_ns": 2554576812177546,
+   "event": "snapshot_end",
+   "conn": 3,
+   "watermark": 134,
+   "count": 37,
+   "truncated": false,
+   "omitted": 0,
+   "t_s": 73.16
+  },
+  {
+   "t_ns": 2554653674701508,
+   "event": "eof",
+   "conn": 3,
+   "t_s": 150.03
+  },
+  {
+   "t_ns": 2554653674781732,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 150.03
+  },
+  {
+   "t_ns": 2554654674940263,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 151.03
+  },
+  {
+   "t_ns": 2554656675082177,
+   "event": "connected",
+   "conn": 4,
+   "t_s": 153.03
+  },
+  {
+   "t_ns": 2554656750931004,
+   "event": "hello",
+   "conn": 4,
+   "run": "9b36d5e3a3460d9e5de691b92683f66d",
+   "pid": 3785427,
+   "t_s": 153.1
+  },
+  {
+   "t_ns": 2554656752794059,
+   "event": "snapshot_end",
+   "conn": 4,
+   "watermark": 163,
+   "count": 63,
+   "truncated": false,
+   "omitted": 0,
+   "t_s": 153.1
+  },
+  {
+   "t_ns": 2554657675154346,
+   "event": "eof",
+   "conn": 4,
+   "t_s": 154.03
+  },
+  {
+   "t_ns": 2554657675228779,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 154.03
+  },
+  {
+   "t_ns": 2554658675476743,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 155.03
+  },
+  {
+   "t_ns": 2554660675595732,
+   "event": "connected",
+   "conn": 5,
+   "t_s": 157.03
+  },
+  {
+   "t_ns": 2554660810247759,
+   "event": "hello",
+   "conn": 5,
+   "run": "d037cf544213ac9688d3beb1442400a3",
+   "pid": 3785733,
+   "t_s": 157.16
+  },
+  {
+   "t_ns": 2554660812124462,
+   "event": "snapshot_end",
+   "conn": 5,
+   "watermark": 155,
+   "count": 65,
+   "truncated": false,
+   "omitted": 0,
+   "t_s": 157.16
+  },
+  {
+   "t_ns": 2554661677844392,
+   "event": "eof",
+   "conn": 5,
+   "t_s": 158.03
+  },
+  {
+   "t_ns": 2554661677909625,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 158.03
+  },
+  {
+   "t_ns": 2554662678145278,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 159.03
+  },
+  {
+   "t_ns": 2554664678255149,
+   "event": "connected",
+   "conn": 6,
+   "t_s": 161.03
+  },
+  {
+   "t_ns": 2554664678499600,
+   "event": "hello",
+   "conn": 6,
+   "run": "f780c8e0e2ea61eccb7e2c0f53b95901",
+   "pid": 3786121,
+   "t_s": 161.03
+  },
+  {
+   "t_ns": 2554664679586552,
+   "event": "snapshot_end",
+   "conn": 6,
+   "watermark": 157,
+   "count": 61,
+   "truncated": false,
+   "omitted": 0,
+   "t_s": 161.03
+  },
+  {
+   "t_ns": 2554665690135913,
+   "event": "eof",
+   "conn": 6,
+   "t_s": 162.04
+  },
+  {
+   "t_ns": 2554665690202874,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 162.04
+  },
+  {
+   "t_ns": 2554666690453097,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 163.04
+  },
+  {
+   "t_ns": 2554668690592186,
+   "event": "connected",
+   "conn": 7,
+   "t_s": 165.04
+  },
+  {
+   "t_ns": 2554668844214611,
+   "event": "hello",
+   "conn": 7,
+   "run": "5709f28f69537faa19fb1ad109fa900e",
+   "pid": 3786464,
+   "t_s": 165.2
+  },
+  {
+   "t_ns": 2554668880826238,
+   "event": "snapshot_end",
+   "conn": 7,
+   "watermark": 166,
+   "count": 64,
+   "truncated": false,
+   "omitted": 0,
+   "t_s": 165.23
+  },
+  {
+   "t_ns": 2554669676055095,
+   "event": "eof",
+   "conn": 7,
+   "t_s": 166.03
+  },
+  {
+   "t_ns": 2554669676122328,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 166.03
+  },
+  {
+   "t_ns": 2554670676361023,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 167.03
+  },
+  {
+   "t_ns": 2554672676492467,
+   "event": "connected",
+   "conn": 8,
+   "t_s": 169.03
+  },
+  {
+   "t_ns": 2554672800385754,
+   "event": "hello",
+   "conn": 8,
+   "run": "422ebbc53803897b86ad5ca11131cc6d",
+   "pid": 3786631,
+   "t_s": 169.15
+  },
+  {
+   "t_ns": 2554672823540295,
+   "event": "snapshot_end",
+   "conn": 8,
+   "watermark": 160,
+   "count": 64,
+   "truncated": false,
+   "omitted": 0,
+   "t_s": 169.17
+  },
+  {
+   "t_ns": 2554703680839996,
+   "event": "eof",
+   "conn": 8,
+   "t_s": 200.03
+  },
+  {
+   "t_ns": 2554703680906556,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 200.03
+  },
+  {
+   "t_ns": 2554704681127982,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 201.03
+  },
+  {
+   "t_ns": 2554706681443079,
+   "event": "connect_failed",
+   "error": "Connection refused",
+   "t_s": 203.03
+  },
+  {
+   "t_ns": 2554710681656959,
+   "event": "connected",
+   "conn": 9,
+   "t_s": 207.03
+  },
+  {
+   "t_ns": 2554710715123427,
+   "event": "hello",
+   "conn": 9,
+   "run": "5db51f6c7a425de69afc6c60ba088f87",
+   "pid": 3787642,
+   "t_s": 207.07
+  },
+  {
+   "t_ns": 2554710718708081,
+   "event": "snapshot_end",
+   "conn": 9,
+   "watermark": 343,
+   "count": 123,
+   "truncated": false,
+   "omitted": 0,
+   "t_s": 207.07
+  }
+ ]
+}
