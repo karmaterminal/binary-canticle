@@ -169,3 +169,5 @@ the pending frame's survival (RED); every key's service under a full flood, with
 | **W** | #177 at the daemon (a diagnostic) | `nobudget` (pass 3's `toggles/a-budgets.patch`: the head's two check budgets lifted) on `a0862c3` and on 🕯's `0f55b1d`: `churn-40-20000-30` and `-120`. Pass 3's finding was 16.4 and 56.8 s there. 🕯's passes if its first frame is ≤ 1.0 s in every run; reverting his commit must miss it | 5 with `0f55b1d`, 3 without |
 
 W runs after E1. It decides nothing about the slice.
+
+**That section's time, corrected:** it was committed at 17:53Z (`38bd631`), not 18:10Z. Nothing had been measured then, or has been since.

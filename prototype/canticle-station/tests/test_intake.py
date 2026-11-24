@@ -1051,13 +1051,13 @@ class SlotTest(IntakeCase):
 
     def taken(self, frame, limit):
         """The turn that takes ``frame``; what comes before it fails."""
-        while True:
+        for _ in range(1_000):
             got = self.intake.take(limit)
             if frame in [t.data for t in got]:
                 return got
             for t in got:
                 self.intake.settle(t, False, False)
-            self.assertTrue(got, "nothing is left, and it never came")
+        self.fail("it never came")
 
     def test_a_source_that_waits_alone_queues_as_ever(self):
         f = item(B, 1)
@@ -1342,7 +1342,7 @@ class SlotTest(IntakeCase):
                 self.offer(*[forge(f, 1_000 * round_ + n) for n in range(8)], src=THERE)
                 self.offer(forge(f, 50_000 + round_), src=udp(40_000 + k, 2 + round_))
         self.intake.slice.tokens, self.intake.slice.at = 0.0, self.now
-        while len(order) < 3 * len(frames):
+        for _ in range(100):
             self.now += 2.001 / intake.SLICE_RATE                    # two tokens a turn
             for t in self.intake.take(8):
                 if t.budget is self.intake.slice:
@@ -1386,7 +1386,7 @@ class EchoTest(IntakeCase):
     def turns(self, frame):
         """Until ``frame`` is accepted. Returns whose copy was."""
         who = None
-        while self.intake.waiting():
+        for _ in range(100):
             self.now += 0.02
             for t in self.intake.take(32):
                 ok = t.data == frame
