@@ -20,7 +20,7 @@ read-only verification did not repeat that timed socket row.
 | lane/safe branch | `codeagent/bc-173-pick-verify` | `fcb4359db29c7c565c605cfb167b897c31042f30` before report commit | equal | equal | equal |
 | CI/workflow | N/A | N/A | N/A | N/A | N/A |
 | presentation | N/A | N/A | N/A | N/A | N/A |
-| docs/proof | this report | to be set by pushed commit | report branch | report branch | report branch |
+| docs/proof | this report | `b0bef41eccd5d6c3e43460a8c192d951dadd009f` | equal | equal | equal |
 
 The lane branch was published unchanged before the identity gate. It resolved
 equally in the local worktree, `origin/...`, and `ls-remote origin` before
