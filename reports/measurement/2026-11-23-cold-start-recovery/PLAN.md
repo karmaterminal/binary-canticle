@@ -102,3 +102,15 @@ neither its address nor more than three others: then it gets a stranger's place 
 | 1r | saturation, rate | 200 000 (four producers; about what four can churn) | `churn-40` | 1 | 5 |
 | 1h | saturation, the newcomer on another address than the flood | 20 000, 100 000 | `otherhost-40`: `churn-40` from 127.0.0.1, the newcomer on 127.0.0.2 | 1 | 5 (base 3) |
 | 1m | model: the head's own `Intake` in virtual time (`newcomer_model.py`), no sockets, no signatures | 5 000 – 400 000 | churn and fixed, even and in bursts | – | – |
+
+### The two gates, and how a candidate from the split is measured (declared before any of their runs)
+
+- **Gate 1, established-station protection:** #171's 57/57 flood rows. Scaled down (`established_rows.py`: R1, R2, R3, R3c, R4; 5
+  runs each of the head and of the split candidate, 3 of base), with the tests' own bounds: 57 of 57 during the flood, p50 ≤ 250
+  ms, none later than 4.5 s, the kernel's drops reported. Any run that misses fails the row. Full length (#171's harness, 570 s;
+  F rows 300 s): the head's are pass 2's, on the same daemon code; the candidate gets one run of each row, and four more of
+  every row whose first run passes, since one failing run already decides a row.
+- **Gate 2, cold-start-under-churn latency:** row 0 of this file, with its deadlines, on the candidate (5 runs per cell) beside the
+  head and base.
+- The rest of the #171 suite (pass 2's `scaled_rows.py`: cold start, exact-source spoof, relay-first) runs 5 times on the candidate.
+- Neither gate stands in for the other.
