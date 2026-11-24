@@ -194,19 +194,19 @@ class StreamQueue:
         self.known_next = True
 
     def put(self, source: Source, entry: tuple) -> Optional[tuple]:
-        """None when the same bytes already wait in this source's lane. Else (whether a lane was opened, the source of
-        the datagram that lost its place or None): at most one does, the new one or, when a stranger below its share
-        of a full pool comes, the newest of the longest lane."""
+        """None when the same bytes already wait in this source's lane. Else (whether a lane was opened, the datagram that lost
+        its place and its source, or None): at most one does, the new one or, when a stranger below its share of a full
+        pool comes, the newest of the longest lane."""
         lane = self.lanes.get(source)
         if lane is not None and entry[1] in lane.digests:
             return None
         out = None
         if source.known:
             if lane is not None and len(lane.queue) >= KNOWN_DEPTH:
-                return False, source
+                return False, (entry, source)
         elif self.pool >= STRANGER_POOL:
             if lane is not None and len(lane.queue) >= STRANGER_POOL // len(self.strange):
-                return False, source
+                return False, (entry, source)
             out = self._shed()
         new = lane is None
         if new:
@@ -223,13 +223,14 @@ class StreamQueue:
         lane = None if source.crowd else self.lanes.get(source)
         return self.pool > (len(lane.queue) if lane is not None else 0)
 
-    def _shed(self) -> Source:
-        """The newest datagram of the strangers' longest lane loses its place. Returns whose it was."""
+    def _shed(self) -> tuple:
+        """The newest datagram of the strangers' longest lane loses its place. Returns it, and whose it was."""
         longest = max(self.strange, key=lambda o: len(o.queue))
-        longest.digests.remove(longest.queue.pop()[1])
+        entry = longest.queue.pop()
+        longest.digests.remove(entry[1])
         longest.source.queued -= 1
         self.pool -= 1
-        return longest.source
+        return entry, longest.source
 
     def pick(self, now: float) -> Optional[tuple]:
         for ring in ((self.known, self.strange) if self.known_next else (self.strange, self.known)):
@@ -251,32 +252,51 @@ class StreamQueue:
                 return (*entry, source)
         return None
 
-    def change(self, source: Source) -> int:
-        """``source`` has just become known, or a stranger again: its lane goes to the other ring. Returns how many
-        datagrams that left without a place in the strangers' pool."""
+    def remove(self, source: Source, entry: tuple) -> None:
+        """Take one datagram out of its source's lane: it is served by another way."""
+        lane = self.lanes[source]
+        lane.queue.remove(entry)
+        lane.digests.remove(entry[1])
+        source.queued -= 1
+        ring = self.known if source.known else self.strange
+        self.pool -= ring is self.strange
+        if not lane.queue:
+            ring.remove(lane)
+            del self.lanes[source]
+
+    def change(self, source: Source) -> list:
+        """``source`` has just become known, or a stranger again: its lane goes to the other ring. Returns the datagrams
+        that left without a place in the strangers' pool."""
         lane = self.lanes.get(source)
         if lane is None:
-            return 0
+            return []
         old, new = (self.strange, self.known) if source.known else (self.known, self.strange)
         old.remove(lane)
         new.append(lane)
         self.pool += -len(lane.queue) if source.known else len(lane.queue)
-        over = max(0, self.pool - STRANGER_POOL)
-        for _ in range(over):
-            self._shed()
-        return over
+        return [self._shed()[0] for _ in range(max(0, self.pool - STRANGER_POOL))]
 
-    def drop(self, source: Source) -> int:
-        """Forget what a source that is no longer known has waiting. Returns how many datagrams that was."""
+    def drop(self, source: Source) -> list:
+        """Forget what a source that is no longer known has waiting. Returns it."""
         lane = self.lanes.pop(source, None)
         if lane is None:
-            return 0
+            return []
         self.known.remove(lane)
-        return len(lane.queue)
+        source.queued -= len(lane.queue)
+        return list(lane.queue)
+
+
+class Claim:
+    """A newcomer's datagram that has a place in its key's slot, and in its source's lane too while it is ``queued``."""
+
+    __slots__ = ("entry", "stream", "source", "queued")
+
+    def __init__(self, entry: tuple, stream: StreamQueue, source: Source):
+        self.entry, self.stream, self.source, self.queued = entry, stream, source, True
 
 
 class Slot:
-    """What waits of a key for the slice: one (entry, stream, source) of each address, in the order they came."""
+    """What waits of a key for the slice: one Claim of each address, in the order they came."""
 
     __slots__ = ("untried", "demoted", "turns", "due")
 
@@ -287,24 +307,29 @@ class Slot:
     def __len__(self) -> int:
         return len(self.untried) + len(self.demoted)
 
-    def get(self, addr) -> Optional[tuple]:
+    def get(self, addr) -> Optional[Claim]:
         return self.untried.get(addr) or self.demoted.get(addr)
+
+    def remove(self, addr) -> None:
+        if self.untried.pop(addr, None) is None:
+            del self.demoted[addr]
 
     def move(self, addr, old: OrderedDict, new: OrderedDict) -> None:
         """What an address has waiting, behind the others of the other kind, when there is room for it."""
         if addr in old and len(new) < SLOT_MAX:
             new[addr] = old.pop(addr)
 
-    def pick(self, ready: Callable[[StreamQueue], bool]) -> Optional[tuple]:
-        """The next one whose stream is ``ready``. A few are looked at: one that isn't goes behind the others."""
+    def pick(self, ready: Callable[[StreamQueue], bool]) -> Optional[Claim]:
+        """The next one whose stream is ``ready``; the others keep their turns."""
         last = self.turns % SLOT_M == SLOT_M - 1
+        streams: dict = {}
         for ring in ((self.demoted, self.untried) if last else (self.untried, self.demoted)):
-            for _ in range(min(len(ring), TURN)):
-                addr = next(iter(ring))
-                if ready(ring[addr][1]):
+            for addr, claim in ring.items():
+                if claim.stream not in streams:
+                    streams[claim.stream] = ready(claim.stream)
+                if streams[claim.stream]:
                     self.turns += 1
                     return ring.pop(addr)
-                ring.move_to_end(addr)
         return None
 
 
@@ -362,8 +387,8 @@ class KeyQueue:
         return got
 
     def demote(self, addr, now: float) -> None:
-        """A frame from ``addr`` failed. That is evidence against the frame, and no proof against its source, so it costs it its
-        place in the order and no more."""
+        """A frame from ``addr`` failed, or verified and changed nothing. That is evidence against the frame, and no proof against
+        its source, so it costs it its place in the order and no more."""
         self.demotions[addr] = now
         self.demotions.move_to_end(addr)
         if len(self.demotions) > DEMOTED_MAX:
@@ -371,7 +396,7 @@ class KeyQueue:
         self.slot.move(addr, self.slot.untried, self.slot.demoted)
 
     def clear(self, addr) -> None:
-        """A frame from ``addr`` verified."""
+        """A frame from ``addr`` was new, or is kept."""
         if self.demotions.pop(addr, None) is not None:
             self.slot.move(addr, self.slot.demoted, self.slot.untried)
 
@@ -408,15 +433,25 @@ class KeyQueue:
         old.budget, old.known = self.stranger_budget, False
         if self._room(host_of(old_addr)):
             self._enter(old_addr, old)
-            return sum(s.change(old) for s in self.streams.values())
+            return sum(self.lost(s.change(old)) for s in self.streams.values())
         # No room to keep it apart: what it had waiting goes, so lanes stay bounded by the two tables.
         lost = 0
         for s in self.streams.values():
-            lost += s.drop(old)
+            lost += self.lost(s.drop(old))
             if not s.lanes and s in self.ready:
                 self.ready.remove(s)
-        old.queued -= lost
         return lost
+
+    def lost(self, entries: list) -> int:
+        """Datagrams that lost their place in a lane. Returns how many don't wait in the slot either."""
+        n = 0
+        for entry in entries:
+            claim = self.slot.get(entry[2])
+            if claim is not None and claim.entry is entry:
+                claim.queued = False
+            else:
+                n += 1
+        return n
 
     def pick(self, now: float) -> Optional["Ticket"]:
         for _ in range(len(self.ready)):
@@ -706,32 +741,37 @@ class Intake:
     def _place(self, key: KeyQueue, entry: tuple, now: float) -> bool:
         """Queue one claim, or refuse it (or the one it displaces). True when a source has something waiting for
         the stream that had nothing."""
-        data, addr = entry[0], entry[2]
+        data = entry[0]
         stream = key.streams.get(BEACON if data[3] == wire.KIND_BEACON else peek_stream(data)) or key.streams[OTHER]
-        source = key.source(addr, now)
+        source = key.source(entry[2], now)
+        wake = False
         if not source.known and stream.contended(source):
             stood = self._stand(key, entry, stream, source, now)
-            if stood is not None:
-                return stood
+            if stood is None:
+                self.copied += 1
+                return False
+            wake = stood and len(key.slot) == 1 and self.slice.ready(now)    # else the loop comes back for the queues
         idle = not stream.lanes
         got = stream.put(source, entry)
         if got is None:
             self.copied += 1
             return False
         new, out = got
-        if out is not None:
-            self.refused["unverified" if out.budget.tokens < 1.0 or self.checks.tokens < 1.0 else
+        if out is not None and key.lost(out[:1]):
+            source = out[1]
+            self.refused["unverified" if source.budget.tokens < 1.0 or self.checks.tokens < 1.0 else
                          "over_rate" if stream.bucket.tokens < 1.0 or (key.bucket.tokens < 1.0 and not stream.beacon)
                          else "backlog"] += 1
         if idle:
             key.ready.append(stream)
             if len(key.ready) == 1:
                 self._ready.append(key)
-        return new
+        return new or wake
 
     def _stand(self, key: KeyQueue, entry: tuple, stream: StreamQueue, source: Source, now: float) -> Optional[bool]:
-        """Give a newcomer's datagram a place in its key's slot. None when there is none for it, or its source has one, so that
-        it queues; else whether the loop is to be woken (it comes back by itself for what waits in the queues)."""
+        """Whether a newcomer's datagram got a place in its key's slot, beside the one in its lane. It doesn't when its source
+        has one, when there is no room, or when the same bytes wait in a lane of the stream: an echo of them must not go
+        round. None when it is a copy of what its source has there."""
         addr, slot = entry[2], key.slot
         at = key.demotions.get(addr)
         demoted = at is not None and now - at < self.retain
@@ -739,18 +779,14 @@ class Intake:
         if held is not None:
             if not demoted:
                 slot.move(addr, slot.demoted, slot.untried)
-            if held[0][1] != entry[1]:
-                return None
-            self.copied += 1
-            return False
+            return None if held.entry[1] == entry[1] else False
         ring = slot.demoted if demoted else slot.untried
         if len(ring) >= SLOT_MAX or any(entry[1] in lane.digests for lane in stream.lanes.values()):
-            return None                            # no room, or an echo of what waits already, which must not go round it
+            return False
         if not slot:
             self._slots.append(key)
-        ring[addr] = entry, stream, source
-        source.queued += 1
-        return self.slice.ready(now) and len(slot) == 1
+        ring[addr] = Claim(entry, stream, source)
+        return True
 
     def _place_unlisted(self, datagrams: list) -> bool:
         q = self.unlisted.ready
@@ -822,6 +858,11 @@ class Intake:
             if t is not None:
                 if t.key is not None:
                     self.checks.take()
+                    claim = key.slot.get(t.addr)
+                    if claim is not None and claim.entry[1] == t.digest:     # its turn in the queues came first
+                        key.slot.remove(t.addr)
+                        if not key.slot:
+                            self._slots.remove(key)
                 return t
         return None
 
@@ -834,15 +875,18 @@ class Intake:
             self._slots.rotate(-1)
             if now < key.slot.due:
                 continue
-            got = key.slot.pick(lambda s: s.bucket.ready(now) and (s.beacon or key.bucket.ready(now)))
-            if got is None:
+            claim = key.slot.pick(lambda s: s.bucket.ready(now) and (s.beacon or key.bucket.ready(now)))
+            if claim is None:
                 continue
             if not key.slot:
                 self._slots.pop()
-            entry, stream, source = got
-            source.queued -= 1
+            if claim.queued:
+                claim.stream.remove(claim.source, claim.entry)
+                if not claim.stream.lanes:
+                    key.ready.remove(claim.stream)
+                    self._unready(key)
             self.slice.take()
-            return Ticket(*entry, self._slice, key, stream)
+            return Ticket(*claim.entry, self._slice, key, claim.stream)
         return None
 
     def waiting(self) -> bool:
@@ -879,9 +923,9 @@ class Intake:
                 if t.budget is not self.slice:
                     t.budget.take(NO_OP_COST - 1)
                 elif t.digest not in self.repeats:     # turns of its own key, never another's; what is kept was that only once
-                    t.key.slot.due = now + SLICE_PAUSE_S
+                    t.key.slot.due = max(now, t.key.slot.due) + SLICE_PAUSE_S
             if t.key is not None:
-                if verified:
+                if fresh or t.digest in self.repeats:
                     t.key.clear(t.addr)
                 elif t.addr not in t.key.known:
                     t.key.demote(t.addr, now)
@@ -958,7 +1002,8 @@ class Intake:
 
     def stats(self) -> dict:
         with self._lock:
-            queued = len(self.unlisted.ready) + sum(len(k.slot) for k in self.keys.values()) + sum(
+            queued = len(self.unlisted.ready) + sum(
+                not c.queued for k in self.keys.values() for r in (k.slot.untried, k.slot.demoted) for c in r.values()) + sum(
                 len(lane.queue) for k in self.keys.values() for s in k.streams.values() for lane in s.lanes.values())
             return {"read": self.read, "repeats": self.repeated, "copies": self.copied, "verified": self.verified,
                     "unverified": self.unverified, "reserved": self.reserved, "queued": queued,
