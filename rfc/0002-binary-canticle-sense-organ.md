@@ -450,7 +450,7 @@ rate-limited decision `[proposed: #168]`. Today:
   readable with `hear` `[built+tested: frond-ear@a8e2e5b:src/canticle/delivery.ts:5 | test/canticle-delivery.test.ts:749]`.
 - Daemon-held schedules owe wakes until acknowledged, and `wake_on` GitHub is off unless the config turns
   it on `[built+tested: frond-ear@a8e2e5b:src/wakes.ts:2 | test/wake-on.test.ts:154]`.
-- The OpenClaw plugin wires no wake path `[built: binary-canticle@08c11127:prototype/openclaw-canticle/README.md:9]`.
+- The OpenClaw plugin wires no wake path (per binary-canticle@08c11127 `prototype/openclaw-canticle/README.md:9`) `[open: #161]`.
 
 Whether a canticle arrival outside the alarm class may earn a wake under the prince's own policy is
 §7.2.
@@ -614,7 +614,7 @@ lifecycle revision `[built: binary-canticle@08c11127:prototype/openclaw-canticle
 Its fake-host tests are a **source slice**, not an installed continuing-reader proof: the
 [prototype README at `08c11127`](https://github.com/karmaterminal/binary-canticle/tree/08c11127d4e11ed00f307a7006d85581c8674a28/prototype/openclaw-canticle)
 explicitly lacks a live host drain/activation proof and a wake path
-`[built: binary-canticle@08c11127:prototype/openclaw-canticle/README.md:7]`. #161's first code lane
+(per binary-canticle@08c11127 `prototype/openclaw-canticle/README.md:7`) `[open: #161]`. #161's first code lane
 stopped at a real gate: #162's positive Reader route admitted an isolated child, not an ordinary
 continuing Discord session `[built: binary-canticle@452c5433:prototype/canticle-station/canticle/derived_reply_proposal.py:85]`.
 That lane produced no product-code candidate. The next design join MUST reconcile the existing OC-0
@@ -662,7 +662,7 @@ an installed receipt.
 | Fair admission at the host daemon's first hop | open PR, not merged | #173 | `[proposed: #173]` |
 | §2.7 flood acceptance test | FAILS on the built path | #171's report | `[built+tested: binary-canticle@d4c3066:reports/measurement/2026-11-23-step-one/README.md:9 \| step-one flood cells F1-F11]` |
 | Derived publication (answering back) | closed: no owner issuer; on silas the station keys remain readable by the ear uid | frond-ear#113; #162 draft; binary-canticle#99 | `[open: binary-canticle#99]` |
-| OpenClaw continuing-reader ingress | conditional OC-0 source slice; live continuing-session drain/custody unproved | #161 and the pinned prototype README | `[built: binary-canticle@08c11127:prototype/openclaw-canticle/README.md:7]` |
+| OpenClaw continuing-reader ingress | conditional OC-0 source slice; live continuing-session drain/custody unproved | #161 and the pinned prototype README | `[open: #161]` |
 | Ring-backed ear | design only | frond-ear#116, frond-ear#118 | `[proposed: frond-ear#116]` |
 | Durable per-prince ledger and return view | design only | this RFC §3.1 | `[proposed: #168]` |
 | End-to-end round trip to a second ear | not proven | #167 | `[proposed: #167]` |
