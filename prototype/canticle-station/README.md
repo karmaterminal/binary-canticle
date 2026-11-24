@@ -596,8 +596,9 @@ What it does not do:
 - **A station that is still a stranger, among many.** Until one of its frames verifies from a new source (a cold
   start, or its restart on a new port) it competes with every other stranger claiming its key. If a flood shares its
   lane, it is verified only as often as chance picks it there. Flooded at 20 000 a second from 12 or 40 ports of its own
-  host, its first valid frame was admitted within 0.1 s; from 200 ports its first items came up to 16 s late in one run
-  (at most 2 s in five others); from a newly opened socket per datagram its first valid frame took up to 14 s and its
+  host, its first valid frame was admitted within 0.1 s; from 200 ports its first items came up to 16 s late in one run,
+  and in five others its first frame took up to 1,065 ms and its items up to 2,015 ms, a FAIL of the ≤1 s / ≤2 s deadline
+  declared for pass 3; from a newly opened socket per datagram its first valid frame took up to 14 s and its
   items up to 25 s: **a FAIL of the rows' 4.5 s bound**, and worse than before #171, when a whole core spent on checking
   admitted the first one within 0.1 s at that rate.
 - **The caps are fixed.** They do not follow a station's declared `b_station` or `b_stream` (§7.5), which its own key

@@ -169,7 +169,7 @@ raw runs: [`results-scaled/a3460fe8.json`](results-scaled/a3460fe8.json).
 | relay-after-then-churn-100000 | 5 | 100,004–100,005 | 1,027,949–1,027,993 | 20, 20, 20, 20, 20 of 20 | 22–31, 33–38, 33–38 | – | 20, 20, 20, 20, 20 of 20 | 0 (0) | unverified 1,979,633, backlog 31 | 20,414 | 2–5, 0 | datagrams_refused | PASS |
 | cold-start-12-ports-20000 | 5 | 20,000–20,001 | 12 | 20, 20, 20, 20, 20 of 20 | 19–20, 26–43, 26–43 | 29–54 | – | 0 (0) | unverified 569,414, backlog 6 | 30,499 | 1, 0 | datagrams_refused | PASS |
 | cold-start-40-ports-20000 | 5 | 20,000–20,001 | 40 | 20, 20, 20, 20, 20 of 20 | 19–21, 71–95, 71–95 | 73–104 | – | 0 (0) | unverified 569,411, backlog 6 | 30,505 | 1, 0 | datagrams_refused | PASS |
-| cold-start-200-ports-20000 | 5 | 20,000–20,001 | 200 | 20, 20, 20, 20, 20 of 20 | 18–21, 164–2,015, 164–2,015 | 159–1,065 | – | 0 (0) | unverified 569,414, backlog 5 | 30,499 | 1, 0 | datagrams_refused | PASS |
+| cold-start-200-ports-20000 | 5 | 20,000–20,001 | 200 | 20, 20, 20, 20, 20 of 20 | 18–21, 164–2,015, 164–2,015 | 159–1,065 | – | 0 (0) | unverified 569,414, backlog 5 | 30,499 | 1, 0 | datagrams_refused | **FAIL** (first frame up to 1,065 ms, items up to 2,015 ms: misses the ≤1 s / ≤2 s deadline declared for pass 3; within the rows' 4.5 s bound) |
 | cold-start-churn-own-host-20000 | 5 | 20,000–20,001 | 28,227–28,228 | 20, 20, 20, 20, 20 of 20 | 19–16,287, 170–25,159, 170–25,159 | 162–13,768 | – | 0 (0) | unverified 569,449, backlog 0 | 30,454 | 1, 0 | datagrams_refused | **FAIL** |
 | cold-start-churn-60000-hosts-20000 | 5 | 20,000–20,001 | 599,922–599,933 | 20, 20, 20, 20, 20 of 20 | 20–10,784, 1,024–17,330, 1,024–17,330 | 600–5,454 | – | 0 (0) | unverified 569,456, backlog 0 | 30,594 | 1, 0 | datagrams_refused | **FAIL** |
 
@@ -195,7 +195,8 @@ What they say:
 - **Cold start.** The station's FIRST valid frame arrives during the forged flood, before its source has earned a share of its
   own, so it competes with the forger's ports as a stranger. From 12 and 40 ports of its own host, its first valid frame was
   admitted 29-104 ms after it went out and all 20 items arrived within 0.1 s. From 200 ports it took up to 1.1 s in these
-  five runs and the items up to 2.0 s; pass 1 had a run 16 s late, so the row is a FAIL whatever the table's five say.
+  five runs and the items up to 2.0 s: a FAIL of the ≤1 s / ≤2 s deadline declared for pass 3 (first frame 1,065 ms, items
+  2,015 ms), though within the rows' 4.5 s bound; pass 1 also had a run 16 s late.
   Against **churned sources** it took 0.2-13.8 s, and the items up to 25 s: the crowd's lanes are full of the flood, and the
   station waits for chance. All 20 arrived, but this FAILS the 4.5 s bound and is worse than base (first valid frame within
   0.05 s, items within 2 s at this rate), because base spends a whole core on checks and this spends 1 000 a second on the
