@@ -1269,7 +1269,7 @@ class SlotTest(IntakeCase):
                     key.lost(s.drop(source))
                     key.ready.clear()
             self.intake._ready.clear()
-        self.assertEqual(self.intake.stats()["queued"], 40)
+        self.assertEqual((self.intake.stats()["queued"], self.intake.waiting()), (40, True))
         self.assertEqual(len(self.intake.take(32)), 40)
 
     def test_no_queue_full_of_copies_keeps_the_slots_from_their_places(self):
@@ -1380,8 +1380,19 @@ class SlotTest(IntakeCase):
         self.offer(b, src=addr(41))
         bucket = self.key.streams[stream_id("chatter")].bucket
         bucket.tokens, bucket.at = 0.0, self.now
-        self.assertIn(b, self.serve(2))
+        self.assertEqual([t.data for t in self.intake.take(2) if t.budget is self.intake.slice], [b])
         self.assertEqual(self.waits(), [f])
+
+    def test_a_slot_that_serves_the_last_of_what_waits_takes_the_key_out_of_the_turns(self):
+        self.serve(8, verified=lambda t: False)
+        f = item(A, 1)
+        self.offer(forge(f, 9), src=THERE)
+        self.offer(f, src=HERE)
+        self.assertEqual(len(self.serve(1, verified=lambda t: False)), 1)      # the other's, and it is left
+        self.assertEqual((self.waits(), len(self.key.ready)), ([f], 1))
+        self.intake.checks.tokens, self.intake.checks.at = -1e9, self.now      # the queues serve nothing
+        self.assertEqual(self.serve(4), [f])
+        self.assertEqual((list(self.key.ready), list(self.intake._ready), self.intake.waiting()), ([], [], False))
 
     def test_what_waits_for_its_streams_rate_keeps_its_turn(self):
         frames = [item(A, n + 1) for n in range(6)]
@@ -1666,17 +1677,20 @@ class LeaseTest(IntakeCase):
         self.offer(old, src=HERE)
         self.assertEqual(self.known(HORIZON_S - 1), [HERE])
 
-    def test_the_copies_of_a_slots_ticket_renew_when_a_queues_stands_for_it(self):
-        self.accept_from(HERE, item(A, 1))
-        self.accept_from(THERE, item(A, 2))
-        self.now += HORIZON_S - 1
+    def test_a_slots_copy_renews_its_source_when_a_queues_stands_for_it(self):
+        """A source whose frame waits in the slot has become known by another one meanwhile."""
+        self.accept_from(THERE, item(A, 1))
         self.offer(*[forge(item(A, 1), n) for n in range(4)], src=addr(9))
         f = item(A, 3)
-        self.offer(f, src=addr(60))                            # a relay's, in the slot; then both of those that have a place
         self.offer(f, src=HERE)
+        with self.intake._lock:
+            self.intake.keys[KID_A].know(HERE)
+        self.now += HORIZON_S - 1
         self.offer(f, src=THERE)
-        self.accept()
-        self.assertLessEqual({HERE, THERE}, set(self.known(HORIZON_S - 1)))
+        (t,) = [t for t in self.intake.take(32) if t.data == f]
+        self.intake.remember(t, (KID_A, 5, 0, 3), runner.now_ms() + 60_000)
+        self.intake.settle(t, True, True)
+        self.assertEqual((t.addr, set(self.known(HORIZON_S - 1))), (THERE, {HERE, THERE}))
 
     def test_a_lapse_that_takes_the_last_of_what_waits_leaves_the_key_out_of_the_turns(self):
         self.accept_from(HERE, item(A, 1))
