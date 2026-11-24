@@ -603,8 +603,9 @@ What it does not do:
   second 4 of 240 were late, at 100 000 156 of 240 late or lost. Its first frame comes sooner (within 0.1 s, and 2.4 s). Once one frame
   is heard, the head's later items took at most 27 ms, base's did not. These are observed maxima of one workload, no guarantee.
   A flood from at most three *other* hosts (one was measured) is bounded by the code: the station has a place of its own, and its
-  first frame took 0.16-0.19 s at both rates. From ports held open (pass 2): 12 or 40, within 0.1 s; 200, up to 1,065 ms and items up to 2,015 ms, a FAIL of the same
-  deadline, and 16 s late in one run of pass 1. See
+  first frame took 0.16-0.19 s at both rates. From ports held open on its own host: 12 (within the 16 places of a host), 0.1 s; 40, 0.1 s in most runs and up to 50 s in those whose
+  lane the flood's ports share (11 of 40), a FAIL; 200, up to 2.8 s, a FAIL. Pass 2 had 12 and 40 within 0.1 s, 200 up to 1,065 ms and items up to 2,015 ms, and one run 16 s late
+  in pass 1. See
   [`reports/measurement/2026-11-23-cold-start-recovery/`](../../reports/measurement/2026-11-23-cold-start-recovery/README.md).
 - **The caps are fixed.** They do not follow a station's declared `b_station` or `b_stream` (§7.5), which its own key
   could raise at will, and the spike's manifest has no budget field. A station run well above the 16 kbit/s default

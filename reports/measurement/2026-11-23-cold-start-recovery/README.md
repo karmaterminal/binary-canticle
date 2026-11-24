@@ -54,7 +54,7 @@ Every run records its tree, the versions and the load before it; one run at a ti
 | 2 | attribution, five toggles of the head, offset 1 s | 5 each | `attribution.json` (50) |
 | 2w | attribution, wake: `nobudget-wake` on row 0's eight cells | 5 | `recovery-wake.json` (40) |
 | 1s, 1r, 1h | evenly spaced sender; 200 000/s; the newcomer on another address | 5 / 3 (head only: 1s, 1r) | `saturation-extra.json` (15), `otherhost.json` (16) |
-| 0c, 1c | companions: the `fixed` reading | RUNNING | `recovery-fixed.json`, `saturation-fixed.json` |
+| 0c, 1c | companions: the `fixed` reading (12, 40 and 200 ports) | 5 / 3 | `recovery-fixed.json` (64), `saturation-fixed.json` (48) |
 | candidates | pass 2's cold start, spoof, relay-first rows (`scaled-*.json`), full length (`full/`) | RUNNING | |
 | 1m | the model, alone, last | QUEUED | |
 
@@ -263,6 +263,34 @@ another address than the flood's (1h). Each is one miss to fail.
 - **Where a bound holds, the runs meet it: row 1h, PASS at both rates.** The newcomer on 127.0.0.2, the flood from 127.0.0.1: first frames 0.16-0.19 s at 20 000/s and at 100 000/s alike, five runs each, every item on time. The code
   gives it a place of its own (`_room`) and one round of at most 16 + 64 + 1 lanes at 500 checks a second: 0.16 s, and the 20 ms the loop waits to look at an empty budget again. **It holds only while the flood comes from at most three hosts that
   aren't the newcomer's** (four fill the 64 places); from its own host there is none. Base fails both cells of 1h (2 of 3 first frames late at 100 000/s).
+
+## The companion reading: ports held open (rows 0c and 1c)
+
+The companion reading (0c, 1c): N sockets held open and used in turn, `fixed-N`. Where the flood's ports are few, the outcome is in two parts, and it follows from the code.
+
+| row (sources-ports-rate-offset) | head | base |
+|---|---|---|
+| fixed-12-20000-1 | PASS: worst first 0.06 s; first 0/5, items 0/100 | **FAIL**: worst first 0.03 s; first 0/3, items 1/60 |
+| fixed-40-20000-0 | PASS: worst first 0.04 s; first 0/5, items 0/100 | **FAIL**: worst first 0.02 s; first 0/3, items 1/60 |
+| fixed-40-20000-1 | **FAIL**: worst first 2.64 s; first 1/5, items 10/100 | **FAIL**: worst first 0.03 s; first 0/3, items 1/60 |
+| fixed-40-20000-5 | **FAIL**: worst first 1.01 s; first 1/5, items 1/100 | PASS: worst first 0.33 s; first 0/3, items 0/60 |
+| fixed-40-20000-30 | **FAIL**: worst first 13.75 s; first 1/5, items 20/100 (lost 0, > 10 s 20) | **FAIL**: worst first 0.03 s; first 0/3, items 1/60 |
+| fixed-40-20000-120 | **FAIL**: worst first 1.54 s; first 1/5, items 4/100 | PASS: worst first 0.03 s; first 0/3, items 0/60 |
+| fixed-200-20000-1 | **FAIL**: worst first 1.90 s; first 4/5, items 13/100 | PASS: worst first 0.03 s; first 0/3, items 0/60 |
+| fixed-12-100000-1 | PASS: worst first 0.06 s; first 0/5, items 0/100 | **FAIL**: worst first 1.08 s; first 1/3, items 35/60 (lost 7, > 10 s 12) |
+| fixed-40-100000-0 | PASS: worst first 0.42 s; first 0/5, items 0/100 | **FAIL**: worst first 1.03 s; first 1/3, items 39/60 (lost 12, > 10 s 16) |
+| fixed-40-100000-1 | **FAIL**: worst first 49.62 s; first 3/5, items 41/100 (lost 0, > 10 s 20) | **FAIL**: worst first 0.78 s; first 0/3, items 38/60 (lost 9, > 10 s 17) |
+| fixed-40-100000-5 | **FAIL**: worst first 2.94 s; first 2/5, items 23/100 | **FAIL**: worst first 1.08 s; first 1/3, items 34/60 (lost 6, > 10 s 14) |
+| fixed-40-100000-30 | **FAIL**: worst first 13.36 s; first 1/5, items 20/100 (lost 0, > 10 s 20) | **FAIL**: worst first 0.49 s; first 0/3, items 35/60 (lost 9, > 10 s 14) |
+| fixed-40-100000-120 | PASS: worst first 0.09 s; first 0/5, items 0/100 | **FAIL**: worst first 0.63 s; first 0/3, items 39/60 (lost 11, > 10 s 13) |
+| fixed-200-100000-1 | **FAIL**: worst first 2.79 s; first 3/5, items 19/100 | **FAIL**: worst first 0.33 s; first 0/3, items 37/60 (lost 11, > 10 s 10) |
+| **cells passed** | **5 of 14** | **3 of 14** |
+
+- **12 ports: PASS at both rates**, first frames 0.04-0.06 s. The flood's 12 ports and the newcomer's one are within the 16 places a host has, so it queues apart.
+- **40 ports: FAIL in 7 of 10 cells, by the hash's chance.** 16 ports take the host's places and 24 share the 64 lanes; the newcomer's own lane is shared with at least one of them in 1 − (63/64)²⁴ = 31 % of runs. Of the 40 head runs (offset > 0 of row 0c
+  and row 1c) 11 had a first frame above 0.2 s, up to 49.6 s, and 10 of them above the 1.0 s deadline. The others came in 0.07-0.11 s. *A first frame of 0.1 s or of 50 s is what a run gets, and neither is the cell's.*
+- **200 ports: FAIL** (7 of 10 first frames above 1.0 s, 0.55-2.8 s). 184 ports share 64 lanes, so no lane is the newcomer's own, and it waits in one for a check among the others in it.
+- **Base fails 11 of 14 cells**, nearly all by its items; its first frame came within 1.1 s.
 
 ## Attribution (rows 2 and 2w)
 
