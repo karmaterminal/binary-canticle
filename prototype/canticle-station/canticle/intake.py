@@ -29,13 +29,10 @@ What is spent, and by whom:
   queues' part of theirs). A key has one slot beside its queues, where a source that is not known has a claim on one datagram
   of its that waits in its lane too, when others already wait in the stream that claims. The slots are served in turn over
   the keys, on a bucket of their own, so no flood of other keys or of the queues spends it. In a key's turn the sources that
-  were not found wrong come first, in the order they came; one whose frame failed, or was not new, is demoted behind them: it
-  has one turn in SLOT_M, and the next frame of its that is new clears it. A newcomer is then checked within (S + 1)
-  rounds of the keys, S being the sources that were not tried before it, whatever the flood's rate: once, since each is then
-  behind it;
-- in a stream, the known sources get every other turn however many strangers claim it. Strangers queue apart too, in
-  a pool the stream's longest queue pays for: a flood can fill it, but a source that queues apart still gets a place
-  and its turn;
+  were not tried come first, in the order they came; those that were and did not fail (a replay, a place that was lost) behind
+  them, in turn; those whose frame failed behind those. One turn in SLOT_M is for one that was tried. Nothing but a new frame
+  moves a source up. A newcomer is then checked within (S + 1) rounds of the keys, S being the sources that were not tried
+  before it, whatever the flood's rate: once, since each is then behind it;
 - a known place is a lease: it ends LEASE_S after the daemon first verified the newest frame that its source delivered, by the
   daemon's own clock. An exact repeat renews it to that frame's age and no further, and gives a place to nobody;
 - whatever churns its sources, a key has at most KNOWN_MAX + STRANGERS_MAX of them and CROWD_LANES lanes for the rest, a
@@ -56,8 +53,8 @@ What this does not do:
 - **A station that is still a stranger, among many.** Until one of its frames verifies from a new address (a cold
   start, or its restart on a new port), it competes with every other stranger claiming its key. STRANGERS_PER_HOST
   ports of a host, and STRANGERS_MAX in all, queue apart; the rest share CROWD_LANES lanes by a salted hash. The rounds of the
-  slice bound it where its key is not forged, or is forged from fewer than SLOT_MAX sources that stay (up to DEMOTED_MAX after
-  each was tried once). **A sender that changes its source with every frame, or has more of them than a key can hold demoted**, looks
+  slice bound it where its key is not forged, or is forged from fewer than SLOT_MAX sources that stay (up to MARKS_MAX after
+  each was tried once). **A sender that changes its source with every frame, or has more of them than a key remembers**, looks
   like a station that starts in everything that is read before the signature: a copy is verified with chance
   (SOURCE_RATE + SLICE_RATE) / R at best, and no deadline follows.
 - **Source binding and a house MAC** (RFC §10.2) are not here. A binding is only as good as the switch's enforcement.
@@ -103,10 +100,12 @@ CHECK_RATE, CHECK_BURST = 2_000.0, 200.0
 # station's first frame may take.
 STRANGE_RATE, STRANGE_BURST = 1_500.0, 150.0
 SLICE_RATE, SLICE_BURST = 500.0, 50.0
-SLICE_PAUSE_S = (NO_OP_COST - 1) / SLICE_RATE    # what such an ITEM or PLUCK out of a slot costs its key's demoted sources: turns
-SLOT_MAX, SLOT_M = 64, 4                    # sources with a datagram in a key's slot, of each kind; a demoted one's turns, one in M
-DEMOTED_MAX = 256                           # sources a key holds demoted, for as long as a newcomer may wait for them all: RETAIN
-RETAIN = 2.0 * (DEMOTED_MAX + 1) / SLICE_RATE    # rounds of the slice it takes to try them, twice over, in seconds per key
+SLICE_PAUSE_S = (NO_OP_COST - 1) / SLICE_RATE    # what such an ITEM or PLUCK out of a slot costs its key's tried sources: turns
+SLOT_MAX, SLOT_M = 64, 4                    # sources with a datagram in a key's slot, of each tier; one turn in M is the tried ones'
+MARKS_MAX = 256                             # sources a key remembers as tried, for as long as a newcomer may wait for them all: RETAIN
+RETAIN = 2.0 * (MARKS_MAX + 1) / SLICE_RATE    # rounds of the slice it takes to try them, twice over, in seconds per key
+UNTRIED, TRIED, DEMOTED = range(3)          # a source's tier in a key's slot
+NEVER = float("-inf")
 UNLISTED_RATE, UNLISTED_BURST = 500.0, 500.0  # datagrams of no listed key examined a second, all together
 UNLISTED_DEPTH = 64
 KNOWN_MAX, KNOWN_DEPTH = 4, 64              # known sources per key; datagrams waiting per stream and known source, or
@@ -309,35 +308,40 @@ class Claim:
 
 
 class Slot:
-    """What waits of a key for the slice: one Claim of each address, in the order they came."""
+    """What waits of a key for the slice: one Claim of each address, by its tier, in the order they came."""
 
-    __slots__ = ("untried", "demoted", "turns", "due")
+    __slots__ = ("rings", "turns", "due")
 
     def __init__(self):
-        self.untried, self.demoted = OrderedDict(), OrderedDict()
-        self.turns, self.due = 0, 0.0           # turns it had; none of the demoted before ``due``
+        self.rings = OrderedDict(), OrderedDict(), OrderedDict()     # UNTRIED, TRIED, DEMOTED
+        self.turns, self.due = 0, 0.0           # turns it had; none of the tried and the demoted before ``due``
 
     def __len__(self) -> int:
-        return len(self.untried) + len(self.demoted)
+        return sum(map(len, self.rings))
 
     def get(self, addr) -> Optional[Claim]:
-        return self.untried.get(addr) or self.demoted.get(addr)
+        untried, tried, demoted = self.rings
+        return untried.get(addr) or tried.get(addr) or demoted.get(addr)
 
     def remove(self, addr) -> None:
-        if self.untried.pop(addr, None) is None:
-            del self.demoted[addr]
+        del next(ring for ring in self.rings if addr in ring)[addr]
 
-    def move(self, addr, old: OrderedDict, new: OrderedDict) -> None:
-        """What an address has waiting, behind the others of the other kind, when there is room for it."""
-        if addr in old and len(new) < SLOT_MAX:
+    def move(self, addr, tier: int) -> None:
+        """What an address has waiting goes behind the others of its tier, when there is room for it."""
+        new = self.rings[tier]
+        old = next((ring for ring in self.rings if addr in ring), new)
+        if old is not new and len(new) < SLOT_MAX:
             new[addr] = old.pop(addr)
 
     def pick(self, now: float, ready: Callable[[StreamQueue], bool]) -> Optional[Claim]:
-        """The next one whose stream is ``ready``; the others keep their turns."""
-        last = self.turns % SLOT_M == SLOT_M - 1
+        """The next one whose stream is ``ready``; the others keep their turns. The untried come first, and one turn in SLOT_M is
+        for those that were tried: the demoted and the rest of them in turn."""
+        untried, tried, demoted = order = self.rings
+        if self.turns % SLOT_M == SLOT_M - 1:
+            order = (tried, demoted, untried) if self.turns // SLOT_M % 2 else (demoted, tried, untried)
         streams: dict = {}
-        for ring in ((self.demoted, self.untried) if last else (self.untried, self.demoted)):
-            if ring is self.demoted and now < self.due:
+        for ring in order:
+            if ring is not untried and now < self.due:
                 continue
             for addr, claim in ring.items():
                 if claim.stream not in streams:
@@ -352,7 +356,7 @@ class KeyQueue:
     """Everything that waits under one listed key."""
 
     __slots__ = ("bucket", "streams", "ready", "known", "strangers", "hosts", "stranger_budget", "crowd", "salt",
-                 "reclaimed", "shares", "displaced", "lapsed", "slot", "demotions")
+                 "reclaimed", "shares", "displaced", "lapsed", "slot", "marks", "retain")
 
     def __init__(self, stream_ids):
         self.bucket = Bucket(KEY_RATE, KEY_BURST)
@@ -369,7 +373,8 @@ class KeyQueue:
         self.shares = self.displaced = 0          # sources that became known, and those a newer one displaced
         self.lapsed = 0                           # and those whose lease ended
         self.slot = Slot()
-        self.demotions: OrderedDict = OrderedDict()   # address -> when a frame of its last failed, oldest first
+        self.marks: OrderedDict = OrderedDict()   # address -> (when it was last tried, when a frame of its last failed), oldest first
+        self.retain = RETAIN                      # seconds a mark lasts (for one key; the intake knows how many there are)
 
     def source(self, addr, now: float) -> Source:
         got = self.known.get(addr) or self.strangers.get(addr)
@@ -401,19 +406,27 @@ class KeyQueue:
                 del self.hosts[host]
         return got
 
-    def demote(self, addr, now: float) -> None:
-        """A frame from ``addr`` failed, or verified and was not new. That is evidence against the frame, and no proof against its
-        source, so it costs it its place in the order and no more: it has been tried, and others have not."""
-        self.demotions[addr] = now
-        self.demotions.move_to_end(addr)
-        if len(self.demotions) > DEMOTED_MAX:
-            self.demotions.popitem(last=False)
-        self.slot.move(addr, self.slot.untried, self.slot.demoted)
+    def tier(self, addr, now: float) -> int:
+        tried, failed = self.marks.get(addr, (NEVER, NEVER))
+        return DEMOTED if now - failed < self.retain else TRIED if now - tried < self.retain else UNTRIED
 
-    def clear(self, addr) -> None:
-        """A frame from ``addr`` was new: a signature alone clears nothing, since a replay has one."""
-        if self.demotions.pop(addr, None) is not None:
-            self.slot.move(addr, self.slot.demoted, self.slot.untried)
+    def mark(self, addr, now: float, failed: bool) -> None:
+        """A frame from ``addr`` was checked, and was not new: it failed, or it is a replay. Either is evidence against the frame,
+        and no proof against its source. It has been tried, and others have not; a failure demotes it, and a replay leaves
+        its demotion as it is: a signature alone moves nobody up."""
+        self._mark(addr, now, now if failed else self.marks.get(addr, (NEVER, NEVER))[1])
+
+    def admit(self, addr, now: float) -> None:
+        """A new frame was verified from ``addr``: its demotion is over."""
+        if addr in self.marks:
+            self._mark(addr, now, NEVER)
+
+    def _mark(self, addr, now: float, failed: float) -> None:
+        self.marks[addr] = now, failed
+        self.marks.move_to_end(addr)
+        if len(self.marks) > MARKS_MAX:
+            self.marks.popitem(last=False)
+        self.slot.move(addr, self.tier(addr, now))
 
     def know(self, addr) -> int:
         """A new frame of this key was verified from ``addr``. Returns how many waiting datagrams that displaced."""
@@ -445,6 +458,7 @@ class KeyQueue:
 
     def _forfeit(self, old_addr) -> int:
         old = self.known.pop(old_addr)
+        self.mark(old_addr, time.monotonic(), failed=False)
         old.budget, old.known = self.stranger_budget, False
         if self._room(host_of(old_addr)):
             self._enter(old_addr, old)
@@ -646,7 +660,9 @@ class Intake:
         self._ready: deque = deque()               # keys (and the unlisted queue) with something waiting, in turn
         self._passed: list = []                    # those of them that couldn't be served in this take
         self._slots: deque = deque()               # keys whose slot holds something, in turn
-        self.retain = RETAIN * max(1, len(self.keys))    # seconds a demotion lasts
+        self.retain = RETAIN * max(1, len(self.keys))
+        for key in self.keys.values():
+            key.retain = self.retain
         self._lock = threading.Lock()
         self._stop = False
         self.read = self.repeated = self.copied = self.verified = self.unverified = 0
@@ -791,17 +807,15 @@ class Intake:
         has one, when there is no room, or when the same bytes wait in a lane of the stream: an echo of them must not go
         round. None when it is a copy of what its source has there."""
         addr, slot = entry[2], key.slot
-        at = key.demotions.get(addr)
-        demoted = at is not None and now - at < self.retain
+        tier = key.tier(addr, now)
         held = slot.get(addr)
         if held is not None:
-            if not demoted:
-                slot.move(addr, slot.demoted, slot.untried)
+            slot.move(addr, tier)
             return None if held.entry[1] == entry[1] else False
-        ring = slot.demoted if demoted else slot.untried
+        ring = slot.rings[tier]
         if len(ring) >= SLOT_MAX or entry[1] in stream.bytes:
             return False
-        if not slot:
+        if not len(slot):
             self._slots.append(key)
         ring[addr] = Claim(entry, stream, source)
         return True
@@ -950,11 +964,11 @@ class Intake:
                     t.key.slot.due = max(now, t.key.slot.due) + SLICE_PAUSE_S
             if t.key is not None:
                 if fresh:
-                    t.key.clear(t.addr)
+                    t.key.admit(t.addr, now)
                 else:
                     for addr in (t.addr, *t.copies):
                         if addr not in t.key.known:
-                            t.key.demote(addr, now)
+                            t.key.mark(addr, now, failed=not verified)
             if not verified:
                 self.unverified += 1
                 return
@@ -1029,7 +1043,7 @@ class Intake:
     def stats(self) -> dict:
         with self._lock:
             queued = len(self.unlisted.ready) + sum(
-                not c.queued for k in self.keys.values() for r in (k.slot.untried, k.slot.demoted) for c in r.values()) + sum(
+                not c.queued for k in self.keys.values() for r in k.slot.rings for c in r.values()) + sum(
                 len(lane.queue) for k in self.keys.values() for s in k.streams.values() for lane in s.lanes.values())
             return {"read": self.read, "repeats": self.repeated, "copies": self.copied, "verified": self.verified,
                     "unverified": self.unverified, "reserved": self.reserved, "queued": queued,

@@ -571,15 +571,16 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
   one slot, where a source that has no known place has a claim on one of its datagrams, when others already wait in the stream that claims. The datagram
   waits in its lane as before, and whichever comes first serves it; what a lane refuses or sheds still waits in the slot. The slots are
   served in turn over the keys, 500 checks a second on a bucket of their own, in 16 places of a turn beside the queues' 32. Strangers pay for it: of the daemon's 2 000
-  their queues have 1 500, so what strangers cost is 2 000 as before, and an established station loses no turn to it. In a key's turn, sources that were not found wrong come
-  first, in the order they came. A source whose frame failed, or verified and was not new (a replayed old beacon verifies for ever), is demoted behind
-  them, and has one turn in four: it has been tried, and that is evidence against the frame, and no proof against its source. The next frame of its that is admitted as new clears it. A
-  key holds 256 sources demoted, for twice the rounds it takes to try them all. So a newcomer is checked within **(S + 1) rounds of the keys, K/500 s each (a third
-  more where demoted ones wait), whatever the flood's rate**, S being the sources of its own key that are not tried yet: 0 where its key is not forged, and each
-  costs its turn once. That holds for at most 63 sources that start with it, and for 256 that stay. An echo of a frame that waits takes no slot, and a known
-  source's copy stands for a slot's. A verified ITEM or PLUCK out of a slot that changes nothing costs its key's demoted sources nine turns, and nobody else. A key or a stream that
-  can't be served keeps its turn, so nothing that is served meanwhile comes between. `receive.reserved` counts what the
-  slice checked.
+  their queues have 1 500, so what strangers cost is 2 000 as before, and an established station loses no turn to it.
+- **In a key's turn there are three tiers.** Sources that were not tried come first, in the order they came. Those that were tried and did not fail come behind them, in
+  turn: a replay (an old beacon verifies for ever), a source whose last frame was admitted, one that lost its known place. Those whose frame failed come last. One turn in four is for one that was
+  tried, the two kinds in turn. Nothing but a frame admitted as new moves a source up, and then to the second tier; a replay leaves a failure as it is. A key
+  remembers 256 sources that were tried, for twice the rounds it takes to try them all. Being tried is evidence against a frame, and no proof against its source. So a
+  newcomer is checked within **(S + 1) rounds of the keys, K/500 s each (a third more where tried ones wait), whatever the flood's rate**, S being the sources of its own
+  key that are not tried yet: 0 where its key is not forged, and each costs its turn once. That holds for at most 63 sources that start with it, and for 256 that
+  stay. An echo of a frame that waits takes no slot, and a known source's copy stands for a slot's. A verified ITEM or PLUCK out of a slot that
+  changes nothing costs its key's tried sources nine turns, and nobody else. A key or a stream that can't be served keeps its turn, so nothing that is served
+  meanwhile comes between. `receive.reserved` counts what the slice checked.
 - **A known place is a lease.** It ends 60 s after the daemon first verified the newest frame that its source delivered: the clock is the
   daemon's monotonic one, and having nothing waiting means nothing. An exact repeat from a source that has a place renews it up to the
   age of the frame it repeats and no further, so a source that stopped and replays one cached frame keeps its place no longer than if it were silent. A repeat

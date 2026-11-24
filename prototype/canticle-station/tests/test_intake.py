@@ -827,8 +827,8 @@ def udp(port: int, host: int = 1) -> int:
 
 
 C_SLICE, C_ALL = 500.0, 2_000.0     # the newcomer-recovery report's PLAN.md: the slice's checks a second, and the daemon's
-M = 4                               # and a demoted source's share of a key's turns, one in so many
-CAP, PENDING = 256, 64              # the demotions a key holds, and the sources that wait in its slot, of each kind
+M = 4                               # and the share of a key's turns of those that were tried, one in so many
+CAP, PENDING = 256, 64              # the marks a key holds, and the sources that wait in its slot, of each tier
 CHECK_S = 0.00014                   # the dearest check of #171 (60-140 µs on ronan)
 TURN_S = 48 * CHECK_S               # a turn of the event loop, its durable save apart
 SAVE_TURN_S = 0.045                 # and with it
@@ -1084,8 +1084,8 @@ class NewcomerTest(NewcomerCase):
         self.PORTS = 4 * CAP
         self.play(1.5, keys=(0,), rate=100_000)
         key = self.intake.keys[self.kids[0]]
-        self.assertEqual(len(key.demotions), CAP)
-        self.assertLessEqual((len(key.slot.untried), len(key.slot.demoted)), (PENDING, PENDING))
+        self.assertEqual(len(key.marks), CAP)
+        self.assertLessEqual(max(len(ring) for ring in key.slot.rings), PENDING)
 
     def test_a_demoted_source_that_sends_a_valid_frame_is_heard_while_untried_ones_keep_coming(self):
         """A failed frame is evidence against the frame, not against its source (🌫): demotion is a priority, not a ban. One turn
@@ -1095,12 +1095,26 @@ class NewcomerTest(NewcomerCase):
         key = self.intake.keys[self.kids[0]]
         self.play(1.0, keys=(0,), churn="once")
         with self.intake._lock:
-            key.demote(udp(50_001), self.now)
+            key.mark(udp(50_001), self.now, failed=True)
         f = item(self.sks[0], 1)
         waits = self.play(0.5, keys=(0,), churn="once", copies=[(0.0, f, udp(50_001))])
         self.assertChecked(waits, M / C_SLICE + RETRY_S + TURN_S, "a demoted source's valid frame")
-        self.assertNotIn(udp(50_001), key.demotions)
+        self.assertNotEqual(key.tier(udp(50_001), self.now), intake.DEMOTED)
         self.assertIn(udp(50_001), key.known)
+
+    def test_a_source_that_was_tried_and_did_not_fail_is_heard_in_a_churned_flood_of_its_key(self):
+        """A station that lost its place, or is heard again after a restart of the daemon, whose frames its key's flood would
+        otherwise leave to chance for ever: one turn in M is for those that were tried, however many untried ones keep coming
+        and however many that failed wait."""
+        key = self.intake.keys[self.kids[0]]
+        self.play(1.0, keys=(0,), churn=True, rate=100_000)
+        with self.intake._lock:
+            for n in range(100):
+                key.mark(udp(45_000 + n), self.now, failed=True)
+            key.mark(udp(50_001), self.now, failed=False)
+        f = item(self.sks[0], 1)
+        waits = self.play(0.5, keys=(0,), churn=True, rate=100_000, copies=[(0.0, f, udp(50_001))])
+        self.assertChecked(waits, 2 * M / C_SLICE + RETRY_S + 2 * TURN_S, "tried, and not failed")
 
     def test_what_waits_in_the_slot_survives_whatever_comes_after_it(self):
         """🌫: a bound on rounds is a deadline only if the newcomer's frame is there when its turn comes."""
@@ -1182,18 +1196,23 @@ class NewcomerTest(NewcomerCase):
 class SlotTest(IntakeCase):
     """What a key has waiting for the slice, rule by rule."""
 
+    TIERS = "untried", "tried", "demoted"
+
     def setUp(self):
         super().setUp()
         self.key = self.intake.keys[KID_A]
         self.offer(*[forge(item(A, 1), n) for n in range(4)], src=THERE)       # so that others wait in the stream
 
     def waits(self, ring="untried", key=None):
-        return [claim.entry[0] for claim in getattr((key or self.key).slot, ring).values()]
+        return [claim.entry[0] for claim in (key or self.key).slot.rings[self.TIERS.index(ring)].values()]
 
-    def demote(self, *srcs):
+    def demote(self, *srcs, failed=True):
         with self.intake._lock:
             for src in srcs:
-                self.key.demote(src, self.now)
+                self.key.mark(src, self.now, failed)
+
+    def tier(self, src):
+        return self.TIERS[self.key.tier(src, self.now)]
 
     def taken(self, frame, limit):
         """The turn that takes ``frame``; what comes before it fails."""
@@ -1248,7 +1267,7 @@ class SlotTest(IntakeCase):
         self.demote(*[udp(50_000 + n) for n in range(3 * intake.SLOT_MAX)])
         for n in range(3 * intake.SLOT_MAX):
             self.offer(item(A, 1_000 + n), src=udp(50_000 + n))
-        self.assertEqual((len(self.waits()), len(self.waits("demoted"))), (intake.SLOT_MAX, intake.SLOT_MAX))
+        self.assertEqual([len(self.waits(r)) for r in self.TIERS], [intake.SLOT_MAX, 0, intake.SLOT_MAX])
         self.assertEqual(self.intake.stats()["queued"] + sum(self.refused.values()), 4 + 6 * intake.SLOT_MAX)
 
     def test_a_source_whose_frame_failed_waits_behind_those_that_were_not_tried(self):
@@ -1280,22 +1299,82 @@ class SlotTest(IntakeCase):
         for kept, fresh in ((True, True), (True, False), (False, False)):
             src = addr(70 + 2 * kept + fresh)
             self.demote(src)
+            self.assertEqual(self.tier(src), "demoted")
             self.offer(*[forge(item(A, 1), 200 + n) for n in range(4)], src=THERE)
             self.offer(f := item(A, 10 + 2 * kept + fresh), src=src)
             (t,) = [t for t in self.intake.take(32) if t.data == f]
             if kept:
                 self.intake.remember(t, (KID_A, 5, 0, 1), runner.now_ms() + 60_000, fresh)
             self.intake.settle(t, True, fresh)
-            self.assertEqual(src in self.key.demotions, not fresh, (kept, fresh))
+            self.assertEqual(self.tier(src), "tried" if fresh else "demoted", (kept, fresh))
 
     def test_a_source_whose_replay_changed_nothing_is_no_longer_untried(self):
-        """It is no failure. But the first places are the untried sources', and it has been tried."""
+        """It is no failure. But the first places are the untried sources', and it has been tried: 🍃's second tier (7142734748)."""
         self.offer(f := beacon(A, 1), src=HERE)
         (t,) = [t for t in self.intake.take(32) if t.data == f]
         self.intake.settle(t, True, False)
         self.offer(*[forge(item(A, 1), 300 + n) for n in range(4)], src=THERE)
         self.offer(g := item(A, 2), src=HERE)
-        self.assertEqual((self.waits(), self.waits("demoted")), ([], [g]))
+        self.assertEqual((self.tier(HERE), self.waits(), self.waits("tried")), ("tried", [], [g]))
+
+    def test_the_tiers_come_in_their_order(self):
+        """Untried first, in the order they came; those that were tried and did not fail behind them, in turn; a source whose frame
+        failed behind those. Of a key's turns one in M is for one that was tried, the two kinds in turn."""
+        self.demote(*[addr(60 + n) for n in range(4)])
+        self.demote(*[addr(80 + n) for n in range(4)], failed=False)
+        kind = {}
+        for n in range(4):
+            for first, name in ((80, "t"), (60, "d"), (20, "u"), (40, "u")):
+                self.offer(f := item(A, 10 * first + n), src=addr(first + n))
+                kind[f] = name
+        self.key.slot.turns = 0
+        self.intake.checks.tokens, self.intake.checks.at = -1e9, self.now     # the queues serve nothing
+        self.assertEqual("".join(kind[t.data] for t in self.intake.take(32)), "uuud" "uuut" "uutd" "ttdd")
+
+    def test_one_that_replays_all_the_time_keeps_no_other_of_its_tier_waiting(self):
+        """In turn, not the latest first (🍃's first condition)."""
+        noisy, quiet = addr(60), addr(61)
+        self.demote(noisy, quiet, failed=False)
+        self.intake.checks.tokens, self.intake.checks.at = -1e9, self.now
+        self.offer(beacon(A, 1), src=noisy)
+        self.offer(q := item(A, 2), src=quiet)
+        for n in range(5):
+            self.offer(beacon(A, 10 + n), src=noisy)
+            got = self.intake.take(1)
+            for t in got:
+                self.intake.settle(t, True, False)
+            if got[0].data == q:
+                break
+        self.assertLessEqual(n, 1)
+
+    def test_no_replay_moves_a_source_up_and_only_a_new_frame_does(self):
+        """🍃's second condition. From the third tier to the second, never to the first; a replay from the first to the second."""
+        with self.intake._lock:
+            self.key.mark(HERE, self.now, failed=True)
+            self.assertEqual(self.tier(HERE), "demoted")
+            self.key.mark(HERE, self.now, failed=False)
+            self.assertEqual(self.tier(HERE), "demoted")
+            self.key.admit(HERE, self.now)
+            self.assertEqual(self.tier(HERE), "tried")
+            self.key.admit(HERE, self.now)
+            self.assertEqual(self.tier(HERE), "tried")
+            self.key.mark(THERE, self.now, failed=False)
+            self.assertEqual(self.tier(THERE), "tried")
+
+    def test_a_replay_keeps_no_demotion_alive(self):
+        """It leaves it as it is: the failure is as old as it is."""
+        self.demote(HERE)
+        self.now += self.intake.retain - 0.1
+        self.demote(HERE, failed=False)
+        self.assertEqual(self.tier(HERE), "demoted")
+        self.now += 0.2
+        self.assertEqual(self.tier(HERE), "tried")
+
+    def test_a_source_that_lost_its_known_place_has_been_tried(self):
+        for n in range(intake.KNOWN_MAX + 1):
+            self.offer(item(A, 10 + n), src=addr(50 + n))
+            self.serve(32, verified=lambda t: t.addr == addr(50 + n))
+        self.assertEqual((self.tier(addr(50)), self.tier(addr(51))), ("tried", "untried"))
 
     def test_what_waits_in_the_slot_waits_in_its_lane_as_well_and_is_served_once(self):
         """So the slot is never a worse place to wait than the queues are: whichever comes first serves it."""
@@ -1328,23 +1407,25 @@ class SlotTest(IntakeCase):
     def test_what_a_source_has_waiting_follows_it(self):
         f = item(A, 1)
         self.offer(f, src=HERE)
+        self.demote(HERE, failed=False)
+        self.assertEqual([self.waits(r) for r in self.TIERS], [[], [f], []])
         self.demote(HERE)
-        self.assertEqual((self.waits(), self.waits("demoted")), ([], [f]))
+        self.assertEqual([self.waits(r) for r in self.TIERS], [[], [], [f]])
         with self.intake._lock:
-            self.key.clear(HERE)
-        self.assertEqual((self.waits(), self.waits("demoted")), ([f], []))
+            self.key.admit(HERE, self.now)
+        self.assertEqual([self.waits(r) for r in self.TIERS], [[], [f], []])
         self.demote(HERE)
-        self.now += self.intake.retain                         # the demotion is over: its next copy finds it so
+        self.now += self.intake.retain                         # the marks have ended: its next copy finds it so
         self.offer(item(A, 2), src=HERE)
-        self.assertEqual((self.waits(), self.waits("demoted")), ([f], []))
+        self.assertEqual([self.waits(r) for r in self.TIERS], [[f], [], []])
 
-    def test_demotions_are_a_bounded_number_the_oldest_forgotten_first_and_kept_for_the_longest_wait(self):
-        self.demote(*[udp(40_000 + n) for n in range(3 * intake.DEMOTED_MAX)])
-        self.assertEqual(list(self.key.demotions), [udp(40_000 + n) for n in range(2 * intake.DEMOTED_MAX, 3 * intake.DEMOTED_MAX)])
+    def test_marks_are_a_bounded_number_the_oldest_forgotten_first_and_kept_for_the_longest_wait(self):
+        self.demote(*[udp(40_000 + n) for n in range(3 * intake.MARKS_MAX)])
+        self.assertEqual(list(self.key.marks), [udp(40_000 + n) for n in range(2 * intake.MARKS_MAX, 3 * intake.MARKS_MAX)])
         for keys in (1, 16, 64):
             self.intake = self.make(Manifest([StationEntry(f"s{n}", wire.public_key_bytes(Ed25519PrivateKey.generate()),
                                                            frozenset({1}), ()) for n in range(keys)]))
-            wait = (intake.DEMOTED_MAX + 1) * intake.SLOT_M / (intake.SLOT_M - 1) * keys / intake.SLICE_RATE
+            wait = (intake.MARKS_MAX + 1) * intake.SLOT_M / (intake.SLOT_M - 1) * keys / intake.SLICE_RATE
             self.assertGreaterEqual(self.intake.retain, wait + RETRY_S + TURN_S)
 
     def test_a_known_source_is_not_demoted(self):
@@ -1352,7 +1433,7 @@ class SlotTest(IntakeCase):
         self.serve()
         self.offer(forge(item(A, 1), 9), src=HERE)             # somebody's, from its address and port
         self.serve(verified=lambda t: False)
-        self.assertNotIn(HERE, self.key.demotions)
+        self.assertEqual(self.tier(HERE), "untried")
 
     def test_the_slots_come_after_the_queues_and_have_half_a_turns_places_of_their_own(self):
         sks = [Ed25519PrivateKey.generate() for _ in range(24)]
@@ -1455,7 +1536,7 @@ class SlotTest(IntakeCase):
         self.now += 1.501 / intake.SLICE_RATE
         self.assertEqual(self.serve(32), [f])
 
-    def test_a_record_that_changes_nothing_costs_turns_of_its_keys_demoted_sources_only(self):
+    def test_a_record_that_changes_nothing_costs_turns_of_its_keys_tried_sources_only(self):
         """A verified ITEM that is not new makes a record, so from a queue it costs its sender ten checks. From a slot, what its
         key's tried sources have waiting waits for nine more turns: neither an untried one nor another key does."""
         self.offer(*[forge(item(B, 1), n) for n in range(4)], src=THERE)
@@ -1468,7 +1549,7 @@ class SlotTest(IntakeCase):
         self.offer(b, src=addr(32))
         self.offer(new, src=addr(33))
         self.intake.checks.tokens, self.intake.checks.at = -1e9, self.now     # so that the queues serve nothing
-        self.assertEqual((set(self.serve(32)), self.waits("demoted")), ({b, new}, [a]))
+        self.assertEqual((set(self.serve(32)), self.waits("tried")), ({b, new}, [a]))
         self.now += intake.SLICE_PAUSE_S
         self.assertEqual(self.serve(32), [a])
 
@@ -1477,7 +1558,7 @@ class SlotTest(IntakeCase):
         for n in range(3):
             self.offer(bad, src=addr(40 + n))
         self.assertEqual(self.serve(32, verified=lambda t: False).count(bad), 1)
-        self.assertEqual([addr(40 + n) in self.key.demotions for n in range(3)], [True] * 3)
+        self.assertEqual([self.tier(addr(40 + n)) for n in range(3)], ["demoted"] * 3)
 
     def test_the_same_bytes_again_in_a_lane_while_they_wait_in_the_slot_are_a_copy(self):
         """Its lane lost the first, its source has become known since, and sends it again."""
@@ -1646,10 +1727,14 @@ class SlotTest(IntakeCase):
         before = self.intake.stats()["queued"]
         with self.intake._lock:
             lost = [self.key.know(addr(50 + n)) for n in range(intake.KNOWN_MAX)]
-        self.assertEqual((lost, self.waits()[0]), ([0] * (intake.KNOWN_MAX - 1) + [3], frames[0]))
+        self.assertEqual((lost, self.waits("tried")), ([0] * (intake.KNOWN_MAX - 1) + [3], [frames[0]]))
         self.assertEqual(self.intake.stats()["queued"], before - 3)
         self.assertNotIn(HERE, (*self.key.known, *self.key.strangers))
-        self.assertEqual(self.serve(2).count(frames[0]), 1)
+        served = []
+        for _ in range(20):
+            self.now += 1
+            served += self.serve(32, verified=lambda t: False)
+        self.assertEqual((served.count(frames[0]), self.intake.stats()["queued"]), (1, 0))
 
 
 HORIZON_S = 60.0        # the newcomer-recovery report's PLAN.md: the lease of a known place
@@ -1941,8 +2026,8 @@ class ConsistencyTest(IntakeCase):
             listed = [*key.known.values(), *key.strangers.values(), *key.crowd]
             self.assertLessEqual(set(queued), set(listed))     # who waits in a lane; a displaced source may still have a place in the slot
             self.assertEqual(i._slots.count(key), 1 if key.slot else 0)
-            self.assertFalse(set(key.slot.untried) & set(key.slot.demoted))
-            for ring in (key.slot.untried, key.slot.demoted):
+            self.assertEqual(len(set().union(*key.slot.rings)), len(key.slot))
+            for ring in key.slot.rings:
                 self.assertLessEqual(len(ring), intake.SLOT_MAX)
                 for at, c in ring.items():
                     self.assertEqual(at, c.entry[2])
@@ -1950,7 +2035,7 @@ class ConsistencyTest(IntakeCase):
                     lane = c.stream.lanes.get(c.source)
                     self.assertEqual(c.queued, lane is not None and any(e is c.entry for e in lane.queue))
                     waiting += not c.queued
-            self.assertLessEqual(len(key.demotions), intake.DEMOTED_MAX)
+            self.assertLessEqual(len(key.marks), intake.MARKS_MAX)
             waiting += sum(queued.values())
             self.assertTrue(all(source.queued == queued[source] for source in listed))
             self.assertLessEqual(len(key.known), intake.KNOWN_MAX)
@@ -1976,7 +2061,7 @@ class ConsistencyTest(IntakeCase):
             junk = [b"x", item(Ed25519PrivateKey.generate(), 1)]
             spent: Counter = Counter()
             with mock.patch.multiple(intake, STRANGERS_MAX=10, STRANGERS_PER_HOST=3, STRANGER_POOL=40, CROWD_LANES=6,
-                                     KNOWN_DEPTH=5, LEASE_S=8.0, SLOT_MAX=4, DEMOTED_MAX=20, **never):
+                                     KNOWN_DEPTH=5, LEASE_S=8.0, SLOT_MAX=4, MARKS_MAX=20, **never):
                 self.intake = self.make()
 
                 def turn(limit, verdict):
@@ -2349,7 +2434,7 @@ class DaemonIntakeTest(DaemonCase):
                         socks[n % 40].sendto(forge(f, n), ("127.0.0.1", port))
                     await asyncio.sleep(0.005)
             task = asyncio.create_task(flood())
-            await until(lambda: len(key.demotions) == 40)
+            await until(lambda: len(key.marks) == 40)
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 while True:                                    # a port that shares a lane with a forger's
                     s.bind(("127.0.0.1", 0))

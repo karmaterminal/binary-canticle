@@ -213,3 +213,14 @@ Row J asks over sockets what the third review found in virtual time: #173's sche
 | **J** | established stations in a flood of junk and other keys' forgeries (`junk_rows.py`) | 16 stations; four established ones sing 57 items each, 150 ms apart; the flood is half junk (no frames, so the unlisted queue) and half forgeries of the 12 others' keys, from 40 ports held open, 20 000/s and 100 000/s, 13.6 s | 5 `slice`, 3 `base` | each of the four 57 of 57 during the flood in every run, p50 ≤ 250 ms, none later than 4.5 s, drops reported |
 
 Prediction: `base` fails at 20 000/s or above, `slice` passes. J runs after W, and it gates nothing of the newcomers' rows; it is a finding about #173.
+
+## Added 2026-11-24 20:23Z, before any run: three tiers
+
+Nothing has been measured. 🍃 agreed at 19:53Z ([7142734748](https://github.com/karmaterminal/binary-canticle/pull/173#issuecomment-7142734748)) that a replay's source is *tried, not failed*, and stated the order inside a key's slot as three tiers: untried; tried and not failed, in turn among themselves; failed, one turn in four. A replay never
+moves a source up, and an admitted new frame moves one from the third tier to the second. Built so, with both conditions as tests. Row J stays, as the standing regression row 🍃 asked for.
+
+- **One completion, for 🍃 and 🌫 to amend:** the one turn in four is for *tried* sources, the two kinds in turn when both wait (a failed one then has one in eight). With the second tier strictly behind the first, it would never be served in a churned flood, where untried sources keep coming, while the third tier is. The bound for newcomers is the same.
+- What it buys (virtual time): **a source that was tried and did not fail is served within eight turns of its key even in a churned flood of its own key** (`test_a_source_that_was_tried_and_did_not_fail_is_heard_in_a_churned_flood_of_its_key`): a station that a relay displaced, whose lease ended, or whose items resurfaced after a daemon restart (known after 0.5 s in a fixed-40 flood; 1.6 s before, 15 s on the base). It is no source authentication: whoever can replay can be tried as well, and they take turns.
+- A source that loses its known place is marked as tried.
+
+(B1) and (B2) are unchanged.
