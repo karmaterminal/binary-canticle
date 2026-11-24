@@ -26,7 +26,7 @@ the other.
 | | head (#173) | base | `narrow` | `nobudget` |
 |---|---|---|---|---|
 | **Gate 1**: an established station is protected. Scaled rows, 5 runs each (3 of base), 57 of 57 during the flood | **PASS**: 25 of 25 runs | FAIL: 0 of 15 | FAIL: 5 of 25 (R4 only) | **PASS**: 25 of 25 |
-| Gate 1 at full length (570 s; pass 2's rows are the head's) | PASS (pass 2) | FAIL (#171) | RUNNING | RUNNING |
+| Gate 1 at full length (570 s R, 300 s F; pass 2's rows are the head's) | PASS (pass 2) | FAIL (#171) | FAIL: R1, R2, R3, R3c, F3b, F5 | **FAIL: R4a** (11 of 57 on time, the other ten rows run again) |
 | **Gate 2**: cold start under churn, row 0. 8 cells, one miss fails a cell | **FAIL**: 1 of 8 cells | FAIL: 1 of 8 | FAIL: 2 of 8 | FAIL: 1 of 8 |
 | a bound on a newcomer's recovery that follows from the code, a churned flood from its own host | none | none | none | none |
 | the same, the flood from at most three other hosts | 0.23 s (from one other host 0.18 s; row 1h: 0.16-0.19 s) | none | none | the same queues as the head, not measured |
@@ -55,7 +55,7 @@ Every run records its tree, the versions and the load before it; one run at a ti
 | 2w | attribution, wake: `nobudget-wake` on row 0's eight cells | 5 | `recovery-wake.json` (40) |
 | 1s, 1r, 1h | evenly spaced sender; 200 000/s; the newcomer on another address | 5 / 3 (head only: 1s, 1r) | `saturation-extra.json` (15), `otherhost.json` (16) |
 | 0c, 1c | companions: the `fixed` reading (12, 40 and 200 ports) | 5 / 3 | `recovery-fixed.json` (64), `saturation-fixed.json` (48) |
-| candidates | pass 2's cold start, spoof, relay-first rows (`scaled-*.json`), full length (`full/`) | RUNNING | |
+| candidates | pass 2's cold start, spoof, relay-first rows, head beside them; full length: R rows 570 s, F rows 300 s | 5 each (scaled); 1 + 4 of every row that passed (full) | `scaled-*.json` (150), `full/` |
 | 1m | the model, alone, last | QUEUED | |
 
 The deadlines (PLAN.md): the first valid frame at most 1.0 s after the newcomer's first actual send, each item at most 2.0 s after its own; one
@@ -380,7 +380,44 @@ Its negative control and its patch-reverts are in the commit message. No PR was 
 - **What it doesn't:** it protects nobody. Gate 1's R1, R2, R3 and R3c fail on it as on base (0-33 of 57, in no run 57). Gate 2 fails 6 of 8, and at 20 000/s its two failures are 1 and 2 items of 100 at 2.08-2.09 s.
 - **So attribution supports the split only as a split, not as a landing.** The separable part is accounting without protection. The part that protects (gate 1) is the scheduling, and the delay (gate 2) is in the budgets that go with it.
   Neither passes both gates. The PR stays held, and the newcomer-recovery change ([`DESIGN-NOTE.md`](DESIGN-NOTE.md)) is what would move it.
-- The rest of #171's suite on it (cold start, exact-source spoof, relay-first, and the full-length rows) is still running.
+- **The rest of #171's suite, pass 2's scaled rows** (5 runs each, the head beside them, by pass 2's own bounds, which are 4.5 s and not pass 3's deadline):
+
+| row | head | narrow | nobudget |
+|---|---|---|---|
+| spoof-exact-source-100000 | **FAIL** (outside the supported guarantee); 5, 1, 3, 3, 3 of 20; max 4,089 ms | **FAIL** (outside the supported guarantee); 8, 8, 10, 10, 12 of 20; max 4,106 ms | **FAIL** (outside the supported guarantee); 8, 7, 7, 5, 12 of 20; max 4,033 ms |
+| spoof-exact-source-500 | PASS; 20, 20, 20, 20, 20 of 20; max 30 ms | PASS; 20, 20, 20, 20, 20 of 20; max 30 ms | PASS; 20, 20, 20, 20, 20 of 20; max 32 ms |
+| churn-established-100000 | PASS; 57, 57, 57, 57, 57 of 57; max 40 ms | **FAIL**; 24, 30, 33, 31, 27 of 57; max 4,122 ms | PASS; 57, 57, 57, 57, 57 of 57; max 130 ms |
+| relay-first-then-churn-100000 | **FAIL** (outside the supported guarantee); 15, 20, 2, 20, 20 of 20; max 16,761 ms | **FAIL** (outside the supported guarantee); 14, 13, 14, 15, 9 of 20; max 17,216 ms | **FAIL** (outside the supported guarantee); 20, 20, 20, 20, 20 of 20; max 2,046 ms |
+| relay-after-then-churn-100000 | PASS; 20, 20, 20, 20, 20 of 20; max 38 ms | **FAIL**; 13, 9, 10, 18, 13 of 20; max 17,189 ms | PASS; 20, 20, 20, 20, 20 of 20; max 78 ms |
+| cold-start-12-ports-20000 | PASS; 20, 20, 20, 20, 20 of 20; max 44 ms; first 30-55 ms | PASS; 20, 20, 20, 20, 20 of 20; max 4,085 ms; first 79-87 ms | PASS; 20, 20, 20, 20, 20 of 20; max 25 ms; first 29-33 ms |
+| cold-start-40-ports-20000 | **FAIL**; 20, 20, 20, 20, 20 of 20; max 2,019 ms; first 84-1,754 ms | PASS; 20, 20, 20, 20, 20 of 20; max 2,091 ms; first 67-81 ms | PASS; 20, 20, 20, 20, 20 of 20; max 1,023 ms; first 28-223 ms |
+| cold-start-200-ports-20000 | **FAIL**; 20, 20, 20, 20, 20 of 20; max 2,018 ms; first 836-1,454 ms | PASS; 20, 20, 20, 20, 20 of 20; max 2,085 ms; first 72-90 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 5,312 ms; first 4,532-5,323 ms |
+| cold-start-churn-own-host-20000 | **FAIL**; 20, 20, 20, 20, 20 of 20; max 4,024 ms; first 170-3,520 ms | PASS; 20, 20, 20, 20, 20 of 20; max 1,081 ms; first 65-79 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 2,760 ms; first 566-2,085 ms |
+| cold-start-churn-60000-hosts-20000 | **FAIL**; 20, 20, 20, 20, 20 of 20; max 17,336 ms; first 1,781-6,974 ms | PASS; 20, 20, 20, 20, 20 of 20; max 2,085 ms; first 75-77 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 4,631 ms; first 2,309-3,436 ms |
+
+  `narrow` fails the established rows of the churned flood (24-33 of 57) and both relay rows; it passes the five cold starts by the 4.5 s bound (first frame 65-90 ms, items up to 4.1 s), which are 20 000/s rows that base
+  passes too. `nobudget` passes the established rows and the relays whole (20 of 20 in all runs; the relay-first row's FAIL is its p50, 1.0 s) and fails three cold starts. The exact-source spoof is a FAIL for all three, outside the guarantee. The head fails
+  four of five cold starts here, 40 fixed ports (a lane shared by chance, above) among them, where pass 2's five runs passed.
+- **Full length** (#171's harness, 570 s for R rows, 300 s for F rows): judged by 🌫's comparator (at the daemon within 4.5 s during the flood, the kernel's drops reported, and pushed to the ear). One run of each, then four more of every row whose first run passed (PLAN.md): a first-run failure decides its row.
+
+| row | narrow | nobudget |
+|---|---|---|
+| R1-valid-other-key-4x-max | **FAIL**: 0 of 1 runs; on time 0 of 57 | PASS: 1 of 1 runs; on time 57 of 57 |
+| R2-same-station | **FAIL**: 0 of 1 runs; on time 3 of 57 | PASS: 1 of 1 runs; on time 57 of 57 |
+| R3-forged-claiming-quiet-2x-max | **FAIL**: 0 of 1 runs; on time 3 of 57 | PASS: 1 of 1 runs; on time 57 of 57 |
+| R3c-forged-churned-sources-2x-max | **FAIL**: 0 of 1 runs; on time 21 of 57 | PASS: 1 of 1 runs; on time 57 of 57 |
+| R4a-replay-earlier-frames-2x-max | PASS: 1 of 1 runs; on time 57 of 57 | **FAIL**: 0 of 1 runs; on time 11 of 57 |
+| R4b-replay-latest-item-2x-max | PASS: 1 of 1 runs; on time 57 of 57 | PASS: 1 of 1 runs; on time 57 of 57 |
+| F0-quiet-only | PASS: 1 of 1 runs; on time 30 of 30 | PASS: 1 of 1 runs; on time 30 of 30 |
+| F2b-forged-own-key-2x-max | PASS: 1 of 1 runs; on time 30 of 30 | PASS: 1 of 1 runs; on time 30 of 30 |
+| F3b-unknown-key-2x-max | **FAIL**: 0 of 1 runs; on time 25 of 30 | PASS: 1 of 1 runs; on time 30 of 30 |
+| F4-replay-other-key-2x-max | PASS: 1 of 1 runs; on time 30 of 30 | PASS: 1 of 1 runs; on time 30 of 30 |
+| F5-real-station-flood | **FAIL**: 0 of 1 runs; on time 3 of 30 | PASS: 1 of 1 runs; on time 30 of 30 |
+| **rows passed** | **5 of 11** | **10 of 11** |
+
+  `narrow` fails R1, R2, R3 and R3c as base does, and F3b and F5; it answers replays. **`nobudget` fails R4a at full length, where the head passes** (11 of 57 on time, the other 46 late by up to 132 s, 26 of them pushed; daemon CPU 142 % mean): without the budgets each replay of an old beacon is verified
+  and served (4.8 M checks that verified), as the wake's backlog would explain. The budgets are what kept that loop idle. So `nobudget` fails both gates, gate 1 only at full length, though it passes the scaled rows.
+
 
 ## 🌫's comparator
 
