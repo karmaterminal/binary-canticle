@@ -564,19 +564,21 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
 - **Who pays.** A frame that verified and was new debits its key's bucket (16 a second, burst 64) and its stream's (12
   and 48, below the key's, so siblings have room); beacons have their own (8 and 16). A check that comes to nothing
   is charged to its source: each of those 4 sources may spend 1 000 of them a second, all other sources claiming
-  the key share 1 000, and everything together may spend 1 500, beside the slice's 500 (next). That covers a forgery, and a replay that verifies and
+  the key share 1 000, and everything together may spend 2 000, strangers of all keys 1 500 of them, beside the slice's 500 (next). That covers a forgery, and a replay that verifies and
   changes nothing: an old beacon (it has no expiry, so it verifies whenever it is replayed), or a frame refused at steps
   3-4, which costs ten, because it makes a record each time. So neither spends the station's bucket.
 - **A slice of the checks is reserved for newcomers, per key** (#173's newcomer recovery; the order is 🍃's and 🌫's). Beside its queues a listed key has
-  one slot, where a source that has no known place has one datagram, when others already wait in the stream it claims; what else it
-  sends queues like anything else. The slots are served in turn over the keys, 500 checks a second on a bucket of their own (the daemon's total stays 2 000), in places of
-  a turn that the queues cannot take. In a key's turn, sources that were not found wrong come first, in the order they came; nothing that comes later
-  takes a place from one. A source whose frame failed is demoted behind them, and has one turn in four: a failed frame is evidence against
-  the frame, and no proof against its source. The next frame of its that verifies clears it. A key holds 256 sources demoted, for as long as twice the
-  rounds it takes to try them all. So a newcomer is checked within **(S + 1) rounds of the keys, K/500 s each (a third more where demoted ones wait), whatever the flood's
-  rate**, S being the sources of its own key that are not tried yet: 0 where its key is not forged, and each costs a turn once. That holds for at most 64 sources that
-  start with it, and for 256 that stay. `receive.reserved` counts what the slice checked. A verified ITEM or PLUCK out of a slot that changes nothing costs its own
-  key nine turns, never another key's.
+  one slot, where a source that has no known place has a claim on one of its datagrams, when others already wait in the stream that claims. The datagram
+  waits in its lane as before, and whichever comes first serves it; what a lane refuses or sheds still waits in the slot. The slots are
+  served in turn over the keys, 500 checks a second on a bucket of their own, in 16 places of a turn beside the queues' 32. Strangers pay for it: of the daemon's 2 000
+  their queues have 1 500, so what strangers cost is 2 000 as before, and an established station loses no turn to it. In a key's turn, sources that were not found wrong come
+  first, in the order they came. A source whose frame failed, or verified and changed nothing (a replayed old beacon verifies for ever), is demoted behind
+  them, and has one turn in four: that is evidence against the frame, and no proof against its source. The next frame of its that is new, or is kept, clears it. A
+  key holds 256 sources demoted, for twice the rounds it takes to try them all. So a newcomer is checked within **(S + 1) rounds of the keys, K/500 s each (a third
+  more where demoted ones wait), whatever the flood's rate**, S being the sources of its own key that are not tried yet: 0 where its key is not forged, and each
+  costs its turn once. That holds for at most 63 sources that start with it, and for 256 that stay. An echo of a frame that waits takes no slot, and a known
+  source's copy stands for a slot's. A verified ITEM or PLUCK out of a slot that changes nothing costs its own key nine turns, never another key's. `receive.reserved` counts what the
+  slice checked.
 - **A known place is a lease.** It ends 60 s after the daemon first verified the newest frame that its source delivered: the clock is the
   daemon's monotonic one, and having nothing waiting means nothing. An exact repeat from a source that has a place renews it up to the
   age of the frame it repeats and no further, so a source that stopped and replays one cached frame keeps its place no longer than if it were silent. A repeat

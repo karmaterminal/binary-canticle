@@ -1045,7 +1045,7 @@ class NewcomerTest(NewcomerCase):
             self.play(2.0, keys=range(self.K), churn=churn, rate=100_000)
             self.assertLessEqual(self.checked.total() - before, 2.0 * C_ALL + 250)
         spare = getattr(intake, "SLICE_RATE", 0.0)
-        self.assertEqual((intake.CHECK_RATE + spare, spare), (C_ALL, C_SLICE))
+        self.assertEqual((intake.CHECK_RATE, getattr(intake, "STRANGE_RATE", intake.CHECK_RATE) + spare, spare), (C_ALL, C_ALL, C_SLICE))
 
     def test_established_sources_are_served_as_before_while_every_slot_is_contended(self):
         """A guard: a known source of each key, its key forged at from churned ports, is served within a round of the keys and
@@ -1788,7 +1788,7 @@ class ConsistencyTest(IntakeCase):
                          + in_flight)
 
     def test_random_traffic(self):
-        never = {f"{b}_{k}": v for b in ("KEY", "STREAM", "BEACON", "SOURCE", "CHECK", "UNLISTED", "SLICE")
+        never = {f"{b}_{k}": v for b in ("KEY", "STREAM", "BEACON", "SOURCE", "CHECK", "UNLISTED", "SLICE", "STRANGE")
                  for k, v in (("RATE", 0.0), ("BURST", 1e6))}
         for seed in range(12):
             r = random.Random(seed)
@@ -1811,12 +1811,13 @@ class ConsistencyTest(IntakeCase):
                         self.intake.settle(t, verified, fresh)
                         if t.key is not None:
                             spent.update([t.stream.bucket] + [t.key.bucket] * (not t.stream.beacon) if fresh else
-                                         [self.intake.slice if t.budget is self.intake.slice else self.intake.checks])
+                                         [self.intake.slice] if t.budget is self.intake.slice else
+                                     [self.intake.checks] + [self.intake.strange] * t.strange)
                     self.intake.heard_again()
                     self.check()
                     station = [b for k in self.intake.keys.values()
                                for b in (k.bucket, *(s.bucket for s in k.streams.values()))]
-                    for b in (*station, self.intake.checks, self.intake.slice):
+                    for b in (*station, self.intake.checks, self.intake.strange, self.intake.slice):
                         self.assertEqual(1e6 - b.tokens, spent[b])
 
                 for _ in range(250):

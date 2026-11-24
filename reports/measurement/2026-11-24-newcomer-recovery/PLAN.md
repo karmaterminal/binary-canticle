@@ -171,3 +171,16 @@ the pending frame's survival (RED); every key's service under a full flood, with
 W runs after E1. It decides nothing about the slice.
 
 **That section's time, corrected:** it was committed at 17:53Z (`38bd631`), not 18:10Z. Nothing had been measured then, or has been since.
+
+## Added 2026-11-24 18:26Z, before any run: what two independent reviews of the code changed
+
+Nothing has been measured. No row, threshold or run count changes; three points of the rule and the bound do, each a RED first:
+
+- **Clears:** a demotion is cleared by a frame that is *new, or is kept* (a resurfaced one), not by any that verifies. An old beacon verifies for ever, so a source that replays one now and then would be untried for ever. A verified frame
+  that changes nothing demotes its source. (7138942171 says "a valid frame"; this is its reading here, for 🍃 and 🌫 to agree or amend.)
+- **A newcomer's frame waits in its lane as on the base, and the slot holds a second claim on it,** void once either serves it. So a slot is never a worse place than the queue was, and an echo behind it goes round neither.
+- **Strangers pay for the slice, not established stations.** The queues keep 2 000 checks a second, strangers of all keys 1 500 of them; the slots' 500 are beside. What strangers cost is 2 000 as before (2 500 only while a known station's exact source is
+  spoofed as well, which is outside). In (B1) C_gen is 1 500/s; K/C_eff stays the larger.
+- A verified ITEM or PLUCK that changes nothing counts as **ten** turns of its own key. The second review's numbers (virtual time, base / the form before / this one): S = 200 sources that stay and replay, newcomers within the S = 0 bound 0 / 0 / 79 of 79; K = 64, S = 63, all keys, first frame 0.189 / 10.758 / 0.007 s; an established station's echo credited 0 / 20 / 0 of 20.
+
+(B2)'s "S" counts sources not tried yet **or whose demotion has ended** (retained 1.03 s · K).

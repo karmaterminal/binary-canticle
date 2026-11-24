@@ -25,12 +25,14 @@ What is spent, and by whom:
   which has no expiry and verifies for ever) is charged to the source it came from. Each address a new frame of the
   key was verified from (the latest KNOWN_MAX) has a budget of its own, and all other addresses claiming the key
   share one. All of them together have one bound, which is what the daemon spends on checks that come to nothing;
-- beside it, a slice of such checks is reserved for newcomers, per **key**. A key has one slot beside its queues, where a
-  source that is not known has one datagram, when others already wait in the stream it claims. The slots are served in turn
-  over the keys, on a bucket of their own, so no flood of other keys or of the queues spends it. In a key's turn the sources
-  that were not found wrong come first, in the order they came; one whose frame failed is demoted behind them: it has one
-  turn in SLOT_M, and the next frame of its that verifies clears it. A newcomer is then checked within (S + 1) rounds of the
-  keys, S being the sources that were not tried before it, whatever the flood's rate: once, since each is then behind it;
+- beside it, a slice of such checks is reserved for newcomers, per **key**, and paid for by strangers (STRANGE_RATE is the
+  queues' part of theirs). A key has one slot beside its queues, where a source that is not known has a claim on one datagram
+  of its that waits in its lane too, when others already wait in the stream that claims. The slots are served in turn over
+  the keys, on a bucket of their own, so no flood of other keys or of the queues spends it. In a key's turn the sources that
+  were not found wrong come first, in the order they came; one whose frame failed, or changed nothing, is demoted behind them:
+  it has one turn in SLOT_M, and the next frame of its that is new or kept clears it. A newcomer is then checked within (S + 1)
+  rounds of the keys, S being the sources that were not tried before it, whatever the flood's rate: once, since each is then
+  behind it;
 - in a stream, the known sources get every other turn however many strangers claim it. Strangers queue apart too, in
   a pool the stream's longest queue pays for: a flood can fill it, but a source that queues apart still gets a place
   and its turn;
@@ -54,8 +56,8 @@ What this does not do:
 - **A station that is still a stranger, among many.** Until one of its frames verifies from a new address (a cold
   start, or its restart on a new port), it competes with every other stranger claiming its key. STRANGERS_PER_HOST
   ports of a host, and STRANGERS_MAX in all, queue apart; the rest share CROWD_LANES lanes by a salted hash. The rounds of the
-  slice bound it where its key is not forged, or is forged from at most SLOT_MAX sources that stay (up to DEMOTED_MAX after each
-  was tried once). **A sender that changes its source with every frame, or has more of them than a key can hold demoted**, looks
+  slice bound it where its key is not forged, or is forged from fewer than SLOT_MAX sources that stay (up to DEMOTED_MAX after
+  each was tried once). **A sender that changes its source with every frame, or has more of them than a key can hold demoted**, looks
   like a station that starts in everything that is read before the signature: a copy is verified with chance
   (SOURCE_RATE + SLICE_RATE) / R at best, and no deadline follows.
 - **Source binding and a house MAC** (RFC §10.2) are not here. A binding is only as good as the switch's enforcement.
@@ -95,9 +97,11 @@ BEACON_RATE, BEACON_BURST = 8.0, 16.0       # new beacons per key
 # and for everything that claims a listed key, together (a check is 60-140 µs on ronan, #171).
 SOURCE_RATE, SOURCE_BURST = 1_000.0, 100.0
 NO_OP_COST = 10                             # what a verified ITEM or PLUCK that changes nothing costs: it makes a record
-CHECK_RATE, CHECK_BURST = 1_500.0, 150.0
-# Reserved beside them for the keys' slots, whatever else is forged: 2 000 a second in all. A round of 64 keys is 0.13 s of it,
-# an eighth of the second a station's first frame may take.
+CHECK_RATE, CHECK_BURST = 2_000.0, 200.0
+# Of them, what strangers' datagrams in the queues may have. The rest is reserved for the keys' slots, so it is strangers that pay
+# for newcomers: 2 000 a second for both, as before. A round of 64 keys is 0.13 s of the slice, an eighth of the second a
+# station's first frame may take.
+STRANGE_RATE, STRANGE_BURST = 1_500.0, 150.0
 SLICE_RATE, SLICE_BURST = 500.0, 50.0
 SLICE_PAUSE_S = (NO_OP_COST - 1) / SLICE_RATE    # what such an ITEM or PLUCK out of a slot costs: turns of its own key only
 SLOT_MAX, SLOT_M = 64, 4                    # sources with a datagram in a key's slot, of each kind; a demoted one's turns, one in M
@@ -232,9 +236,9 @@ class StreamQueue:
         self.pool -= 1
         return entry, longest.source
 
-    def pick(self, now: float) -> Optional[tuple]:
+    def pick(self, now: float, strangers: bool) -> Optional[tuple]:
         for ring in ((self.known, self.strange) if self.known_next else (self.strange, self.known)):
-            for _ in range(len(ring)):
+            for _ in range(len(ring) if strangers or ring is self.known else 0):
                 lane = ring[0]
                 ring.rotate(-1)
                 source = lane.source
@@ -453,13 +457,13 @@ class KeyQueue:
                 n += 1
         return n
 
-    def pick(self, now: float) -> Optional["Ticket"]:
+    def pick(self, now: float, strangers: bool) -> Optional["Ticket"]:
         for _ in range(len(self.ready)):
             s = self.ready[0]
             self.ready.rotate(-1)
             if not s.bucket.ready(now) or not (s.beacon or self.bucket.ready(now)):
                 continue
-            got = s.pick(now)
+            got = s.pick(now, strangers)
             if got is None:
                 continue
             if not s.lanes:
@@ -479,7 +483,7 @@ class Unlisted:
     def __init__(self):
         self.bucket, self.ready = Bucket(UNLISTED_RATE, UNLISTED_BURST), deque()
 
-    def pick(self, now: float) -> Optional["Ticket"]:
+    def pick(self, now: float, strangers: bool) -> Optional["Ticket"]:
         if not self.ready or not self.bucket.ready(now):
             return None
         self.bucket.take()
@@ -491,12 +495,13 @@ class Ticket:
     """A datagram whose turn has come. It holds one token of each bucket it might pay from until ``settle``; one out of a slot
     holds one of the slice's, and none of its station's: they are asked for when it has verified."""
 
-    __slots__ = ("data", "digest", "addr", "at", "budget", "key", "stream", "copies", "dropped")
+    __slots__ = ("data", "digest", "addr", "at", "budget", "key", "stream", "strange", "copies", "dropped")
 
     def __init__(self, data: bytes, digest: Optional[bytes], addr, at: int, source: Optional[Source],
                  key: Optional[KeyQueue], stream: Optional[StreamQueue]):
         self.data, self.digest, self.addr, self.at = data, digest, addr, at    # at: when it arrived
         self.budget = source.budget if source is not None else None
+        self.strange = source is not None and not source.known
         self.key, self.stream = key, stream
         self.copies, self.dropped = [], False      # where copies of it came from that share its verdict; that it is one itself
 
@@ -621,6 +626,7 @@ class Intake:
         self.keys = {e.key_id: KeyQueue(e.stream_names) for e in manifest if not e.revoked}
         self.unlisted = Unlisted()
         self.checks = Bucket(CHECK_RATE, CHECK_BURST)
+        self.strange = Bucket(STRANGE_RATE, STRANGE_BURST)
         self.slice = Bucket(SLICE_RATE, SLICE_BURST)
         self._slice = Source(self.slice)           # who pays for a ticket out of a slot
         self.repeats: dict = {}                    # digest -> Repeat (recorded by ``remember`` only)
@@ -759,7 +765,8 @@ class Intake:
         new, out = got
         if out is not None and key.lost(out[:1]):
             source = out[1]
-            self.refused["unverified" if source.budget.tokens < 1.0 or self.checks.tokens < 1.0 else
+            self.refused["unverified" if source.budget.tokens < 1.0 or self.checks.tokens < 1.0 or
+                         (self.strange.tokens < 1.0 and not source.known) else
                          "over_rate" if stream.bucket.tokens < 1.0 or (key.bucket.tokens < 1.0 and not stream.beacon)
                          else "backlog"] += 1
         if idle:
@@ -847,17 +854,20 @@ class Intake:
             out.append(t)
 
     def _pick(self, now: float) -> Optional[Ticket]:
+        strangers = self.strange.ready(now)
         for _ in range(len(self._ready)):
             key = self._ready[0]
             self._ready.rotate(-1)
             if key is not self.unlisted and not self.checks.ready(now):
                 continue
-            t = key.pick(now)
+            t = key.pick(now, strangers)
             if not key.ready:
                 self._ready.pop()
             if t is not None:
                 if t.key is not None:
                     self.checks.take()
+                    if t.strange:
+                        self.strange.take()
                     claim = key.slot.get(t.addr)
                     if claim is not None and claim.entry[1] == t.digest:     # its turn in the queues came first
                         key.slot.remove(t.addr)
@@ -901,6 +911,8 @@ class Intake:
             t.budget.give()
             if not spare:
                 self.checks.give()
+                if t.strange:
+                    self.strange.give()
         if spare and station_pays:
             t.stream.bucket.take()
             if not t.stream.beacon:
