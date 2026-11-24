@@ -1,0 +1,57 @@
+{
+ "row": "F3b-unknown-key-2x-max",
+ "python": "3.12.3",
+ "cryptography": "50.0.1",
+ "offered_per_s": 643171.6,
+ "sung": 30,
+ "at_daemon": 30,
+ "at_daemon_during_flood": 30,
+ "pushed": 30,
+ "send_to_record_ms": {
+  "p50": 17.8,
+  "p90": 18.8,
+  "p99": 19.8,
+  "max": 19.8
+ },
+ "send_to_push_ms": {
+  "p50": 5735.4,
+  "p90": 5973.3,
+  "p99": 6036.8,
+  "max": 6042.7
+ },
+ "kernel_drops": 0,
+ "reported_socket_dropped": 0,
+ "receive": {
+  "read": 192952061,
+  "repeats": 233,
+  "copies": 0,
+  "verified": 346,
+  "unverified": 150559,
+  "queued": 0,
+  "known": 1,
+  "displaced": 0,
+  "refused": {
+   "unlisted": 192800923,
+   "unverified": 0,
+   "over_rate": 0,
+   "backlog": 0
+  }
+ },
+ "health_reasons_seen": [],
+ "admission": {
+  "verified": 30,
+  "duplicate": 233
+ },
+ "unverified": {
+  "unknown_key": 150559
+ },
+ "ear_live_overflow": null,
+ "daemon_cpu_rss": {
+  "cpu_max": 101.9,
+  "rss_max_kb": 34772,
+  "cpu_mean": 92.5
+ },
+ "load_at_start": 5.65,
+ "duration_s": 300.0,
+ "drain_s": 15.0
+}
