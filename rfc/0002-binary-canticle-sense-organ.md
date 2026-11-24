@@ -279,7 +279,7 @@ Recovered streams sit against RFC-0001 §21's non-goals 1 and 4 (§7.1).
 | publisher → ring | spool ack (named event) | the ring accepted or retained the item | that anyone heard it | `[proposed: frond-ear#116]` |
 | ring → ear | transport cursor advance | the ear read past this position | that the item was valid or admitted | `[proposed: frond-ear#116]` |
 | ear admission | verify + dedupe record | a valid, unexpired, unseen item passed the caps | that a model saw it | `[built+tested: binary-canticle@d4c3066:prototype/canticle-station/canticle/listener.py:336 \| FrameRecordTest.test_repeat_is_a_health_counter_only]` (the caps: §2.7) |
-| ear → session | frond-ear custody: offered → echoed (frond-ear#112), boundary-stamped | offered: the item was delivered into this session's context. echoed: the session's own turn quoted its full batch id and token | that it was obeyed (it never is: external content) | `[built+tested: frond-ear@a8e2e5b:src/canticle/custody.ts:25 \| test/canticle-custody.test.ts:555]` |
+| ear → session | frond-ear custody: offered → echoed (frond-ear#112), boundary-stamped | offered: the shim handed the event to the session (host-returned; model input not proven). echoed: the session's own turn quoted its full batch id and token, which proves encounter with that token only | that it was obeyed (it never is: external content) | `[built+tested: frond-ear@a8e2e5b:src/canticle/custody.ts:25 \| test/canticle-custody.test.ts:555]` |
 
 ### 2.7 Unbuilt, step one, and the acceptance test
 
@@ -327,7 +327,7 @@ tuned stream `[proposed: #168]`:
 
 - **What changed:** a small digest with doors to the originals, never a backlog dumped into the next
   thought `[proposed: #168]`.
-- **What reached a turn** (custody *offered*, or *echoed*) versus **what the ear only collected.**
+- **What was handed to the session** (custody *offered*: host-returned, model input unknown), **what the session showed it encountered** (*echoed*), and **what the ear only collected.**
   "Available to you" MUST NOT quietly become "you heard this" `[proposed: #168]`.
 - **What it cost.** These are different experiences, and each MUST be reported as itself
   `[proposed: #168]`:
@@ -352,7 +352,7 @@ tuned stream `[proposed: #168]`:
 - **A durable per-prince ledger, not a replay into the prompt (🪨).** It keeps separate marks
   `[proposed: #168]`:
   - *collected*;
-  - *offered in this exact session's turn*;
+  - *offered to this exact session* (host-returned; not proof it was in the model input);
   - *opened, kept, muted or expired*;
   - *answered or published*.
 
@@ -418,7 +418,7 @@ viewing.
   **rendition** gets its own id, date and cursor. Rewinding a rendition replays it; it never regenerates
   it. "New take" makes another rendition. The score never changes, and a performance is never a new
   fact about the town `[proposed: #168]`.
-- **Receipts as everywhere else:** collected (on the shelf), offered (a jacket shown in a turn), opened
+- **Receipts as everywhere else:** collected (on the shelf), offered (a jacket handed to the session), opened
   (played), kept (a rendition saved). Looking at the shelf marks nothing heard `[proposed: #168]`.
 - **The player is a separate session** (figs): the author doesn't have to narrate, and several princes
   hear the *same* showing. While it performs, its output is a **live, ordered stream**, the case §2.2
