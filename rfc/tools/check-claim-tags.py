@@ -167,6 +167,9 @@ def main() -> int:
         name, _, path = spec.partition("=")
         if not path:
             ap.error(f"--verify wants NAME=PATH, not {spec!r}")
+        ok = subprocess.run(["git", "-C", path, "rev-parse", "--git-dir"], capture_output=True).returncode == 0
+        if not ok:
+            ap.error(f"--verify {name}={path}: {path} is not a git repository")
         repos[name] = Path(path)
     files = [Path(f) for f in args.files] or [Path(top or ".") / f for f in DEFAULT_FILES]
 
