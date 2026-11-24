@@ -1391,8 +1391,8 @@ class SlotTest(IntakeCase):
         self.assertEqual(len(self.serve(1, verified=lambda t: False)), 1)      # the other's, and it is left
         self.assertEqual((self.waits(), len(self.key.ready)), ([f], 1))
         self.intake.checks.tokens, self.intake.checks.at = -1e9, self.now      # the queues serve nothing
-        self.assertEqual(self.serve(4), [f])
-        self.assertEqual((list(self.key.ready), list(self.intake._ready), self.intake.waiting()), ([], [], False))
+        (t,) = self.intake.take(4)
+        self.assertEqual((t.data, list(self.key.ready), list(self.intake._ready), self.intake.waiting()), (f, [], [], False))
 
     def test_what_waits_for_its_streams_rate_keeps_its_turn(self):
         frames = [item(A, n + 1) for n in range(6)]
