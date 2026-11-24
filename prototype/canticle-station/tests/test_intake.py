@@ -779,14 +779,15 @@ C_SLICE, C_ALL = 500.0, 2_000.0     # the newcomer-recovery report's PLAN.md: th
 M = 4                               # and a demoted source's share of a key's turns, one in so many
 CAP, PENDING = 256, 64              # the demotions a key holds, and the sources that wait in its slot, of each kind
 CHECK_S = 0.00014                   # the dearest check of #171 (60-140 µs on ronan)
-TURN_S = 32 * CHECK_S               # a turn of the event loop, its durable save apart
+TURN_S = 48 * CHECK_S               # a turn of the event loop, its durable save apart
 SAVE_TURN_S = 0.045                 # and with it
 
 
 class NewcomerCase(IntakeCase):
     """A flood and a newcomer in virtual time: each millisecond the reader places what came, and the event loop, when it is not
     busy with the checks of its last turn, runs at most one turn, as ``Daemon._hear_queued`` would: at once when the last one
-    looked at something, RETRY_S later when it did not, and when it is woken."""
+    looked at something, RETRY_S later when it did not, and when it is woken. A turn's verdicts come when it is over: what
+    arrives meanwhile is placed before them."""
 
     K, RATE, PORTS = 16, 20_000, 40
 
@@ -806,7 +807,7 @@ class NewcomerCase(IntakeCase):
         self.intake = self.make(Manifest([StationEntry(f"s{n}", wire.public_key_bytes(sk), frozenset({1}), ("chatter",))
                                           for n, sk in enumerate(self.sks)]))
         self.n, self.rng, self.busy, self.due = 0, random.Random(7), self.now, self.now
-        self.checked, self.slots = Counter(), Counter()
+        self.checked, self.slots, self.flight = Counter(), Counter(), []
         self.waits: dict = {}           # newcomer's frame -> when it was sent, then how long it waited for its check
 
     def forged(self, keys, churn=False):
@@ -836,14 +837,21 @@ class NewcomerCase(IntakeCase):
                 self.intake.offer(batch)
             if self.woken != woken:
                 self.due = self.now
-            if self.now >= max(self.busy, self.due):
-                self.turn(mine, turn_s)
+            if self.flight and self.now >= self.busy:
+                self.settled(mine)
+            if not self.flight and self.now >= self.due:
+                self.turn(turn_s)
             self.now = start + (ms + 1) / 1000
         return [self.waits[f] for f in mine]
 
-    def turn(self, mine, turn_s):
-        got = self.intake.take(32)
-        for t in got:
+    def turn(self, turn_s):
+        self.flight = self.intake.take(32)
+        self.busy = self.now + max(turn_s, len(self.flight) * CHECK_S)
+        if not self.flight:
+            self.due = float("inf") if not self.intake.waiting() else self.now + RETRY_S
+
+    def settled(self, mine):
+        for t in self.flight:
             ok = t.data in mine
             if ok and self.waits.get(t.data, 1) < 0:
                 self.waits[t.data] += self.now
@@ -851,8 +859,7 @@ class NewcomerCase(IntakeCase):
                 self.checked[t.data[4:12], ok] += 1
                 self.slots[t.data[4:12]] += t.budget is getattr(self.intake, "slice", None)
             self.intake.settle(t, ok, ok)
-        self.busy = self.now + max(turn_s, len(got) * CHECK_S)
-        self.due = (float("inf") if not self.intake.waiting() else self.busy if self.intake.took else self.now + RETRY_S)
+        self.flight, self.due = [], self.now if self.intake.waiting() else float("inf")
 
     def shares_a_lane(self, k, src) -> bool:
         """Whether ``src`` falls in a lane of the crowd that one of the flood's ports has too."""
@@ -883,9 +890,10 @@ class NewcomerCase(IntakeCase):
 class NewcomerTest(NewcomerCase):
     """The time to a newcomer's first check in a flood that goes on (#173's newcomer recovery; PLAN.md's B1-B3)."""
 
-    def within(self, keys, sources=0):
-        """The bound: (S + 1) turns of the key's slot, one in M of them a demoted source's, when ``keys`` keys contend."""
-        return (sources + 1) * M / (M - 1) * keys / C_SLICE + RETRY_S + TURN_S
+    def within(self, keys, sources=0, turn_s=TURN_S):
+        """The bound: (S + 1) turns of the key's slot, one in M of them a demoted source's, when ``keys`` keys contend; the turn
+        that runs when it comes, and its own."""
+        return (sources + 1) * M / (M - 1) * keys / min(C_SLICE, 16 / turn_s) + RETRY_S + 2 * turn_s
 
     def test_a_flood_over_the_other_keys_does_not_delay_a_newcomer(self):
         """A guard, not a RED: the round-robin over keys already gives this (K picks of the general budget)."""
@@ -942,7 +950,17 @@ class NewcomerTest(NewcomerCase):
                 self.stations(1)                                 # K = 1: the retention is at its shortest
                 self.play(2.0 * (CAP + 1) / C_SLICE, keys=(0,))
                 waits = self.play(3.5, keys=(0,), copies=[(0.041 * n, item(self.sks[0], n + 1), udp(50_001 + n)) for n in range(80)])
-                self.assertChecked(waits, self.within(1, PENDING), f"{sources} sources that stay")
+                self.assertChecked(waits, self.within(1, 16), f"{sources} sources that stay")
+
+    def test_a_source_that_is_being_checked_takes_no_place_meanwhile(self):
+        """In a long turn a source's next frame comes before the verdict on its last one. It would be untried again: with every
+        turn saving, 200 sources that stay would cost a newcomer their turns over and over."""
+        self.PORTS = 200
+        self.stations(1)
+        self.play(3.0, keys=(0,), turn_s=SAVE_TURN_S)
+        waits = self.play(4.0, keys=(0,), turn_s=SAVE_TURN_S,
+                          copies=[(0.15 * n, item(self.sks[0], n + 1), udp(50_001 + n)) for n in range(24)])
+        self.assertChecked(waits, self.within(1, 1, SAVE_TURN_S), "200 sources that stay, a save in every turn")
 
     def test_more_sources_than_a_key_can_hold_demoted_are_outside_and_grow_nothing(self):
         """🌫: the exclusion. Nothing is claimed of the wait; what a key holds is bounded, and it still forgets nobody early."""
