@@ -115,7 +115,7 @@ neither its address nor more than three others: then it gets a stranger's place 
 - The rest of the #171 suite (pass 2's `scaled_rows.py`: cold start, exact-source spoof, relay-first) runs 5 times on the candidate.
 - Neither gate stands in for the other.
 
-## Added 2026-11-24 02:30Z: rows 0, 1 and 2 are rerun on the pinned runtime
+## Added 2026-11-24 02:18Z: rows 0, 1 and 2 are rerun on the pinned runtime
 
 **What went wrong.** Rows 0, 1 and 2 ran on the host's system `cryptography` 41.0.7, which the repository's own doctor refuses, and
 not on the 50.0.1 that `.github/ci/requirements-station.txt` locks and pass 1 and 2 used. A signature check costs 39 µs on the
