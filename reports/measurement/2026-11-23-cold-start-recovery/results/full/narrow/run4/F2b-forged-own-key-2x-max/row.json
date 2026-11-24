@@ -1,0 +1,54 @@
+{
+ "row": "F2b-forged-own-key-2x-max",
+ "python": "3.12.3",
+ "cryptography": "50.0.1",
+ "offered_per_s": 662558.8,
+ "sung": 30,
+ "at_daemon": 30,
+ "at_daemon_during_flood": 30,
+ "pushed": 30,
+ "send_to_record_ms": {
+  "p50": 17.6,
+  "p90": 19.0,
+  "p99": 25.8,
+  "max": 28.1
+ },
+ "send_to_push_ms": {
+  "p50": 5697.7,
+  "p90": 5989.7,
+  "p99": 6036.6,
+  "max": 6040.7
+ },
+ "kernel_drops": 7111,
+ "reported_socket_dropped": 7111,
+ "receive": {
+  "read": 198761119,
+  "repeats": 233,
+  "copies": 195277490,
+  "verified": 346,
+  "unverified": 3483050,
+  "queued": 0,
+  "refused": {
+   "backlog": 0
+  }
+ },
+ "health_reasons_seen": [
+  "socket_drops"
+ ],
+ "admission": {
+  "verified": 30,
+  "duplicate": 233
+ },
+ "unverified": {
+  "bad_signature": 3483050
+ },
+ "ear_live_overflow": null,
+ "daemon_cpu_rss": {
+  "cpu_max": 161.9,
+  "rss_max_kb": 35092,
+  "cpu_mean": 145.5
+ },
+ "load_at_start": 1.78,
+ "duration_s": 300.0,
+ "drain_s": 15.0
+}
