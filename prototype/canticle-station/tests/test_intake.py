@@ -1114,6 +1114,120 @@ class SlotTest(IntakeCase):
         self.assertIn(frames[0], self.serve(2))
 
 
+HORIZON_S = 60.0        # the newcomer-recovery report's PLAN.md: the lease of a known place
+
+
+class LeaseTest(IntakeCase):
+    """Who keeps a known place, and how long (🌫's inverse rows on #173). It authenticates nobody: a place is a share of the
+    verify work, and the clock is the daemon's own."""
+
+    def accept_from(self, src, *frames):
+        self.offer(*frames, src=src)
+        self.assertLessEqual(set(frames), set(self.accept()))
+
+    def known(self, after=0.0):
+        self.now += after
+        getattr(self.intake, "lapse", lambda: None)()         # so that it fails, not errs, on a tree without a lease
+        return list(self.intake.keys[KID_A].known)
+
+    def test_a_place_ends_at_the_horizon_after_its_newest_frame(self):
+        self.accept_from(HERE, item(A, 1))
+        self.assertEqual(self.known(HORIZON_S), [HERE])
+        self.assertEqual(self.known(0.01), [])
+        self.assertEqual([self.intake.stats().get(k) for k in ("known", "displaced", "lapsed")], [1, 0, 1])
+
+    def test_nothing_waiting_is_not_being_idle_and_a_new_frame_renews(self):
+        for n in range(6):
+            self.accept_from(HERE, beacon(A, n + 1))
+            self.assertEqual(self.known(HORIZON_S - 1), [HERE])
+
+    def test_a_stopped_incumbent_that_replays_one_frame_keeps_its_place_no_longer(self):
+        """Row I-b: however often and from the very source, the replays end with the frame's first verification."""
+        f = beacon(A, 1)
+        self.accept_from(HERE, f)
+        for n in range(int(HORIZON_S) * 10 - 1):
+            self.offer(f, src=HERE)
+            self.assertEqual(self.known(0.1), [HERE])
+        self.offer(f, src=HERE)
+        self.assertEqual(self.known(0.2), [])
+        for n in range(20):
+            self.offer(f, src=HERE)
+            self.assertEqual((self.known(0.1), self.serve()), ([], []))
+
+    def test_a_repeat_of_a_newer_frame_renews_to_that_frames_age_and_no_further(self):
+        """A station whose frames a relay on a faster path is heard with first keeps the place it has, for as long as its
+        own copies of new frames come."""
+        self.accept_from(HERE, item(A, 1))
+        self.now += HORIZON_S - 10
+        f = item(A, 2)
+        self.accept_from(THERE, f)
+        self.now += 5
+        self.offer(f, src=HERE)                                # five seconds after f was first verified
+        self.assertIn(HERE, self.known(HORIZON_S - 5))
+        self.assertNotIn(HERE, self.known(0.01))
+
+    def test_a_copy_that_was_queued_when_the_frame_was_accepted_renews_too(self):
+        self.accept_from(HERE, item(A, 1))
+        self.now += HORIZON_S - 1
+        f = item(A, 2)
+        self.offer(f, src=THERE)
+        (t,) = self.intake.take(1)
+        self.offer(f, src=HERE)                                # waits in its own queue while the relay's copy is verified
+        self.intake.remember(t, (KID_A, 5, 0, 2), runner.now_ms() + 60_000)
+        self.intake.settle(t, True, True)
+        self.assertEqual(self.serve(), [])
+        self.assertIn(HERE, self.known(HORIZON_S - 1))
+
+    def test_a_repeat_never_gives_a_place(self):
+        f = item(A, 1)
+        self.accept_from(HERE, f)
+        self.offer(f, src=THERE)
+        self.assertEqual(self.known(), [HERE])
+        self.known(HORIZON_S + 1)
+        self.offer(f, src=HERE)
+        self.assertEqual(self.known(), [])
+
+    def test_a_lapsed_source_queues_on_as_a_stranger(self):
+        self.accept_from(HERE, item(A, 1))
+        waits = [item(A, n + 2) for n in range(5)]
+        self.offer(*waits, src=HERE)
+        self.assertEqual((self.known(HORIZON_S + 1), HERE in self.intake.keys[KID_A].strangers), ([], True))
+        self.assertEqual(self.serve(), waits)
+        self.assertEqual((self.refused, self.known()), ({}, [HERE]))
+
+    def test_with_no_room_for_it_what_a_lapsed_source_had_waiting_is_counted(self):
+        self.accept_from(HERE, item(A, 1))
+        key = self.intake.keys[KID_A]
+        self.now += HORIZON_S
+        for n in range(intake.STRANGERS_MAX + 1):
+            key.note_tried(addr(100 + n), self.now)
+            self.offer(forge(item(A, 1), n), src=addr(100 + n))
+        self.offer(*[item(A, n + 2, "other") for n in range(5)], src=HERE)
+        before = self.intake.stats()["queued"]
+        self.assertEqual(self.known(0.01), [])
+        self.assertEqual((before - self.intake.stats()["queued"], self.refused["backlog"]), (5, 5))
+        self.serve(200, verified=lambda t: False)
+        self.assertEqual((self.intake.stats()["queued"], self.intake.waiting()), (0, False))
+
+    def test_four_relays_that_were_first_hold_no_place_against_the_station_that_starts(self):
+        """Row I-a, a guard (the rule is #173's): four relays have the key's places and go on forwarding valid copies. The
+        station's first new frame gives it a place at once, on a new port too, and the copies of it take none away."""
+        relays = [addr(7, 5_000 + n) for n in range(intake.KNOWN_MAX)]
+        for n, src in enumerate(relays):
+            self.accept_from(src, beacon(A, n + 1))
+        seq = 100
+        for port in (HERE, THERE):
+            for _ in range(20):
+                seq += 1
+                f = beacon(A, seq)
+                self.accept_from(port, f)
+                for src in relays:
+                    self.offer(f, src=src)
+                self.assertIn(port, self.known(0.25))
+        self.assertEqual(self.intake.stats()["displaced"], 2)
+        self.assertEqual(self.known(), [*relays[2:], HERE, THERE])
+
+
 class ConsistencyTest(IntakeCase):
     """Random traffic from many addresses, random verdicts: after every step the queues, rings, tables and counts
     agree with each other, and the station's buckets and the daemon's hold exactly what the verdicts left them (the
