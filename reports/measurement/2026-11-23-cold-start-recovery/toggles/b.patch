@@ -1,0 +1,21 @@
+--- a/prototype/canticle-station/canticle/intake.py
++++ b/prototype/canticle-station/canticle/intake.py
+@@ -485,7 +485,8 @@
+     def __init__(self, sock: socket.socket, manifest, *, now_ms: Callable[[], int], wake: Callable[[], None],
+                  failed: Callable[[BaseException], None] = lambda e: None, rcvbuf: int = RCVBUF):
+         self.sock, self.now_ms, self.wake, self.failed = sock, now_ms, wake, failed
+-        self.keys = {e.key_id: KeyQueue(e.stream_names) for e in manifest if not e.revoked}
++        one = KeyQueue(())    # TOGGLE b: one queue for every listed key and stream
++        self.keys = {e.key_id: one for e in manifest if not e.revoked}
+         self.unlisted = Unlisted()
+         self.checks = Bucket(CHECK_RATE, CHECK_BURST)
+         self.repeats: dict = {}                    # digest -> Repeat (recorded by ``remember`` only)
+@@ -599,7 +600,7 @@
+         """Queue one claim, or refuse it (or the one it displaces). True when a source has something waiting for
+         the stream that had nothing."""
+         data = entry[0]
+-        stream = key.streams.get(BEACON if data[3] == wire.KIND_BEACON else peek_stream(data)) or key.streams[OTHER]
++        stream = key.streams[OTHER]    # TOGGLE b
+         source = key.source(entry[2], now)
+         idle = not stream.lanes
+         got = stream.put(source, entry)

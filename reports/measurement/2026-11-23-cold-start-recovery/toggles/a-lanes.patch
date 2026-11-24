@@ -1,0 +1,20 @@
+--- a/prototype/canticle-station/canticle/intake.py
++++ b/prototype/canticle-station/canticle/intake.py
+@@ -269,6 +269,9 @@
+         self.shares = self.displaced = 0          # sources that became known, and those a newer one displaced
+ 
+     def source(self, addr, now: float) -> Source:
++        return self.crowd[0]    # TOGGLE a: one lane per stream, whatever the source
++
++    def _source_unused(self, addr, now: float) -> Source:
+         got = self.known.get(addr) or self.strangers.get(addr)
+         if got is not None:
+             return got
+@@ -300,6 +303,7 @@
+ 
+     def know(self, addr) -> int:
+         """A new frame of this key was verified from ``addr``. Returns how many waiting datagrams that displaced."""
++        return 0                # TOGGLE a: no source earns a share
+         got = self.known.pop(addr, None)
+         if got is None:
+             got = self._leave(addr) or Source(self.stranger_budget)

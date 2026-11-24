@@ -1,0 +1,11 @@
+--- a/prototype/canticle-station/canticle/intake.py
++++ b/prototype/canticle-station/canticle/intake.py
+@@ -681,7 +681,7 @@
+         if station_pays is not False:
+             t.budget.give()
+             self.checks.give()
+-        if station_pays is not True:
++        if station_pays is None:    # TOGGLE c: a claim spends its key's and stream's buckets, whatever the check says
+             t.stream.bucket.give()
+             if not t.stream.beacon:
+                 t.key.bucket.give()
