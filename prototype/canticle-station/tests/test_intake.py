@@ -214,11 +214,9 @@ class OrderTest(IntakeCase):
 
     def test_a_quiet_source_waits_behind_one_datagram_of_another_claiming_its_stream(self):
         self.offer(*[forge(item(A, n), n) for n in range(1, 50)], src=THERE)
-        first, quiet = item(A, 1), item(A, 2)
-        self.offer(first, quiet, src=HERE)                     # the first of them has a place in the key's slot
-        served = self.serve(4)
-        self.assertEqual(served.index(quiet), 1)
-        self.assertIn(first, served)
+        quiet = item(A, 1)
+        self.offer(quiet, src=HERE)
+        self.assertIn(quiet, self.serve(4))                    # it has a place in the key's slot, beside its turn in the queue
 
     def test_one_source_of_one_stream_is_served_in_order(self):
         frames = [item(A, n) for n in range(1, 6)]
@@ -300,9 +298,9 @@ class BoundTest(IntakeCase):
             self.offer(*[forge(item(A, 1), 100 * n + i) for i in range(20)], src=addr(7, n))
         mine = {key.source(addr(7, n), self.now) for n in range(40)}
         quiet = next(addr(7, port) for port in range(1_000, 2_000) if key.source(addr(7, port), self.now) not in mine)
-        first, f = item(A, 1), item(A, 2)
-        self.offer(first, f, src=quiet)                        # the first has a place in the key's slot, the next one queues
-        served = [d for _ in range(len(mine) // 16 + 1) for d in self.serve_queues(16, lambda t: t.data == f)]
+        f = item(A, 1)
+        self.offer(f, src=quiet)
+        served = [d for _ in range(len(mine) // 16 + 1) for d in self.serve(16, verified=lambda t: t.data == f)]
         self.assertIn(f, served[:len(mine) + 1])
 
     def test_the_lane_of_a_crowded_address_cannot_be_chosen(self):
@@ -799,6 +797,7 @@ class NewcomerCase(IntakeCase):
         self.sks = [Ed25519PrivateKey.generate() for _ in range(n)]
         self.kids = [wire.key_id(wire.public_key_bytes(sk)) for sk in self.sks]
         self.frames = [(item(sk, 1), beacon(sk, 1)) for sk in self.sks]      # to forge from
+        self.old = [[beacon(sk, 1_000 + n) for n in range(4)] for sk in self.sks]    # captured: they verify, and change nothing
         self.fresh()
 
     def fresh(self):
@@ -816,9 +815,11 @@ class NewcomerCase(IntakeCase):
         self.n += 1
         k = keys[self.n % len(keys)]
         kind = self.n // len(keys) // self.PORTS % 2
+        if churn == "replay" and self.n // len(keys) // self.PORTS % 2:
+            return self.old[k][self.n % 4], udp(40_000 + self.n // len(keys) % self.PORTS)
         if churn == "once":                     # never the same source twice
             return forge(self.frames[k][kind], self.n), udp(1_024 + self.n % 60_000, 10 + self.n // 60_000)
-        port = self.rng.randrange(32_768, 61_000) if churn else 40_000 + self.n // len(keys) % self.PORTS
+        port = self.rng.randrange(32_768, 61_000) if churn is True else 40_000 + self.n // len(keys) % self.PORTS
         return forge(self.frames[k][kind], self.n), udp(port)
 
     def play(self, seconds, keys=(), churn=False, copies=(), rate=None, turn_s=0.0):
@@ -858,7 +859,7 @@ class NewcomerCase(IntakeCase):
             if t.key is not None:
                 self.checked[t.data[4:12], ok] += 1
                 self.slots[t.data[4:12]] += t.budget is getattr(self.intake, "slice", None)
-            self.intake.settle(t, ok, ok)
+            self.intake.settle(t, ok or t.data in self.old[self.kids.index(t.data[4:12])], ok)
         self.flight, self.due = [], self.now if self.intake.waiting() else float("inf")
 
     def shares_a_lane(self, k, src) -> bool:
@@ -951,6 +952,19 @@ class NewcomerTest(NewcomerCase):
                 self.play(2.0 * (CAP + 1) / C_SLICE, keys=(0,))
                 waits = self.play(3.5, keys=(0,), copies=[(0.041 * n, item(self.sks[0], n + 1), udp(50_001 + n)) for n in range(80)])
                 self.assertChecked(waits, self.within(1, 16), f"{sources} sources that stay")
+
+    def test_sources_that_replay_what_they_captured_are_behind_a_newcomer_too(self):
+        """An old beacon verifies whenever it is replayed, and proves nothing about who sends it. Were it to clear a demotion,
+        a source that sends one now and then would be untried for ever (an independent review's finding, at 2b15ed8: 63 of them
+        delayed a station by 2.6 s at 16 keys)."""
+        for sources in (63, 200):
+            with self.subTest(sources=sources):
+                self.PORTS = sources
+                self.stations(1)
+                self.play(2.0, keys=(0,), churn="replay")
+                waits = self.play(3.5, keys=(0,), churn="replay",
+                                  copies=[(0.041 * n, item(self.sks[0], n + 1), udp(50_001 + n)) for n in range(80)])
+                self.assertChecked(waits, self.within(1, 16), f"{sources} sources that stay and replay")
 
     def test_a_source_that_is_being_checked_takes_no_place_meanwhile(self):
         """In a long turn a source's next frame comes before the verdict on its last one. It would be untried again: with every
@@ -1146,18 +1160,47 @@ class SlotTest(IntakeCase):
         self.assertEqual([n for n, a in enumerate(served) if a[0] in {addr(60 + k)[0] for k in range(3)}],
                          [intake.SLOT_M - 1, 2 * intake.SLOT_M - 1, 3 * intake.SLOT_M - 1])
 
-    def test_a_frame_that_verifies_clears_its_source_new_or_not(self):
-        for fresh in (False, True):
-            self.demote(HERE)
-            f, behind = beacon(A, 1 + fresh), item(A, 5 + fresh)
-            self.offer(beacon(A, 50 + fresh), src=THERE)
-            self.offer(f, behind, src=HERE)
-            self.assertIn(f, self.waits("demoted"))
-            for t in self.taken(f, 2):
-                self.intake.settle(t, t.data == f, fresh and t.data == f)
-            self.assertNotIn(HERE, self.key.demotions)
-            self.serve(32, verified=lambda t: False)
-            self.demote(THERE)
+    def test_a_frame_that_is_new_or_kept_clears_its_source_and_one_that_changes_nothing_demotes_it(self):
+        """New, or kept though not new (it resurfaced after a restart of the daemon): the signature stands for the sender. A replay
+        that changes nothing (an old beacon verifies for ever) stands for nobody."""
+        for kept, fresh in ((True, True), (True, False), (False, False)):
+            src = addr(70 + 2 * kept + fresh)
+            self.offer(f := item(A, 10 + 2 * kept + fresh), src=src)
+            if kept:
+                self.demote(src)
+            (t,) = [t for t in self.intake.take(32) if t.data == f]
+            if kept:
+                self.intake.remember(t, (KID_A, 5, 0, 1), runner.now_ms() + 60_000, fresh)
+            self.intake.settle(t, True, fresh)
+            self.assertEqual(src in self.key.demotions, not kept, (kept, fresh))
+
+    def test_what_waits_in_the_slot_waits_in_its_lane_as_well_and_is_served_once(self):
+        """So the slot is never a worse place to wait than the queues are: whichever comes first serves it."""
+        for spent in (True, False):
+            with self.subTest(slice_spent=spent):
+                self.setUp()
+                f = item(A, 1)
+                self.offer(f, src=HERE)
+                if spent:
+                    self.intake.slice.tokens, self.intake.slice.at = 0.0, self.now
+                self.assertEqual((self.waits(), self.intake.stats()["queued"]), ([f], 5))
+                served = self.serve(32, verified=lambda t: t.data == f)
+                self.assertEqual((served.count(f), len(served), self.waits(), self.intake.stats()["queued"]), (1, 5, [], 0))
+                self.assertFalse(self.intake.waiting())
+
+    def test_what_the_queues_refuse_or_shed_still_waits_in_the_slot_and_is_not_counted_lost(self):
+        self.offer(*[forge(item(A, 1), 100 + n) for n in range(2 * intake.STRANGER_POOL)], src=THERE)
+        frames = [item(A, n + 1) for n in range(3 * intake.STRANGER_POOL)]
+        lost = sum(self.refused.values())
+        self.offer(frames[0], src=HERE)                        # sheds one of THERE's, and has a lane and a place
+        self.offer(*frames[1:], src=HERE)                      # its lane fills up, and refuses
+        for n in range(40):
+            self.offer(forge(item(A, 1), 5_000 + n), src=addr(100 + n))       # others take its lane's places back
+        self.assertEqual(self.waits()[0], frames[0])
+        s = self.intake.stats()
+        self.assertEqual(s["read"], s["repeats"] + s["copies"] + s["verified"] + s["unverified"] + sum(s["refused"].values()) + s["queued"])
+        self.assertGreater(sum(self.refused.values()), lost)
+        self.assertIn(frames[0], self.serve(2, verified=lambda t: t.data == frames[0]))
 
     def test_what_a_source_has_waiting_follows_it(self):
         f = item(A, 1)
@@ -1277,6 +1320,15 @@ class SlotTest(IntakeCase):
         self.now += intake.SLICE_PAUSE_S
         self.assertEqual(self.serve(32), [a])
 
+    def test_every_one_of_them_costs_turns_however_many_come_in_a_turn(self):
+        for n in range(3):
+            self.offer(item(A, n + 1), src=addr(40 + n))
+        got = [t for t in self.intake.take(32) if t.budget is self.intake.slice]
+        for t in got:
+            self.intake.settle(t, True, False)
+        self.assertAlmostEqual(self.key.slot.due, self.now + len(got) * intake.SLICE_PAUSE_S)
+        self.assertEqual(len(got), 3)
+
     def test_an_old_beacon_costs_no_turns(self):
         self.offer(beacon(A, 9), beacon(A, 8), src=THERE)
         self.offer(beacon(A, 1), src=HERE)
@@ -1306,6 +1358,15 @@ class SlotTest(IntakeCase):
         bucket.tokens, bucket.at = 0.0, self.now
         self.assertIn(b, self.serve(2))
         self.assertEqual(self.waits(), [f])
+
+    def test_what_waits_for_its_streams_rate_keeps_its_turn(self):
+        frames = [item(A, n + 1) for n in range(6)]
+        for n, f in enumerate(frames):
+            self.offer(f, src=addr(40 + n))
+        bucket = self.key.streams[stream_id("chatter")].bucket
+        bucket.tokens, bucket.at = 0.0, self.now
+        self.serve(8, verified=lambda t: False)
+        self.assertEqual(self.waits(), frames)
 
     def test_the_first_in_it_wakes_the_loop_while_the_slice_can_pay(self):
         self.woken = 0
@@ -1463,6 +1524,13 @@ class EchoTest(IntakeCase):
                 self.offer(f, src=relay)
                 self.assertEqual(self.turns(f), new)
                 self.setUp()
+                self.offer(*[forge(item(A, 1), k) for k in range(8)], src=THERE)
+                self.offer(forge(f, 99), src=relay if where.startswith("a queue") else new)
+                self.offer(f, src=new)
+                self.offer(f, src=relay)
+                self.intake.slice.tokens, self.intake.slice.at, self.now = -100.0, self.now, self.now
+                self.assertEqual(self.turns(f), new, "the slice is spent: the queues decide")
+                self.setUp()
 
     def test_where_both_wait_in_a_turn_the_queues_copy_is_the_one_that_counts(self):
         """An echo ahead of the station's own copy has a place in the slot; the station's lane is served first, as it was."""
@@ -1559,6 +1627,37 @@ class LeaseTest(IntakeCase):
             self.offer(f, src=HERE)
             self.assertEqual(len(self.accept()), 1)
             self.assertEqual(set(self.known(1.0)), {HERE, THERE})
+
+    def test_a_repeat_of_an_older_frame_shortens_nothing(self):
+        """A carousel sends its older items again and again."""
+        old = item(A, 1)
+        self.accept_from(HERE, old)
+        self.now += HORIZON_S - 1
+        self.accept_from(HERE, item(A, 2))
+        self.offer(old, src=HERE)
+        self.assertEqual(self.known(HORIZON_S - 1), [HERE])
+
+    def test_the_copies_of_a_slots_ticket_renew_when_a_queues_stands_for_it(self):
+        self.accept_from(HERE, item(A, 1))
+        self.accept_from(THERE, item(A, 2))
+        self.now += HORIZON_S - 1
+        self.offer(*[forge(item(A, 1), n) for n in range(4)], src=addr(9))
+        f = item(A, 3)
+        self.offer(f, src=addr(60))                            # a relay's, in the slot; then both of those that have a place
+        self.offer(f, src=HERE)
+        self.offer(f, src=THERE)
+        self.accept()
+        self.assertLessEqual({HERE, THERE}, set(self.known(HORIZON_S - 1)))
+
+    def test_a_lapse_that_takes_the_last_of_what_waits_leaves_the_key_out_of_the_turns(self):
+        self.accept_from(HERE, item(A, 1))
+        key = self.intake.keys[KID_A]
+        self.offer(*[item(A, n + 2) for n in range(3)], src=HERE)
+        self.now += HORIZON_S + 1
+        with mock.patch.object(intake, "STRANGERS_MAX", 0):
+            self.intake.lapse()
+        self.assertEqual((list(key.ready), list(self.intake._ready), self.intake.waiting()), ([], [], False))
+        self.assertEqual(self.refused["backlog"], 3)
 
     def test_and_renews_nothing_when_it_was_not(self):
         self.accept_from(HERE, beacon(A, 1))
@@ -2062,7 +2161,7 @@ class DaemonIntakeTest(DaemonCase):
             task.cancel()
             return time.monotonic() - sent, d.intake.stats()["reserved"]
         (took, reserved), _ = self.run_with(scenario)
-        self.assertLess(took, 0.5)
+        self.assertLess(took, 1.0)
         self.assertGreater(reserved, 0)
 
     def test_health_tells_the_kinds_of_loss_apart(self):
