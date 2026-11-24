@@ -45,9 +45,10 @@ be read as saying so.
 
 Nothing above is changed; what the runs say about it:
 
-- **B is already there for a flood from other hosts, and the runs meet its bound.** Row 1h: first valid frame 0.16-0.19 s at 20 000/s and at 100 000/s alike, where the code's one round of at most 81 lanes is 0.16 s, and 20 ms more to look at an empty budget again.
-- **The lottery is what the numbers say it is.** p = *C/R* holds at *C* = 1 000 (the head) and at about 13 000 (`nobudget-wake`). A pass of the 1.0 s deadline in 99 % of runs needs p of 44 %, for
-  this newcomer's eight copies in its first second: 8 800 checks a second against 20 000/s, 44 000/s against 100 000/s. **D buys the first and not the second, and is not a bound.**
-- **D has a prerequisite.** Lifting the budgets without more exposes a second defect (README, "Finding"): the reader posts an event-loop turn for every batch that opens a lane, and posts don't collapse, so a busy loop publishes
-  later the older the flood. Collapse the wake first, with a test that holds the publish delay constant over the flood's age.
+- **B's shape is already there for a flood from one other host, and the runs are near its estimate.** Row 1h: first valid frame 0.155-0.185 s at 20 000/s and at 100 000/s alike; one round of at most 81 lanes is 0.16 s, and 20 ms more to look at an empty budget
+  again (estimate 0.18 s, three of ten runs above it by up to 4 ms). At most three other hosts: 0.25 s by the same arithmetic, not measured. An estimate for this flood, not a bound (README, "What the code estimates").
+- **The lottery is consistent with the numbers.** *C/R* is inside the interval of p at *C* = 1 000 (the head) at both rates, and at about 13 000 (`nobudget-wake`) at 100 000/s. A pass of the 1.0 s deadline in 99 % of runs needs p of 40-44 %, for
+  this newcomer's eight or nine copies in its first second: 8 000-8 800 checks a second against 20 000/s, 40 000-44 000/s against 100 000/s. **D buys the first and not the second, and is not a bound.**
+- **D has a prerequisite.** Lifting the budgets without more exposes a second defect at 20 000/s (README, "Finding"): the reader posts an event-loop turn for every batch that opens a lane, and posts don't collapse, so a loop that is
+  kept busy publishes later the older the flood. Collapse the wake first, with a test that holds the publish delay constant over the flood's age. Lifting the budgets also failed #171's R4a at full length (README).
 - **A, B and C are the rows of the table above that give a deadline here, and on the flood's own host only A** (a station that is remembered or named) **and C** (house keys) do.
