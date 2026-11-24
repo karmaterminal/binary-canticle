@@ -25,6 +25,7 @@ them loop until they expire.
 | §18.9 Web tuner (#57) | `canticle tuner`: a loopback-only synthetic-only human dashboard over one listener. Live station identity, streams, activity and payloads are never published to humans. |
 | §14.18.3 Record v1 (BC-2, #77) | `canticle/records.py`: the listener's outcomes as receptor record v1 (`hello`, `landing_state`, `frame`, `retract`, `presence`, `health`, `fatal`, `bye`) under the disposition mapping, with fixed health counters and a bounded table of unverified key ids (D34). See [Record v1 and the host daemon](#record-v1-and-the-host-daemon-bc-2-d35-77). |
 | §11.1, §14.18.2 Host daemon (D35, #77) | `canticle daemon`: the host's one UDP listener, carrying record v1 to every binding over a unix `SOCK_STREAM` socket with peer-credential checks, a two-record bootstrap per connection and per-connection isolation. |
+| §12.2 step 4 Intake (#171) | `canticle/intake.py`: the host daemon reads every datagram off its socket on a thread of its own, drops exact repeats of verified frames before verify, hears the rest in arrival order, one durable save per turn, and counts what is lost by reason. It schedules nothing. See [Intake](#intake-a-fast-reader-and-counted-losses-171). |
 | §14.18.3 Join snapshot (BC-1b, D36, #84) | `canticle daemon` serves the opt-in join snapshot: an atomic cut at watermark *W*, presence and deliverable frames as `snapshot` records (`snap_seq` 1..n, `rec_seq` *W*), `snapshot_end`, the `min(511, free − 513)` and 1 MiB bound, and the deferred cut of #86 (wait until the live state fits, 2 s bound). See [Join snapshot](#join-snapshot-bc-1b-d36-84). |
 
 ### Public discovery catalog prerequisite
@@ -429,9 +430,10 @@ record per line.
   and the first `landing_state`, then the socket. A failure emits `fatal` (`state_locked`, `manifest_invalid`,
   `state_corrupt`, `state_not_durable`, `bind_failed`, `socket_failed`) and exits 1. SIGTERM or SIGINT emits
   `bye`, waits up to 2 s for it to reach each connection, closes them and removes the socket.
-- **Durable publish (write-ahead, #79 review).** Each datagram and each tick is one batch. The records it
-  implies are held, the safety state is saved (one atomic replace), and only then are the records numbered and
-  sent. If the save fails, none of that batch is sent, retracts included, and no `rec_seq` is spent. The run
+- **Durable publish (write-ahead, #79 review).** Each tick, and each turn of at most 32 datagrams (group commit,
+  #171), is one batch. The records it implies are held, the safety state is saved (one atomic replace), and only
+  then are the records numbered and sent: nothing a datagram says counts as received until the save that covers
+  it has landed. If the save fails, none of that batch is sent, retracts included, and no `rec_seq` is spent. The run
   then ends: `fatal` with reason `state_not_durable` (an error elsewhere in the record path ends it the same
   way, reason `internal`), up to 2 s for it to reach each connection, then exit 1, with no `bye`. This
   follows the RFC rather than limping on: a receptor's `health.state` is only `ok` or `degraded`
@@ -481,9 +483,14 @@ and unverified reason; the unverified key ids, at most 16, kept by space-saving 
 and the `error` it may overcount by, and `other` for what no listed id accounts for); dedup occupancy; beacon age
 per manifest key; `last_datagram_at`; records emitted and dropped and connections closed; and `state` `ok` or
 `degraded` with `no_datagrams` (none for 30 s), `records_lost` (a connection dropped a record since the last
-`health`) or `clock_skew` (a station's δ̂ beyond 5 s). The receptor keeps which tuples it surfaced, and which
+`health`), `clock_skew` (a station's δ̂ beyond 5 s), `socket_drops` (the kernel dropped a datagram at the socket
+since the last `health`) or `datagrams_refused` (the intake's queue was full for one). The host daemon's `health`
+also carries what was lost before it was heard, in two optional additions (#171): `records.socket_dropped`, the
+kernel's drop count for the daemon's socket, exact; and `receive`, what became of every datagram read (`read`,
+`repeats`, `copies`, `verified`, `unverified`, `queued`, and `refused` by reason). `records.dropped` keeps its
+meaning: records dropped for a connection. The receptor keeps which tuples it surfaced, and which
 keys it quarantined, in the listener's state file (`"receptor"`), written with the listener's guards in one
-atomic replace per datagram. At start, after `hello` and before the first `landing_state` (so before any
+atomic replace per batch. At start, after `hello` and before the first `landing_state` (so before any
 connection is served), `Receptor.reconcile` retracts every surfaced tuple the persisted guards say is withdrawn:
 key revoked or gone (`revoked`), key quarantined (`quarantined`), a sticky PLUCK on it (`plucked`), a newer
 supersession mark (`superseded`) or local expiry passed (`expired`). It is idempotent (#79 review).
@@ -499,6 +506,9 @@ lower-epoch tuples as above. `canticle listen` behaves as before; `canticle tune
 - `landing_state` never changes on its own: there is no MUTE (§10.6), circuit breaker (§14.8.3) or
   modulation (§14.7) here. It is always `mute: null`, `breaker: "closed"`, `modulation: []`;
   `Receptor.set_landing` is the hook, and only tests call it.
+- **The intake is ahead of the RFC (#171).** §14.1 deduplicates after crypto. The daemon drops exact copies of verified
+  frames before it. §7.4 and §10.9 hold as written (a repeat is still a counted no-op). `health` has two optional
+  additions and two reasons that §14.18.3 does not list. An amendment has to say all of this, or the code goes.
 - `quarantine_strengthen` / `quarantine_rescind`: reserved in the RFC, not emitted. A local quarantine has no
   rescind here; it lasts until the daemon's state is removed with the daemon stopped.
 - Revocation retracts only at start: the daemon does not reload its manifest while running.
@@ -518,6 +528,39 @@ lower-epoch tuples as above. `canticle listen` behaves as before; `canticle tune
 - The stdout child-process transport of §14.18.2 is not a separate command: only the daemon carries records.
 - Mixed-host proof cases (4) and (6) need a harness binding and OC-0, and are not run here. Case (1) is shown
   with sockets in one test host (a second daemon and a `canticle listen` both fail to bind), not with `ss`.
+
+### Intake: a fast reader and counted losses (#171)
+
+Served one datagram and one durable save at a time from the kernel's small socket buffer, the daemon dropped whatever came
+while it was busy, and nothing said so (#171, finding 1). `canticle/intake.py` takes that apart, and no further: it
+does not decide whose datagram is heard first. That is #173's scheduling, held for newcomer recovery.
+
+- **Read everything.** A thread takes datagrams off the socket with `recvmmsg(2)` and only places each one: among the
+  repeats, in one queue of at most 1 024, or among the refused.
+- **An exact repeat is dropped before verify.** A datagram whose SHA-256 is that of a frame already verified and
+  accepted in this run is counted (`receive.repeats`, and `duplicate` as before) and dropped: no verify, no save. It
+  still refreshes its stream's presence and the on-air item's count, as a repeat heard does. The digest is
+  recorded only after the signature verified and the save that covers the frame landed, so no claim (a key, a seq)
+  reserves anything. A frame refused at steps 3-4 is not recorded, and its next copy is judged again. One digest per
+  live dedup entry, until the item's local expiry, so the listener's per-key quotas bound them, plus the latest 64
+  beacons of each key. A restart starts with none, so the first copy after it resurfaces.
+- **A copy takes no second place.** The same bytes already waiting get the same verdict, so a copy is counted
+  (`receive.copies`) and not queued.
+- **The rest is heard in arrival order**, at most 32 in a turn of the event loop, one durable save per turn (group commit).
+- **Beacons are timed when they arrive**, not when they are heard, so the clock offset (§8.2) absorbs no queueing.
+- **What is counted.** `receive.refused.backlog`: the queue was full. `receive.read` is the sum of everything else there.
+  Socket drops are the kernel's (`SO_RXQ_OVFL` on what is read, `SO_MEMINFO` at each `health`), and are never mixed
+  with these. Either marks `health` degraded.
+
+What it does not do:
+
+- **It protects nobody from a flood that must be verified or saved.** Who sends most still decides what everyone hears: new
+  valid frames of another key, another stream of the same station, or forgeries of any listed key fill the queue,
+  and a quiet station's frames are heard as often as chance picks them. #171's rows R1, R2 and R3 fail with it as
+  they do without it. Now the loss is counted.
+- **A newcomer under such a flood waits for chance too**, as on `main`.
+- **The reader can be outrun.** Then the kernel drops, whoever sent it, and `socket_drops` says so.
+- `canticle listen` and `canticle tuner` still hear as before.
 
 ### Join snapshot (BC-1b, D36, #84)
 
@@ -675,6 +718,14 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
     item as new when it comes again;
   - socket and directory modes, a refused peer uid, the peer limit, bytes from a peer ignored, `bye` and end of
     stream on a clean stop, a live socket not taken over and a loose socket directory refused.
+- `test_intake.py` holds the intake's invariants (#171): arrival order, the bounds, that every datagram read is accounted for
+  once, and what may be skipped before verify: only the exact bytes of an accepted frame. An invalid packet with the same
+  key, epoch, stream and seq arriving first suppresses nothing. Against the daemon: repeats still count and refresh
+  presence, a restart resurfaces, an `over_quota` frame is judged again, one save covers a batch and a failed one sends
+  nothing, and `health` tells the kinds of loss apart.
+- `test_intake_floods.py` runs #171's rows that the intake answers, against a `canticle daemon` process: (R4) replays of the quiet
+  key's own frames, also from its very socket, with every item admitted within the station's burst; (R5) the kernel's
+  drops, counted exactly; and a forged flood whose every loss is counted.
 - `test_join_snapshot.py` runs proof case (5) with a join snapshot (BC-1b, D36), daemon side, with a binding's
   validation and view-application model in the test:
   - (a) `hello` 1, `landing_state` 50, I1 at 60, S's presence at 70, a held item, I2 at 80 plucked at 90, B asks

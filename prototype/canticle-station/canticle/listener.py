@@ -168,7 +168,7 @@ class Listener:
             raise ValueError(f"unknown binding {binding!r}")
         self.binding = binding
         self.state_path = state_path
-        # A receptor (records.py) saves once per datagram, after its own records, with its state in the same
+        # A receptor (records.py) saves once per batch, after its own records, with its state in the same
         # file: autosave off, extra_state set. Two separate writes would leave a crash window (#79 review).
         self.autosave = True
         self.extra_state = None          # callable -> dict, saved under "receptor"
@@ -642,6 +642,19 @@ class Listener:
                 self.hwm_per_key[k[0]] -= 1
                 self._dirty = True
         self._hwm_due.compact(len(self.hwm), lambda: ((v[3], k) for k, v in self.hwm.items()))
+
+    def repeated(self, ident: tuple, copies: int, last_ms: int) -> None:
+        """``copies`` exact copies of an accepted frame, dropped before they were parsed (``intake.py``): they leave
+        what a repeat heard here leaves, its stream's presence and the on-air item's count (§7.4, §8.6). A frame of
+        an earlier epoch refreshes nothing, as in ``_lower_epoch``."""
+        st = self._st(ident[0])
+        if ident[1] < st.epoch_hwm:
+            return
+        h = self.current.get(ident)
+        if h is not None:
+            h.copies += copies
+            h.last_heard = last_ms
+        self._heard_on(st, ident[2], last_ms)
 
     # ------------------------------------------------------------ time
 

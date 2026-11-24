@@ -1,0 +1,312 @@
+"""What the host daemon's intake holds under a flood (binary-canticle#171), against a throwaway ``canticle daemon`` process
+over loopback UDP: replays of genuine frames cost a quiet station nothing, and whatever is lost is counted. Asserted from the
+daemon's own records and the kernel's drop counter for its socket (``/proc/net/udp``), never from the daemon's internals.
+
+Not asserted, because the intake does not schedule (#173 does): that a quiet station is heard through a flood of datagrams
+that must each be verified or saved. There it is heard as often as chance picks it, and the test is that the loss is told.
+The flat-out floods are #171's harness, not this module.
+"""
+
+import json
+import os
+import random
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import unittest
+from pathlib import Path
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from canticle import runner, wire
+from canticle.ids import stream_id
+from canticle.manifest import Manifest, StationEntry
+from canticle.station import Station, StreamConfig
+from flood import item
+
+ROOT = Path(__file__).resolve().parents[1]
+FLOOD = Path(__file__).resolve().parent / "flood.py"
+QUIET_ITEMS = 57                # #171: "57/57"
+QUIET_INTERVAL_S = 0.15
+TAIL_S = 5.0                    # the flood outlasts the last quiet item's burst, so nothing is admitted after it
+LATENCY_MAX_S = 4.5             # the last copy of the station's burst, and half a second
+LATENCY_P50_S = 0.25
+FLOOD_RATE = 100_000            # datagrams/s
+BURST = 40_000                  # datagrams sent at a stopped daemon: more than any socket buffer it can ask for
+
+
+def kernel_drops(port: int) -> int:
+    """The kernel's own drop counter for the socket bound to 127.0.0.1:port."""
+    want = "0100007F:%04X" % port
+    with open("/proc/net/udp") as fh:
+        for row in fh.read().splitlines()[1:]:
+            cols = row.split()
+            if cols[1] == want:
+                return int(cols[-1])
+    raise AssertionError(f"no UDP socket on 127.0.0.1:{port}")
+
+
+def percentile(xs: list, p: float) -> float:
+    xs = sorted(xs)
+    return xs[min(len(xs) - 1, int(round(p / 100 * (len(xs) - 1))))]
+
+
+class Tap(threading.Thread):
+    """A record v1 binding on the daemon's socket that notes when each record arrived."""
+
+    def __init__(self, path: str):
+        super().__init__(daemon=True)
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.connect(path)
+        self.recs: list = []          # (monotonic arrival, record)
+        self.first: dict = {}         # idem -> arrival of its first verified frame record
+        self.start()
+
+    def run(self):
+        buf = b""
+        try:
+            while chunk := self.sock.recv(1 << 20):
+                now = time.monotonic()
+                *lines, buf = (buf + chunk).split(b"\n")
+                for line in lines:
+                    rec = json.loads(line)
+                    self.recs.append((now, rec))
+                    if rec["type"] == "frame" and rec["admission"] == "verified":
+                        self.first.setdefault(rec["idem"], now)
+        except OSError:
+            pass
+
+    def frames(self) -> list:
+        return [r for _, r in list(self.recs) if r["type"] == "frame"]
+
+    def healths(self) -> list:
+        return [r for _, r in list(self.recs) if r["type"] == "health"]
+
+    def next_health(self, timeout=5.0) -> dict:
+        n, deadline = len(self.healths()), time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if len(self.healths()) > n:
+                return self.healths()[-1]
+            time.sleep(0.01)
+        raise AssertionError("no health record in time")
+
+
+class Quiet(threading.Thread):
+    """The quiet station: a real carousel, one item every QUIET_INTERVAL_S, from one socket."""
+
+    def __init__(self, sk, port: int, capture=None, items=QUIET_ITEMS):
+        super().__init__(daemon=True)
+        self.items = items
+        self.st = Station(sk, [StreamConfig("quiet")], epoch=7, rng=random.Random(3), now_ms=runner.now_ms(),
+                          beacon_period_ms=1_000)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind(("127.0.0.1", 0))
+        self.dest, self.capture = ("127.0.0.1", port), capture
+        self.sung: dict = {}          # idem -> when its first copy went out
+        self.distinct: set = set()
+        self.singing, self.stop = threading.Event(), threading.Event()
+        self.warm: list = []          # items to sing before the row starts
+
+    def poll(self):
+        for frame in self.st.poll(runner.now_ms()):
+            self.distinct.add(frame)
+            self.sock.sendto(frame, self.dest)
+            if self.capture is not None and not self.singing.is_set():
+                for dest in self.capture:
+                    self.sock.sendto(frame, dest)
+
+    def run(self):
+        start = None
+        while not self.stop.is_set():
+            while self.warm:
+                self.st.sing(runner.now_ms(), "quiet", text=self.warm.pop())
+            if self.singing.is_set():
+                start = start or time.monotonic()
+                n = len(self.sung)
+                if n < self.items and time.monotonic() >= start + n * QUIET_INTERVAL_S:
+                    r = self.st.sing(runner.now_ms(), "quiet", text=f"quiet {n}")
+                    self.sung[f"canticle:{self.st.key_id.hex()}:7:{stream_id('quiet'):08x}:{r.seq}"] = time.monotonic()
+            self.poll()
+            self.stop.wait(0.01)
+        self.sock.close()
+
+
+class FloodCase(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.keys = {}
+        entries = []
+        for name, streams in (("quiet", ("quiet", "flood")), ("other", ("flood", "quiet"))):
+            sk = Ed25519PrivateKey.generate()
+            self.keys[name] = sk
+            path = os.path.join(self.dir, f"{name}.key")
+            Path(path).write_text(sk.private_bytes_raw().hex())
+            os.chmod(path, 0o600)
+            entries.append(StationEntry(name, wire.public_key_bytes(sk), frozenset({1, 3}), streams))
+        self.manifest = os.path.join(self.dir, "fleet.json")
+        Path(self.manifest).write_text(json.dumps(Manifest(entries).to_json()))
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.bind(("127.0.0.1", 0))
+            self.port = s.getsockname()[1]
+
+    def kid(self, name: str) -> str:
+        return wire.key_id(wire.public_key_bytes(self.keys[name])).hex()
+
+    def env(self) -> dict:
+        return {**os.environ, "PYTHONPATH": str(ROOT), "PYTHONDONTWRITEBYTECODE": "1",
+                "XDG_RUNTIME_DIR": self.dir, "XDG_STATE_HOME": self.dir}
+
+    def daemon(self) -> subprocess.Popen:
+        path = os.path.join(self.dir, "run", "daemon.sock")
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "canticle", "daemon", "--manifest", self.manifest, "--bind",
+             f"127.0.0.1:{self.port}", "--no-multicast", "--socket", path, "--state-dir",
+             os.path.join(self.dir, "state"), "--health-interval", "0.5"],
+            env=self.env(), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        self.addCleanup(self._reap, proc)
+        deadline = time.monotonic() + 15
+        while not os.path.exists(path):
+            if proc.poll() is not None or time.monotonic() > deadline:
+                raise RuntimeError("the daemon did not start: " + proc.stderr.read().decode())
+            time.sleep(0.02)
+        time.sleep(0.1)
+        self.tap = Tap(path)
+        self.addCleanup(self.tap.sock.close)
+        return proc
+
+    def _reap(self, proc):
+        if proc.poll() is None:
+            proc.kill()
+        proc.wait()
+        for f in (proc.stdout, proc.stderr):
+            if f is not None:
+                f.close()
+
+    def flood(self, mode: str, duration: float, *args, fds=()) -> subprocess.Popen:
+        proc = subprocess.Popen([sys.executable, str(FLOOD), mode, "--port", str(self.port), "--duration",
+                                 str(duration), *map(str, args)], env=self.env(), stdout=subprocess.PIPE, pass_fds=fds)
+        self.addCleanup(self._reap, proc)
+        self.assertTrue(json.loads(proc.stdout.readline())["ready"])
+        return proc
+
+    @staticmethod
+    def totals(proc) -> tuple:
+        """(the JSON lines a flood printed, its totals)."""
+        lines = [json.loads(x) for x in proc.stdout.read().splitlines()]    # not communicate(): it skips what is buffered
+        proc.wait(60)
+        return lines[:-1], lines[-1]
+
+    def quiet(self, name="quiet", **kw) -> Quiet:
+        q = Quiet(self.keys[name], self.port, **kw)
+        q.start()
+        self.addCleanup(q.join)
+        self.addCleanup(q.stop.set)
+        return q
+
+    def settle(self, q: Quiet):
+        """The daemon has heard the quiet station before the flood starts, as on a live seat."""
+        deadline = time.monotonic() + 10
+        while not any(r["type"] == "presence" for _, r in list(self.tap.recs)):
+            self.assertLess(time.monotonic(), deadline, "the daemon never heard the quiet station")
+            time.sleep(0.02)
+
+    def measure(self, name: str, sung: dict, floods: list) -> tuple:
+        """Print one row: what arrived and when, what was offered, and what was lost. Returns (the latencies, the last
+        health), whose every count must agree."""
+        offered = sum(t["sent"] / t["elapsed"] for t in floods)
+        time.sleep(0.3)
+        health = self.tap.next_health()
+        lost, r = kernel_drops(self.port), health["receive"]
+        lat = [self.tap.first[i] - t for i, t in sung.items() if i in self.tap.first]
+        dist = " ".join(f"{k} {percentile(lat, p) * 1000:.0f}" for k, p in
+                        (("p50", 50), ("p90", 90), ("p99", 99), ("max", 100))) if lat else "-"
+        sys.stderr.write(f"\n{name}: quiet {len(lat)}/{len(sung)}; latency ms {dist}; offered {offered:,.0f}/s; "
+                         f"socket drops {lost} (reported {health['records']['socket_dropped']}); receive {json.dumps(r)}\n")
+        self.assertEqual(health["records"]["socket_dropped"], lost, f"{name}: the kernel's drops are not reported")
+        self.assertEqual(r["read"], sum(v for k, v in r.items() if k not in ("read", "refused")) + r["refused"]["backlog"])
+        return lat, health
+
+
+class ReplayTest(FloodCase):
+    DURATION = QUIET_ITEMS * QUIET_INTERVAL_S + TAIL_S
+
+    def test_r4_replays_of_the_quiet_keys_own_frames(self):
+        """(R4) The quiet station's own frames, beacons included, captured before the flood and resent unchanged while
+        they are still valid: from a sender of its own, and at the same time from the station's very socket (a
+        perfect source spoof). No copy is verified again or costs the station anything, and every one is counted.
+        (Replays of the newest item only would deliver it: the copies must be of earlier frames to do harm.)"""
+        self.daemon()
+        caps = [socket.socket(socket.AF_INET, socket.SOCK_DGRAM) for _ in range(2)]
+        for c in caps:
+            c.bind(("127.0.0.1", 0))
+            self.addCleanup(c.close)
+        q = self.quiet(capture=[c.getsockname() for c in caps])
+        self.settle(q)
+        for n in range(4):
+            q.warm.append(f"warm {n}")
+        time.sleep(4.5)                         # the warm items' bursts, and as many beacons, are captured
+        floods = [self.flood("replay", self.DURATION, "--rate", FLOOD_RATE / 2, "--capture", c.fileno(), *extra,
+                             fds=(c.fileno(), *fds))
+                  for c, extra, fds in ((caps[0], (), ()),
+                                        (caps[1], ("--fd", q.sock.fileno()), (q.sock.fileno(),)))]
+        q.singing.set()
+        lat, health = self.measure("R4 replays of the quiet key's own frames", q.sung, [self.totals(f)[1] for f in floods])
+        self.assertEqual((len(q.sung), len(lat)), (QUIET_ITEMS, QUIET_ITEMS))
+        self.assertLessEqual(percentile(lat, 50), LATENCY_P50_S)
+        self.assertLessEqual(max(lat), LATENCY_MAX_S)
+        self.assertGreater(health["receive"]["repeats"], 100_000)
+        # One verify per distinct frame, give or take the copies already queued when the first one was verified.
+        self.assertLessEqual(health["receive"]["verified"], len(q.distinct) + 50)
+
+
+class LossVisibilityTest(FloodCase):
+    def test_what_a_flood_crowds_out_is_counted_and_degrades_health(self):
+        """Distinct invalid signatures naming the quiet key, several times what the daemon can check. Which of the quiet
+        station's frames are heard is chance, so nothing is asserted of it; that the loss is told, is: every datagram that
+        reached the socket is verified, refused and counted, or among the kernel's drops."""
+        self.daemon()
+        q = self.quiet(items=20)
+        self.settle(q)
+        f = self.flood("forged", 5, "--kid", self.kid("quiet"), "--stream", "quiet", "--rate", FLOOD_RATE)
+        q.singing.set()
+        total = self.totals(f)[1]
+        lat, health = self.measure("a forged flood claiming the quiet key", q.sung, [total])
+        r = health["receive"]
+        self.assertGreater(r["refused"]["backlog"], 10_000)
+        self.assertEqual(r["unverified"], health["counters"]["unverified"]["bad_signature"])
+        self.assertGreaterEqual(r["read"] + health["records"]["socket_dropped"], total["sent"])
+        reasons = {x for h in self.tap.healths() for x in h["reasons"]}
+        self.assertIn("datagrams_refused", reasons)
+
+    def test_r5_socket_drops_are_counted_and_degrade_health(self):
+        """(R5) What the kernel drops at the daemon's socket is counted exactly, degrades health, and is told apart
+        from what the daemon refused and from records dropped for a slow connection."""
+        proc = self.daemon()
+        self.assertEqual((self.tap.next_health()["state"], kernel_drops(self.port)), ("ok", 0))
+        frame = item(self.keys["other"], "flood", 1, 7)
+        os.kill(proc.pid, signal.SIGSTOP)       # the daemon stands still, so the socket must overflow
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            for _ in range(BURST):
+                s.sendto(frame, ("127.0.0.1", self.port))
+        os.kill(proc.pid, signal.SIGCONT)
+        time.sleep(1.5)
+        health, lost = self.tap.next_health(), kernel_drops(self.port)
+        self.assertGreater(lost, 0)
+        self.assertEqual(health["records"].get("socket_dropped"), lost,
+                         f"the kernel dropped {lost} datagrams and health reported "
+                         f"{health['records'].get('socket_dropped')}")
+        degraded = [h for h in self.tap.healths() if "socket_drops" in h["reasons"]]
+        self.assertTrue(degraded and all(h["state"] == "degraded" for h in degraded))
+        self.assertEqual(health["records"]["dropped"], 0)          # records for a connection: none were
+        self.assertNotIn("records_lost", {r for h in self.tap.healths() for r in h["reasons"]})
+        self.assertEqual(self.tap.next_health()["reasons"], [])    # reported once per loss, not forever
+
+
+if __name__ == "__main__":
+    unittest.main()
