@@ -29,6 +29,38 @@ def verify(directory, negative=False):
     assert counts["delivered"] == n - int(negative), counts
     assert counts["missed"] == int(negative), counts
     assert cleanup["ok"] and cleanup["k6_child_reaped"], cleanup
+    if not run["shared_process"]:
+        assert fixture["process_mode"] is True, fixture
+        children = fixture["processes"]
+        assert set(children) == {"station", "daemon"}, children
+        startup_fields = {"pid", "alive", "started", "ready", "started_ns", "child_started_ns", "ready_ns", "exit_code"}
+        assert all(startup_fields <= set(r) for r in children.values()), children
+        assert len({r["pid"] for r in children.values()}) == 2, children
+        assert type(fixture["parent_pid"]) is int and fixture["parent_pid"] > 0, fixture
+        assert all(r["pid"] != fixture["parent_pid"] for r in children.values()), children
+        assert all(r["alive"] is True and type(r["pid"]) is int and r["pid"] > 0
+                   and r["started"] is True and r["ready"] is True
+                   and r["exit_code"] is None
+                   and all(type(r[k]) is int and r[k] > 0
+                           for k in ("started_ns", "child_started_ns", "ready_ns"))
+                   and r["started_ns"] <= r["child_started_ns"] <= r["ready_ns"]
+                   for r in children.values()), children
+        assert cleanup["processes_reaped"], cleanup
+        assert set(cleanup["processes"]) == {"station", "daemon"}, cleanup
+        cleanup_fields = startup_fields | {"reaped", "reaped_ns", "exit_observed_ns", "handle_closed", "term_sent", "kill_sent"}
+        assert all(cleanup_fields <= set(r) for r in cleanup["processes"].values()), cleanup
+        assert all(cleanup["processes"][name][key] == receipt[key]
+                   for name, receipt in children.items()
+                   for key in ("pid", "started", "ready", "started_ns", "child_started_ns", "ready_ns")), cleanup
+        assert all(r["reaped"] is True and r["exit_code"] == 0
+                   and r["handle_closed"] is True and r["alive"] is False
+                   and r["term_sent"] is True and r["kill_sent"] is False
+                   and r["ready_ns"] <= r["exit_observed_ns"]
+                   and r["ready_ns"] <= r["reaped_ns"]
+                   for r in cleanup["processes"].values()), cleanup
+        assert cleanup["processes"]["station"]["reaped_ns"] <= cleanup["processes"]["daemon"]["reaped_ns"], cleanup
+        assert all(cleanup["processes"][name]["pid"] == receipt["pid"]
+                   for name, receipt in children.items()), cleanup
     metrics = summary["metrics"]
     assert metrics["canticle_offered"]["values"]["count"] == n
     assert metrics["canticle_delivered"]["values"]["count"] == n - int(negative)

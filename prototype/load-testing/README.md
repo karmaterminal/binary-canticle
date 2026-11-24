@@ -13,9 +13,10 @@ not full RFC conformance, and not evidence that a model heard anything.
 	  -> production Daemon.run / independent verification + durable state
 	  -> real Unix SOCK_STREAM record-v1 client / complete newline
 
-The production station, daemon and record client run as separate asyncio tasks
-inside the one fixture process. They are **not mocked**, but this is not a
-multi-process daemon deployment benchmark. The relay is test instrumentation,
+By default the production station, daemon and record client run as separate
+asyncio tasks inside one fixture process. They are **not mocked**. The opt-in
+`--processes` mode below isolates station and daemon in separate OS processes;
+neither mode is a deployment or capacity benchmark. The relay is test instrumentation,
 not an implementation of the RFC relay protocol. The only production-source
 change is a five-line station-startup cleanup correction: if Unix control-server
 startup fails or is cancelled, close its UDP socket before propagating the
@@ -74,6 +75,41 @@ verify.py checks the **failed** zero-miss threshold as well as the denominator.
 A failed HTTP request also remains in k6's attempted-offer denominator; missing
 fixture rows, missing samples or an incomplete schedule cannot produce a pass.
 
+## Opt-in isolated processes
+
+`run.py --processes` runs the production station and daemon in distinct,
+short-lived OS processes. The controller/relay/complete-record client remain
+in the parent fixture process; k6 remains a separate controller child. This
+mode is a bounded localhost correctness probe, not a deployment, throughput
+benchmark, fairness/recovery acceptance (#173/#177), or session-hearing proof.
+The default shared-task mode above remains unchanged.
+
+Use new external output directories, then verify each receipt as above:
+
+    python3 prototype/load-testing/run.py --processes --out /tmp/canticle-process-positive
+    python3 prototype/load-testing/verify.py /tmp/canticle-process-positive
+    python3 prototype/load-testing/run.py --processes --drop-first --out /tmp/canticle-process-negative
+    # Require actual nonzero (normally 99), then:
+    python3 prototype/load-testing/verify.py /tmp/canticle-process-negative --negative
+
+The full population, complete-record hash boundary, censoring and zero-miss
+threshold do not change. Process mode adds child PID/liveness and cleanup
+exit/reap receipts; passing delivery cannot excuse early child death or failed
+cleanup. No production configuration, installed service or non-loopback bind
+is involved.
+
+The process-specific tests include early station/daemon death, real production
+startup failure, spawn failure, readiness timeout, forced KILL, controller wall
+timeout, and a record-client reconnect followed by a new exact-identity offer.
+That reconnect test keeps the daemon running; it is not daemon restart recovery,
+join-snapshot/custody acceptance, or delivery of items published while offline.
+
+Recorded localhost receipts are in `evidence/2026-11-24-processes/`: actual k6
+positive → mandatory negative → fresh positive, plus verifier base/revert RED
+and current GREEN. `manifest.json` pins the measured source bytes and runtime.
+The structural mutation tests deliberately use synthetic process fields; those
+are verifier tests, never process-run receipts.
+
 ## What latency means
 
 All fixture timestamps use the same monotonic clock, in integer nanoseconds.
@@ -126,8 +162,13 @@ fixture has bounded application state, but this is not a cgroup memory proof.
 The supervisor strips inherited proxies, K6 cloud/output configuration and
 credentials, disables usage reporting, and binds k6's own API to loopback port
 0. SIGTERM/interrupts and ordinary exceptions unwind cleanup; SIGKILL/power loss
-cannot run application cleanup (as with any process). The only child process is
-k6, in its own process group: TERM then KILL if needed, followed by wait/reap.
+cannot run application cleanup (as with any process). In default shared-task mode the only child process is k6, in its own
+process group: TERM then KILL if needed, followed by wait/reap. With
+`--processes`, Python spawn adds two production coroutine children; neither
+inherits the parent sockets or the other child's state. They have bounded
+readiness, a 65-second coroutine lifetime, and ordered TERM/KILL/reap. Their
+PID/start/ready/exit/reap receipts accompany the existing cleanup checks.
+These children do not have cgroup isolation or the k6-specific resource limits.
 Fixture shutdown closes HTTP and its handlers, stops the station before the
 daemon, closes the record client and relay, joins owned tasks and removes the
 temporary directory. cleanup.json records task termination, removed Unix

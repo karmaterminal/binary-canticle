@@ -1,0 +1,188 @@
+test_changed_startup_receipt_cannot_pass (test_process_receipts.ProcessReceiptTest.test_changed_startup_receipt_cannot_pass) ... FAIL
+test_cleanup_alive_cannot_pass (test_process_receipts.ProcessReceiptTest.test_cleanup_alive_cannot_pass) ... FAIL
+test_daemon_first_shutdown_cannot_pass (test_process_receipts.ProcessReceiptTest.test_daemon_first_shutdown_cannot_pass) ... FAIL
+test_dead_child_cannot_pass (test_process_receipts.ProcessReceiptTest.test_dead_child_cannot_pass) ... FAIL
+test_failed_exit_cannot_pass (test_process_receipts.ProcessReceiptTest.test_failed_exit_cannot_pass) ... FAIL
+test_forced_kill_cannot_pass (test_process_receipts.ProcessReceiptTest.test_forced_kill_cannot_pass) ... FAIL
+test_impossible_start_order_cannot_pass (test_process_receipts.ProcessReceiptTest.test_impossible_start_order_cannot_pass) ... FAIL
+test_missing_readiness_cannot_pass (test_process_receipts.ProcessReceiptTest.test_missing_readiness_cannot_pass) ... FAIL
+test_missing_reap_cannot_pass (test_process_receipts.ProcessReceiptTest.test_missing_reap_cannot_pass) ... FAIL
+test_open_handle_cannot_pass (test_process_receipts.ProcessReceiptTest.test_open_handle_cannot_pass) ... FAIL
+test_parent_cannot_masquerade_as_child (test_process_receipts.ProcessReceiptTest.test_parent_cannot_masquerade_as_child) ... FAIL
+test_same_process_cannot_masquerade_as_two_children (test_process_receipts.ProcessReceiptTest.test_same_process_cannot_masquerade_as_two_children) ... FAIL
+test_structural_control_only_not_process_evidence (test_process_receipts.ProcessReceiptTest.test_structural_control_only_not_process_evidence) ... ok
+test_unready_child_cannot_pass (test_process_receipts.ProcessReceiptTest.test_unready_child_cannot_pass) ... FAIL
+test_wrong_reaped_pid_cannot_pass (test_process_receipts.ProcessReceiptTest.test_wrong_reaped_pid_cannot_pass) ... FAIL
+
+======================================================================
+FAIL: test_changed_startup_receipt_cannot_pass (test_process_receipts.ProcessReceiptTest.test_changed_startup_receipt_cannot_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 83, in test_changed_startup_receipt_cannot_pass
+    self.rejects("cleanup.json", lambda r: r["processes"]["station"].update(child_started_ns=3))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_cleanup_alive_cannot_pass (test_process_receipts.ProcessReceiptTest.test_cleanup_alive_cannot_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 77, in test_cleanup_alive_cannot_pass
+    self.rejects("cleanup.json", lambda r: r["processes"]["station"].update(alive=True))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_daemon_first_shutdown_cannot_pass (test_process_receipts.ProcessReceiptTest.test_daemon_first_shutdown_cannot_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 68, in test_daemon_first_shutdown_cannot_pass
+    self.rejects("cleanup.json", lambda r: r["processes"]["station"].update(reaped_ns=6))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_dead_child_cannot_pass (test_process_receipts.ProcessReceiptTest.test_dead_child_cannot_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 53, in test_dead_child_cannot_pass
+    self.rejects("fixture-report.json", lambda r: r["processes"]["daemon"].update(alive=False))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_failed_exit_cannot_pass (test_process_receipts.ProcessReceiptTest.test_failed_exit_cannot_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 59, in test_failed_exit_cannot_pass
+    self.rejects("cleanup.json", lambda r: r["processes"]["station"].update(exit_code=1))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_forced_kill_cannot_pass (test_process_receipts.ProcessReceiptTest.test_forced_kill_cannot_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 65, in test_forced_kill_cannot_pass
+    self.rejects("cleanup.json", lambda r: r["processes"]["station"].update(kill_sent=True))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_impossible_start_order_cannot_pass (test_process_receipts.ProcessReceiptTest.test_impossible_start_order_cannot_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 74, in test_impossible_start_order_cannot_pass
+    self.rejects("fixture-report.json", lambda r: r["processes"]["station"].update(child_started_ns=4))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_missing_readiness_cannot_pass (test_process_receipts.ProcessReceiptTest.test_missing_readiness_cannot_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 71, in test_missing_readiness_cannot_pass
+    self.rejects("fixture-report.json", lambda r: r["processes"]["station"].pop("ready"))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_missing_reap_cannot_pass (test_process_receipts.ProcessReceiptTest.test_missing_reap_cannot_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 56, in test_missing_reap_cannot_pass
+    self.rejects("cleanup.json", lambda r: r["processes"]["station"].update(reaped=False))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_open_handle_cannot_pass (test_process_receipts.ProcessReceiptTest.test_open_handle_cannot_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 80, in test_open_handle_cannot_pass
+    self.rejects("cleanup.json", lambda r: r["processes"]["station"].update(handle_closed=False))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_parent_cannot_masquerade_as_child (test_process_receipts.ProcessReceiptTest.test_parent_cannot_masquerade_as_child)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 50, in test_parent_cannot_masquerade_as_child
+    self.rejects("fixture-report.json", lambda r: r["processes"]["station"].update(pid=100))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_same_process_cannot_masquerade_as_two_children (test_process_receipts.ProcessReceiptTest.test_same_process_cannot_masquerade_as_two_children)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 47, in test_same_process_cannot_masquerade_as_two_children
+    self.rejects("fixture-report.json", lambda r: r["processes"]["station"].update(pid=102))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_unready_child_cannot_pass (test_process_receipts.ProcessReceiptTest.test_unready_child_cannot_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 62, in test_unready_child_cannot_pass
+    self.rejects("fixture-report.json", lambda r: r["processes"]["station"].update(ready=False))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_wrong_reaped_pid_cannot_pass (test_process_receipts.ProcessReceiptTest.test_wrong_reaped_pid_cannot_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 86, in test_wrong_reaped_pid_cannot_pass
+    self.rejects("cleanup.json", lambda r: r["processes"]["station"].update(pid=999))
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/canticle-verifier-final-6p94w_py/tests/test_process_receipts.py", line 40, in rejects
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.023s
+
+FAILED (failures=14)

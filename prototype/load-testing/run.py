@@ -62,7 +62,12 @@ async def run(args, bounds):
     loop = asyncio.get_running_loop()
     owner = asyncio.current_task()
     loop.add_signal_handler(signal.SIGTERM, owner.cancel)
-    fixture = Fixture(bounds)
+    process_mode = getattr(args, "processes", False)
+    if process_mode:
+        from fixtures.processes import ProcessFixture
+        fixture = ProcessFixture(bounds)
+    else:
+        fixture = Fixture(bounds)
     child = None
     code = 1
     failure = None
@@ -82,7 +87,7 @@ async def run(args, bounds):
                        str(HERE / "scenarios" / "smoke.js")]
             dump(out / "run.json", dict(bounds=asdict(bounds), command=command,
                  latency_boundary="first relay UDP arrival to complete record-v1 newline; not model heard",
-                 shared_process=True, hard_caps=dict(child_cpu_seconds=30, child_fds=128,
+                 shared_process=not process_mode, hard_caps=dict(child_cpu_seconds=30, child_fds=128,
                  child_file_bytes=8*1024*1024, child_wall_seconds=55)))
             with (out / "k6.log").open("wb") as log:
                 child = await asyncio.create_subprocess_exec(*command, env=env, cwd=fixture.root,
@@ -117,6 +122,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", required=True, help="NEW artifact directory outside the repository")
     parser.add_argument("--k6", default="k6", help="path to local k6 executable")
+    parser.add_argument("--processes", action="store_true", help="isolate real station and daemon in distinct OS processes")
     parser.add_argument("--items", type=int, default=6)
     parser.add_argument("--vus", type=int, default=1)
     parser.add_argument("--deadline-ms", type=int, default=1000)
