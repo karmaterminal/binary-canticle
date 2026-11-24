@@ -209,7 +209,7 @@ class OrderTest(IntakeCase):
         self.offer(*[forge(item(A, n), n) for n in range(1, 50)], src=THERE)
         quiet = item(A, 1)
         self.offer(quiet, src=HERE)
-        self.assertEqual(self.serve(4).index(quiet), 1)
+        self.assertLessEqual(self.serve(4).index(quiet), 1)
 
     def test_one_source_of_one_stream_is_served_in_order(self):
         frames = [item(A, n) for n in range(1, 6)]
@@ -252,7 +252,7 @@ class BoundTest(IntakeCase):
             self.intake.offer([(forge(item(A, 1), n), addr(n % 250, n))])
         key = self.intake.keys[KID_A]
         self.assertLessEqual(len(key.strangers), intake.STRANGERS_MAX)
-        self.assertEqual(self.intake.stats()["queued"], intake.STRANGER_POOL)
+        self.assertEqual(self.intake.stats()["queued"], intake.STRANGER_POOL + 1)    # and one in the key's slot
         self.assertEqual(self.intake.stats()["queued"] + sum(self.refused.values()), 5_000)
 
     def test_a_newcomer_gets_a_queue_once_idle_strangers_are_gone(self):
@@ -322,8 +322,8 @@ class BoundTest(IntakeCase):
         self.assertEqual(self.intake.stats()["queued"], intake.STRANGER_POOL)
         quiet = [item(A, n + 1) for n in range(4)]
         self.offer(*quiet, src=HERE)
-        self.assertEqual(self.intake.stats()["queued"], intake.STRANGER_POOL)
-        self.assertEqual(sum(self.refused.values()), intake.STRANGER_POOL + 4)
+        self.assertEqual(self.intake.stats()["queued"], intake.STRANGER_POOL + 1)    # the first of them in the slot
+        self.assertEqual(sum(self.refused.values()), intake.STRANGER_POOL + 3)
         served = self.serve(8, verified=lambda t: t.data in quiet)
         self.assertEqual([d for d in served if d in quiet], quiet)
 
@@ -939,6 +939,181 @@ class NewcomerTest(NewcomerCase):
         self.assertEqual((len(self.intake.unlisted.ready), self.intake.stats()["queued"]), (intake.UNLISTED_DEPTH, intake.UNLISTED_DEPTH))
 
 
+class SlotTest(IntakeCase):
+    """The one place a key has for the slice, its rules one by one."""
+
+    def setUp(self):
+        super().setUp()
+        self.key = self.intake.keys[KID_A]
+        self.offer(*[forge(item(A, 1), n) for n in range(4)], src=THERE)       # so that others wait in the stream
+
+    def waits_in_slot(self, key=None):
+        return (key or self.key).slot and (key or self.key).slot[0][0]
+
+    def test_a_source_that_waits_alone_queues_as_ever(self):
+        f = item(B, 1)
+        self.offer(f, src=HERE)
+        self.assertEqual((self.waits_in_slot(self.intake.keys[KID_B]), self.serve(8).count(f)), (None, 1))
+
+    def test_the_latest_of_the_newcomers_has_it_and_what_it_replaces_queues(self):
+        frames = [item(A, n + 1) for n in range(3)]
+        for n, f in enumerate(frames):
+            self.offer(f, src=addr(20 + n))
+            self.assertEqual(self.waits_in_slot(), f)
+        self.assertEqual(self.intake.stats()["queued"], 7)
+        served = self.serve(32, verified=lambda t: t.data in frames)
+        self.assertEqual((served[0], set(served) >= set(frames), self.refused), (frames[2], True, {}))
+
+    def test_a_source_that_has_it_queues_the_rest_so_it_is_served_in_order(self):
+        frames = [item(A, n + 1) for n in range(5)]
+        self.offer(*frames, src=HERE)
+        self.assertEqual(self.waits_in_slot(), frames[0])
+        self.assertEqual([d for d in self.serve(32) if d in frames], frames)
+
+    def test_a_copy_of_what_is_in_it_is_one(self):
+        f = item(A, 1)
+        self.offer(f, f, f, src=HERE)
+        self.assertEqual((self.waits_in_slot(), self.intake.copied, self.intake.stats()["queued"]), (f, 2, 5))
+
+    def test_a_source_whose_check_came_to_nothing_stands_aside_for_a_while(self):
+        bad = [forge(item(A, 1), 100 + n) for n in range(3)]
+        self.offer(bad[0], src=HERE)
+        self.assertEqual(self.waits_in_slot(), bad[0])
+        self.intake.settle(self.intake.take(1)[0], False, False)     # its place: a limit of 1 is served from the queues ...
+        self.intake.settle(self.intake.take(2)[0], False, False)     # ... and one of 2 from the slot first
+        self.assertIsNone(self.waits_in_slot())
+        self.offer(bad[1], src=HERE)
+        self.assertIsNone(self.waits_in_slot())
+        self.now += intake.TRIED_S
+        self.offer(bad[2], src=HERE)
+        self.assertEqual(self.waits_in_slot(), bad[2])
+
+    def test_the_sources_that_stand_aside_are_a_bounded_number_the_oldest_forgotten_first(self):
+        for n in range(3 * intake.TRIED_MAX):
+            with self.intake._lock:
+                self.key.note_tried(udp(40_000 + n), self.now)
+        self.assertEqual(len(self.key.tried), intake.TRIED_MAX)
+        self.assertFalse(self.key.stands_aside(udp(40_000), self.now))
+        self.assertTrue(self.key.stands_aside(udp(40_000 + 3 * intake.TRIED_MAX - 1), self.now))
+
+    def test_a_source_that_becomes_known_no_longer_stands_aside(self):
+        self.offer(forge(item(A, 1), 9), src=HERE)
+        self.serve(verified=lambda t: False)
+        self.assertTrue(self.key.stands_aside(HERE, self.now))
+        self.offer(item(A, 2), src=HERE)
+        self.serve()
+        self.assertFalse(self.key.stands_aside(HERE, self.now))
+
+    def test_it_is_served_before_the_queues_and_has_half_a_turn_at_most(self):
+        sks = [Ed25519PrivateKey.generate() for _ in range(24)]
+        self.intake = self.make(Manifest([StationEntry(f"s{n}", wire.public_key_bytes(sk), frozenset({1}), ("chatter",))
+                                          for n, sk in enumerate(sks)]))
+        first = {sk: item(sk, 1) for sk in sks}
+        for sk in sks:
+            self.offer(*[forge(item(sk, 1), n) for n in range(8)], src=THERE)
+            self.offer(first[sk], src=HERE)
+        served = self.serve(32, verified=lambda t: t.data in first.values())
+        slots = [n for n, d in enumerate(served) if d in first.values()]
+        self.assertEqual((len(served), slots), (32, list(range(16))))
+        self.assertLessEqual(set(first.values()), set(served) | set(self.serve(32)))
+
+    def test_a_turn_of_one_still_comes_to_it(self):
+        f = item(A, 1)
+        self.offer(f, src=HERE)
+        self.assertIn(f, [d for _ in range(5) for d in self.serve(1)])
+        self.assertFalse(self.intake.waiting())
+
+    def test_a_new_frame_costs_the_slice_nothing_and_a_forgery_one(self):
+        f = item(A, 1)
+        self.offer(f, src=HERE)
+        (t,) = [t for t in self.intake.take(2) if t.data == f]
+        self.assertEqual(self.intake.slice.tokens, intake.SLICE_BURST - 1)
+        checks = self.intake.checks.tokens
+        self.intake.settle(t, True, True)
+        self.assertEqual((self.intake.slice.tokens, self.intake.checks.tokens), (intake.SLICE_BURST, checks))
+        self.offer(forge(f, 99), src=addr(30))
+        (t,) = [t for t in self.intake.take(2) if t.data == forge(f, 99)]
+        self.intake.settle(t, False, False)
+        self.assertEqual(self.intake.slice.tokens, intake.SLICE_BURST - 1)
+        self.assertEqual(self.intake.stats()["reserved"], 2)
+
+    def test_when_it_is_spent_the_slot_waits_and_the_queues_are_served(self):
+        self.intake.slice.tokens = 0.0
+        self.intake.slice.at = self.now
+        f = item(A, 1)
+        self.offer(f, src=HERE)
+        self.assertEqual((len(self.serve(32, verified=lambda t: False)), self.waits_in_slot()), (4, f))
+        self.assertTrue(self.intake.waiting())
+        self.now += 1.001 / intake.SLICE_RATE
+        self.assertEqual(self.serve(32), [f])
+
+    def test_a_record_that_changes_nothing_costs_turns_of_its_own_key_only(self):
+        """A verified ITEM that is not new makes a record, so from a queue it costs its sender ten checks. From a slot its key
+        waits for nine more, and another key's slot doesn't."""
+        self.offer(*[forge(item(B, 1), n) for n in range(4)], src=THERE)
+        self.offer(item(A, 1), src=HERE)
+        (t,) = [t for t in self.intake.take(2) if t.budget is self.intake.slice]
+        self.intake.settle(t, True, False)
+        a, b = item(A, 2), item(B, 2)
+        self.offer(a, src=addr(31))
+        self.offer(b, src=addr(32))
+        self.assertEqual(self.serve(2)[0], b)
+        self.serve(32, verified=lambda t: False)
+        self.assertEqual(self.waits_in_slot(), a)
+        self.now += intake.SLICE_PAUSE_S
+        self.assertEqual(self.serve(32), [a])
+
+    def test_it_is_held_to_the_keys_and_streams_rates(self):
+        for bucket in (self.key.bucket, self.key.streams[stream_id("chatter")].bucket):
+            f = item(A, 1 + int(bucket.rate))
+            self.offer(f, src=addr(40 + int(bucket.rate)))
+            bucket.tokens, bucket.at = 0.0, self.now
+            self.assertNotIn(f, self.serve(32))
+            self.assertEqual(self.waits_in_slot(), f)
+            self.now += 1 / bucket.rate + 0.001
+            self.assertIn(f, self.serve(32))
+
+    def test_filling_it_wakes_the_loop_while_the_slice_can_pay(self):
+        self.woken = 0
+        self.offer(item(A, 1), src=HERE)
+        self.assertEqual(self.woken, 1)
+        self.serve(32, verified=lambda t: False)
+        self.offer(*[forge(item(A, 1), 20 + n) for n in range(4)], src=THERE)
+        self.intake.slice.tokens, self.woken = 0.0, 0
+        self.offer(item(A, 2), src=addr(33))                         # it can't: the loop comes back for the queues
+        self.assertEqual((self.waits_in_slot() is None, self.woken), (False, 0))
+
+    def test_a_frame_that_was_accepted_while_it_waited_there_costs_nothing(self):
+        f = item(A, 1)
+        self.offer(f, src=HERE)
+        for t in self.intake.take(2)[:1]:
+            self.assertEqual(t.data, f)
+            self.intake.remember(t, (KID_A, 5, 0, 1), runner.now_ms() + 60_000)
+            self.intake.settle(t, True, True)
+        self.offer(f, src=addr(34))
+        self.assertEqual((self.waits_in_slot(), self.intake.repeated), (None, 1))
+
+    def test_a_displaced_source_keeps_what_waits_in_the_slot_and_the_rest_is_counted(self):
+        """A source that has the slot becomes known by a frame it had queued behind it, and is displaced with no room to
+        keep it apart: what it had queued is gone and counted, what waits in the slot is still served."""
+        frames = [item(A, n + 1) for n in range(4)]
+        self.offer(*frames, src=HERE)
+        while (t := self.intake.take(1)[0]).data != frames[1]:       # a turn of one: from the queues
+            self.intake.settle(t, False, False)
+        self.intake.settle(t, True, True)
+        self.assertEqual((self.waits_in_slot(), HERE in self.key.known), (frames[0], True))
+        for n in range(intake.STRANGERS_MAX + 1):                    # every place in the table has something waiting
+            self.key.note_tried(addr(100 + n), self.now)             # (and none of them takes the slot)
+            self.offer(forge(item(A, 1), 100 + n), src=addr(100 + n))
+        before = self.intake.stats()["queued"]
+        with self.intake._lock:
+            lost = [self.key.know(addr(50 + n)) for n in range(intake.KNOWN_MAX)]
+        self.assertEqual((lost, self.waits_in_slot()), ([0] * (intake.KNOWN_MAX - 1) + [2], frames[0]))
+        self.assertEqual(self.intake.stats()["queued"], before - 2)
+        self.assertNotIn(HERE, (*self.key.known, *self.key.strangers))
+        self.assertIn(frames[0], self.serve(2))
+
+
 class ConsistencyTest(IntakeCase):
     """Random traffic from many addresses, random verdicts: after every step the queues, rings, tables and counts
     agree with each other, and the station's buckets and the daemon's hold exactly what the verdicts left them (the
@@ -961,6 +1136,12 @@ class ConsistencyTest(IntakeCase):
                 for source, lane in s.lanes.items():
                     self.assertIs(lane.source, source)
                     queued[source] += len(lane.queue)
+            self.assertEqual(i._slots.count(key), 1 if key.slot else 0)
+            if key.slot:
+                (_, _, at), stream, source = key.slot[0][1:], *key.slot[1:]
+                self.assertIn(stream, key.streams.values())
+                queued[source] += 1
+            self.assertLessEqual(len(key.tried), intake.TRIED_MAX)
             waiting += sum(queued.values())
             listed = [*key.known.values(), *key.strangers.values(), *key.crowd]
             self.assertLessEqual(set(queued), set(listed))
@@ -978,7 +1159,7 @@ class ConsistencyTest(IntakeCase):
                          + in_flight)
 
     def test_random_traffic(self):
-        never = {f"{b}_{k}": v for b in ("KEY", "STREAM", "BEACON", "SOURCE", "CHECK", "UNLISTED")
+        never = {f"{b}_{k}": v for b in ("KEY", "STREAM", "BEACON", "SOURCE", "CHECK", "UNLISTED", "SLICE")
                  for k, v in (("RATE", 0.0), ("BURST", 1e6))}
         for seed in range(12):
             r = random.Random(seed)
@@ -1001,12 +1182,12 @@ class ConsistencyTest(IntakeCase):
                         self.intake.settle(t, verified, fresh)
                         if t.key is not None:
                             spent.update([t.stream.bucket] + [t.key.bucket] * (not t.stream.beacon) if fresh else
-                                         [self.intake.checks])
+                                         [self.intake.slice if t.budget is self.intake.slice else self.intake.checks])
                     self.intake.heard_again()
                     self.check()
                     station = [b for k in self.intake.keys.values()
                                for b in (k.bucket, *(s.bucket for s in k.streams.values()))]
-                    for b in (*station, self.intake.checks):
+                    for b in (*station, self.intake.checks, self.intake.slice):
                         self.assertEqual(1e6 - b.tokens, spent[b])
 
                 for _ in range(250):
@@ -1320,7 +1501,7 @@ class DaemonIntakeTest(DaemonCase):
             return quiet, junk, refused, later
         (quiet, junk, refused, later), _ = self.run_with(scenario)
         self.assertEqual((quiet["state"], quiet["records"]["socket_dropped"]), ("ok", 0))
-        self.assertEqual(set(quiet["receive"]), {"read", "repeats", "copies", "verified", "unverified", "queued",
+        self.assertEqual(set(quiet["receive"]), {"read", "repeats", "copies", "verified", "unverified", "reserved", "queued",
                                                  "known", "displaced", "refused"})
         self.assertEqual(tuple(quiet["receive"]["refused"]), intake.REFUSED)
         self.assertGreater(junk["receive"]["refused"]["unlisted"], 0)

@@ -25,6 +25,11 @@ What is spent, and by whom:
   which has no expiry and verifies for ever) is charged to the source it came from. Each address a new frame of the
   key was verified from (the latest KNOWN_MAX) has a budget of its own, and all other addresses claiming the key
   share one. All of them together have one bound, which is what the daemon spends on checks that come to nothing;
+- beside it, a slice of such checks is reserved for newcomers, per **key**. A key has one slot beside its queues, for the
+  latest datagram of a source that is not known, when others already wait in the stream it claims. The slots are served in
+  turn over the keys, on a bucket of their own, so no flood of other keys or of the queues spends it. A source whose check
+  came to nothing takes no slot for TRIED_S, so ports that stay are tried once each and stand aside, whatever lane they
+  share. A newcomer then waits for one round of the keys at most, K / SLICE_RATE, whatever the flood's rate;
 - in a stream, the known sources get every other turn however many strangers claim it. Strangers queue apart too, in
   a pool the stream's longest queue pays for: a flood can fill it, but a source that queues apart still gets a place
   and its turn;
@@ -45,9 +50,11 @@ What this does not do:
   (``displaced``), and the station is a stranger again until one of its own frames is heard first: outside the guarantee too.
 - **A station that is still a stranger, among many.** Until one of its frames verifies from a new address (a cold
   start, or its restart on a new port), it competes with every other stranger claiming its key. STRANGERS_PER_HOST
-  ports of a host, and STRANGERS_MAX in all, queue apart; the rest share CROWD_LANES lanes by a salted hash, and a
-  station whose lane a flood shares is verified only as often as chance picks it there. A flood that opens new ports
-  for every datagram crowds every lane.
+  ports of a host, and STRANGERS_MAX in all, queue apart; the rest share CROWD_LANES lanes by a salted hash, and its
+  key's slot goes to whichever of them came last and was not tried lately. So the round of the keys bounds it where its key
+  is not forged, or is forged from sources that stay: at most TRIED_MAX, and as many as the key has checked in TRIED_S.
+  **A flood that forges its own key and opens a new port for every datagram** looks like it in everything that is read before
+  the signature: a copy is verified with chance (SOURCE_RATE + SLICE_RATE) / R at best, and no deadline follows.
 - **Source binding and a house MAC** (RFC §10.2) are not here. A binding is only as good as the switch's enforcement.
   A MAC excludes outsiders but not another key holder. Neither replaces the signature.
 - **The reader can be outrun.** Then the kernel drops datagrams, whoever sent them: counted (``socket_drops``), and
@@ -85,7 +92,12 @@ BEACON_RATE, BEACON_BURST = 8.0, 16.0       # new beacons per key
 # and for everything that claims a listed key, together (a check is 60-140 µs on ronan, #171).
 SOURCE_RATE, SOURCE_BURST = 1_000.0, 100.0
 NO_OP_COST = 10                             # what a verified ITEM or PLUCK that changes nothing costs: it makes a record
-CHECK_RATE, CHECK_BURST = 2_000.0, 200.0
+CHECK_RATE, CHECK_BURST = 1_500.0, 150.0
+# Reserved beside them for the keys' slots, whatever else is forged: 2 000 a second in all. A newcomer's slot waits for one
+# round of the keys: 0.13 s for 64 of them, an eighth of the second a station's first frame may take.
+SLICE_RATE, SLICE_BURST = 500.0, 50.0
+SLICE_PAUSE_S = (NO_OP_COST - 1) / SLICE_RATE    # what such an ITEM or PLUCK out of a slot costs: turns of its own key only
+TRIED_MAX, TRIED_S = 512, 2.0               # sources of a key whose check came to nothing, and how long they take no slot
 UNLISTED_RATE, UNLISTED_BURST = 500.0, 500.0  # datagrams of no listed key examined a second, all together
 UNLISTED_DEPTH = 64
 KNOWN_MAX, KNOWN_DEPTH = 4, 64              # known sources per key; datagrams waiting per stream and known source, or
@@ -138,10 +150,10 @@ class Bucket:
 class Source:
     """One address and port claiming one key, or (``crowd``) those beyond the tables' bounds that share a lane."""
 
-    __slots__ = ("budget", "known", "queued")
+    __slots__ = ("budget", "known", "queued", "crowd")
 
-    def __init__(self, budget: Bucket):
-        self.budget, self.known, self.queued = budget, False, 0
+    def __init__(self, budget: Bucket, crowd: bool = False):
+        self.budget, self.known, self.queued, self.crowd = budget, False, 0, crowd
 
 
 def host_of(addr):
@@ -198,6 +210,11 @@ class StreamQueue:
         self.pool += not source.known
         return new, out
 
+    def contended(self, source: Source) -> bool:
+        """Whether datagrams of strangers other than ``source`` wait here (a lane of the crowd is anybody's)."""
+        lane = None if source.crowd else self.lanes.get(source)
+        return self.pool > (len(lane.queue) if lane is not None else 0)
+
     def _shed(self) -> Source:
         """The newest datagram of the strangers' longest lane loses its place. Returns whose it was."""
         longest = max(self.strange, key=lambda o: len(o.queue))
@@ -241,18 +258,20 @@ class StreamQueue:
             self._shed()
         return over
 
-    def drop(self, source: Source) -> None:
-        """Forget what a source that is no longer known has waiting."""
+    def drop(self, source: Source) -> int:
+        """Forget what a source that is no longer known has waiting. Returns how many datagrams that was."""
         lane = self.lanes.pop(source, None)
-        if lane is not None:
-            self.known.remove(lane)
+        if lane is None:
+            return 0
+        self.known.remove(lane)
+        return len(lane.queue)
 
 
 class KeyQueue:
     """Everything that waits under one listed key."""
 
     __slots__ = ("bucket", "streams", "ready", "known", "strangers", "hosts", "stranger_budget", "crowd", "salt",
-                 "reclaimed", "shares", "displaced")
+                 "reclaimed", "shares", "displaced", "slot", "slot_due", "tried")
 
     def __init__(self, stream_ids):
         self.bucket = Bucket(KEY_RATE, KEY_BURST)
@@ -263,10 +282,13 @@ class KeyQueue:
         self.strangers: dict = {}                 # address -> Source
         self.hosts: Counter = Counter()           # host -> how many of the strangers are there
         self.stranger_budget = Bucket(SOURCE_RATE, SOURCE_BURST)
-        self.crowd = [Source(self.stranger_budget) for _ in range(CROWD_LANES)]
+        self.crowd = [Source(self.stranger_budget, crowd=True) for _ in range(CROWD_LANES)]
         self.salt = secrets.randbits(64)          # so a sender can't choose to share a station's lane
         self.reclaimed = 0.0
         self.shares = self.displaced = 0          # sources that became known, and those a newer one displaced
+        self.slot: Optional[tuple] = None         # (entry, stream, source): the one datagram that waits for the slice
+        self.slot_due = 0.0                       # no turn of the slice before this
+        self.tried: OrderedDict = OrderedDict()   # address -> when a check of its came to nothing, oldest first
 
     def source(self, addr, now: float) -> Source:
         got = self.known.get(addr) or self.strangers.get(addr)
@@ -298,8 +320,20 @@ class KeyQueue:
                 del self.hosts[host]
         return got
 
+    def stands_aside(self, addr, now: float) -> bool:
+        """Whether a check of this source came to nothing lately, so that it leaves the slot to others."""
+        at = self.tried.get(addr)
+        return at is not None and now - at < TRIED_S
+
+    def note_tried(self, addr, now: float) -> None:
+        self.tried[addr] = now
+        self.tried.move_to_end(addr)
+        if len(self.tried) > TRIED_MAX:
+            self.tried.popitem(last=False)
+
     def know(self, addr) -> int:
         """A new frame of this key was verified from ``addr``. Returns how many waiting datagrams that displaced."""
+        self.tried.pop(addr, None)
         got = self.known.pop(addr, None)
         if got is None:
             got = self._leave(addr) or Source(self.stranger_budget)
@@ -317,11 +351,13 @@ class KeyQueue:
             self._enter(old_addr, old)
             return sum(s.change(old) for s in self.streams.values())
         # No room to keep it apart: what it had waiting goes, so lanes stay bounded by the two tables.
+        lost = 0
         for s in self.streams.values():
-            s.drop(old)
+            lost += s.drop(old)
             if not s.lanes and s in self.ready:
                 self.ready.remove(s)
-        return old.queued
+        old.queued -= lost
+        return lost
 
     def pick(self, now: float) -> Optional["Ticket"]:
         for _ in range(len(self.ready)):
@@ -488,14 +524,18 @@ class Intake:
         self.keys = {e.key_id: KeyQueue(e.stream_names) for e in manifest if not e.revoked}
         self.unlisted = Unlisted()
         self.checks = Bucket(CHECK_RATE, CHECK_BURST)
+        self.slice = Bucket(SLICE_RATE, SLICE_BURST)
+        self._slice = Source(self.slice)           # who pays for a ticket out of a slot
         self.repeats: dict = {}                    # digest -> Repeat (recorded by ``remember`` only)
         self._due: list = []                       # heap of (until, digest) over the items and PLUCKs in it
         self._beacons = {kid: deque() for kid in self.keys}
         self._touched: deque = deque()             # Repeats with copies the event loop has not been told of
         self._ready: deque = deque()               # keys (and the unlisted queue) with something waiting, in turn
+        self._slots: deque = deque()               # keys whose slot holds something, in turn
         self._lock = threading.Lock()
         self._stop = False
         self.read = self.repeated = self.copied = self.verified = self.unverified = 0
+        self.reserved = 0                          # checks the slice paid for
         self.took = 0                              # places the last ``take`` looked at
         self.refused = dict.fromkeys(REFUSED, 0)
         self.last_datagram_at: Optional[int] = None
@@ -598,9 +638,23 @@ class Intake:
     def _place(self, key: KeyQueue, entry: tuple, now: float) -> bool:
         """Queue one claim, or refuse it (or the one it displaces). True when a source has something waiting for
         the stream that had nothing."""
-        data = entry[0]
+        data, addr = entry[0], entry[2]
         stream = key.streams.get(BEACON if data[3] == wire.KIND_BEACON else peek_stream(data)) or key.streams[OTHER]
-        source = key.source(entry[2], now)
+        source = key.source(addr, now)
+        if not source.known and stream.contended(source) and not key.stands_aside(addr, now):
+            old = key.slot
+            if old is None or old[0][2] != addr:  # a source that has the slot queues the rest, so it is served in order
+                key.slot = entry, stream, source
+                source.queued += 1
+                if old is None:
+                    self._slots.append(key)
+                    return self.slice.ready(now)  # else the loop comes back for what waits in the queues
+                entry, stream, source = old       # what it replaces waits like anything else
+                source.queued -= 1
+                source = key.source(entry[2], now)
+            elif old[0][1] == entry[1]:
+                self.copied += 1
+                return False
         idle = not stream.lanes
         got = stream.put(source, entry)
         if got is None:
@@ -638,22 +692,23 @@ class Intake:
         now_ms, now = self.now_ms(), time.monotonic()
         self.took = 0
         with self._lock:
-            while len(out) < limit and self.took < limit * TURN:
-                t = self._pick(now)
-                if t is None:
-                    break
-                self.took += 1
-                rep = self.repeats.get(t.digest)
-                if rep is not None and rep.until > now_ms:
-                    self._copy(rep, now_ms)
-                    self._release(t)
-                elif t.digest in seen:
-                    self.copied += 1
-                    self._release(t)
-                else:
-                    if t.digest is not None:
-                        seen.add(t.digest)
-                    out.append(t)
+            for pick, most in ((self._pick_slot, limit // 2), (self._pick, limit), (self._pick_slot, limit)):
+                while len(out) < most and self.took < limit * TURN:
+                    t = pick(now)
+                    if t is None:
+                        break
+                    self.took += 1
+                    rep = self.repeats.get(t.digest)
+                    if rep is not None and rep.until > now_ms:
+                        self._copy(rep, now_ms)
+                        self._release(t)
+                    elif t.digest in seen:
+                        self.copied += 1
+                        self._release(t)
+                    else:
+                        if t.digest is not None:
+                            seen.add(t.digest)
+                        out.append(t)
         return out
 
     def _pick(self, now: float) -> Optional[Ticket]:
@@ -671,8 +726,29 @@ class Intake:
                 return t
         return None
 
+    def _pick_slot(self, now: float) -> Optional[Ticket]:
+        """The next key's slot, in turn over the keys, on the slice's own bucket."""
+        if not self.slice.ready(now):
+            return None
+        for _ in range(len(self._slots)):
+            key = self._slots[0]
+            self._slots.rotate(-1)
+            entry, stream, source = key.slot
+            if now < key.slot_due or not stream.bucket.ready(now) or not (stream.beacon or key.bucket.ready(now)):
+                continue
+            self._slots.pop()
+            key.slot = None
+            source.queued -= 1
+            self.slice.take()
+            stream.bucket.take()
+            if not stream.beacon:
+                key.bucket.take()
+            self.reserved += 1
+            return Ticket(*entry, self._slice, key, stream)
+        return None
+
     def waiting(self) -> bool:
-        return bool(self._ready)
+        return bool(self._ready or self._slots)
 
     def _release(self, t: Ticket, station_pays: Optional[bool] = None) -> None:
         """Give back what a ticket held: all of it (no verdict was needed), or all but what the verdict costs."""
@@ -680,7 +756,8 @@ class Intake:
             return
         if station_pays is not False:
             t.budget.give()
-            self.checks.give()
+            if t.budget is not self.slice:
+                self.checks.give()
         if station_pays is not True:
             t.stream.bucket.give()
             if not t.stream.beacon:
@@ -693,8 +770,14 @@ class Intake:
         an ITEM or PLUCK that changes nothing costs more, for the record it makes (§14.18.3)."""
         with self._lock:
             self._release(t, fresh)
-            if verified and not fresh and not t.stream.beacon:
-                t.budget.take(NO_OP_COST - 1)
+            if t.key is not None and not fresh:
+                now = time.monotonic()
+                t.key.note_tried(t.addr, now)
+                if verified and not t.stream.beacon:
+                    if t.budget is self.slice:     # its key's turns of the slice, never another key's
+                        t.key.slot_due = now + SLICE_PAUSE_S
+                    else:
+                        t.budget.take(NO_OP_COST - 1)
             if not verified:
                 self.unverified += 1
                 return
@@ -754,9 +837,9 @@ class Intake:
 
     def stats(self) -> dict:
         with self._lock:
-            queued = len(self.unlisted.ready) + sum(
+            queued = len(self.unlisted.ready) + len(self._slots) + sum(
                 len(lane.queue) for k in self.keys.values() for s in k.streams.values() for lane in s.lanes.values())
             return {"read": self.read, "repeats": self.repeated, "copies": self.copied, "verified": self.verified,
-                    "unverified": self.unverified, "queued": queued,
+                    "unverified": self.unverified, "reserved": self.reserved, "queued": queued,
                     "known": sum(k.shares for k in self.keys.values()),
                     "displaced": sum(k.displaced for k in self.keys.values()), "refused": dict(self.refused)}

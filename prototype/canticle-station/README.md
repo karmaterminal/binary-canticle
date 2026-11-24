@@ -487,8 +487,8 @@ per manifest key; `last_datagram_at`; records emitted and dropped and connection
 since the last `health`) or `datagrams_refused` (the intake refused one that claimed a listed key). The host
 daemon's `health` also carries what was lost before it was heard, in two optional additions (#171):
 `records.socket_dropped`, the kernel's drop count for the daemon's socket, exact; and `receive`, the intake's
-fixed counters (`read`, `repeats`, `copies`, `verified`, `unverified`, `queued`, `known` and `displaced`, the sources
-that gained a share of their own and those that lost it to a newer one, and `refused` by reason).
+fixed counters (`read`, `repeats`, `copies`, `verified`, `unverified`, `reserved`, the checks the newcomers' slice
+paid for, `queued`, `known` and `displaced`, the sources that gained a share of their own and those that lost it to a newer one, and `refused` by reason).
 `records.dropped` keeps its meaning: records dropped for a connection. The receptor keeps which tuples it surfaced, and which
 keys it quarantined, in the listener's state file (`"receptor"`), written with the listener's guards in one
 atomic replace per batch. At start, after `hello` and before the first `landing_state` (so before any
@@ -562,9 +562,17 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
 - **Who pays.** A frame that verified and was new debits its key's bucket (16 a second, burst 64) and its stream's (12
   and 48, below the key's, so siblings have room); beacons have their own (8 and 16). A check that comes to nothing
   is charged to its source: each of those 4 sources may spend 1 000 of them a second, all other sources claiming
-  the key share 1 000, and everything together may spend 2 000. That covers a forgery, and a replay that verifies and
+  the key share 1 000, and everything together may spend 1 500, beside the slice's 500 (next). That covers a forgery, and a replay that verifies and
   changes nothing: an old beacon (it has no expiry, so it verifies whenever it is replayed), or a frame refused at steps
   3-4, which costs ten, because it makes a record each time. So neither spends the station's bucket.
+- **A slice of the checks is reserved for newcomers, per key** (#173's newcomer recovery). Beside its queues a listed key has one slot: the latest datagram of
+  a source that has no known place, when others already wait in the stream it claims; what it replaces queues like anything
+  else. The slots are served in turn over the keys, before the queues and for at most half of a turn, on 500 checks a second
+  of their own, so the daemon's total stays 2 000. A source whose check came to nothing takes no slot for 2 s: the latest 512
+  of a key are remembered, by address and port, whatever lane they share. So a newcomer is checked within one round of
+  the keys, **K/500 s, whatever the flood's rate**, where its key is not forged, or is forged from at most 512 sources that stay
+  (and no more than the key has checked in 2 s). A verified ITEM or PLUCK out of a slot that changes nothing costs its own key
+  nine turns, never another key's. `receive.reserved` counts what the slice checked.
 - **Beacons are timed when they arrive**, not when their turn comes, so the clock offset (§8.2) absorbs no queueing.
 - **A copy takes no second place.** The same bytes already waiting in the same queue get the same verdict, so a copy is
   counted (`receive.copies`) and not queued. It is neither a repeat (nothing has verified yet) nor refused.
@@ -596,8 +604,10 @@ What it does not do:
   then a stranger in any flood: **a FAIL, outside the supported guarantee.** `receive.displaced` counts it. A relay that
   is heard after the station displaces nothing.
 - **A station that is still a stranger, among many.** Until one of its frames verifies from a new source (a cold
-  start, or its restart on a new port) it competes with every other stranger claiming its key. If a flood shares its
-  lane, it is verified only as often as chance picks it there. Flooded at 20 000 a second from 12 or 40 ports of its own
+  start, or its restart on a new port) it competes with every other stranger claiming its key. **A flood that forges its own key and
+  opens a new port for every datagram is a FAIL, outside the supported guarantee:** each copy of the station's is verified with chance
+  (1 000 + 500) / the flood's rate at best, and no deadline follows. Other keys' newcomers are unaffected. What follows was measured on
+  #173 before the slice (above); the rows with it are in `reports/measurement/2026-11-24-newcomer-recovery/`. Flooded at 20 000 a second from 12 or 40 ports of its own
   host, its first valid frame was admitted within 0.1 s; from 200 ports its first items came up to 16 s late in one run,
   and in five others its first frame took up to 1,065 ms and its items up to 2,015 ms, a FAIL of the ≤1 s / ≤2 s deadline
   declared for pass 3; from a newly opened socket per datagram its first valid frame took up to 14 s and its
