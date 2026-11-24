@@ -1,0 +1,50 @@
+{
+ "row": "F4-replay-other-key-2x-max",
+ "python": "3.12.3",
+ "cryptography": "50.0.1",
+ "offered_per_s": 670162.6,
+ "sung": 30,
+ "at_daemon": 30,
+ "at_daemon_during_flood": 30,
+ "pushed": 30,
+ "send_to_record_ms": {
+  "p50": 27.9,
+  "p90": 29.8,
+  "p99": 33.8,
+  "max": 34.1
+ },
+ "send_to_push_ms": {
+  "p50": 5404.2,
+  "p90": 5907.5,
+  "p99": 6003.7,
+  "max": 6016.0
+ },
+ "kernel_drops": 0,
+ "reported_socket_dropped": 0,
+ "receive": {
+  "read": 201049385,
+  "repeats": 197213041,
+  "copies": 3835394,
+  "verified": 950,
+  "unverified": 0,
+  "queued": 0,
+  "refused": {
+   "backlog": 0
+  }
+ },
+ "health_reasons_seen": [],
+ "admission": {
+  "verified": 632,
+  "duplicate": 197213041
+ },
+ "unverified": {},
+ "ear_live_overflow": null,
+ "daemon_cpu_rss": {
+  "cpu_max": 103.9,
+  "rss_max_kb": 34788,
+  "cpu_mean": 93.8
+ },
+ "load_at_start": 4.43,
+ "duration_s": 300.0,
+ "drain_s": 15.0
+}
