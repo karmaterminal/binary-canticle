@@ -110,7 +110,7 @@ spool ack, an ear receipt and model-input custody are four different events.
 | **on air** | a station signed the item and sent it (looped, or retained by a ring) | the station's own carousel; the host daemon's verified record v1 `[built+tested: binary-canticle@d4c3066:prototype/canticle-station/canticle/wire.py:454 \| UnverifiedTest.test_unverified_datagrams_are_counters_only_and_never_attributed]` | the same daemon and station `[built: binary-canticle@d4c3066:prototype/canticle-station/canticle/wire.py:454]` |
 | **queued** | the ear recorded the exact item for one reader, durably, before offering it | frond-ear's store claims the record before the push `[built+tested: frond-ear@a8e2e5b:src/canticle/custody.ts:4 \| test/canticle-custody.test.ts:254]` | a pending custody row: the OC-0 slot ledger is a source slice with fake-host tests only `[built: binary-canticle@08c11127:prototype/openclaw-canticle/src/oc0-host.ts:20]` |
 | **host-returned** | the host said it handed the item to that session | **offered**: the shim or host confirmed it handed the event over `[built+tested: frond-ear@a8e2e5b:src/canticle/custody.ts:31 \| test/canticle-custody.test.ts:254]` | a generation-bound enqueue or withdraw outcome; no live host drain is claimed `[open: #161]` |
-| **model-seen** | the item was in the model input of that session's turn | collapses into **offered**: there is no gateway between the ear and the live session, and no separate model-input settlement `[built: frond-ear@a8e2e5b:src/canticle/custody.ts:31]` | host-authoritative exact-item settlement, then custody confirmation: unbuilt `[open: #161]` |
+| **model-seen** | the item was in the model input of that session's turn | **unknown, not proven separately.** `offered` stops at the shim's write (host-returned), and Claude Code has no model-input settlement the ear can read. Only **echoed** (next row) shows the model saw it, after the fact (🪨, #176 decision 3; #174 §1.4: `offered` traces to shim write completion) `[open: #176]` | host-authoritative exact-item settlement, then custody confirmation: unproved `[open: #161]` |
 | **prince-encountered** | the prince's own turn showed it | **echoed**: the session's own turn named the push's whole batch id and token `[built+tested: frond-ear@a8e2e5b:src/canticle/custody.ts:25 \| test/canticle-custody.test.ts:1489]` | not yet defined `[open: §7.6]` |
 
 `08c11127` is binary-canticle `08c11127d4e11ed00f307a7006d85581c8674a28`.
@@ -678,8 +678,8 @@ the layer names are §0.5's):
 | --- | --- | --- | --- |
 | Station/receptor → local ear | on air | verified item id | host daemon verifies; frond-ear filters by tune and `wakeKeys` |
 | Ear → local durable queue | queued | pending custody row | frond-ear's store (frond-ear#112 records the item before it's offered) |
-| Queue → Gateway | host-returned | generation-bound enqueue | collapses into the next row: no gateway between the ear and the session |
-| → model input | model-seen | host-authoritative settlement | **offered**: delivered as an MCP channel event into the live session (frond-ear#112) |
+| Queue → Gateway | host-returned | generation-bound enqueue | **offered**: the shim wrote the MCP channel event to the live session (frond-ear#112) |
+| → model input | model-seen | host-authoritative settlement | **unknown**: no model-input settlement on Claude Code; shown only after the fact by echoed |
 | (stronger) the session read it | prince-encountered | not yet defined | **echoed**: the session's own turn quoted the full batch_id and token (frond-ear#112) |
 
 ---
