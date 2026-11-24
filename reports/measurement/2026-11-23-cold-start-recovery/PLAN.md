@@ -137,3 +137,19 @@ its list. Both readings of "the parts that do not cause the delay" are measured 
 | `nobudget` | the head with only the two budgets lifted (toggle `a-budgets`): all its scheduling, no cap on checks that come to nothing | `toggles/a-budgets.patch` on `ab61baf2`; no branch |
 
 Rows 0 and gate 1 run on `head`, `base`, `narrow` and `nobudget`, interleaved: 5, 3, 5 and 5 runs.
+
+## Added 2026-11-24 03:35Z: resumed after a network outage; no row, threshold or run count changes
+
+Pass 3's lane was killed at 02:45Z by an outage of the host's network. Its queue was not: started at 02:18Z on the pinned runtime and on the
+harness committed at `fc0c103d`, it had finished `established_rows.py` (90 runs) and gone on with row 0, unattended. It is left to
+finish row 0, and nothing is run again. Checked after the fact, byte for byte: the trees it runs are `ab61baf2` (head), `d4c30661` (base),
+`f8a91c1f` (`narrow`) and the five committed toggles on `ab61baf2` (`a-budgets` is `nobudget`). [`results/runtime.json`](results/runtime.json) is
+the interpreter's, with the doctor's two runtime checks; every run records the two versions itself.
+
+- After row 0 the order is the declared one (rows 1 and 2, the added diagnostics 1s, 1r and 1h, the companions 0c and 1c), then the candidates' other
+  runs: `scaled_rows.py` (5 of `narrow` and `nobudget`, and of the head beside them), #171's harness at full length (one run of each row
+  of both candidates, then four more of every row that passed), and last, alone, the model (1m).
+- `scaled_rows.py` and `rerun.py` (pass 2's) now refuse another `cryptography`, and record the version with every run. Nothing else in them changed.
+- The PR's head is now `a0862c3e`, documentation only over `ab61baf2`: `prototype/canticle-station/canticle` is identical, so the rows measure its daemon.
+- The host is a shared one. At 03:21-03:23Z this lane's own first steps (a file search and tree comparisons, not a second measurement) ran
+  beside `base churn-40-100000-30` run 0 and the start of `narrow`'s; every run records the load average before it.

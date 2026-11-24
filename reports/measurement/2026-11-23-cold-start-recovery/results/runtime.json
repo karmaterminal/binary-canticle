@@ -1,0 +1,28 @@
+{
+ "interpreter": "/home/figs/.venvs/bc-fair/bin/python",
+ "python": "3.12.3",
+ "cryptography": "50.0.1",
+ "metadata": {
+  "cryptography": "50.0.1",
+  "cffi": "2.1.1",
+  "pycparser": "3.0"
+ },
+ "doctor": [
+  {
+   "name": "python",
+   "status": "ok",
+   "detail": "Python 3.12.3 (/home/figs/.venvs/bc-fair/bin/python)",
+   "version": "3.12.3"
+  },
+  {
+   "name": "cryptography",
+   "status": "ok",
+   "detail": "cryptography 50.0.1; Ed25519 reproduces RFC 8032 TEST 1",
+   "version": "50.0.1"
+  }
+ ],
+ "host": "ronan",
+ "machine": "aarch64",
+ "kernel": "7.0.0-1019-nvidia",
+ "nproc": 20
+}

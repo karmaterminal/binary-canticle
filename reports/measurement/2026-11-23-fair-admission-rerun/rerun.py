@@ -1,12 +1,16 @@
 """The #171 rerun rows, on #171's own harness (read only, at 7d46e4f2). Usage: rerun.py <harness dir> <out dir> <row,row|all> <duration> <drain>
 The canticle under test is <harness>/../../../../prototype/canticle-station."""
-import json, os, sys, time
+import json, os, platform, sys, time
+from importlib.metadata import version
 from pathlib import Path
 harness, out, rows, duration, drain = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve(), sys.argv[3], float(sys.argv[4]), float(sys.argv[5])
 sys.path.insert(0, str(harness))
 import cells, mlib
 from mlib import PYTHON, Lab, free_udp_port, key_id_hex, loadavg, machine, percentile
 HERE = Path(__file__).resolve().parent
+LOCKED = "50.0.1"          # .github/ci/requirements-station.txt
+if version("cryptography") != LOCKED:
+    sys.exit(f"cryptography {version('cryptography')}, not the locked {LOCKED}: not a run of these rows")
 base = dict(payload="64", prod_wake=False, ear_tune="none", quiet_interval=10, duration=duration, drain=drain, status_every=5, sample_every=0)
 ROWS = {
     "F0-quiet-only": dict(producers=0),
@@ -64,7 +68,7 @@ for name, p in ROWS.items():
     during = [x for x in r.get("quiet_items", []) if x["at_daemon_s"] is not None and x["at_daemon_s"] <= duration]
     def dist(xs):
         return {k: round(percentile(xs, v), 1) for k, v in (("p50", 50), ("p90", 90), ("p99", 99), ("max", 100))} if xs else None
-    row = {"row": name, "offered_per_s": r.get("offered_rate") or (r.get("flood_station") or {}).get("rate"), "sung": q.get("sung"),
+    row = {"row": name, "python": platform.python_version(), "cryptography": version("cryptography"), "offered_per_s": r.get("offered_rate") or (r.get("flood_station") or {}).get("rate"), "sung": q.get("sung"),
            "at_daemon": len(lat), "at_daemon_during_flood": len(during), "pushed": (q.get("pushed_per_ear") or {}).get("ear0"),
            "send_to_record_ms": dist(lat), "send_to_push_ms": dist(push), "kernel_drops": r.get("kernel_drops"),
            "reported_socket_dropped": (h.get("records") or {}).get("socket_dropped"), "receive": h.get("receive"),
