@@ -1,0 +1,3 @@
+# The sense organ: one ordinary day
+
+This design moved, whole, into [RFC-0002, the sense organ](../../rfc/0002-binary-canticle-sense-organ.md), where it is organized by capability (receive-only encounter, selective and returning attention, authorized answering) and every claim carries a status tag (`built+tested`, `built`, `proposed` or `open`) that points at code, a test or an issue; RFC-0002's Appendix A maps each old section (§1 the day, §2 tower and ear, §2.7a coming back, §3 the OpenClaw seam, §4 answering back, §5 built and unbuilt) to its new place, and the last version of this document is `docs/design/sense-organ.md` at `2c3f5ab6`.
