@@ -40,3 +40,14 @@ be read as saying so.
 3. 🌫's inverse rows: what a relay, or an attacker that gets in early, can now hold on to, and for how long.
 4. For A: a restart of the station, of the daemon and of both, in a flood; a named source that moved; a named source spoofed.
 5. For B: a flood from 3, 4, 64 and 65 hosts, and from the newcomer's own.
+
+## Added 2026-11-24, after rows 0, 1, 2, 2w and 1h
+
+Nothing above is changed; what the runs say about it:
+
+- **B is already there for a flood from other hosts, and the runs meet its bound.** Row 1h: first valid frame 0.16-0.19 s at 20 000/s and at 100 000/s alike, where the code's one round of at most 81 lanes is 0.16 s, and 20 ms more to look at an empty budget again.
+- **The lottery is what the numbers say it is.** p = *C/R* holds at *C* = 1 000 (the head) and at about 13 000 (`nobudget-wake`). A pass of the 1.0 s deadline in 99 % of runs needs p of 44 %, for
+  this newcomer's eight copies in its first second: 8 800 checks a second against 20 000/s, 44 000/s against 100 000/s. **D buys the first and not the second, and is not a bound.**
+- **D has a prerequisite.** Lifting the budgets without more exposes a second defect (README, "Finding"): the reader posts an event-loop turn for every batch that opens a lane, and posts don't collapse, so a busy loop publishes
+  later the older the flood. Collapse the wake first, with a test that holds the publish delay constant over the flood's age.
+- **A, B and C are the rows of the table above that give a deadline here, and on the flood's own host only A** (a station that is remembered or named) **and C** (house keys) do.

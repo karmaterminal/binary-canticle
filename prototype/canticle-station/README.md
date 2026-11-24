@@ -593,14 +593,19 @@ What it does not do:
   heard before the station's own, from a new port each, displaces the station from its key's 4 known sources, and it is
   then a stranger in any flood: **a FAIL, outside the supported guarantee.** `receive.displaced` counts it. A relay that
   is heard after the station displaces nothing.
-- **A station that is still a stranger, among many.** Until one of its frames verifies from a new source (a cold
+- **A station that is still a stranger, among many: unbounded.** Until one of its frames verifies from a new source (a cold
   start, or its restart on a new port) it competes with every other stranger claiming its key. If a flood shares its
-  lane, it is verified only as often as chance picks it there. Flooded at 20 000 a second from 12 or 40 ports of its own
-  host, its first valid frame was admitted within 0.1 s; from 200 ports its first items came up to 16 s late in one run,
-  and in five others its first frame took up to 1,065 ms and its items up to 2,015 ms, a FAIL of the ≤1 s / ≤2 s deadline
-  declared for pass 3; from a newly opened socket per datagram its first valid frame took up to 14 s and its
-  items up to 25 s: **a FAIL of the rows' 4.5 s bound**, and worse than before #171, when a whole core spent on checking
-  admitted the first one within 0.1 s at that rate.
+  lane, it is verified only as often as chance picks it there, and nothing bounds how long that takes: against a flood of
+  *R* a second from churned ports of its own host, a copy of its frame is checked with chance 1 000 / *R*. Measured: the
+  first valid frame 0.2-3.2 s after its send at 20 000 a second and 0.3-48.7 s at 100 000, one never heard in the 64 s its
+  flood ran on, and items sung before it late or lost: **a FAIL of the ≤1 s / ≤2 s deadline declared for
+  pass 3** in 7 of its 8 cells (it passes a station that starts with a 20 000 a second flood). Base fails 7 of them too, by its items: at 20 000 a
+  second 4 of 240 were late, at 100 000 156 of 240 late or lost. Its first frame comes sooner (within 0.1 s, and 2.4 s). Once one frame
+  is heard, the head's later items took at most 27 ms, base's did not. These are observed maxima of one workload, no guarantee.
+  A flood from at most three *other* hosts (one was measured) is bounded by the code: the station has a place of its own, and its
+  first frame took 0.16-0.19 s at both rates. From ports held open (pass 2): 12 or 40, within 0.1 s; 200, up to 1,065 ms and items up to 2,015 ms, a FAIL of the same
+  deadline, and 16 s late in one run of pass 1. See
+  [`reports/measurement/2026-11-23-cold-start-recovery/`](../../reports/measurement/2026-11-23-cold-start-recovery/README.md).
 - **The caps are fixed.** They do not follow a station's declared `b_station` or `b_stream` (§7.5), which its own key
   could raise at will, and the spike's manifest has no budget field. A station run well above the 16 kbit/s default
   is held to 16 new frames a second.
