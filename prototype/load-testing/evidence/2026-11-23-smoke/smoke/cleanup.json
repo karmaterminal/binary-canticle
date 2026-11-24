@@ -1,0 +1,14 @@
+{
+  "tasks_done": true,
+  "unix_sockets_removed": true,
+  "temporary_state_removed": true,
+  "ports_rebindable": {
+    "daemon_udp": true,
+    "relay_udp": true,
+    "http_tcp": true,
+    "station_udp": true
+  },
+  "errors": [],
+  "ok": true,
+  "k6_child_reaped": true
+}

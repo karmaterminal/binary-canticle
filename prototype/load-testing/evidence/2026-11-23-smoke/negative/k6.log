@@ -1,0 +1,25 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: /var/tmp/elliott-bc-k6-20261123/prototype/load-testing/scenarios/smoke.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 1 max VUs, 51s max duration (incl. graceful stop):
+              * baseline: 6 iterations shared among 1 VUs (maxDuration: 50s, gracefulStop: 1s)
+
+
+running (01.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+baseline   [   0% ] 1 VUs  01.0s/50s  0/6 shared iters
+
+running (02.0s), 1/1 VUs, 3 complete and 0 interrupted iterations
+baseline   [  50% ] 1 VUs  02.0s/50s  3/6 shared iters
+
+running (02.5s), 0/1 VUs, 6 complete and 0 interrupted iterations
+baseline ✓ [ 100% ] 1 VUs  02.5s/50s  6/6 shared iters
+time="2026-11-23T17:43:24-08:00" level=error msg="thresholds on metrics 'canticle_deadline_miss, canticle_delivered, checks' have been crossed"

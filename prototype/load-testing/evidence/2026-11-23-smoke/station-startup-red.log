@@ -1,0 +1,41 @@
+test_intermediate_startup_cancellation_closes_station_udp (test_loopback.StationStartupTest.test_intermediate_startup_cancellation_closes_station_udp) ... FAIL
+test_intermediate_startup_failure_closes_station_udp (test_loopback.StationStartupTest.test_intermediate_startup_failure_closes_station_udp) ... FAIL
+
+======================================================================
+FAIL: test_intermediate_startup_cancellation_closes_station_udp (test_loopback.StationStartupTest.test_intermediate_startup_cancellation_closes_station_udp)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/asyncio/runners.py", line 128, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/var/tmp/elliott-bc-k6-20261123/prototype/load-testing/tests/test_loopback.py", line 277, in test_intermediate_startup_cancellation_closes_station_udp
+    await self.probe(cancel=True)
+  File "/var/tmp/elliott-bc-k6-20261123/prototype/load-testing/tests/test_loopback.py", line 268, in probe
+    self.assertTrue(all(s.fileno() == -1 for s in sockets), "station UDP socket leaked before control startup")
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : station UDP socket leaked before control startup
+
+======================================================================
+FAIL: test_intermediate_startup_failure_closes_station_udp (test_loopback.StationStartupTest.test_intermediate_startup_failure_closes_station_udp)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/asyncio/runners.py", line 128, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/var/tmp/elliott-bc-k6-20261123/prototype/load-testing/tests/test_loopback.py", line 274, in test_intermediate_startup_failure_closes_station_udp
+    await self.probe()
+  File "/var/tmp/elliott-bc-k6-20261123/prototype/load-testing/tests/test_loopback.py", line 268, in probe
+    self.assertTrue(all(s.fileno() == -1 for s in sockets), "station UDP socket leaked before control startup")
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : station UDP socket leaked before control startup
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.007s
+
+FAILED (failures=2)

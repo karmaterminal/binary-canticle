@@ -1,0 +1,30 @@
+test_rejects_unbounded_or_ambiguous_parameters (test_loopback.BoundsTest.test_rejects_unbounded_or_ambiguous_parameters) ... ok
+test_exception_and_partial_startup_cleanup (test_loopback.FixtureTest.test_exception_and_partial_startup_cleanup) ... ok
+test_failed_record_close_does_not_skip_remaining_cleanup (test_loopback.FixtureTest.test_failed_record_close_does_not_skip_remaining_cleanup) ... ok
+test_fresh_run_plan_exists_before_submission (test_loopback.FixtureTest.test_fresh_run_plan_exists_before_submission) ... ok
+test_http_bounds_auth_and_metrics (test_loopback.FixtureTest.test_http_bounds_auth_and_metrics) ... ok
+test_real_negative_drops_all_copies_but_keeps_offered_population (test_loopback.FixtureTest.test_real_negative_drops_all_copies_but_keeps_offered_population) ... ok
+test_real_station_daemon_record_client_and_cleanup (test_loopback.FixtureTest.test_real_station_daemon_record_client_and_cleanup) ... ok
+test_relay_close_timeout_does_not_skip_remaining_cleanup (test_loopback.FixtureTest.test_relay_close_timeout_does_not_skip_remaining_cleanup) ... ok
+test_submission_failure_is_a_deadline_miss_not_removed (test_loopback.FixtureTest.test_submission_failure_is_a_deadline_miss_not_removed) ... ok
+test_supervisor_wall_timeout_reaps_real_k6_and_releases_fixture (test_loopback.FixtureTest.test_supervisor_wall_timeout_reaps_real_k6_and_releases_fixture) ... ok
+test_complete_listener_record_latency_not_submit_ack (test_loopback.LedgerTest.test_complete_listener_record_latency_not_submit_ack) ... ok
+test_duplicate_or_invalid_id_never_expands_population (test_loopback.LedgerTest.test_duplicate_or_invalid_id_never_expands_population) ... ok
+test_known_dropped_offer_remains_in_latency_and_miss_denominator (test_loopback.LedgerTest.test_known_dropped_offer_remains_in_latency_and_miss_denominator) ... ok
+test_late_record_does_not_rewrite_failure_as_success (test_loopback.LedgerTest.test_late_record_does_not_rewrite_failure_as_success) ... ok
+test_missing_arrival_or_wrong_hash_is_not_delivery (test_loopback.LedgerTest.test_missing_arrival_or_wrong_hash_is_not_delivery) ... ok
+test_pending_rejected_and_packet_conservation (test_loopback.LedgerTest.test_pending_rejected_and_packet_conservation) ... ok
+test_intermediate_startup_cancellation_closes_station_udp (test_loopback.StationStartupTest.test_intermediate_startup_cancellation_closes_station_udp) ... ok
+test_intermediate_startup_failure_closes_station_udp (test_loopback.StationStartupTest.test_intermediate_startup_failure_closes_station_udp) ... ok
+test_missing_item_cannot_be_deleted_from_expected_plan (test_verify.VerifyTest.test_missing_item_cannot_be_deleted_from_expected_plan) ... ok
+test_missing_row_cannot_hide_in_aggregate_counts (test_verify.VerifyTest.test_missing_row_cannot_hide_in_aggregate_counts) ... ok
+test_negative_json_cannot_hide_successful_process_exit (test_verify.VerifyTest.test_negative_json_cannot_hide_successful_process_exit) ... ok
+test_real_receipt_controls (test_verify.VerifyTest.test_real_receipt_controls) ... ok
+test_success_verifier_rejects_negative_control (test_verify.VerifyTest.test_success_verifier_rejects_negative_control) ... ok
+test_unreaped_child_cannot_pass (test_verify.VerifyTest.test_unreaped_child_cannot_pass) ... ok
+
+----------------------------------------------------------------------
+Ran 24 tests in 6.345s
+
+OK
+{"exit_code": 1, "artifacts": "/tmp/canticle-k6-timeout-8mqi10zu/receipt", "cleanup_ok": true, "failure": "TimeoutError: "}

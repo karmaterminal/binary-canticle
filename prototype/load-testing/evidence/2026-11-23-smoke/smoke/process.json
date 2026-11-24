@@ -1,0 +1,6 @@
+{
+  "k6_exit_code": 0,
+  "supervisor_exit_code": 0,
+  "child_started": true,
+  "child_reaped": true
+}
