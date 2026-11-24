@@ -1,0 +1,47 @@
+--- a/prototype/canticle-station/canticle/intake.py
++++ b/prototype/canticle-station/canticle/intake.py
+@@ -83,9 +83,9 @@
+ BEACON_RATE, BEACON_BURST = 8.0, 16.0       # new beacons per key
+ # Checks a second, and at once, that come to nothing: per known source of a key, and per key for all its strangers;
+ # and for everything that claims a listed key, together (a check is 60-140 µs on ronan, #171).
+-SOURCE_RATE, SOURCE_BURST = 1_000.0, 100.0
++SOURCE_RATE, SOURCE_BURST = float("inf"), float("inf")   # TOGGLE a: no budget for checks that come to nothing
+ NO_OP_COST = 10                             # what a verified ITEM or PLUCK that changes nothing costs: it makes a record
+-CHECK_RATE, CHECK_BURST = 2_000.0, 200.0
++CHECK_RATE, CHECK_BURST = float("inf"), float("inf")
+ UNLISTED_RATE, UNLISTED_BURST = 500.0, 500.0  # datagrams of no listed key examined a second, all together
+ UNLISTED_DEPTH = 64
+ KNOWN_MAX, KNOWN_DEPTH = 4, 64              # known sources per key; datagrams waiting per stream and known source, or
+--- a/prototype/canticle-station/canticle/daemon.py
++++ b/prototype/canticle-station/canticle/daemon.py
+@@ -437,7 +437,7 @@
+     def _make_intake(self, loop) -> Intake:
+         try:
+             return Intake(self.udp, self.receptor.lst.manifest, now_ms=runner.now_ms, rcvbuf=self.cfg.rcvbuf,
+-                          wake=lambda: self._from_reader(loop, self._hear_queued),
++                          wake=lambda: self._wake(loop),    # TOGGLE wake: one turn posted at a time, not one per batch
+                           failed=lambda e: self._from_reader(loop, self._fail, "internal", type(e).__name__))
+         except OSError as e:
+             raise StartError("bind_failed", f"{self.cfg.bind}: {e.strerror or e}") from None
+@@ -531,6 +531,13 @@
+             self._cleanup_files()
+         return 1 if self.failed else 0
+ 
++    _posted = False
++
++    def _wake(self, loop) -> None:
++        if not self._posted:
++            self._posted = True
++            self._from_reader(loop, self._hear_queued)
++
+     @staticmethod
+     def _from_reader(loop, fn, *args) -> None:
+         try:
+@@ -541,6 +548,7 @@
+     def _hear_queued(self) -> None:
+         """Hear one batch of what the intake has waiting, in its order, as one durable save. The loop gets its turn
+         between batches, however much waits."""
++        self._posted = False    # before anything is taken: what the reader places from here on posts again
+         if self._hear_at is not None:
+             self._hear_at.cancel()
+             self._hear_at = None

@@ -153,3 +153,19 @@ the interpreter's, with the doctor's two runtime checks; every run records the t
 - The PR's head is now `a0862c3e`, documentation only over `ab61baf2`: `prototype/canticle-station/canticle` is identical, so the rows measure its daemon.
 - The host is a shared one. At 03:21-03:23Z this lane's own first steps (a file search and tree comparisons, not a second measurement) ran
   beside `base churn-40-100000-30` run 0 and the start of `narrow`'s; every run records the load average before it.
+
+## Added 2026-11-24 03:37Z, during row 0's run 1 of 5: a diagnostic for what row 0's first run showed of `nobudget`
+
+`nobudget`'s first valid frame at 20 000/s came 0.1, 2.3, 16.8 and 59.4 s after its send at offsets 0, 5, 30 and 120 s: about half the flood's age. Every
+copy the newcomer sent had been verified or counted as a repeat (85 + 161 of 246 at 120 s), so the daemon took them and *published* them late.
+The reader posts the event loop a turn for every batch that opens a lane (`Intake.offer` -> `wake` -> `call_soon_threadsafe`), and posts don't
+collapse into one. With no budget a turn is 32 checks, and turns posted faster than they run queue ahead of the connection's writer.
+[`wakes.py`](wakes.py) counts it in virtual time, over 3 s at 20 000/s: `nobudget` 3 000 turns posted and 1 875 run, the head 80, `narrow` 375.
+The head's budgets keep its turns cheap and its lanes full, so it does not show there. `nobudget`'s rows stand as they run.
+
+| # | row | what | runs |
+|---|---|---|---|
+| 2w | attribution, wake | `nobudget` with the reader's wake collapsed into one posted turn ([`toggles/a-budgets-wake.patch`](toggles/a-budgets-wake.patch)): row 0's eight cells, and gate 1's scaled rows | 5 each |
+
+It is a diagnostic of whether the budgets own the delay, at every offset and not at 1 s alone. It is not a third candidate, and decides no gate. It runs
+after row 2 and before 1s, 1r and 1h.
