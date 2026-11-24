@@ -828,19 +828,19 @@ class Intake:
         slots: list = []
         out: list = []
         seen: dict = {}                            # digest -> its ticket
-        now_ms, now = self.now_ms(), time.monotonic()
-        half = limit // 2
+        now = self.now_ms(), time.monotonic()
+        all_, half = limit + limit // 2, limit // 2
         self.took = 0
         with self._lock:
-            for pick, got, most, looks in ((self._pick_slot, slots, half, half * TURN), (self._pick, out, limit, (limit + half) * TURN),
-                                           (self._pick_slot, slots, limit + half, (limit + half) * TURN)):
-                self._draw(pick, got, most - len(out) * (got is slots), looks, seen, now_ms, now)
-                self._ready.extendleft(reversed(self._passed))
-                self._passed.clear()
+            self._draw(self._pick_slot, slots, half, half * TURN, seen, *now)
+            self._draw(self._pick, out, limit, all_ * TURN, seen, *now)
+            self._ready.extendleft(reversed(self._passed))
+            self._passed.clear()
+            self._draw(self._pick_slot, slots, all_ - len(out), all_ * TURN, seen, *now)
         return out + [t for t in slots if not t.dropped]
 
     def _draw(self, pick: Callable, out: list, most: int, looks: int, seen: dict, now_ms: int, now: float) -> None:
-        """Fill ``out`` up to ``most``, having looked at ``looks`` places at most in this turn."""
+        """Fill ``out`` up to ``most``, having looked at no more than ``looks`` places in this turn."""
         while len(out) < most and self.took < looks:
             t = pick(now)
             if t is None:
