@@ -91,12 +91,14 @@ Smoke runs of the harness (a few seconds, to see that it works) are not evidence
 
 ## Added 2026-11-24 00:30Z, after row 0 had run and while row 1 was running
 
-Rows 0-2 are unchanged. Three diagnostics are added, because row 0 raised a question it can't answer: on the head, a copy of the
+Rows 0-2 are unchanged. Four diagnostics are added. Three, because row 0 raised a question it can't answer: on the head, a copy of the
 newcomer's is verified about as often at 100 000/s (1 in 41) as at 20 000/s (1 in 29), where the code reads as if it should be
-five times rarer. The paced producers send in millisecond bursts with silence between, and that may be what hides it.
+five times rarer. The paced producers send in millisecond bursts with silence between, and that may be what hides it. The fourth (1h), because the code reads as if a newcomer has a bound when the flood shares
+neither its address nor more than three others: then it gets a stranger's place of its own at once.
 
 | # | row | rates, /s | ports | offset, s | runs, head |
 |---|---|---|---|---|---|
 | 1s | saturation, evenly spaced sender | 20 000, 100 000 | `smooth-40`: `churn-40`, each datagram sent when it is due, the producer spinning between | 1 | 5 |
 | 1r | saturation, rate | 200 000 (four producers; about what four can churn) | `churn-40` | 1 | 5 |
+| 1h | saturation, the newcomer on another address than the flood | 20 000, 100 000 | `otherhost-40`: `churn-40` from 127.0.0.1, the newcomer on 127.0.0.2 | 1 | 5 (base 3) |
 | 1m | model: the head's own `Intake` in virtual time (`newcomer_model.py`), no sockets, no signatures | 5 000 – 400 000 | churn and fixed, even and in bursts | – | – |

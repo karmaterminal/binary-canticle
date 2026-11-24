@@ -2,7 +2,7 @@
 
 Usage: newcomer_rows.py <out.json> <name=tree:runs,...> <row,...>
   e.g. newcomer_rows.py rows.json head=/scratch/head:5,base=/scratch/base:3 churn-40-20000-0,churn-40-100000-120
-A tree is a ``git archive`` of prototype/canticle-station; a row is <churn|smooth|fixed>-<ports>-<rate>-<offset>. ``canticle`` comes
+A tree is a ``git archive`` of prototype/canticle-station; a row is <churn|smooth|otherhost|fixed>-<ports>-<rate>-<offset>. ``canticle`` comes
 from the tree, and everything else from this repository (the daemon, the tap and the carousel are ``test_fair_admission``'s), so
 every tree is measured by the same code. Runs are interleaved over the trees; what <out.json> already has is not run again.
 Nothing is asserted. Run it under nice -n 19 ionice -c3, and nothing beside it."""
@@ -72,6 +72,10 @@ def one(tree: str, row: str, after: float) -> dict:
         t0 = max(json.loads(p.stdout.readline())["t0"] for p in procs)
         time.sleep(max(0.0, t0 + offset - time.monotonic()))
         q = Newcomer(c.keys["quiet"], c.port)
+        if kind == "otherhost":
+            q.sock.close()
+            q.sock = F.socket.socket(F.socket.AF_INET, F.socket.SOCK_DGRAM)
+            q.sock.bind(("127.0.0.2", 0))
         c.addCleanup(q.join)
         c.addCleanup(q.stop.set)
         q.singing.set()
