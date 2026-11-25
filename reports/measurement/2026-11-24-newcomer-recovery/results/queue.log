@@ -40,3 +40,21 @@
 01:25:08Z slice R3c-forged-churned-sources 4 57 of 57 {'p50': 19.6, 'p90': 25.3, 'p99': 30.8, 'max': 37.5} PASS offered 100006 drops 0 0 {'unlisted': 0, 'unverified': 1333935, 'over_rate': 0, 'backlog': 296}
 01:25:27Z slice R4-replay-own-frames 4 57 of 57 {'p50': 17.6, 'p90': 18.5, 'p99': 19.2, 'max': 19.6} PASS offered 100006 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 0, 'backlog': 0}
 === 01:25:27Z W
+01:27:03Z nobudget-177 churn-40-20000-30 0 first 0.0498 items min/med/max 0.0126 0.022 0.0497 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 108.26
+01:28:38Z nobudget churn-40-20000-30 0 first 21.631 items min/med/max 18.7809 20.2765 21.6309 | misses: first 1 items 20 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 108.01
+01:31:43Z nobudget-177 churn-40-20000-120 0 first 0.042 items min/med/max 0.0136 0.0229 0.0598 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 208.38
+01:34:48Z nobudget churn-40-20000-120 0 first None items min/med/max inf inf inf | misses: first 1 items 20 lost 20 | offered 20000 low 19990 | drops 0 0 | cpu 208.73
+01:36:23Z nobudget-177 churn-40-20000-30 1 first 0.0307 items min/med/max 0.011 0.0216 0.0306 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 106.72
+01:37:58Z nobudget churn-40-20000-30 1 first 17.3602 items min/med/max 14.5031 16.0098 17.3601 | misses: first 1 items 20 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 107.15
+01:41:03Z nobudget-177 churn-40-20000-120 1 first 0.0675 items min/med/max 0.012 0.0216 1.0199 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 210.42
+01:44:08Z nobudget churn-40-20000-120 1 first None items min/med/max inf inf inf | misses: first 1 items 20 lost 20 | offered 20000 low 19990 | drops 0 0 | cpu 208.74
+01:45:43Z nobudget-177 churn-40-20000-30 2 first 0.056 items min/med/max 0.0124 0.0233 1.0228 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 107.81
+01:47:18Z nobudget churn-40-20000-30 2 first 22.1053 items min/med/max 19.2512 20.7461 22.1053 | misses: first 1 items 20 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 107.76
+01:50:23Z nobudget-177 churn-40-20000-120 2 first 0.0555 items min/med/max 0.0148 0.0229 1.0116 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 209.15
+01:53:28Z nobudget churn-40-20000-120 2 first 9.2867 items min/med/max 6.4286 7.9313 9.2866 | misses: first 1 items 20 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 209.87
+01:55:03Z nobudget-177 churn-40-20000-30 3 first 0.0615 items min/med/max 0.0121 0.0216 1.0209 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 106.94
+01:58:08Z nobudget-177 churn-40-20000-120 3 first 0.0375 items min/med/max 0.0115 0.0224 0.0375 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 210.06
+01:59:43Z nobudget-177 churn-40-20000-30 4 first 0.0447 items min/med/max 0.0128 0.0221 0.0446 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 106.61
+02:02:48Z nobudget-177 churn-40-20000-120 4 first 0.0367 items min/med/max 0.0115 0.0221 0.0366 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 209.63
+=== 02:02:48Z J
+02:03:03Z slice junk-40-20000 0 PASS {'quiet': (57, {'p50': 29.8, 'p90': 39.8, 'p99': 42.0, 'max': 42.0}), 'x0': (57, {'p50': 30.0, 'p90': 37.5, 'p99': 41.2, 'max': 42.8}), 'x1': (57, {'p50': 29.1, 'p90': 38.0, 'p99': 41.4, 'max': 42.2}), 'x2': (57, {'p50': 29.5, 'p90': 38.1, 'p99': 41.7, 'max': 42.2})} offered 20002
