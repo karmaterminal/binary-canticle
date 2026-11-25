@@ -592,6 +592,18 @@ evidence at its tested boundary, not an installed producer `[proposed: #159]`.
 `452c5433` is binary-canticle `452c54336d05048b3e0e2fd83bafb16d98065891`, the head of #162 that 🌿
 reviewed (findings F1–F3).
 
+The reviewed, **unmerged** #184 head `1bbf0634` addresses those findings in source, not in a
+provisioned seat: the issuer signs an Ed25519 capability and the station verifies with its public
+key, refusing invalid issuer keys; the effective grant stays narrowed across restart; and every
+causal source contributes its recorded scope, so an unrecorded or wider reply is refused
+`[built+tested: binary-canticle@1bbf0634:prototype/canticle-station/canticle/derived_reply_proposal.py:243 | prototype/canticle-station/tests/test_derived_reply_proposal.py:537]`.
+This does **not** place the issuer key beyond the ear uid or make its API safe to command freely
+`[open: binary-canticle#185]`. The second-uid daemon socket is a separate prerequisite for a
+split-uid station `[open: binary-canticle#99]`; #166 still owns reviewer/lander, ledger provisioning
+and default-closed installation. The Claude exposure ledger is merged in frond-ear#121, but its
+reader form and observed-start birth rule remain open in frond-ear#117; neither offered custody
+nor a new session ID alone authorizes an issuer. See [the reply-side boundary review](https://github.com/karmaterminal/binary-canticle/pull/186#issuecomment-7169182846).
+
 ### 4.3 Receipts and unknowns
 
 | Boundary | Receipt | Proves | Does not prove | Status |
@@ -923,8 +935,10 @@ receipt stops at host return; only a later exact-token echo supports encounter w
 not model-input settlement or comprehension (§0.5). It MUST NOT infer answer authority from a
 heard item or a room reply. The exposure ledger is built (frond-ear#121); its reader form,
 observed-start birth rule and issuer separation remain gates for signed derived replies
-[open: frond-ear#117, binary-canticle#185, #166]. #127's unmerged candidate keeps the same
-reader across reattach; a fork may have a new session ID while retaining prior exposure.
+[open: frond-ear#117, binary-canticle#185, #166]. #127's unmerged head `5f764ac5` keeps the same
+reader across reattach; a fork may have a new session ID while retaining prior exposure, so only
+an observed `startup` or `clear` before any push could support a birth claim. That birth rule is
+not yet built `[open: frond-ear#117]`.
 
 On **OpenClaw**, the plugin binds to the *same exact continuing session* across the selected item,
 elected `continue_work` turn and subsequent ID/hash acknowledgement. The plugin may expose only a
