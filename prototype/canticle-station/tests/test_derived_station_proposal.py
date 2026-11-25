@@ -59,7 +59,7 @@ class StationProposalTest(unittest.TestCase):
     def expose(self, n=1, **kw):
         source = Exposure(**{**dict(receipt_id=f"exposure-{n}", binding="rune-reader",
                                   reader_decision=f"allowed-read-{n}", item=(f"{n:016x}", 7, 5, n),
-                                  root=None, hop=0, drained_at=self.now, expires_at=self.now + 240_000),
+                                  root=None, hop=0, drained_at=self.now, expires_at=self.now + 240_000, scope="lan"),
                              **kw})
         self.proposal.record_exposure(self.reader, source)
         return source

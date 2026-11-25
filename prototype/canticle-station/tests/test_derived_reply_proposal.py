@@ -12,6 +12,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from canticle import vectors, wire
+from canticle.ids import SCOPES
 from canticle.derived_reply_proposal import (
     MAX_EXPOSURES, Exposure, Grant, HistoryOrigin, Intent, Reader, Refused, ReplyProposal,
     exposure_record, proposed_item,
@@ -51,7 +52,7 @@ class ProposalTest(unittest.TestCase):
     def source(self, number=1, **kw):
         options = dict(receipt_id=f"exposure-{number}", binding="rune-reader",
                        reader_decision=f"allowed-read-{number}", item=(f"{number:016x}", 7, 5, number),
-                       root=None, hop=0, drained_at=self.now, expires_at=self.now + 240_000)
+                       root=None, hop=0, drained_at=self.now, expires_at=self.now + 240_000, scope="lan")
         return Exposure(**{**options, **kw})
 
     def expose(self, number=1, **kw):
@@ -478,6 +479,26 @@ class ProposalTest(unittest.TestCase):
         self.reopen(grant=replace(self.grant, audience_principals=("nobody",)))
         revoked.replace_grant(self.grant)  # explicit, trusted widening restores it
         self.assertTrue(self.elect())
+
+    def test_derived_audience_is_never_wider_than_the_narrowest_heard_source(self):
+        # F1 (#162 review): the reply's scope is bounded by every source the reader was exposed to.
+        self.expose(1, scope="lan")
+        self.expose(2, scope="host")
+        self.refused("source_scope", self.elect)
+        host = replace(self.intent, scope="host")
+        eid = self.elect(intent=host)
+        item = proposed_item(self.admit(self.b.claim(eid, self.body)), self.body, epoch=1, seq=1, now=self.now)
+        self.assertEqual(item.scope, SCOPES["host"])
+
+    def test_a_source_without_a_recorded_scope_refuses_every_reply(self):
+        self.expose(scope=None)  # unknown is not "lan": an unrecorded scope can never bound an audience
+        self.refused("source_scope", self.elect)
+        self.refused("source_scope", lambda: self.elect(intent=replace(self.intent, scope="host")))
+
+    def test_source_scope_is_validated_and_bound_into_the_history_digest(self):
+        self.refused("source_class", lambda: self.source(scope="everywhere"))
+        self.assertEqual(exposure_record(self.source(scope="host"))["scope"], "host")
+        self.assertNotEqual(exposure_record(self.source(scope="host")), exposure_record(self.source(scope="lan")))
 
     def test_wake_provenance_is_host_stamped_and_never_promotes_training(self):
         self.expose(wake_derived=None)  # absence of the flag is not evidence of clean wake provenance

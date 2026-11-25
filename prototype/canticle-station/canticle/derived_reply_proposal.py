@@ -102,6 +102,7 @@ class Exposure:
     expires_at: int
     source_class: str = "chatter"
     wake_derived: bool | None = False
+    scope: str | None = None  # F1: the heard source's own scope; None (unrecorded) refuses every reply
 
     def __post_init__(self):
         _require(all(_name(x) for x in (self.receipt_id, self.binding, self.reader_decision)), "exposure_receipt")
@@ -109,7 +110,8 @@ class Exposure:
         _require(_uint(self.hop, 15) and _uint(self.drained_at) and _uint(self.expires_at)
                  and self.drained_at < self.expires_at, "source_bounds")
         _require(self.source_class in CLASS_BY_NAME and
-                 (self.wake_derived is None or type(self.wake_derived) is bool), "source_class")
+                 (self.wake_derived is None or type(self.wake_derived) is bool)
+                 and (self.scope is None or self.scope in SCOPES), "source_class")
 
 
 def exposure_record(exposure: Exposure) -> dict:
@@ -452,6 +454,9 @@ class ReplyProposal:
         return {"history_receipt": origin["receipt"], "count": len(records), "digest": _digest(records), "max_hop": max(r["hop"] for r in records),
                 "tail": records[-4:], "source_classes": sorted({r["source_class"] for r in records}),
                 "wake_derived": any(r["wake_derived"] is not False for r in records),
+                # F1: the narrowest scope any causal source was heard at; None if any is unrecorded.
+                "scope": None if any(r.get("scope") is None for r in records)
+                         else min((r["scope"] for r in records), key=SCOPES.__getitem__),
                 "expires_at": min(r["expires_at"] for r in records)}
 
     def _policy(self, db: sqlite3.Connection, reader: Reader, intent: dict, payload: bytes, snapshot: dict) -> Grant:
@@ -461,7 +466,9 @@ class ReplyProposal:
                  (intent["publisher"], intent["station"], intent["key_id"], intent["stream"], intent["public_key"])
                  == (grant.publisher, grant.station, grant.key_id, grant.stream, grant.public_key), "publisher_not_allowed")
         _require(intent["cls"] == "chatter" and snapshot["source_classes"] == ["chatter"]
-                 and intent["scope"] == grant.scope and intent["scope"] in ("host", "lan"), "class_scope")
+                 and intent["scope"] in ("host", "lan") and SCOPES[intent["scope"]] <= SCOPES[grant.scope], "class_scope")
+        # F1: the derived audience may never be wider than the narrowest source the reader was exposed to.
+        _require(snapshot["scope"] is not None and SCOPES[intent["scope"]] <= SCOPES[snapshot["scope"]], "source_scope")
         _require(1 + snapshot["max_hop"] <= CLASS_BY_NAME["chatter"].hop_limit, "hop_limit")
         _require(type(payload) is bytes and bool(payload), "content_bounds")
         _require(100 < intent["ttl_ms"] <= grant.max_ttl_ms and len(payload) <= grant.max_bytes, "content_bounds")

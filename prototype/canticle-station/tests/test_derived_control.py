@@ -47,7 +47,7 @@ class Fixture:
         self.proposal.attest_history(self.reader, HistoryOrigin(
             "fixture-origin", "observed_session_birth", 0, hashlib.sha256(b"[]").hexdigest()))
         source = Exposure("source-receipt", "fixture-binding", "fixture-decision", ("01" * 8, 1, 1, 1),
-                          None, 0, self.now, self.now + 120_000)
+                          None, 0, self.now, self.now + 120_000, scope="lan")
         # Synthetic host origin and custody are explicit; this suite proves transport, not a prince.
         fence = self.proposal.begin_exposure(self.reader, source)
         self.proposal.confirm_exposure(self.reader, fence)
