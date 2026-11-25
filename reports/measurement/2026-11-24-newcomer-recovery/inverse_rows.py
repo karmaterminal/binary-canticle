@@ -67,12 +67,13 @@ def one(tree: str, row: str) -> dict:
 
         def counted(self, name, want, since, deadline=20.0):
             """Seconds from ``since`` until ``health`` said that ``receive.<name>`` was ``want`` or more."""
-            while time.monotonic() - since < deadline:
+            while True:
                 at = next((t for t, r in list(self.tap.recs) if r["type"] == "health" and (r["receive"].get(name) or 0) >= want), None)
                 if at is not None:
                     return round(at - since, 3)
+                if time.monotonic() - since >= deadline:
+                    return None
                 time.sleep(0.01)
-            return None
 
     popen = subprocess.Popen
 

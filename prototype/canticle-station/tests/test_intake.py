@@ -1830,6 +1830,51 @@ class EchoTest(IntakeCase):
         self.intake.slice.tokens, self.intake.slice.at = -100.0, self.now
         self.assertEqual(self.turns(f), new)
 
+    def relayed(self, first, spent=True):
+        """A frame that ``first`` sends, then four established relays; strangers' checks are spent, so a relay's copy is checked."""
+        relays = [addr(7, 5_000 + n) for n in range(intake.KNOWN_MAX)]
+        for n, src in enumerate(relays):
+            self.offer(beacon(A, 1_000 + n), src=src)
+            self.accept()
+        for b in (self.intake.strange, self.intake.slice) if spent else ():
+            b.tokens, b.at = -1e6, self.now
+        f = beacon(A, 2_000)
+        for src in (first, *relays):
+            self.offer(f, src=src)
+        batch = self.intake.take(32)
+        for t in batch:
+            self.intake.remember(t, (KID_A, 5), runner.now_ms() + 60_000)
+            self.intake.settle(t, True, True)
+        return [t.addr for t in batch if t.data == f]
+
+    def test_the_first_to_be_heard_has_the_share_though_a_relays_copy_is_checked_first(self):
+        """Row I-a: four relays have the key's places, and forward each frame behind the station that starts. Its copy waits for a
+        stranger's turn, so a relay's is checked first, time and again: the station must have its place all the same."""
+        checked = self.relayed(addr(60))
+        self.assertEqual((len(checked), checked[0] in self.key.known), (1, True))
+        self.assertIn(addr(60), self.key.known)
+        self.assertEqual(self.intake.stats()["displaced"], 2)       # HERE's, and the oldest relay's: the station took one place
+        self.assertEqual(self.serve(32), [])                        # its own copy is a repeat now
+
+    def test_and_one_that_is_checked_itself_takes_one_place_only(self):
+        self.assertEqual(self.relayed(addr(60), spent=False), [addr(60)])
+        self.assertEqual((addr(60) in self.key.known, self.intake.stats()["displaced"]), (True, 2))
+
+    def test_an_echo_that_comes_later_has_no_share_in_it(self):
+        relays = [addr(7, 5_000 + n) for n in range(intake.KNOWN_MAX)]
+        self.relayed(addr(60))
+        self.assertEqual([a in self.key.known for a in relays], [False] + [True] * 3)
+
+    def test_a_frame_whose_first_copy_is_gone_is_the_next_ones(self):
+        """What is remembered of who came first is as long as a copy waits, no longer."""
+        stream = self.key.streams[stream_id("chatter")]
+        f = item(A, 5)
+        self.offer(f, src=addr(60))
+        self.serve(32, verified=lambda t: False)
+        self.assertEqual(stream.bytes, {})
+        self.offer(f, src=HERE)
+        self.assertEqual([t.first for t in self.intake.take(4)], [HERE])
+
     def test_where_both_wait_in_a_turn_the_queues_copy_is_the_one_that_counts(self):
         """An echo ahead of the station's own copy has a place in the slot; the station's lane is served first, as it was."""
         self.offer(*[forge(beacon(A, 1), k) for k in range(8)], src=THERE)
@@ -2040,7 +2085,7 @@ class ConsistencyTest(IntakeCase):
                 for ring, known in ((s.known, True), (s.strange, False)):
                     self.assertTrue(all(lane.queue and lane.source.known is known for lane in ring))
                     self.assertTrue(all(sorted(lane.digests) == sorted(e[1] for e in lane.queue) for lane in ring))
-                self.assertEqual(getattr(s, "bytes", None), Counter(e[1] for lane in s.lanes.values() for e in lane.queue))
+                self.assertEqual({d: n for d, (n, _) in s.bytes.items()}, Counter(e[1] for lane in s.lanes.values() for e in lane.queue))
                 for source, lane in s.lanes.items():
                     self.assertIs(lane.source, source)
                     queued[source] += len(lane.queue)
