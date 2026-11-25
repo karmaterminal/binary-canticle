@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | Draft (2026-11-23). Not wire-stable, not installed. Shaped from `docs/design/sense-organ.md` at `2c3f5ab6` (draft PR #168), at figs's ask that the canticle work be anchored to an RFC. |
+| **Status** | Draft (2026-11-23; temporal-integration revision 2026-11-25). Not wire-stable, not installed. Shaped from `docs/design/sense-organ.md` at `2c3f5ab6` (draft PR #168), at figs's ask that the canticle work be anchored to an RFC. |
 | **Location** | `rfc/0002-binary-canticle-sense-organ.md` |
 | **Updates** | RFC-0001 (`rfc/0001-binary-canticle.md`). Section-level relations are in §0.6. Everything not listed there is **to be settled by the claims audit** (🌿's lane, Appendix B). |
-| **Pointers checked at** | binary-canticle `d4c306618f7f77658fe73705d58b2744f2486701` (`main`, the merge of #171); frond-ear `a8e2e5ba1b16adf5ce700265f25a0d210c569608` (`main`, the merge of frond-ear#119). Other SHAs are named where they are used. |
-| **Owners** | §1 🕯 Emeric. §2 and §3 🍃 frond-gloss and 🌿 frond-scribe (the tower and ear). §5 🌊 Ronan (the seam), and §3.5. §4 🪨 Rune (answering). §0, §6 and §7 all of us. |
+| **Pointers checked at** | Earlier claims: binary-canticle `d4c306618f7f77658fe73705d58b2744f2486701` (`main`, the merge of #171); frond-ear `a8e2e5ba1b16adf5ce700265f25a0d210c569608` (`main`, the merge of frond-ear#119). §8's integration proposal was checked against binary-canticle `2eb1a56d8fe4f1b250d4da3adec5611292f66948` (`main`) and does not claim newer host deployment. Other SHAs are named where they are used. |
+| **Owners** | §1 🕯 Emeric. §2 and §3 🍃 frond-gloss and 🌿 frond-scribe (the tower and ear). §5 🌊 Ronan (the seam), and §3.5. §4 and §8 🪨 Rune (answering and temporal join). §0, §6 and §7 all of us. |
 
 **Nothing in this document is installed unless a pointer says so and links its receipt.** A source
 slice, a dispatched lane, a passing unit suite or a merged pull request is not an installed sense. A
@@ -32,7 +32,9 @@ a prince gains, in the order they can be built:
    through a path that does not run back through his own ear.
 
 §5 is the cross-cutting host join for OpenClaw seats. §6 puts what is built, unbuilt and proven on one
-set of rows for both hosts. §7 holds the open decisions.
+set of rows for both hosts. §7 holds the open decisions. §8 ties beacon time, deterministic transport,
+host turns, continuation and player handoff together without promoting a component proof to a
+composed encounter.
 
 RFC-0001 remains the specification of the wire (frame v2), stations, the carousel, trust, the host
 daemon and receptor record v1. This RFC does not change any of those bytes.
@@ -862,6 +864,121 @@ keeps it pilot-only `[open: §7.9]`.
 
 Offered or echoed on Claude seats; exact model-input settlement on OpenClaw. It MUST be settled before
 the issuer is enabled (§4.2) `[open: frond-ear#117]`.
+
+---
+
+## 8. The temporal join: from a beacon to a chosen turn (🪨)
+
+**Status: proposed integration contract, not a claim of installed behaviour.** The earlier sections
+specify the wire, local ear and host separately; this section says *when* each boundary may advance.
+A beacon announces a station's signed, bounded stream window. It is not the item, a wake request,
+a clock for a story performance, or evidence that a prince heard anything. A ring cursor is not
+custody. An OpenClaw continuation is a turn opportunity, not a license to inject text. These
+distinctions are the fit test for this RFC [open: #161, #165, #175, #178].
+
+### 8.1 One item, five clocks
+
+An implementation MUST preserve these independently, rather than sort them by one wall clock
+`[proposed: §8.1]`:
+
+| Clock / position | Owner | What it may decide | What it must not decide |
+| --- | --- | --- | --- |
+| Signed station epoch, beacon sequence and stream head/trail | Station, checked by receptor | Which signed window the station claims is available; restart and gap detection | That a listener received an item, or that the station is offline after silence |
+| Signed item identity, expiry and verification time | Station / receptor | Identity, replay, admission and the remaining opportunity to encounter it | Reader priority or authority to publish |
+| Ring cursor and retention class | Optional ringserver reader | Where a reader resumes and what transport history remains | Truth, signature validity, model exposure or an attention wake |
+| Ear custody and exact reader incarnation | frond-ear or OpenClaw plugin | Which item was selected, withheld, queued, offered and later acknowledged | That a mere queue write was model-seen |
+| Host turn and elected continuation | Claude Code or OpenClaw host | When the bound session can choose to pull, spend attention and answer | Extension of signed expiry or substitution of a successor session |
+
+The receptor uses monotonic local time for bounded waits and resource limits; signed wall time is
+checked only under the explicit offset/skew rule (#175). A wall-clock jump MUST NOT turn an expired
+item fresh, fabricate missed beacons, or convert an unknown delivery into a positive receipt. On
+restart, recover the durable station mark, dedup and reader cursor *before* reporting freshness;
+if any is missing, report the gap and require reconciliation [open: #175]. Beacon disappearance
+means `not observable since t`, never proof that the station or person is absent (§2.4).
+
+### 8.2 The low-burden path and its honest fallbacks
+
+The normal path is **deterministic before model attention**: signed station item/beacon → bounded
+receptor verification, dedup and fair admission → optional ringserver carriage by retention class →
+ear-local tuning, expiry, digest and custody → the prince's elected turn. Filtering, cursors,
+coverage notes and rate limits are host work; they MUST NOT require a model turn per beacon, frame
+or retry. A newly tuned reader can ask for a bounded window; a loss is a visible gap, not silent
+backfill. If the optional ring is absent, the verified local UDP/daemon path remains usable with
+its measured loss and retention limits. A ring's DataLink/SeedLink record is transport evidence,
+not a substitute for the original signed item or the receptor's verification (§2.2, §2.6).
+The ringserver prototypes prove specific format round trips, not this composed reader or fleet
+deployment [proposed: frond-ear#116; open: §7.3].
+
+The first-hop fairness and newcomer recovery gates still apply before any host join. #173's
+verified-repeat → verify → debit order does not by itself rescue a newcomer during churn; #178
+must meet its declared *own-host/key* recovery and flood-rate measurement, not borrow
+other-host positives. Under-rate trials are invalid evidence, not delivery failures. A successful
+local unit suite, a ring read, or a beacon counter cannot promote this path [open: #173, #178].
+
+### 8.3 Two host adapters, one selection contract
+
+On **Claude Code**, frond-ear selects a bounded item or digest, records custody, and may offer it
+to its bound session under the session's own tune and wake grant (§3.4). The shim's `offered`
+receipt stops at host return; only a later exact-token echo supports encounter with that token,
+not model-input settlement or comprehension (§0.5). It MUST NOT infer answer authority from a
+heard item or a room reply. Its exposure ledger and issuer separation remain gates for signed
+derived replies [open: frond-ear#117, #127; #166].
+
+On **OpenClaw**, the plugin binds to the *same exact continuing session* across the selected item,
+elected `continue_work` turn and subsequent ID/hash acknowledgement. The plugin may expose only a
+bounded, untrusted pull result on that turn; neither the continuation reason nor an ambient
+announcement carries story text. A queued injection or isolated child result is not the proof.
+If the host cannot establish exact-session/model-input custody, it withholds the positive claim
+and the item stays pending or unknown under §5, never silently adopted by a successor [open: #161].
+The output fence is an **independent** gate: successful pull/ack does not authorize text to enter
+model input, nor ordinary Discord or tool egress, without the bound-room and trust controls of
+#165. Do not collapse #165 into #161.
+
+**Standalone** station/receptor use needs neither adapter. It can sign, verify, inspect and
+transport items with deterministic receipts, but has no prince encounter, wake, model-input or
+derived-reply claim. A standalone code-agent plugin may implement the same ear selection contract
+only after naming its host's exact-session identity, input/egress fence, restart semantics and
+receipt ceiling. Absence of those APIs is a declared limitation, not an invitation to emulate
+them with a ring cursor or child summary [open: §8.5].
+
+### 8.4 A Mirari wake and a story beacon, walked end to end
+
+An exemplar Mirari wake is a *carrier of a signed cue*, not a command to the model. A station
+publishes the cue with stream, identity, validity and a beacon head; the receptor verifies and
+admits it. The ear's chosen tune decides whether it stays silent, appears in a return digest, or
+is eligible for a seat-local wake grant. At a chosen OpenClaw continuation, the exact session
+pulls the still-valid item, sees it as external data and acknowledges its ID/hash. Only then may
+we claim the reader join; #165 still governs model-input and egress. If a wake grant is absent,
+the cue may remain retrievable without waking anyone. This is a required acceptance trace,
+not a report that Mirari currently exercises the full chain [open: #161, #165, #181].
+
+A story/media beacon advertises a **gift's availability**, not the cassette bytes and not a
+performance clock. A separate, deliberately opened player retrieves a content-addressed
+source, validates its schema and branches, then keeps source version, saved take and performance
+playhead distinct. Canticle may announce or answer about it, but cannot turn that advertisement
+into memory, silently flatten a choice graph, or declare wall-clock playback from container
+readback. The one player is tracked at
+[thornfield-plugins#19](https://github.com/karmaterminal/thornfield-plugins/issues/19);
+it is a linked dependency, not binary-canticle core or a shipped live encounter [open: #161,
+thornfield-plugins#19].
+
+### 8.5 Feedback rule and acceptance matrix
+
+Every implementation or measurement that changes timing, custody, authority, retention,
+failure behaviour or the user-visible claim MUST feed an exact issue/PR result back into this
+RFC: update the relevant contract, claim tag and acceptance row in the same reviewed change or
+record a specific follow-up gate `[proposed: §8.5]`. Do not let a green test silently revise the RFC; do not let
+an aspirational paragraph make a local fixture “installed.” This is the change discipline for
+#172's PR ledger and Project 99.
+
+| Slice | Required positive | Required negative / unknown | Gate |
+| --- | --- | --- | --- |
+| Deterministic source → ear | signed item, bounded loss/gap, expiry and cursor receipts on one opted-in host | forged/replayed/expired item and restart without durable marks fail closed | #173, #175, #178 |
+| Claude ear → session | exact item custody and later token echo | offered alone remains host-returned; reattach must not lend custody to another reader | frond-ear#117, #127 |
+| OpenClaw ear → continuing prince | elected continuation, same exact session pull and later ID/hash ack | isolated child, stale generation, cancelled turn and pending-write failure do not become encounter | #161 |
+| Model/room fence | exact allowed input and bound-room effect | item text cannot smuggle instructions or egress via an unfenced tool/announcement | #165 |
+| Elected signed answer | issuer grant bound to actual exposure and reader generation; second reader verifies | ear cannot read issuer key, station cannot mint, reply cannot exceed what was heard | #99, #166, #180, frond-ear#117 |
+| Story/player | exact source and branch-preserving playhead/readback | beacon and MV2 container parity alone do not prove live playback or memory | thornfield-plugins#19 |
 
 ---
 
