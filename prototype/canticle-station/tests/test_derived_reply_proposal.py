@@ -18,7 +18,11 @@ from canticle.derived_reply_proposal import (
     exposure_record, proposed_item,
 )
 
-SECRET = b"synthetic-capability-key-for-tests"  # memory-only fixture; never a deployed host/station key
+# F3: memory-only issuer fixtures (never a deployed key). The issuer signs; a station holds only ISSUER_PUBLIC.
+ISSUER = Ed25519PrivateKey.from_private_bytes(hashlib.sha256(b"synthetic-test-issuer").digest())
+ISSUER_PUBLIC = wire.public_key_bytes(ISSUER)
+OTHER = Ed25519PrivateKey.from_private_bytes(hashlib.sha256(b"synthetic-other-issuer").digest())
+OTHER_PUBLIC = wire.public_key_bytes(OTHER)
 PUBLIC_KEY = wire.public_key_bytes(Ed25519PrivateKey.from_private_bytes(bytes.fromhex(vectors.TEST1))).hex()
 KEY_ID = "21fe31dfa154a261"  # existing TEST1 conformance-vector identity
 
@@ -45,7 +49,7 @@ class ProposalTest(unittest.TestCase):
             "host-observed-birth", "observed_session_birth", 0, hashlib.sha256(b"[]").hexdigest()))
 
     def reopen(self, **kw):
-        options = dict(enabled=True, secret=SECRET, grant=self.grant, clock=lambda: self.now,
+        options = dict(enabled=True, issuer_key=ISSUER, issuer_public=ISSUER_PUBLIC, grant=self.grant, clock=lambda: self.now,
                        content_allowed=lambda body: not body.startswith(b"SECRET"))
         return ReplyProposal(self.path, **{**options, **kw})
 
@@ -426,7 +430,7 @@ class ProposalTest(unittest.TestCase):
         altered = json.loads(capsule)
         altered["envelope"]["intent"]["scope"] = "public"
         self.refused("capability_auth", lambda: self.admit(canonical(altered)))
-        self.refused("capability_auth", lambda: self.admit(capsule, broker=self.reopen(secret=b"x" * 32)))
+        self.refused("capability_auth", lambda: self.admit(capsule, broker=self.reopen(issuer_key=None, issuer_public=OTHER_PUBLIC)))
         self.refused("wrong_station", lambda: self.b.station_admit(capsule, self.body, station="cael", key_id=KEY_ID, public_key=PUBLIC_KEY))
         self.refused("capability_format", lambda: self.admit(capsule + b" "))
         self.assertEqual(self.b.inspect(eid)["state"], "claimed_unknown")
@@ -499,6 +503,36 @@ class ProposalTest(unittest.TestCase):
         self.refused("source_class", lambda: self.source(scope="everywhere"))
         self.assertEqual(exposure_record(self.source(scope="host"))["scope"], "host")
         self.assertNotEqual(exposure_record(self.source(scope="host")), exposure_record(self.source(scope="lan")))
+
+    def test_a_verify_only_instance_admits_but_can_never_mint(self):
+        # F3 (#162 review): the station side holds only the issuer's public key.
+        self.expose()
+        eid = self.elect()
+        verifier = self.reopen(issuer_key=None)
+        self.refused("issuer_key_missing", lambda: verifier.claim(eid, self.body))
+        self.assertEqual(self.b.inspect(eid)["state"], "elected")  # the refused mint burned nothing
+        capsule = self.b.claim(eid, self.body)
+        self.assertEqual(self.admit(capsule, broker=verifier).election_id, eid)
+
+    def test_a_capsule_signed_by_any_key_but_the_issuer_is_refused(self):
+        # Even with write access to the authority DB, a process without the issuer key cannot forge.
+        self.expose()
+        eid = self.elect()
+        capsule = json.loads(self.b.claim(eid, self.body))
+        encoded = canonical(capsule["envelope"])
+        forged = canonical({"envelope": capsule["envelope"],
+                            "sig": OTHER.sign(b"canticle-derived-reply-proposal\x00" + encoded).hex()})
+        verifier = self.reopen(issuer_key=None)
+        self.refused("capability_auth", lambda: self.admit(forged, broker=verifier))
+        self.refused("capability_format", lambda: self.admit(
+            canonical({"envelope": capsule["envelope"], "mac": capsule["sig"]}), broker=verifier))
+        self.assertEqual(self.b.inspect(eid)["state"], "claimed_unknown")
+
+    def test_an_issuer_key_must_match_the_configured_issuer_public_key(self):
+        self.refused("issuer_key_mismatch", lambda: self.reopen(issuer_public=OTHER_PUBLIC))
+        for bad in (None, b"", ISSUER_PUBLIC + b"\x00", ISSUER_PUBLIC.hex()):
+            with self.subTest(bad=bad):
+                self.refused("authority_missing", lambda: self.reopen(issuer_key=None, issuer_public=bad))
 
     def test_wake_provenance_is_host_stamped_and_never_promotes_training(self):
         self.expose(wake_derived=None)  # absence of the flag is not evidence of clean wake provenance

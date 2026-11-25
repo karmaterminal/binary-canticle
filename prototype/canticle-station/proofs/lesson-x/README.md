@@ -78,7 +78,7 @@ and the two harness paths; no player needs to adjudicate transport semantics dur
 
 1. **Capability and continuing-session custody.** Choose the host→station verifier/provisioning and
    supported session route. Identify the trusted producer of complete exposure history and how it handles
-   prior unknown history and child→parent transfer. The candidate HMAC fixture is not already a fleet
+   prior unknown history and child→parent transfer. The candidate issuer-key fixture is not already a fleet
    authentication arrangement.
 2. **Source use and ordinary room conversation.** Settle historical-source eligibility, withdrawal and
    mixed classes without deleting causal history. The narrow reference's “all previous sources still live”

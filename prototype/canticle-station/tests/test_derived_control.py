@@ -14,6 +14,8 @@ from unittest.mock import patch
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+ISSUER = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))  # memory-only test issuer
+
 from canticle import runner, wire
 from canticle.content_policy import derived_text_allowed, secret_findings
 from canticle.derived_control import DerivedControlBridge
@@ -40,7 +42,7 @@ class Fixture:
         self.grant = Grant("writer", "writer", self.entry.key_id.hex(), "town.reply", ("reader",),
                            ("recipient",), public.hex())
         self.proposal = ReplyProposal(self.root / "authority.db", enabled=True,
-                                      secret=b"disposable-test-authority-secret-32", issuer="test-host",
+                                      issuer_key=ISSUER, issuer_public=wire.public_key_bytes(ISSUER), issuer="test-host",
                                       grant=self.grant, content_allowed=derived_text_allowed)
         self.proposal.set_current_reader(self.reader)
         self.proposal.set_current_reader(self.recipient)

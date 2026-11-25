@@ -9,7 +9,6 @@ This primitive alone does not claim station acceptance. See the accompanying rev
 from __future__ import annotations
 
 import hashlib
-import hmac
 import json
 import os
 import re
@@ -20,6 +19,9 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable, Iterator
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 from . import wire
 from .ids import CLASS_BY_NAME, CTYPES, SCOPES, check_stream_name, key_id, stream_id
@@ -217,16 +219,25 @@ class Admission:
 
 
 class ReplyProposal:
-    def __init__(self, path: Path, *, enabled: bool = False, secret: bytes | None = None,
+    def __init__(self, path: Path, *, enabled: bool = False, issuer_public: bytes | None = None,
+                 issuer_key: Ed25519PrivateKey | None = None,
                  issuer: str = "fixture-host", grant: Grant | None = None,
                  content_allowed: Callable[[bytes], bool] | None = None,
                  clock: Callable[[], int] = lambda: time.time_ns() // 1_000_000):
-        self.path, self.enabled, self.secret = Path(path), enabled, secret
+        # F3 (#162 review): the issuer signs capsules with its private key; a station verifies with the
+        # public key alone. Construct the station side WITHOUT issuer_key: it can admit, never mint.
+        # This separates roles in code only. Holding the private key where the ear's uid cannot read
+        # or command it is a deployment boundary (binary-canticle#99, rfc/0002 §4.2).
+        self.path, self.enabled, self.issuer_key = Path(path), enabled, issuer_key
+        self.issuer_public = issuer_public
         self.issuer, self.grant, self.content_allowed, self.clock = issuer, grant, content_allowed, clock
         if not enabled:
             return  # default-closed construction creates no state, key or process
-        _require(type(secret) is bytes and len(secret) >= 32 and _name(issuer)
+        _require(type(issuer_public) is bytes and len(issuer_public) == 32 and _name(issuer)
                  and grant is not None and callable(content_allowed), "authority_missing")
+        _require(issuer_key is None or (isinstance(issuer_key, Ed25519PrivateKey)
+                                        and wire.public_key_bytes(issuer_key) == issuer_public), "issuer_key_mismatch")
+        self._verify_key = Ed25519PublicKey.from_public_bytes(issuer_public)
         # The caller owns the private directory; reject a symlink or broadly accessible existing DB.
         if self.path.exists() or self.path.is_symlink():
             st = self.path.lstat()
@@ -536,6 +547,7 @@ class ReplyProposal:
 
     def claim(self, election_id: str, payload: bytes) -> bytes:
         """Durably burn the one-use host claim before returning an authenticated station envelope."""
+        _require(self.issuer_key is not None, "issuer_key_missing")  # a verify-only instance cannot mint
         with self._tx() as db:
             now = self._now()
             row = db.execute("SELECT * FROM elections WHERE id=?", (election_id,)).fetchone()
@@ -552,8 +564,8 @@ class ReplyProposal:
                         "issued_at": row["issued_at"], "valid_until": row["valid_until"],
                         "item_expires_at": row["item_expires_at"]}
             encoded = _json(envelope)
-            mac = hmac.new(self.secret, DOMAIN + encoded, hashlib.sha256).hexdigest()
-            capsule = _json({"envelope": envelope, "mac": mac})
+            sig = self.issuer_key.sign(DOMAIN + encoded).hex()
+            capsule = _json({"envelope": envelope, "sig": sig})
             _require(len(capsule) <= MAX_CAPSULE_BYTES, "capability_size")
             now = self._now()
             self._window(row, now)
@@ -575,11 +587,14 @@ class ReplyProposal:
         _require(type(capsule) is bytes and len(capsule) <= MAX_CAPSULE_BYTES, "capability_format")
         try:
             outer = json.loads(capsule)
-            _require(type(outer) is dict and set(outer) == {"envelope", "mac"} and _json(outer) == capsule, "capability_format")
-            envelope, mac = outer["envelope"], outer["mac"]
+            _require(type(outer) is dict and set(outer) == {"envelope", "sig"} and _json(outer) == capsule, "capability_format")
+            envelope, sig = outer["envelope"], outer["sig"]
             encoded = _json(envelope)
-            expected = hmac.new(self.secret, DOMAIN + encoded, hashlib.sha256).hexdigest()
-            _require(type(mac) is str and hmac.compare_digest(mac, expected), "capability_auth")
+            _require(type(sig) is str and re.fullmatch(r"[0-9a-f]{128}", sig) is not None, "capability_auth")
+            try:
+                self._verify_key.verify(bytes.fromhex(sig), DOMAIN + encoded)
+            except InvalidSignature:
+                raise Refused("capability_auth") from None
             _require(envelope["v"] == VERSION and envelope["issuer"] == self.issuer, "capability_auth")
         except Refused:
             raise

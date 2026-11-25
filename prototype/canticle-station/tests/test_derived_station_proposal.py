@@ -13,6 +13,8 @@ from unittest.mock import patch
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+ISSUER = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))  # memory-only test issuer
+
 from canticle import vectors, wire
 from canticle.derived_reply_proposal import Exposure, Grant, HistoryOrigin, Intent, Reader, Refused, ReplyProposal
 from canticle.derived_station_proposal import DerivedStationProposal
@@ -49,7 +51,7 @@ class StationProposalTest(unittest.TestCase):
         self.listener = Listener(Manifest([self.entry]), state_path=Path(self.tmp.name) / "listener.json")
 
     def reopen(self):
-        return ReplyProposal(self.path, enabled=True, secret=b"synthetic-host-capability-secret-32",
+        return ReplyProposal(self.path, enabled=True, issuer_key=ISSUER, issuer_public=wire.public_key_bytes(ISSUER),
                              grant=self.grant, content_allowed=lambda _: True, clock=lambda: self.now)
 
     def new_station(self, **kw):
@@ -80,6 +82,15 @@ class StationProposalTest(unittest.TestCase):
 
     def items(self):
         return [frame for frame in self.station.poll(self.now) if frame[3] == wire.KIND_ITEM]
+
+    def test_a_station_holding_only_the_issuer_public_key_publishes_but_cannot_mint(self):
+        # F3 (#162 review): the station side is constructed without issuer_key.
+        verifier = ReplyProposal(self.path, enabled=True, issuer_public=wire.public_key_bytes(ISSUER),
+                                 grant=self.grant, content_allowed=lambda _: True, clock=lambda: self.now)
+        eid, capsule = self.prepared()
+        self.refused("issuer_key_missing", lambda: verifier.claim(eid, self.body))
+        receipt = DerivedStationProposal(verifier, self.station, "rune", enabled=True).publish(capsule, self.body)
+        self.assertEqual((receipt["election_id"], len(self.items())), (eid, 1))
 
     def test_default_gates_create_no_effect_and_do_not_consume_a_claim(self):
         eid, capsule = self.prepared()
