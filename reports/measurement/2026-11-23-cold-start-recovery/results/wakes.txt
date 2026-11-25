@@ -1,0 +1,3 @@
+head batches 3000 callbacks posted 83 turns run 1875 -> callbacks left queued 0
+tog-a-budgets batches 3000 callbacks posted 3000 turns run 1875 -> callbacks left queued 1125
+narrow batches 3000 callbacks posted 375 turns run 1875 -> callbacks left queued 0

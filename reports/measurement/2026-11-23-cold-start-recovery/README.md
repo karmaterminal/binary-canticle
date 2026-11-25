@@ -26,7 +26,7 @@ the other.
 | | head (#173) | base | `narrow` | `nobudget` |
 |---|---|---|---|---|
 | **Gate 1**: an established station is protected. Scaled rows, 5 runs each (3 of base), 57 of 57 during the flood | **PASS**: 25 of 25 runs | FAIL: 0 of 15 | FAIL: 5 of 25 (R4 only) | **PASS**: 25 of 25 |
-| Gate 1 at full length (570 s R, 300 s F) | not run in this pass: PASS in pass 2 (R rows, `e2d331d0`) and pass 1 (F rows, `0d8fafe4`, an earlier `intake.py`); their files don't record the runtime | FAIL (#171, 1 run of each; not checked here) | FAIL: R1, R2, R3, R3c, F3b, F5 | FAIL: R4a (11 of 57 on time) |
+| Gate 1 at full length (570 s R, 300 s F) | not run in this pass: PASS in pass 2 (R rows, `e2d331d0`) and pass 1 (F rows, `0d8fafe4`, an earlier `intake.py`); their files don't record the runtime | FAIL (#171, 1 run of each; not checked here) | FAIL: 5 of 11 rows pass (R4a, R4b, F0, F2b, F4: 5 of 5 runs each); R1, R2, R3, R3c, F3b, F5 fail on their first run | FAIL: 10 of 11 rows pass (5 of 5 runs each); R4a fails (11 of 57 on time) |
 | **Gate 2**: cold start under churn, row 0. 8 cells, one miss fails a cell | **FAIL**: 1 of 8 cells | FAIL: 1 of 8 | FAIL: 2 of 8 | FAIL: 1 of 8 |
 | a bound on a newcomer's recovery that follows from the code (a churned flood from its own host) | **none** | none | none | none |
 | an *estimate* from the code, not a bound: the flood from one other host | one round of the lanes and a retry, 0.18 s; seen 0.155-0.185 s at the client (row 1h; conditions in "What the code estimates") | none | none | same queues as the head, not measured |
@@ -55,8 +55,8 @@ Every newcomer run records its tree, the versions and the load before it; `estab
 | 2w | attribution, wake: `nobudget-wake` on row 0's eight cells | 5 | `recovery-wake.json` (40) |
 | 1s, 1r, 1h | evenly spaced sender; 200 000/s; the newcomer on another address | 5 / 3 (head only: 1s, 1r) | `saturation-extra.json` (15), `otherhost.json` (16) |
 | 0c, 1c | companions: the `fixed` reading (12, 40 and 200 ports) | 5 / 3 | `recovery-fixed.json` (64), `saturation-fixed.json` (48) |
-| candidates | pass 2's cold start, spoof, relay-first rows, head beside them; full length: R rows 570 s, F rows 300 s | 5 each (scaled); 1 run of each full-length row, then four more of every row that passed (the repeats are running) | `scaled-*.json` (150), `full/` |
-| 1m | the model, alone, last | QUEUED | |
+| candidates | pass 2's cold start, spoof, relay-first rows, head beside them; full length: R rows 570 s, F rows 300 s | 5 each (scaled); 1 run of each full-length row, then four more of every row whose first run passed (done: 82 runs) | `scaled-*.json` (150), `full/` |
+| 1m | the model, the head's own `Intake` in virtual time, alone, last | 4 seeds a line | `model-head.md` |
 
 The deadlines (PLAN.md): the first valid frame at most 1.0 s after the newcomer's first actual send, each item at most 2.0 s after its own; one
 miss, late or lost, fails its cell. "More than 10 s late" is a label ("more than one loop late"), never a gate. The flood ran 59 s or more past
@@ -296,6 +296,29 @@ The companion reading (0c, 1c): N sockets held open and used in turn, `fixed-N`.
 - **200 ports: FAIL** (7 of 10 first frames above 1.0 s, 0.55-2.8 s). 184 ports share 64 lanes, so only one newcomer in 18 has a lane to itself ((63/64)¹⁸⁴ = 5.5 %).
 - **Base fails 11 of 14 cells**, nearly all by its items; its first frame came within 1.1 s.
 
+## The model (row 1m)
+
+[`newcomer_model.py`](newcomer_model.py) runs the head's `Intake` in virtual time: no sockets, no signatures, no loop. It is a check of the reading of the code, and no measurement; a copy is counted as verified if the newcomer's own copy reaches a ticket. Four seeds a line, 20 s, [`results/model-head.md`](results/model-head.md):
+
+ flood | arrives | R, /s | copies sent | copies verified | share | C/R with C = 1 000/s 
+---|---|---|---|---|---|---
+ churn | smooth | 5,000 | 721 | 208 | 28.8% (17%, 36%, 23%, 38%) | 20.0% 
+ churn | smooth | 20,000 | 684 | 29 | 4.2% (2%, 2%, 4%, 9%) | 5.0% 
+ churn | smooth | 50,000 | 710 | 29 | 4.1% (2%, 3%, 12%, 1%) | 2.0% 
+ churn | smooth | 100,000 | 722 | 3 | 0.4% (0%, 0%, 0%, 1%) | 1.0% 
+ churn | smooth | 200,000 | 710 | 0 | 0.0% (0%, 0%, 0%, 0%) | 0.5% 
+ churn | smooth | 400,000 | 717 | 0 | 0.0% (0%, 0%, 0%, 0%) | 0.2% 
+ churn | once a ms | 5,000 | 736 | 273 | 37.1% (53%, 31%, 29%, 34%) | 20.0% 
+ churn | once a ms | 20,000 | 727 | 170 | 23.4% (21%, 32%, 20%, 19%) | 5.0% 
+ churn | once a ms | 50,000 | 689 | 135 | 19.6% (20%, 17%, 24%, 18%) | 2.0% 
+ churn | once a ms | 100,000 | 733 | 147 | 20.1% (15%, 18%, 15%, 33%) | 1.0% 
+ churn | once a ms | 200,000 | 753 | 106 | 14.1% (14%, 11%, 13%, 18%) | 0.5% 
+ churn | once a ms | 400,000 | 689 | 101 | 14.7% (13%, 16%, 13%, 17%) | 0.2% 
+
+- **Even arrivals, churned:** 4.2 % at 20 000/s (*C/R* 5.0 %) and 0.4 % at 100 000/s (1.0 %); at 200 000/s and 400 000/s none of 1 427 copies was verified (*C/R* 0.5 and 0.2 %). Within what four seeds show at 20 000/s; at 50 000/s it is above *C/R* (4.1 % against 2.0) and at 200 000/s below. The lottery is the shape of it, and it does not stop at any rate.
+- **Arrivals once a millisecond (a burst, as the producers pace): 14-37 %**, far above *C/R* and above the runs (1.3 % at 100 000/s). The measured datagrams do not reach the reader as the model's bursts do (an arrival in the silence of an idle millisecond, the newcomer's copy before the burst in half the cases), so this line is **not** relied on for anything; it says the runs are nearer the even arrival than the burst.
+- **Fixed ports:** 40 ports, 1-42 % or 99-100 % of copies by seed, as the runs' bimodality and the hash say; 200 ports, 6-53 % by rate, all lanes shared. A share, not a bound.
+
 ## Attribution (rows 2 and 2w)
 
 Five toggles of the head, each a patch to its daemon committed before its run, at offset 1 s; five runs each, the head beside them (row 1's
@@ -364,7 +387,7 @@ offsets 0, 5, 30 and 120 s (medians of 5 runs; the fifth run at 120 s was not he
 - **Cause, read from the code.** `Intake.offer` (`intake.py` L559) calls `wake` once **for every batch that opens a lane** (L588-589); `wake` is `call_soon_threadsafe`
   (`daemon.py` L440, L535-537), and posts don't collapse. Every posted turn is `_hear_queued`, up to 32 checks (`HEAR_BATCH`), about 2 ms at 16 000/s. A record wakes its connection's writer by appending it behind everything posted
   before (`asyncio`'s `_ready`), and the loop runs them in order. With no budget a turn is never empty, so the queue grows with the flood's age.
-- **Counted** (`wakes.py`, the trees' own `Intake` in virtual time, 3 s at 20 000/s): `nobudget` posts 3 000 turns and a loop of 1.6 ms turns runs 1 875; the head posts 81, `narrow` 375. The head's budgets keep its turns
+- **Counted** (`wakes.py`, the trees' own `Intake` in virtual time, 3 s at 20 000/s): `nobudget` posts 3 000 turns and a loop of 1.6 ms turns runs 1 875; the head posts about 80, `narrow` 375 ([`results/wakes.txt`](results/wakes.txt); its own rng moves the head's count between 80 and 83). The head's budgets keep its turns
   cheap and its lanes full, so nothing piles up.
 - **Confirmed by 2w, at 20 000/s.** One change, the wake collapsed to one posted turn at a time ([`toggles/a-budgets-wake.patch`](toggles/a-budgets-wake.patch)), takes it from 1 of 8 cells to 6 of 8: first frames 0.02-0.07 s at every offset at 20 000/s (the two cells it still fails are at 100 000/s).
 - **In the head it is latent, not seen.** Nothing measured there shows it. It needs turns that cost more than the reader takes to post another, which the budgets prevent.
@@ -399,24 +422,24 @@ Its negative control and its patch-reverts are in the commit message. No PR was 
   `narrow` fails the established rows of the churned flood (24-33 of 57) and both relay rows; it passes the five cold starts by the 4.5 s bound (first frame 65-90 ms, items up to 4.1 s; base's items arrive in pass 2's runs too, but its drops are not reported, so those rows are FAIL there).
   `nobudget` passes the established rows, and gets every item of the relays (20 of 20 in all runs; relay-first is a FAIL on its p50, 1.0 s in 2 of 5 runs), and fails three cold starts. The exact-source spoof is a FAIL for all three, outside the guarantee. The head fails four of five
   cold starts here, 40 fixed ports (a lane shared by chance, above) among them, where pass 2's five runs passed.
-- **Full length** (#171's harness, 570 s for R rows, 300 s for F rows): judged by 🌫's comparator (at the daemon within 4.5 s during the flood, the kernel's drops reported, and pushed to the ear). One run of each, then four more of every row whose first run passed (PLAN.md): a first-run failure decides its row.
+- **Full length** (#171's harness, 570 s for R rows, 300 s for F rows): judged by 🌫's comparator (at the daemon within 4.5 s during the flood, the kernel's drops reported, and pushed to the ear). One run of each, then four more of every row whose first run passed (PLAN.md): a first-run failure decides its row. 82 runs, 0 INVALID; the 75 passing ones and the 7 failing ones are the comparator's.
 
 | row | narrow | nobudget |
 |---|---|---|
-| R1-valid-other-key-4x-max | **FAIL**: 0 of 1 runs; on time 0 of 57 | PASS: 1 of 1 runs; on time 57 of 57 |
-| R2-same-station | **FAIL**: 0 of 1 runs; on time 3 of 57 | PASS: 1 of 1 runs; on time 57 of 57 |
-| R3-forged-claiming-quiet-2x-max | **FAIL**: 0 of 1 runs; on time 3 of 57 | PASS: 1 of 1 runs; on time 57 of 57 |
-| R3c-forged-churned-sources-2x-max | **FAIL**: 0 of 1 runs; on time 21 of 57 | PASS: 1 of 1 runs; on time 57 of 57 |
-| R4a-replay-earlier-frames-2x-max | PASS: 3 of 3 runs; on time 57 of 57, 57 of 57, 57 of 57 | **FAIL**: 0 of 1 runs; on time 11 of 57 |
-| R4b-replay-latest-item-2x-max | PASS: 2 of 2 runs; on time 57 of 57, 57 of 57 | PASS: 1 of 1 runs; on time 57 of 57 |
-| F0-quiet-only | PASS: 2 of 2 runs; on time 30 of 30, 30 of 30 | PASS: 1 of 1 runs; on time 30 of 30 |
-| F2b-forged-own-key-2x-max | PASS: 2 of 2 runs; on time 30 of 30, 30 of 30 | PASS: 1 of 1 runs; on time 30 of 30 |
-| F3b-unknown-key-2x-max | **FAIL**: 0 of 1 runs; on time 25 of 30 | PASS: 1 of 1 runs; on time 30 of 30 |
-| F4-replay-other-key-2x-max | PASS: 2 of 2 runs; on time 30 of 30, 30 of 30 | PASS: 1 of 1 runs; on time 30 of 30 |
-| F5-real-station-flood | **FAIL**: 0 of 1 runs; on time 3 of 30 | PASS: 1 of 1 runs; on time 30 of 30 |
+| R1-valid-other-key-4x-max | **FAIL**: 0 of 1 runs; on time 0 of 57 | PASS: 5 of 5 runs; on time 57 of 57, 57 of 57, 57 of 57, 57 of 57, 57 of 57 |
+| R2-same-station | **FAIL**: 0 of 1 runs; on time 3 of 57 | PASS: 5 of 5 runs; on time 57 of 57, 57 of 57, 57 of 57, 57 of 57, 57 of 57 |
+| R3-forged-claiming-quiet-2x-max | **FAIL**: 0 of 1 runs; on time 3 of 57 | PASS: 5 of 5 runs; on time 57 of 57, 57 of 57, 57 of 57, 57 of 57, 57 of 57 |
+| R3c-forged-churned-sources-2x-max | **FAIL**: 0 of 1 runs; on time 21 of 57 | PASS: 5 of 5 runs; on time 57 of 57, 57 of 57, 57 of 57, 57 of 57, 57 of 57 |
+| R4a-replay-earlier-frames-2x-max | PASS: 5 of 5 runs; on time 57 of 57, 57 of 57, 57 of 57, 57 of 57, 57 of 57 | **FAIL**: 0 of 1 runs; on time 11 of 57 |
+| R4b-replay-latest-item-2x-max | PASS: 5 of 5 runs; on time 57 of 57, 57 of 57, 57 of 57, 57 of 57, 57 of 57 | PASS: 5 of 5 runs; on time 57 of 57, 57 of 57, 57 of 57, 57 of 57, 57 of 57 |
+| F0-quiet-only | PASS: 5 of 5 runs; on time 30 of 30, 30 of 30, 30 of 30, 30 of 30, 30 of 30 | PASS: 5 of 5 runs; on time 30 of 30, 30 of 30, 30 of 30, 30 of 30, 30 of 30 |
+| F2b-forged-own-key-2x-max | PASS: 5 of 5 runs; on time 30 of 30, 30 of 30, 30 of 30, 30 of 30, 30 of 30 | PASS: 5 of 5 runs; on time 30 of 30, 30 of 30, 30 of 30, 30 of 30, 30 of 30 |
+| F3b-unknown-key-2x-max | **FAIL**: 0 of 1 runs; on time 25 of 30 | PASS: 5 of 5 runs; on time 30 of 30, 30 of 30, 30 of 30, 30 of 30, 30 of 30 |
+| F4-replay-other-key-2x-max | PASS: 5 of 5 runs; on time 30 of 30, 30 of 30, 30 of 30, 30 of 30, 30 of 30 | PASS: 5 of 5 runs; on time 30 of 30, 30 of 30, 30 of 30, 30 of 30, 30 of 30 |
+| F5-real-station-flood | **FAIL**: 0 of 1 runs; on time 3 of 30 | PASS: 5 of 5 runs; on time 30 of 30, 30 of 30, 30 of 30, 30 of 30, 30 of 30 |
 | **rows passed** | **5 of 11** | **10 of 11** |
 
-  `narrow` fails R1, R2, R3, R3c, F3b and F5; it answers the replays (R4a, R4b, F4) and the quiet and forged-own rows (F0, F2b). **`nobudget` fails R4a at full length, where the head passes** (11 of 57 on time; 46 late, by up to 132 s, 11 of them only after the flood ended; 26 of 57 pushed; the kernel dropped 156 817 and said so; daemon CPU 142 % mean, the head's 104 %): without the budgets the replays of old beacons are checked
+  `narrow` fails R1, R2, R3, R3c, F3b and F5; it answers the replays (R4a, R4b, F4) and the quiet and forged-own rows (F0, F2b). **`nobudget` fails R4a at full length, which the head passed in pass 2** (11 of 57 on time; 46 late, by up to 132 s, 11 of them only after the flood ended; 26 of 57 pushed; the kernel dropped 156 817 and said so; daemon CPU 142 % mean, the head's 104 %): without the budgets the replays of old beacons are checked
   and served at the loop's speed (4.8 M replays verified of 409 M read, 145 M repeats and 173 M copies). That the wake's backlog is the reason is a hypothesis: `nobudget-wake` has no full-length run. So `nobudget` fails gate 1 at full length (R4a), though it passes the scaled rows, and gate 2 as above.
 
 
@@ -436,7 +459,7 @@ apart, first frame (1.0 s) and items (2.0 s), and the flood must cover every dea
 - **A shared host.** The newcomer rows record the load before each run, at most 6.5 on 20 cores (`established*.json` and `scaled-*.json` don't). `wakes.py` (one process, about ten seconds, counting only) ran beside run 0 of `smooth-40-100000-1`, and this lane's table scripts (seconds of one core each) beside rows from 06:10Z on. No measurement ran beside another.
 - **`established.json`'s R1-R4 are the tests' scale** (13.6 s; offered 73-77 000/s in R1 and 35-38 000/s in R2, 100 000/s in the others), not #171's 570 s.
 - **PLAN.md's addenda were edited after they were written** (2723c45 → d75cd98 changed a count, a5a897a and fc0c103 corrected times), not the predeclared body and not after a run whose row they changed; git has every version.
-- **35 µs a check and 28 000/s a core** are `vbench.py`'s; its output is not a committed raw file.
+- **35 µs a check (a bad signature, 34.9 µs; 39.3 µs for a good one) and 28 000/s a core** are `vbench.py`'s, [`results/vbench.txt`](results/vbench.txt), measured alone after the queue.
 
 ## Rerun
 
