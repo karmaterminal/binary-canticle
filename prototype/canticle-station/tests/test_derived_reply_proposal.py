@@ -438,6 +438,47 @@ class ProposalTest(unittest.TestCase):
         self.b.claim(first, self.body)
         self.refused("budget", lambda: self.reopen().claim(second, b"Another note."))
 
+    def test_reopen_with_a_narrower_constructor_grant_governs_the_next_check(self):
+        # F2 (#162 review): a stored wider grant is not authority once the owner narrows it and restarts.
+        self.expose()
+        eid = self.elect()
+        tighter = self.reopen(grant=replace(self.grant, max_bytes=8))
+        self.refused("content_bounds", lambda: tighter.claim(eid, self.body))
+        self.refused("content_bounds", lambda: self.elect(choice_id="after-restart"))
+        narrowed = self.reopen(grant=replace(self.grant, authors=("cael",)))
+        self.refused("publisher_not_allowed", lambda: narrowed.claim(eid, self.body))
+
+    def test_a_narrowed_grant_survives_a_restart_with_the_old_wider_config(self):
+        # Narrowing is sticky: restarting with the original, wider constructor grant does not widen it back.
+        self.b.replace_grant(replace(self.grant, authors=("cael",), max_bytes=8))
+        restarted = self.reopen()
+        self.expose()
+        self.refused("publisher_not_allowed", lambda: restarted.elect(
+            self.reader, author="rune", turn_id="turn-1", choice_id="c", exposure_receipt="exposure-1",
+            payload=self.body, intent=self.intent))
+        with sqlite3.connect(self.path) as db:
+            stored = json.loads(db.execute("SELECT grant_json FROM policy WHERE id=1").fetchone()[0])
+        self.assertEqual((stored["authors"], stored["max_bytes"]), ([], 8))  # rune removed: revoked, not reverted
+
+    def test_reopen_with_a_different_grant_identity_refuses_instead_of_choosing(self):
+        for changes in (dict(stream="town.other"), dict(station="cael", publisher="cael")):
+            with self.subTest(changes=changes):
+                self.refused("grant_conflict", lambda: self.reopen(grant=replace(self.grant, **changes)))
+        with sqlite3.connect(self.path) as db:
+            stored = json.loads(db.execute("SELECT grant_json FROM policy WHERE id=1").fetchone()[0])
+        self.assertEqual(stored["stream"], "town.reply")
+
+    def test_a_disjoint_author_or_audience_set_revokes_and_stays_revoked(self):
+        # Replacing the only author is a revocation until the owner explicitly widens with replace_grant.
+        self.expose()
+        revoked = self.reopen(grant=replace(self.grant, authors=("cael",)))
+        self.refused("publisher_not_allowed", lambda: self.elect())
+        self.reopen()  # the old wider config again: still revoked
+        self.refused("publisher_not_allowed", lambda: self.elect())
+        self.reopen(grant=replace(self.grant, audience_principals=("nobody",)))
+        revoked.replace_grant(self.grant)  # explicit, trusted widening restores it
+        self.assertTrue(self.elect())
+
     def test_wake_provenance_is_host_stamped_and_never_promotes_training(self):
         self.expose(wake_derived=None)  # absence of the flag is not evidence of clean wake provenance
         eid = self.elect()

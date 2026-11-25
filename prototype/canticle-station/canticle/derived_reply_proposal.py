@@ -178,13 +178,33 @@ class Grant:
     def __post_init__(self):
         _require(re.fullmatch(r"[0-9a-f]{64}", self.public_key or "") is not None
                  and key_id(bytes.fromhex(self.public_key)).hex() == self.key_id, "grant")
-        _require(self.scope in ("host", "lan") and self.authors and self.audience_principals, "grant")
+        # An empty authors or audience tuple is a revocation: nobody passes the membership checks (closed).
+        _require(self.scope in ("host", "lan") and type(self.authors) is tuple
+                 and type(self.audience_principals) is tuple, "grant")
         _require(all(_name(x) and "*" not in x for x in (*self.authors, *self.audience_principals)), "grant")
         _require(_uint(self.max_ttl_ms, 300_000) and self.max_ttl_ms > 100
                  and _uint(self.max_bytes, 800) and self.max_bytes > 0
                  and _uint(self.per_turn, 5) and self.per_turn > 0
                  and _uint(self.per_hour, 60) and self.per_hour > 0
                  and _uint(self.capability_ms, 30_000) and self.capability_ms > 0, "grant_bounds")
+
+
+def _stored_grant(value: dict) -> Grant:
+    """JSON stores tuples as lists; restore them so the stored grant passes the same validation."""
+    return Grant(**{**value, "authors": tuple(value["authors"]),
+                    "audience_principals": tuple(value["audience_principals"])})
+
+
+def narrower_grant(stored: Grant, given: Grant) -> Grant:
+    """The intersection of two grants for one publisher identity; refuses rather than choosing between identities."""
+    identity = ("publisher", "station", "key_id", "stream", "public_key")
+    _require(all(getattr(stored, f) == getattr(given, f) for f in identity), "grant_conflict")
+    authors = tuple(x for x in given.authors if x in stored.authors)
+    audience = tuple(x for x in given.audience_principals if x in stored.audience_principals)
+    bounds = ("max_ttl_ms", "max_bytes", "per_turn", "per_hour", "capability_ms")
+    return Grant(**{**{f: getattr(given, f) for f in identity}, "authors": authors, "audience_principals": audience,
+                    "scope": min(stored.scope, given.scope, key=SCOPES.__getitem__),
+                    **{f: min(getattr(stored, f), getattr(given, f)) for f in bounds}})
 
 
 @dataclass(frozen=True)
@@ -242,7 +262,19 @@ class ReplyProposal:
                     election_id TEXT NOT NULL, kind TEXT NOT NULL, receipt TEXT NOT NULL,
                     PRIMARY KEY(election_id, kind, receipt));
             """)
-            db.execute("INSERT OR IGNORE INTO policy VALUES (1,1,?)", (_json(asdict(grant)).decode(),))
+            # F2: neither the persisted grant nor the constructor's is authority alone. The effective grant
+            # is the narrower of the two, so an owner's narrowing (by config or replace_grant) governs every
+            # check after a restart, and widening needs an explicit replace_grant. Identity disagreement refuses.
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                row = db.execute("SELECT grant_json FROM policy WHERE id=1").fetchone()
+                effective = grant if row is None else narrower_grant(_stored_grant(json.loads(row[0])), grant)
+                db.execute("INSERT INTO policy VALUES (1,1,?) ON CONFLICT(id) DO UPDATE SET grant_json=excluded.grant_json",
+                           (_json(asdict(effective)).decode(),))
+                db.commit()
+            except BaseException:
+                db.rollback()
+                raise
         finally:
             db.close()
 
@@ -423,7 +455,7 @@ class ReplyProposal:
                 "expires_at": min(r["expires_at"] for r in records)}
 
     def _policy(self, db: sqlite3.Connection, reader: Reader, intent: dict, payload: bytes, snapshot: dict) -> Grant:
-        grant = Grant(**json.loads(db.execute("SELECT grant_json FROM policy WHERE id=1").fetchone()[0]))
+        grant = _stored_grant(json.loads(db.execute("SELECT grant_json FROM policy WHERE id=1").fetchone()[0]))
         _require(grant is not None and callable(self.content_allowed), "authority_missing")
         _require(reader.principal in grant.authors and
                  (intent["publisher"], intent["station"], intent["key_id"], intent["stream"], intent["public_key"])
