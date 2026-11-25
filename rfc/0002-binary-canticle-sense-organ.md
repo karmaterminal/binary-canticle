@@ -596,7 +596,7 @@ reviewed (findings F1–F3).
 
 | Boundary | Receipt | Proves | Does not prove | Status |
 | --- | --- | --- | --- | --- |
-| ear → exposure ledger | exact item, scope and reader-generation custody row | this source was recorded at the host's chosen exposure boundary | that the prince chose to answer | `[proposed: frond-ear#117]` |
+| ear → exposure ledger | exact item, scope and reader-generation custody row | this source was recorded at the host's chosen exposure boundary | that the prince chose to answer | ledger built in frond-ear#121; reader form and birth attestation open in frond-ear#117 and binary-canticle#185 |
 | prince → owner issuer | election and grant decision bound to text, sources and audience | this particular request passed the issuer's checks | that a station published it | `[proposed: #166]` |
 | issuer → station | durable one-use claim and station effect receipt (election, payload digest, signed frame) | one admitted derived effect at the station | that a second ear received it | `[proposed: #162]` |
 | station → second ear | verified item and that ear's custody (§2, §5) | the other reader's actual admission or encounter, according to its receipt | that the two princes agreed or must respond | `[proposed: #167]` |
@@ -921,8 +921,10 @@ On **Claude Code**, frond-ear selects a bounded item or digest, records custody,
 to its bound session under the session's own tune and wake grant (§3.4). The shim's `offered`
 receipt stops at host return; only a later exact-token echo supports encounter with that token,
 not model-input settlement or comprehension (§0.5). It MUST NOT infer answer authority from a
-heard item or a room reply. Its exposure ledger and issuer separation remain gates for signed
-derived replies [open: frond-ear#117, #127; #166].
+heard item or a room reply. The exposure ledger is built (frond-ear#121); its reader form,
+observed-start birth rule and issuer separation remain gates for signed derived replies
+[open: frond-ear#117, binary-canticle#185, #166]. #127's unmerged candidate keeps the same
+reader across reattach; a fork may have a new session ID while retaining prior exposure.
 
 On **OpenClaw**, the plugin binds to the *same exact continuing session* across the selected item,
 elected `continue_work` turn and subsequent ID/hash acknowledgement. The plugin may expose only a
@@ -974,10 +976,10 @@ an aspirational paragraph make a local fixture “installed.” This is the chan
 | Slice | Required positive | Required negative / unknown | Gate |
 | --- | --- | --- | --- |
 | Deterministic source → ear | signed item, bounded loss/gap, expiry and cursor receipts on one opted-in host | forged/replayed/expired item and restart without durable marks fail closed | #173, #175, #178 |
-| Claude ear → session | exact item custody and later token echo | offered alone remains host-returned; reattach must not lend custody to another reader | frond-ear#117, #127 |
+| Claude ear → session | exact item custody and later token echo | offered alone remains host-returned; reattach keeps its reader, while a fork with a new session ID must not be attested as an empty-history birth | frond-ear#117, #127, #185 |
 | OpenClaw ear → continuing prince | elected continuation, same exact session pull and later ID/hash ack | isolated child, stale generation, cancelled turn and pending-write failure do not become encounter | #161 |
 | Model/room fence | exact allowed input and bound-room effect | item text cannot smuggle instructions or egress via an unfenced tool/announcement | #165 |
-| Elected signed answer | issuer grant bound to actual exposure and reader generation; second reader verifies | ear cannot read issuer key, station cannot mint, reply cannot exceed what was heard | #99, #166, #180, frond-ear#117 |
+| Elected signed answer | issuer grant bound to actual exposure and reader generation; second reader verifies | ear cannot read issuer key, station cannot mint, reply cannot exceed what was heard | #185, #184 (F1/F3), #166, #180, frond-ear#117; #99 for split-uid socket access |
 | Story/player | exact source and branch-preserving playhead/readback | beacon and MV2 container parity alone do not prove live playback or memory | thornfield-plugins#19 |
 
 ---
