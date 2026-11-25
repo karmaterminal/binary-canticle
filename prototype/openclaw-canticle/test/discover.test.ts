@@ -173,3 +173,25 @@ test("typed DNS responses use bounded fallback cache TTL", async () => {
   assert.equal(result.stations[0]?.locators.length, 1);
   assert.deepEqual(calls, [`PTR:${service}`, `SRV:${instance}`, `TXT:${instance}`, `PTR:${service}`, `SRV:${instance}`, `TXT:${instance}`]);
 });
+
+test("an undotted PTR answer, as node:dns returns it, still finds the station", async () => {
+  // node:dns resolvePtr returns "cael._canticle._udp.example.org" with no trailing dot; the live
+  // dandelion.cult BIND does exactly this (🌿 on bootstrap#1868). A dotted-only suffix match skipped
+  // every station, so canticle_discover listed nothing in production while every fixture was dotted.
+  const seen: string[] = [];
+  const dns = async (name: string, kind: string) => {
+    seen.push(`${kind}:${name}`);
+    if (name === service && kind === "PTR") return [{ type: "PTR", value: instance.replace(/\.$/, ""), ttl: 300 }];
+    if (name === instance && kind === "SRV") return [{ type: "SRV", name: "relay.example.org", port: 47113, ttl: 120 }];
+    if (name === instance && kind === "TXT") return [{ type: "TXT", entries: ["streams=hymn"], ttl: 120 }];
+    return [];
+  };
+  const result = await new Discoverer(config(), dns).browse(domain) as
+    { stations: { public_streams: string[]; locators: { target: string; port: number }[]; mismatches: string[] }[] };
+  assert.equal(result.stations.length, 1);
+  assert.deepEqual(result.stations[0]?.public_streams, ["hymn"]);
+  // The SRV target comes back undotted too ("relay.example.org"); it is a valid locator, not a mismatch.
+  assert.deepEqual(result.stations[0]?.locators.map((l) => [l.target, l.port]), [["relay.example.org.", 47113]]);
+  assert.equal(result.stations[0]?.mismatches.includes("srv-target"), false);
+  assert.deepEqual(seen, [`PTR:${service}`, `SRV:${instance}`, `TXT:${instance}`], "SRV/TXT queried at the absolute name");
+});

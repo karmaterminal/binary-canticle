@@ -71,7 +71,10 @@ export class Discoverer {
     let outputTruncated = false;
     const seen = new Set<string>();
     for (const row of ptr.slice(0, MAX_INSTANCES)) {
-      const instance = String(row.value ?? row.name ?? "").toLowerCase();
+      // node:dns returns PTR targets without the trailing dot ("cael._canticle._udp.example.org"); a
+      // fixture or another resolver may include it. Compare undotted, then query SRV/TXT at the
+      // absolute (dotted) name so cache keys and lookups are one shape either way.
+      const instance = `${String(row.value ?? row.name ?? "").toLowerCase().replace(/\.+$/, "")}.`;
       const suffix = `.${service}`;
       if (!instance.endsWith(suffix) || seen.has(instance)) continue;
       seen.add(instance);
@@ -110,7 +113,8 @@ export class Discoverer {
       if (hints.has("streams") && hints.get("streams") !== grant.publicStreams.join(",")) mismatches.push("streams");
       const locators: object[] = [];
       for (const r of srv) {
-        const target = String(r.target ?? r.name ?? "").toLowerCase();
+        // Same as the PTR above: node:dns returns the SRV target undotted ("silas.dandelion.cult").
+        const target = `${String(r.target ?? r.name ?? "").toLowerCase().replace(/\.+$/, "")}.`;
         if (target.length > 254 || !/^[a-z0-9.-]+\.$/.test(target) || !target.endsWith(`.${domain}.`) ||
             !Number.isInteger(r.port) || r.port! < 1 || r.port! > 65535) {
           mismatches.push("srv-target"); continue;
