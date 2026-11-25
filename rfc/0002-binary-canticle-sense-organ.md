@@ -481,7 +481,7 @@ rate-limited decision `[proposed: #168]`. Today:
 Which classes may wake is #176 decision 1 (§0.7). frond-ear `405e491` (`405e49183f76ed03066fe4d93bd4f75c2cdcc541`,
 `main`, after frond-ear#124 and #126) builds it:
 
-- A `wakeKeys` entry names the classes that may wake. A bare key wakes for a verified `alarm` only, and
+- A `wakeKeys` entry names the classes that may wake. A bare key is eligible to wake for a verified `alarm` only, and
   only where the manifest grants that key alarm. Any other class from it stays readable with `hear`
   and is counted `wake_withheld:<class>`
   `[built+tested: frond-ear@405e491:src/canticle/delivery.ts:934 | test/canticle-wake-class.test.ts:46]`.
@@ -755,8 +755,8 @@ RFC-0001 D1 allows a budgeted, receiver-local wake for the alarm class only. §3
 arrival" ask for attention under the prince's own policy, and frond-ear already pushes allowlisted keys'
 items into a session (§3.4).
 
-**Decided (#176 decision 1, §0.7).** D1's alarm-only remains the default. A bare wake key wakes for a
-verified alarm only. A non-alarm class wakes only through the seat's own choice: an explicit class list
+**Decided (#176 decision 1, §0.7).** D1's alarm-only remains the default. A bare wake key is eligible to
+wake for a verified alarm only. A non-alarm class wakes only through the seat's own choice: an explicit class list
 on that key in the seat's configuration, or the prince's stream-scoped grant with a TTL. Never at a
 station's request, and with every other gate still applying. This is a deliberate amendment to D1, §14.10 and §14.18. The
 non-alarm path keeps every other gate and its own wake budget `[proposed: #176]`. frond-ear builds it
@@ -847,7 +847,8 @@ visible in health `[proposed: #176]`.
 
 Promotion past stage 0 needs all of stage 1; a signed loader alone is not promotion:
 
-- the live loader enforces the signed manifest, genesis pin, serial and expiry, and fails closed;
+- the live loader accepts only a root-signed CBOR manifest checked against an out-of-band genesis pin,
+  enforces serial (no rollback) and expiry, and fails closed (RFC-0001 D15, §10.3);
 - live refresh and revocation take effect within the RFC's bound, without a restart;
 - station keys are held as D15 and §10.5 require (daemon or OS keystore), with alarm and root keys
   separated;
