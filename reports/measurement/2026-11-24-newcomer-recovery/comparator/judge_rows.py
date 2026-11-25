@@ -26,7 +26,7 @@ from pathlib import Path
 
 from oracle import judge
 
-DECLARED = {"slice": 5, "base": 3, "head": 3, "nobudget-177": 5, "nobudget": 3}
+DECLARED = {"new": 5, "slice": 5, "base": 3, "head": 3, "nobudget-177": 5, "nobudget": 3}
 LOCKED, FIRST_S, ITEM_S, ITEMS, GATE1_S = "50.0.1", 1.0, 2.0, 20, 4.5
 
 
