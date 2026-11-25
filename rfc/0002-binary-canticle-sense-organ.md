@@ -149,7 +149,7 @@ how far the code has got.
 | 3 | Which receipt layers, and their names? | The five in §0.5: station-accepted, durable/volatile-queued, host-returned, model-seen, prince-encountered. A receipt at one layer proves nothing at a later one. | 🪨 + 🌊 ([record](https://github.com/karmaterminal/binary-canticle/issues/176#issuecomment-7125295442)) | written into §0.5 |
 | 4 | Admission order | (b) A byte-identical repeat of a previously verified frame is dropped before verify. Then verify, then debit the per-key and per-source rates, then queue. Bounded ingress queues and limits on verification work remain as separate resource controls, and no budget values are made normative. **Newcomer recovery is a separate requirement that no tree meets yet** (#173 pass 3: row 0 passes 1, 1, 2 and 1 of 8 cells on head, `main`, `narrow` and `nobudget`). | 🌫 + 🍃 ([proposal](https://github.com/karmaterminal/binary-canticle/issues/176#issuecomment-7149716579), [record](https://github.com/karmaterminal/binary-canticle/issues/176#issuecomment-7149867439)) | order `[proposed: #173]`; recovery `[open: #178]`; #173 held |
 | 5 | Freshness across a restart | Refuse a beacon whose implied offset exceeds ±B, keep a durable `(epoch, bseq)` mark per station, and retain dedup until signed `expires_at` + B + skew. A refused beacon degrades health as `clock_skew:<station>` and is never silent. frond-ear's embedded listener gets the same three parts and the same shared B, landing as a pair. | 🌿 + 🍃 ([proposal](https://github.com/karmaterminal/binary-canticle/issues/176#issuecomment-7119295496), [record](https://github.com/karmaterminal/binary-canticle/issues/176#issuecomment-7119312608)) | `[open: bc#175]`, a reproduced bug, not fixed |
-| 6 | Binding and trust in use | Direct LAN unicast plus the local unsigned manifest is a **stage-0 pilot profile**. It may exercise verification and receptor behaviour on controlled hosts, but may not claim fleet trust, root-signed revocation or alarm-key safety. It requires stable or re-resolved peer addresses, and an address change must be visible in health. Stage 1 needs a fail-closed signed-manifest loader, with REDs for a misspelt `revoked` and for rollback to an older file. Stage 2 names LAN unicast as a §11 binding, or keeps it pilot-only. | 🪨 + 🌿 ([proposal](https://github.com/karmaterminal/binary-canticle/issues/176#issuecomment-7124854148), [record](https://github.com/karmaterminal/binary-canticle/issues/176#issuecomment-7124914821)) | stage 0 is what runs; stage 1 is `[open: §7.9]` |
+| 6 | Binding and trust in use | Direct LAN unicast plus the local unsigned manifest is a **stage-0 pilot profile**. It may exercise verification and receptor behaviour on controlled hosts, but may not claim fleet trust, root-signed revocation or alarm-key safety. It requires stable or re-resolved peer addresses, and an address change must be visible in health. Stage 1 needs all of: a fail-closed signed-manifest loader, live refresh and revocation within the RFC's bound, D15/§10.5 key custody with alarm and root keys separated, and negative and rollback tests (REDs first for a misspelt `revoked` and for rollback to an older file). A signed loader alone is not promotion. Stage 2 names LAN unicast as a §11 binding, or keeps it pilot-only. | 🪨 + 🌿 ([proposal](https://github.com/karmaterminal/binary-canticle/issues/176#issuecomment-7124854148), [record](https://github.com/karmaterminal/binary-canticle/issues/176#issuecomment-7124914821)) | stage 0 is what runs; stage 1 is `[open: §7.9]` |
 | 7 | Pending keys across restart | When continuity of the receptor record stream is lost, reconcile the host's exact slot outcomes first. An unknown host outcome is a stop-and-reconcile state, never a guessed withdrawal and never permission to replay. Then settle the old run's unconsumed keys `rejoined` (or `run_changed`) and undelivered, counted per reason and visible in health. A key settled that way must not come back as new: the exact frame key stays behind a durable replay barrier through the replay horizon, and reconciliation and settlement preserve that barrier atomically before fresh admission resumes. Only a proven, continuous, same-run, host-only rebuild may move a live key to its successor slot. | 🌊 + 🌿, 🪨 ([proposal](https://github.com/karmaterminal/binary-canticle/issues/176#issuecomment-7125052683), [amendment](https://github.com/karmaterminal/binary-canticle/issues/176#issuecomment-7125205518), [record](https://github.com/karmaterminal/binary-canticle/issues/176#issuecomment-7125299246)) | `[proposed: #176]`; neither binding implements the full gate (#174 item 10) |
 
 What remains is building, in the order the room agreed (receive-only, then returning attention, then
@@ -555,8 +555,9 @@ defect `[open: binary-canticle#99]`.
 The publish path is #176 decision 2 (§0.7): RFC-0001's D35, with the host daemon as the target. The
 harness-facing publish tool MUST be a peer client of the one host daemon. The agent supplies text and an
 explicit election, never signer material, a target socket, or its own hop, lineage, root or
-`wake_derived`. The daemon stamps those itself from the exact exposure, which MUST be bound to the actual
-reader incarnation and turn, and then has the station sign. A claimed batch id or a host-returned `hear`
+`wake_derived`. For an exposure-derived reply, the daemon stamps those itself from the exact exposure,
+which MUST be bound to the actual reader incarnation and turn, and then has the station sign. A
+non-tainted original publication uses the same path without a parent, and the daemon MUST NOT invent one. A claimed batch id or a host-returned `hear`
 result alone does not prove that exposure (§0.5). A tainted reply without a verified, turn-bound parent
 and a permitted non-wake policy MUST be refused, never handed to a clean signer `[proposed: #176]`. The
 OpenClaw spike's own station control socket is a default-disabled departure, not this contract
@@ -755,8 +756,9 @@ arrival" ask for attention under the prince's own policy, and frond-ear already 
 items into a session (§3.4).
 
 **Decided (#176 decision 1, §0.7).** D1's alarm-only remains the default. A bare wake key wakes for a
-verified alarm only. Other classes wake only under the prince's own seat-local, expiring grant per
-station:stream, never at a station's request. This is a deliberate amendment to D1, §14.10 and §14.18. The
+verified alarm only. A non-alarm class wakes only through the seat's own choice: an explicit class list
+on that key in the seat's configuration, or the prince's stream-scoped grant with a TTL. Never at a
+station's request, and with every other gate still applying. This is a deliberate amendment to D1, §14.10 and §14.18. The
 non-alarm path keeps every other gate and its own wake budget `[proposed: #176]`. frond-ear builds it
 (§3.4). The OpenClaw binding wires no wake path `[open: #161]`.
 
@@ -784,8 +786,8 @@ measured only the built UDP path `[open: §7]`.
 **The order is decided (#176 decision 4, §0.7).** The receiver MUST drop a byte-identical repeat of a
 frame it has already verified before verifying it again. It then verifies the signature, and only then
 debits the claimed key's and source's admission rates, so forgeries and repeats spend none of the
-station's allowance. An unverified first arrival MUST NOT seed the repeat check `[proposed: #173]`. The
-old order (rate before crypto) is a departure from RFC-0001 §12.2 and §14.1, made for this reason:
+station's allowance. An unverified first arrival MUST NOT seed the repeat check `[proposed: #173]`. This new order (exact verified-repeat drop → verify → admission debit) departs from RFC-0001 §12.2 and
+§14.1 for the following reasons:
 
 - On #173 pass 3 (`5fcc2c2`, ronan, aarch64, loopback, cryptography 50.0.1), an established station kept 57
   of 57 items in 25 of 25 scaled runs on #173's head, against 0 of 15 on `main`. Forged churned sources
@@ -843,10 +845,17 @@ completion of §11's multicast and relay bindings. Source address and the host f
 never trust. The profile requires stable or re-resolved peer addresses, and a peer address change MUST be
 visible in health `[proposed: #176]`.
 
-Promotion past stage 0 needs stage 1: the live loader enforces the signed manifest, genesis pin, serial and
-expiry, and fails closed. REDs on `main` must come first: a misspelt or unknown `revoked` field fails
-closed, and an older manifest can't undo a revocation. Stage 2 names LAN unicast as a §11 binding, with its
-scope, discovery, guard and failure behaviour, or keeps it pilot-only `[open: §7.9]`.
+Promotion past stage 0 needs all of stage 1; a signed loader alone is not promotion:
+
+- the live loader enforces the signed manifest, genesis pin, serial and expiry, and fails closed;
+- live refresh and revocation take effect within the RFC's bound, without a restart;
+- station keys are held as D15 and §10.5 require (daemon or OS keystore), with alarm and root keys
+  separated;
+- each of these has negative and rollback tests, and REDs on `main` come first: a misspelt or unknown
+  `revoked` field fails closed, and an older manifest can't undo a revocation.
+
+Stage 2 names LAN unicast as a §11 binding, with its scope, discovery, guard and failure behaviour, or
+keeps it pilot-only `[open: §7.9]`.
 
 ### 7.10 Which exposure counts
 
