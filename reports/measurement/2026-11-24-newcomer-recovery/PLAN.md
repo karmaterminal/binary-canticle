@@ -262,3 +262,9 @@ At 10:27Z, with N2 starting, `ps` showed a leftover of this lane: PID 3640405, a
 `nice 19` from 17:58Z on 11-24 until it was killed at 10:27Z on 11-25**: through E1, W, J, N0, N1, N0c and N1c here, and through the last seven hours of pass 3's queue (its full-length repeats, 17:58Z to 00:57Z). PLAN.md says that nothing runs beside a measurement, so this is a departure, and it is told to pass 3's reviewers. From N2 on it is gone.
 
 It is not known to have changed a verdict. It ran beside every tree alike, at the lowest priority, with 17 and more cores to spare until 04:15Z, and the rows that fail (N0) fail on every tree for a reason that is not the CPU. No run is discarded for it, and what is run again (the cells of underdriven runs) is run without it. The rows it ran beside are marked in the report.
+
+## Added 2026-11-25 11:52Z, while E2 was running: a claim of the "three tiers" section, withdrawn
+
+That section says that a source which was tried and did not fail is served within eight turns of its key *even in a churned flood of its own key*. **That holds only while the key remembers it.** A key remembers the latest 256 tried sources, and a churned flood of its own key adds 1 500 a second, so a mark lasts 0.17 s: in virtual time a source tried up to 0.15 s before
+its frame is checked in 3-24 ms, and one tried 0.2 s before it is untried again (0.18 s once, and not within 0.5 s when tried 0.5 s or 1 s before). E3's `relay-first-then-churn-100000` shows it (20, 20, 7, 0 and 20 of 20 on `slice`; 2, 1, 20, 20 and 10 on `base`): outside the guarantee, as before. The unit test sends its frame at once, and says so now. In floods from sources
+that stay (fewer than 256) the claim stands. *Not changed here*, since the code is frozen for these rows: a table of its own for the sources that did not fail would keep them from being turned over by those that did, though not by replays from churned ports. For the next change, with its own rows.

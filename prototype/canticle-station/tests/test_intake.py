@@ -1126,7 +1126,8 @@ class NewcomerTest(NewcomerCase):
     def test_a_source_that_was_tried_and_did_not_fail_is_heard_in_a_churned_flood_of_its_key(self):
         """A station that lost its place, or is heard again after a restart of the daemon, whose frames its key's flood would
         otherwise leave to chance for ever: one turn in M is for those that were tried, however many untried ones keep coming
-        and however many that failed wait."""
+        and however many that failed wait. For as long as the key remembers it, that is: its marks are the latest 256, and this
+        flood turns them over in 0.2 s, so it is no bound for a station whose frames come further apart."""
         key = self.intake.keys[self.kids[0]]
         self.play(1.0, keys=(0,), churn=True, rate=100_000)
         with self.intake._lock:
