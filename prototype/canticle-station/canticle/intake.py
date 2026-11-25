@@ -926,15 +926,13 @@ class Intake:
             self._slots.remove(key)
             if key.slot:
                 self._slots.append(key)
-            first = claim.entry[2]
             if claim.queued:
-                first = claim.stream.bytes[claim.entry[1]][1]
                 claim.stream.remove(claim.source, claim.entry)
                 if not claim.stream.lanes:
                     key.ready.remove(claim.stream)
                     self._unready(key)
             self.slice.take()
-            t = Ticket(claim.entry, self._slice, first, key, claim.stream)
+            t = Ticket(claim.entry, self._slice, claim.entry[2], key, claim.stream)    # nobody sent them before it: it would be an echo
             t.again = claim.tier != UNTRIED
             if t.again:
                 self.retries.take()

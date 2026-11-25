@@ -1,0 +1,19 @@
+base 0 R3- offered 789827/s dropped 11.8 % on time 6 of 6 cpu 92.2 load 2.3
+old 0 R3- offered 732398/s dropped 36.2 % on time 6 of 6 cpu 97.9 load 3.6
+new 0 R3- offered 836758/s dropped 17.3 % on time 6 of 6 cpu 93.3 load 3.7
+base 0 R4a offered 570356/s dropped 0.0 % on time 6 of 6 cpu 71.6 load 4.5
+old 0 R4a offered 804321/s dropped 0.1 % on time 6 of 6 cpu 72.6 load 3.7
+new 0 R4a offered 615053/s dropped 0.1 % on time 6 of 6 cpu 72.6 load 4.2
+base 1 R3- offered 677903/s dropped 0.2 % on time 6 of 6 cpu 93.3 load 4.4
+old 1 R3- offered 732370/s dropped 37.3 % on time 6 of 6 cpu 96.1 load 5.2
+new 1 R3- offered 650276/s dropped 0.1 % on time 6 of 6 cpu 94.1 load 5.2
+base 1 R4a offered 570594/s dropped 0.1 % on time 6 of 6 cpu 71.7 load 5.2
+old 1 R4a offered 796007/s dropped 0.1 % on time 6 of 6 cpu 72.0 load 5.0
+new 1 R4a offered 597540/s dropped 0.2 % on time 6 of 6 cpu 71.6 load 4.2
+base 2 R3- offered 865455/s dropped 17.5 % on time 6 of 6 cpu 92.5 load 5.3
+old 2 R3- offered 875699/s dropped 47.8 % on time 6 of 6 cpu 95.8 load 5.1
+new 2 R3- offered 623040/s dropped 0.0 % on time 6 of 6 cpu 95.2 load 4.5
+base 2 R4a offered 820276/s dropped 0.0 % on time 6 of 6 cpu 71.8 load 4.2
+old 2 R4a offered 704390/s dropped 0.0 % on time 6 of 6 cpu 71.9 load 4.3
+new 2 R4a offered 579460/s dropped 0.0 % on time 6 of 6 cpu 71.7 load 4.5
+AB DONE
