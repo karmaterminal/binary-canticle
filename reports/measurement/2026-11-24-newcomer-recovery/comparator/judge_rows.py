@@ -8,7 +8,9 @@ expected items are PLAN.md's 20, never what was admitted. The recipient is the l
 have: nothing here speaks for an ear. An observation after the flood's end is not in the raw file, so it is missing, as it must be.
 Before a run is judged it must have run as declared: cryptography 50.0.1, its 20 items sung, and the flood at 95 % of its rate
 or more in its lowest whole second. A run that did not is INVALID and passes nothing. So is one whose rate floor is not a finite nonnegative
-number, or whose producer sang another number of items than it lists (🌫's hardening, #173 issuecomment-7125278653).
+number, or whose producer sang another number of items than it lists (🌫's hardening, #173 issuecomment-7125278653). An INVALID run
+stays in the raw file and in this table; its cell needs the declared number of valid ones (complete.py), and a deadline missed in an invalid
+run fails the cell as well: an underdriven flood is the easier one.
 
 ``rerun.py``'s: ``result.json``'s ``quiet_items`` are the comparator's own shape. 57 (R) or 30 (F) expected; at the daemon 4.5 s, gate 1's
 bound. The push stage has no bound of its own (frond-ear waits 5 s by design): only its missing items are printed.
@@ -24,6 +26,7 @@ from pathlib import Path
 
 from oracle import judge
 
+DECLARED = {"slice": 5, "base": 3, "head": 3, "nobudget-177": 5, "nobudget": 3}
 LOCKED, FIRST_S, ITEM_S, ITEMS, GATE1_S = "50.0.1", 1.0, 2.0, 20, 4.5
 
 
@@ -90,13 +93,16 @@ def main() -> None:
             except ValueError as e:
                 invalid.append(f"run {r['run']}: {e}")
         s = lambda w, k: sum(g[w][k] for g in got)
-        ok = bool(got) and not invalid and all(g["first"]["pass"] and g["items"]["pass"] for g in got)
-        own = not any(r["first_miss"] or r["item_misses"] for r in rs)
-        bad += ok != own
+        missed = any(not (g["first"]["pass"] and g["items"]["pass"]) for g in got)
+        missed_too = any(r["first_miss"] or r["item_misses"] for r in rs)
+        short = len(got) < DECLARED.get(tree, 5)
+        verdict = "**FAIL**" if missed or missed_too else f"**INVALID**, {len(got)} of {DECLARED.get(tree, 5)} declared" if short else "PASS"
+        own = not missed_too
+        bad += (verdict == "PASS") != own or short
         print(f"| {row} | {tree} | {len(got)} of {len(rs)} | {s('first', 'on_time')} / {s('first', 'late')} / {s('first', 'missing')} | "
-              f"{s('items', 'on_time')} / {s('items', 'late')} / {s('items', 'missing')} | "
-              f"{'**INVALID** (' + '; '.join(invalid) + ')' if invalid else 'PASS' if ok else '**FAIL**'} | "
-              f"{'PASS' if own else 'FAIL'}{'' if ok == own else ' **(they differ)**'} |")
+              f"{s('items', 'on_time')} / {s('items', 'late')} / {s('items', 'missing')} | {verdict}"
+              f"{' (' + '; '.join(invalid) + ')' if invalid else ''} | {'PASS' if own else 'FAIL'}"
+              f"{'' if (verdict == 'PASS') == own else ' **(they differ)**'} |")
     dirs = [d for f in files if f.is_dir() for d in sorted(f.glob("*/row.json"))]
     if dirs:
         print("| tree | run | row | on time (4.5 s) at the daemon, during the flood | late | missing | caught up after the flood | not pushed to the ear | "
@@ -104,7 +110,7 @@ def main() -> None:
         print("|---|---|---|---|---|---|---|---|---|---|")
     for d in dirs:
         full(d.parent)
-    sys.exit(f"{bad} cells where the two verdicts differ" if bad else 0)
+    sys.exit(f"{bad} cells where the two verdicts differ, or with too few valid runs" if bad else 0)
 
 
 if __name__ == "__main__":

@@ -245,3 +245,13 @@ Pass 3 is COMPLETE (00:57Z, `5fcc2c28c6`; 🍃 reproduced it at 01:02Z). Short s
 5 ms behind it has its copy checked first, so the relay is credited, frame after frame, and the station never gets a place. Changed, RED first (`EchoTest`): **the first to be heard with a new frame has the share, whichever copy of it was checked**; the source whose copy was checked keeps its place as before. An echo that comes later has no part in it. A relay *ahead* of the station is still heard first (I-a′, outside).
 
 I-a's "place" is read as `receive.known` growing by one or more after the start, from what it was then. A relay that is known again grows it as well, which `base` does, so on `base` this half is no evidence of the station's own place; the ten items under the churned own-key flood are.
+
+## Added 2026-11-25 10:18Z, while N1c was running: underdriven runs, what is known of them, and how their cells are completed
+
+🌫 ran the comparator on the published N1 corpus ([7154512527](https://github.com/karmaterminal/binary-canticle/pull/178#issuecomment-7154512527)): four of its 64 runs are INVALID, their flood having fallen under 95 % of its rate in its lowest whole second. This lane had reported "8 of 8 on both trees" from the harness's own verdict without running the
+comparator on N1: **that report is withdrawn until the cells are complete.** The same check on the rest so far: N0, W, J and E1 none; N1 4 of 64 (3 `slice`, 1 `base`); N0c 10 of 64 (9, 1); N1c 9 of the first 59 (8, 1). It is the host: from about 04:15Z a self-hosted CI runner ran jobs on ronan beside the queue (the load before a run, 2-3 through N0, was 4-17), and these producers
+are at `nice 19`. Nothing that was run is discarded, the floor stays, and no run is chosen by how it ended.
+
+- An INVALID run stays in the raw file and in the tables. Its cell is run again (`complete.py`, the next run number, the same harness, at most as many again as were declared) until it has the declared number of valid runs, after the queue, one at a time. Which cells are completed depends on the flood's rate alone.
+- A deadline missed in an INVALID run **fails** its cell as well (an underdriven flood is the easier one). A cell that stays short of its valid runs is INVALID, not PASS.
+- `judge_rows.py` says so per cell; 🌫's `oracle.py` is untouched.
