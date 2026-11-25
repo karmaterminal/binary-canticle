@@ -238,3 +238,10 @@ Row J is therefore two rows, on three trees (`head` is `a0862c3`; `base` is it w
 |---|---|---|---|---|
 | J | `junk-40-20000`, `junk-40-100000` | the 12 other keys | 5 / 3 / 3 | all pass |
 | **J-all** | `junkall-40-20000`, `junkall-40-100000` | all 16, the four established ones' too | 5 / 3 / 3 | `head` and `base` fail, `slice` passes |
+
+## Added 2026-11-25 01:10Z, before any run: who arrived first, and how I-a is read
+
+Pass 3 is COMPLETE (00:57Z, `5fcc2c28c6`; 🍃 reproduced it at 01:02Z). Short smokes of the harness ran before the queue (not evidence, not kept). They showed that **row I-a would fail, on `base` and here**: a newcomer's frame waits up to about 20 ms for a stranger's check, and a *known* relay
+5 ms behind it has its copy checked first, so the relay is credited, frame after frame, and the station never gets a place. Changed, RED first (`EchoTest`): **the first to be heard with a new frame has the share, whichever copy of it was checked**; the source whose copy was checked keeps its place as before. An echo that comes later has no part in it. A relay *ahead* of the station is still heard first (I-a′, outside).
+
+I-a's "place" is read as `receive.known` growing by one or more after the start, from what it was then. A relay that is known again grows it as well, which `base` does, so on `base` this half is no evidence of the station's own place; the ten items under the churned own-key flood are.

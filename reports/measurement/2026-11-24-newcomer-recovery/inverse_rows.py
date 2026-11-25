@@ -66,9 +66,11 @@ def one(tree: str, row: str) -> dict:
             return s
 
         def counted(self, name, want, since, deadline=20.0):
-            """Seconds from ``since`` until ``health`` said that ``receive.<name>`` was ``want`` or more."""
+            """Seconds from ``since`` until ``health`` said that ``receive.<name>`` was ``want`` more than it was then."""
             while True:
-                at = next((t for t, r in list(self.tap.recs) if r["type"] == "health" and (r["receive"].get(name) or 0) >= want), None)
+                health = [(t, r["receive"].get(name) or 0) for t, r in list(self.tap.recs) if r["type"] == "health"]
+                was = max((v for t, v in health if t <= since), default=0)
+                at = next((t for t, v in health if t > since and v >= was + want), None)
                 if at is not None:
                     return round(at - since, 3)
                 if time.monotonic() - since >= deadline:
@@ -149,7 +151,7 @@ def i_a(c, st, dest, runner, wire, stream_id, lead) -> dict:
                     for s in relays:
                         s.sendto(f, dest)
             time.sleep(0.002)
-        place = c.counted("known", len(relays) + 1 + n, t0, deadline=time.monotonic() - t0)
+        place = c.counted("known", 1, t0, deadline=time.monotonic() - t0)
         lat = [c.tap.first[i] - t if i in c.tap.first else None for i, (k, t) in sung.items() if k == n]
         totals = [json.loads(p.stdout.read()) for p in own]
         out["starts"].append({"known_after_s": place, "item_latency_s": [None if x is None else round(x, 4) for x in lat], "sung": len(lat),
