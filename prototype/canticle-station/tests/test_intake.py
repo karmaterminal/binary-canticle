@@ -1185,6 +1185,19 @@ class NewcomerTest(NewcomerCase):
         spare = getattr(intake, "SLICE_RATE", 0.0)
         self.assertEqual((intake.CHECK_RATE, getattr(intake, "STRANGE_RATE", intake.CHECK_RATE) + spare, spare), (C_ALL, C_ALL, C_SLICE))
 
+    def test_sources_that_failed_have_a_quarter_of_the_slice_and_no_more(self):
+        """With nothing untried waiting, too: checking the same forgers again and again is what the daemon must not do, whatever
+        is idle. It costs the reader the interpreter (full length, at d49645b: 500 checks a second, 40 % dropped at the socket)."""
+        for keys in ((0,), range(self.K)):
+            with self.subTest(keys=len(keys)):
+                self.fresh()
+                self.play(1.0, keys=keys)
+                before, woken = Counter(self.slots), self.woken
+                self.play(4.0, keys=keys)
+                self.assertLessEqual((self.slots.total() - before.total()) / 4.0, 1.05 * C_SLICE / M)
+                waits = self.play(0.4, keys=keys, copies=[(0.0, item(self.sks[0], 1), udp(50_001))])
+                self.assertChecked(waits, self.within(len(keys)), "and a newcomer has the rest of it")
+
     def test_established_sources_are_served_as_before_while_every_slot_is_contended(self):
         """A guard: a known source of each key, its key forged at from churned ports, is served within a round of the keys and
         its own two turns."""
@@ -1437,9 +1450,13 @@ class SlotTest(IntakeCase):
             self.key.admit(HERE, self.now)
         self.assertEqual([self.waits(r) for r in self.TIERS], [[], [f], []])
         self.demote(HERE)
-        self.now += self.intake.retain                         # the marks have ended: its next copy finds it so
-        self.offer(item(A, 2), src=HERE)
-        self.assertEqual([self.waits(r) for r in self.TIERS], [[f], [], []])
+        self.now += self.intake.retain                         # the marks have ended: what it sends next finds it so
+        self.serve(32, verified=lambda t: t.data == f, fresh=False)
+        with self.intake._lock:
+            self.key.marks.clear()
+        self.offer(*[forge(item(A, 1), 600 + n) for n in range(4)], src=THERE)
+        self.offer(g := item(A, 2), src=HERE)
+        self.assertEqual([self.waits(r) for r in self.TIERS], [[g], [], []])
 
     def test_marks_are_a_bounded_number_the_oldest_forgotten_first_and_kept_for_the_longest_wait(self):
         self.demote(*[udp(40_000 + n) for n in range(3 * intake.MARKS_MAX)])
@@ -1658,19 +1675,22 @@ class SlotTest(IntakeCase):
         self.serve(8, verified=lambda t: False)
         self.assertEqual(self.waits(), frames)
 
-    def test_the_first_in_it_wakes_the_loop_while_the_slice_can_pay(self):
-        """Where no lane was opened, which would wake it: the source's own was full."""
-        for spent in (False, True):
+    def test_the_first_untried_one_in_it_wakes_the_loop_while_the_slice_can_pay(self):
+        """Where no lane was opened, which would wake it: the source's own was full. One that was tried waits for a turn."""
+        for spent, tried in ((False, False), (True, False), (False, True)):
             self.setUp()
             self.serve(32, verified=lambda t: False)
             self.offer(*[item(A, n + 1) for n in range(200)], src=HERE)          # alone: in its lane only
             self.offer(*[forge(item(A, 1), n) for n in range(300)], src=THERE)
-            self.serve(1, verified=lambda t: False)
-            while self.key.slot:
-                self.intake.settle(self.intake.take(2)[-1], False, False)
+            self.key.slot.due = self.now + 1                                     # THERE's is left there, or taken:
+            while THERE in self.key.slot.claims:
+                self.key.slot.remove(THERE)
+                self.intake._slots.remove(self.key)
+            if tried:
+                self.demote(HERE)
             self.intake.slice.tokens, self.woken = -50.0 if spent else 10.0, 0
             self.offer(f := item(A, 999), src=HERE)
-            self.assertEqual((self.waits() + self.waits("demoted"), self.woken), ([f], int(not spent)))
+            self.assertEqual(([c.entry[0] for c in self.key.slot.claims.values()], self.woken), ([f], int(not spent and not tried)))
 
     def test_a_frame_that_was_accepted_while_it_waited_there_costs_nothing(self):
         f = item(A, 1)
@@ -2095,7 +2115,9 @@ class ConsistencyTest(IntakeCase):
             listed = [*key.known.values(), *key.strangers.values(), *key.crowd]
             self.assertLessEqual(set(queued), set(listed))     # who waits in a lane; a displaced source may still have a place in the slot
             self.assertEqual(i._slots.count(key), 1 if key.slot else 0)
-            self.assertEqual(len(set().union(*key.slot.rings)), len(key.slot))
+            self.assertEqual({a: c for ring in key.slot.rings for a, c in ring.items()}, key.slot.claims)
+            self.assertEqual(sum(map(len, key.slot.rings)), len(key.slot))
+            self.assertEqual(key.slot.room, len(key.slot.rings[intake.UNTRIED]) < intake.SLOT_MAX)
             for ring in key.slot.rings:
                 self.assertLessEqual(len(ring), intake.SLOT_MAX)
                 for at, c in ring.items():
@@ -2146,14 +2168,14 @@ class ConsistencyTest(IntakeCase):
                         self.intake.settle(t, verified, fresh)
                         if t.key is not None:
                             spent.update([t.stream.bucket] + [t.key.bucket] * (not t.stream.beacon) if fresh else
-                                         [self.intake.slice] if t.budget is self.intake.slice else
+                                         [self.intake.slice] + [self.intake.retries] * t.again if t.budget is self.intake.slice else
                                      [self.intake.checks] + [self.intake.strange] * t.strange)
                     self.intake.heard_again()
                     self.check()
                     station = [b for k in self.intake.keys.values()
                                for b in (k.bucket, *(s.bucket for s in k.streams.values()))]
-                    for b in (*station, self.intake.checks, self.intake.strange, self.intake.slice):
-                        self.assertEqual(1e6 - b.tokens, spent[b])
+                    for b in (*station, self.intake.checks, self.intake.strange, self.intake.slice, self.intake.retries):
+                        self.assertEqual(b.burst - b.tokens, spent[b])
 
                 def offer():
                     self.intake.offer([(r.choice(r.choice((good, bad, junk))), addr(r.randrange(8), r.randrange(6)))

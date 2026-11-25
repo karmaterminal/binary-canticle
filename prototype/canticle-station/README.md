@@ -574,7 +574,7 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
   their queues have 1 500, so what strangers cost is 2 000 as before, and an established station loses no turn to it.
 - **In a key's turn there are three tiers.** Sources that were not tried come first, in the order they came. Those that were tried and did not fail come behind them, in
   turn: a replay (an old beacon verifies for ever), a source whose last frame was admitted, one that lost its known place. Those whose frame failed come last. One turn in four is for one that was
-  tried, the two kinds in turn. Nothing but a frame admitted as new moves a source up, and then to the second tier; a replay leaves a failure as it is. A key
+  tried, the two kinds in turn, and they have a quarter of the slice's checks, whatever else is idle: the same forgers are not checked over and over. Nothing but a frame admitted as new moves a source up, and then to the second tier; a replay leaves a failure as it is. A key
   remembers the latest 256 sources that were tried, for twice the rounds it takes to try them all; a flood that opens a new port for every datagram
   turns that memory over in 0.2 s (256 at 1 500 checks a second), and a source is then untried again. Being tried is evidence against a frame, and no proof against its source. So a
   newcomer is checked within **(S + 1) rounds of the keys, K/500 s each (a third more where tried ones wait), whatever the flood's rate**, S being the sources of its own
