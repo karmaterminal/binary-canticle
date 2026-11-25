@@ -14,6 +14,8 @@ from unittest.mock import patch
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+ISSUER = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))  # memory-only test issuer
+
 from canticle import runner, wire
 from canticle.content_policy import derived_text_allowed, secret_findings
 from canticle.derived_control import DerivedControlBridge
@@ -40,14 +42,14 @@ class Fixture:
         self.grant = Grant("writer", "writer", self.entry.key_id.hex(), "town.reply", ("reader",),
                            ("recipient",), public.hex())
         self.proposal = ReplyProposal(self.root / "authority.db", enabled=True,
-                                      secret=b"disposable-test-authority-secret-32", issuer="test-host",
+                                      issuer_key=ISSUER, issuer_public=wire.public_key_bytes(ISSUER), issuer="test-host",
                                       grant=self.grant, content_allowed=derived_text_allowed)
         self.proposal.set_current_reader(self.reader)
         self.proposal.set_current_reader(self.recipient)
         self.proposal.attest_history(self.reader, HistoryOrigin(
             "fixture-origin", "observed_session_birth", 0, hashlib.sha256(b"[]").hexdigest()))
         source = Exposure("source-receipt", "fixture-binding", "fixture-decision", ("01" * 8, 1, 1, 1),
-                          None, 0, self.now, self.now + 120_000)
+                          None, 0, self.now, self.now + 120_000, scope="lan")
         # Synthetic host origin and custody are explicit; this suite proves transport, not a prince.
         fence = self.proposal.begin_exposure(self.reader, source)
         self.proposal.confirm_exposure(self.reader, fence)

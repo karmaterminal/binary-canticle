@@ -6,8 +6,9 @@ an exposure receipt nor makes an election for a prince. The station wire format 
 
 ## Trusted host attachment
 
-The owning host constructs its `ReplyProposal` from its private database, provisioned capability
-secret, issuer and reviewed grant. `content_policy.derived_text_allowed` supplies a real UTF-8,
+The owning host constructs its `ReplyProposal` from its private database, the issuer's public key
+(and, on the issuer side only, its private key), issuer name and reviewed grant. The station side is
+constructed without the private key, so it can verify and admit a capsule but never mint one (#162 F3). `content_policy.derived_text_allowed` supplies a real UTF-8,
 credential and high-entropy check; it ports the existing OpenClaw sender policy. The host must also
 establish source-use permission, sensitivity/audience policy and that the payload is an elected
 summary rather than private reasoning. Those decisions do not come from the payload.
@@ -27,12 +28,12 @@ Only these internal control messages are accepted:
 `capsule_b64` is strict base64 of the existing version-2 authenticated host capsule. `text` must be
 its exact UTF-8 elected payload, at most 800 bytes before the grant's narrower bounds. The transport
 does not accept lineage, audience, signer, stream, database path or policy fields. The capsule and
-capability secret stay outside model-visible tool input and output.
+the issuer's private key stay outside model-visible tool input and output.
 
 Both operations require the actual Unix peer UID to match the station process UID. Missing kernel
 peer identity refuses. The existing 0600 control socket and request-size ceiling remain in effect.
 The publication operation also respects the control socket's chatter class restriction. The
-existing effect adapter independently verifies the HMAC, complete ledger, exact generations,
+existing effect adapter independently verifies the issuer's Ed25519 signature, complete ledger, exact generations,
 election, full signer, current authority, budgets and deadlines before the one-use Station effect.
 The bridge scans outgoing text again even if a producer's callback was incorrectly permissive.
 Refusals name a finding kind and never include the matched credential.

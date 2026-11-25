@@ -12,12 +12,17 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from canticle import vectors, wire
+from canticle.ids import SCOPES
 from canticle.derived_reply_proposal import (
     MAX_EXPOSURES, Exposure, Grant, HistoryOrigin, Intent, Reader, Refused, ReplyProposal,
     exposure_record, proposed_item,
 )
 
-SECRET = b"synthetic-capability-key-for-tests"  # memory-only fixture; never a deployed host/station key
+# F3: memory-only issuer fixtures (never a deployed key). The issuer signs; a station holds only ISSUER_PUBLIC.
+ISSUER = Ed25519PrivateKey.from_private_bytes(hashlib.sha256(b"synthetic-test-issuer").digest())
+ISSUER_PUBLIC = wire.public_key_bytes(ISSUER)
+OTHER = Ed25519PrivateKey.from_private_bytes(hashlib.sha256(b"synthetic-other-issuer").digest())
+OTHER_PUBLIC = wire.public_key_bytes(OTHER)
 PUBLIC_KEY = wire.public_key_bytes(Ed25519PrivateKey.from_private_bytes(bytes.fromhex(vectors.TEST1))).hex()
 KEY_ID = "21fe31dfa154a261"  # existing TEST1 conformance-vector identity
 
@@ -44,14 +49,14 @@ class ProposalTest(unittest.TestCase):
             "host-observed-birth", "observed_session_birth", 0, hashlib.sha256(b"[]").hexdigest()))
 
     def reopen(self, **kw):
-        options = dict(enabled=True, secret=SECRET, grant=self.grant, clock=lambda: self.now,
+        options = dict(enabled=True, issuer_key=ISSUER, issuer_public=ISSUER_PUBLIC, grant=self.grant, clock=lambda: self.now,
                        content_allowed=lambda body: not body.startswith(b"SECRET"))
         return ReplyProposal(self.path, **{**options, **kw})
 
     def source(self, number=1, **kw):
         options = dict(receipt_id=f"exposure-{number}", binding="rune-reader",
                        reader_decision=f"allowed-read-{number}", item=(f"{number:016x}", 7, 5, number),
-                       root=None, hop=0, drained_at=self.now, expires_at=self.now + 240_000)
+                       root=None, hop=0, drained_at=self.now, expires_at=self.now + 240_000, scope="lan")
         return Exposure(**{**options, **kw})
 
     def expose(self, number=1, **kw):
@@ -425,7 +430,7 @@ class ProposalTest(unittest.TestCase):
         altered = json.loads(capsule)
         altered["envelope"]["intent"]["scope"] = "public"
         self.refused("capability_auth", lambda: self.admit(canonical(altered)))
-        self.refused("capability_auth", lambda: self.admit(capsule, broker=self.reopen(secret=b"x" * 32)))
+        self.refused("capability_auth", lambda: self.admit(capsule, broker=self.reopen(issuer_key=None, issuer_public=OTHER_PUBLIC)))
         self.refused("wrong_station", lambda: self.b.station_admit(capsule, self.body, station="cael", key_id=KEY_ID, public_key=PUBLIC_KEY))
         self.refused("capability_format", lambda: self.admit(capsule + b" "))
         self.assertEqual(self.b.inspect(eid)["state"], "claimed_unknown")
@@ -437,6 +442,104 @@ class ProposalTest(unittest.TestCase):
         second = self.elect(choice_id="second", payload=b"Another note.")
         self.b.claim(first, self.body)
         self.refused("budget", lambda: self.reopen().claim(second, b"Another note."))
+
+    def test_reopen_with_a_narrower_constructor_grant_governs_the_next_check(self):
+        # F2 (#162 review): a stored wider grant is not authority once the owner narrows it and restarts.
+        self.expose()
+        eid = self.elect()
+        tighter = self.reopen(grant=replace(self.grant, max_bytes=8))
+        self.refused("content_bounds", lambda: tighter.claim(eid, self.body))
+        self.refused("content_bounds", lambda: self.elect(choice_id="after-restart"))
+        narrowed = self.reopen(grant=replace(self.grant, authors=("cael",)))
+        self.refused("publisher_not_allowed", lambda: narrowed.claim(eid, self.body))
+
+    def test_a_narrowed_grant_survives_a_restart_with_the_old_wider_config(self):
+        # Narrowing is sticky: restarting with the original, wider constructor grant does not widen it back.
+        self.b.replace_grant(replace(self.grant, authors=("cael",), max_bytes=8))
+        restarted = self.reopen()
+        self.expose()
+        self.refused("publisher_not_allowed", lambda: restarted.elect(
+            self.reader, author="rune", turn_id="turn-1", choice_id="c", exposure_receipt="exposure-1",
+            payload=self.body, intent=self.intent))
+        with sqlite3.connect(self.path) as db:
+            stored = json.loads(db.execute("SELECT grant_json FROM policy WHERE id=1").fetchone()[0])
+        self.assertEqual((stored["authors"], stored["max_bytes"]), ([], 8))  # rune removed: revoked, not reverted
+
+    def test_reopen_with_a_different_grant_identity_refuses_instead_of_choosing(self):
+        for changes in (dict(stream="town.other"), dict(station="cael", publisher="cael")):
+            with self.subTest(changes=changes):
+                self.refused("grant_conflict", lambda: self.reopen(grant=replace(self.grant, **changes)))
+        with sqlite3.connect(self.path) as db:
+            stored = json.loads(db.execute("SELECT grant_json FROM policy WHERE id=1").fetchone()[0])
+        self.assertEqual(stored["stream"], "town.reply")
+
+    def test_a_disjoint_author_or_audience_set_revokes_and_stays_revoked(self):
+        # Replacing the only author is a revocation until the owner explicitly widens with replace_grant.
+        self.expose()
+        revoked = self.reopen(grant=replace(self.grant, authors=("cael",)))
+        self.refused("publisher_not_allowed", lambda: self.elect())
+        self.reopen()  # the old wider config again: still revoked
+        self.refused("publisher_not_allowed", lambda: self.elect())
+        self.reopen(grant=replace(self.grant, audience_principals=("nobody",)))
+        revoked.replace_grant(self.grant)  # explicit, trusted widening restores it
+        self.assertTrue(self.elect())
+
+    def test_derived_audience_is_never_wider_than_the_narrowest_heard_source(self):
+        # F1 (#162 review): the reply's scope is bounded by every source the reader was exposed to.
+        self.expose(1, scope="lan")
+        self.expose(2, scope="host")
+        self.refused("source_scope", self.elect)
+        host = replace(self.intent, scope="host")
+        eid = self.elect(intent=host)
+        item = proposed_item(self.admit(self.b.claim(eid, self.body)), self.body, epoch=1, seq=1, now=self.now)
+        self.assertEqual(item.scope, SCOPES["host"])
+
+    def test_a_source_without_a_recorded_scope_refuses_every_reply(self):
+        self.expose(scope=None)  # unknown is not "lan": an unrecorded scope can never bound an audience
+        self.refused("source_scope", self.elect)
+        self.refused("source_scope", lambda: self.elect(intent=replace(self.intent, scope="host")))
+
+    def test_source_scope_is_validated_and_bound_into_the_history_digest(self):
+        self.refused("source_class", lambda: self.source(scope="everywhere"))
+        self.assertEqual(exposure_record(self.source(scope="host"))["scope"], "host")
+        self.assertNotEqual(exposure_record(self.source(scope="host")), exposure_record(self.source(scope="lan")))
+
+    def test_a_verify_only_instance_admits_but_can_never_mint(self):
+        # F3 (#162 review): the station side holds only the issuer's public key.
+        self.expose()
+        eid = self.elect()
+        verifier = self.reopen(issuer_key=None)
+        self.refused("issuer_key_missing", lambda: verifier.claim(eid, self.body))
+        self.assertEqual(self.b.inspect(eid)["state"], "elected")  # the refused mint burned nothing
+        capsule = self.b.claim(eid, self.body)
+        self.assertEqual(self.admit(capsule, broker=verifier).election_id, eid)
+
+    def test_a_capsule_signed_by_any_key_but_the_issuer_is_refused(self):
+        # Even with write access to the authority DB, a process without the issuer key cannot forge.
+        self.expose()
+        eid = self.elect()
+        capsule = json.loads(self.b.claim(eid, self.body))
+        encoded = canonical(capsule["envelope"])
+        forged = canonical({"envelope": capsule["envelope"],
+                            "sig": OTHER.sign(b"canticle-derived-reply-proposal\x00" + encoded).hex()})
+        verifier = self.reopen(issuer_key=None)
+        self.refused("capability_auth", lambda: self.admit(forged, broker=verifier))
+        self.refused("capability_format", lambda: self.admit(
+            canonical({"envelope": capsule["envelope"], "mac": capsule["sig"]}), broker=verifier))
+        self.assertEqual(self.b.inspect(eid)["state"], "claimed_unknown")
+
+    def test_an_issuer_key_must_match_the_configured_issuer_public_key(self):
+        self.refused("issuer_key_mismatch", lambda: self.reopen(issuer_public=OTHER_PUBLIC))
+        for bad in (None, b"", ISSUER_PUBLIC + b"\x00", ISSUER_PUBLIC.hex()):
+            with self.subTest(bad=bad):
+                self.refused("authority_missing", lambda: self.reopen(issuer_key=None, issuer_public=bad))
+
+    def test_a_small_order_or_noncanonical_issuer_public_key_refuses_at_construction(self):
+        # 🌿's #184 review: cryptography accepts these 32-byte keys; ids.check_public_key does not (§9.3).
+        for name, bad in (("all-zero, small order", bytes(32)), ("identity", (1).to_bytes(32, "little")),
+                          ("y >= p", b"\xff" * 31 + b"\x7f")):
+            with self.subTest(name=name):
+                self.refused("issuer_public_invalid", lambda: self.reopen(issuer_key=None, issuer_public=bad))
 
     def test_wake_provenance_is_host_stamped_and_never_promotes_training(self):
         self.expose(wake_derived=None)  # absence of the flag is not evidence of clean wake provenance

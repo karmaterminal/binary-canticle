@@ -95,7 +95,7 @@ Listener and loopback UDP. Station acceptance, host reception and session exposu
 receipts, and ambiguous claims never retry an effect.
 
 The fixture accepts subagent session keys only; it is not a continuing main/Discord-session adapter.
-The new Unix control transport checks the kernel peer UID, the existing HMAC capability and exact
+The new Unix control transport checks the kernel peer UID, the issuer-signed (Ed25519) capability and exact
 station identity, and applies the same credential/high-entropy scan as the OpenClaw publisher.
 The host still owns capability provisioning, exposure receipts and source-use authorization.
 The [proposal and production seam inventory](../../rfc/0001-notes/derived-reply-capability-proposal.md)
