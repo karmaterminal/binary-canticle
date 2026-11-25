@@ -24,7 +24,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 from . import wire
-from .ids import CLASS_BY_NAME, CTYPES, SCOPES, check_stream_name, key_id, stream_id
+from .ids import CLASS_BY_NAME, CTYPES, SCOPES, check_public_key, check_stream_name, key_id, stream_id
 
 VERSION = "canticle-derived-reply-proposal/2"
 DOMAIN = b"canticle-derived-reply-proposal\x00"
@@ -237,6 +237,10 @@ class ReplyProposal:
                  and grant is not None and callable(content_allowed), "authority_missing")
         _require(issuer_key is None or (isinstance(issuer_key, Ed25519PrivateKey)
                                         and wire.public_key_bytes(issuer_key) == issuer_public), "issuer_key_mismatch")
+        try:
+            check_public_key(issuer_public)  # 🌿's #184 review: cryptography alone accepts small-order keys (§9.3)
+        except ValueError:
+            raise Refused("issuer_public_invalid") from None
         self._verify_key = Ed25519PublicKey.from_public_bytes(issuer_public)
         # The caller owns the private directory; reject a symlink or broadly accessible existing DB.
         if self.path.exists() or self.path.is_symlink():

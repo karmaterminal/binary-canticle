@@ -534,6 +534,13 @@ class ProposalTest(unittest.TestCase):
             with self.subTest(bad=bad):
                 self.refused("authority_missing", lambda: self.reopen(issuer_key=None, issuer_public=bad))
 
+    def test_a_small_order_or_noncanonical_issuer_public_key_refuses_at_construction(self):
+        # 🌿's #184 review: cryptography accepts these 32-byte keys; ids.check_public_key does not (§9.3).
+        for name, bad in (("all-zero, small order", bytes(32)), ("identity", (1).to_bytes(32, "little")),
+                          ("y >= p", b"\xff" * 31 + b"\x7f")):
+            with self.subTest(name=name):
+                self.refused("issuer_public_invalid", lambda: self.reopen(issuer_key=None, issuer_public=bad))
+
     def test_wake_provenance_is_host_stamped_and_never_promotes_training(self):
         self.expose(wake_derived=None)  # absence of the flag is not evidence of clean wake provenance
         eid = self.elect()
