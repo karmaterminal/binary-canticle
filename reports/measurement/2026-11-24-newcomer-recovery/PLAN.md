@@ -255,3 +255,10 @@ are at `nice 19`. Nothing that was run is discarded, the floor stays, and no run
 - An INVALID run stays in the raw file and in the tables. Its cell is run again (`complete.py`, the next run number, the same harness, at most as many again as were declared) until it has the declared number of valid runs, after the queue, one at a time. Which cells are completed depends on the flood's rate alone.
 - A deadline missed in an INVALID run **fails** its cell as well (an underdriven flood is the easier one). A cell that stays short of its valid runs is INVALID, not PASS.
 - `judge_rows.py` says so per cell; 🌫's `oracle.py` is untouched.
+
+## Added 2026-11-25 10:28Z: a process of this lane's own ran beside every row so far
+
+At 10:27Z, with N2 starting, `ps` showed a leftover of this lane: PID 3640405, a `python -m unittest` of `test_intake.py` at `nice 19`, in an endless loop of a test that a mutation of the code had made endless (an unbounded loop of the test's, bounded since). Its parent was killed at 18:00Z on 11-24 and it was not. **It held one of the host's 20 cores at
+`nice 19` from 17:58Z on 11-24 until it was killed at 10:27Z on 11-25**: through E1, W, J, N0, N1, N0c and N1c here, and through the last seven hours of pass 3's queue (its full-length repeats, 17:58Z to 00:57Z). PLAN.md says that nothing runs beside a measurement, so this is a departure, and it is told to pass 3's reviewers. From N2 on it is gone.
+
+It is not known to have changed a verdict. It ran beside every tree alike, at the lowest priority, with 17 and more cores to spare until 04:15Z, and the rows that fail (N0) fail on every tree for a reason that is not the CPU. No run is discarded for it, and what is run again (the cells of underdriven runs) is run without it. The rows it ran beside are marked in the report.
