@@ -1856,14 +1856,16 @@ class EchoTest(IntakeCase):
         self.assertEqual(self.intake.stats()["displaced"], 2)       # HERE's, and the oldest relay's: the station took one place
         self.assertEqual(self.serve(32), [])                        # its own copy is a repeat now
 
-    def test_and_one_that_is_checked_itself_takes_one_place_only(self):
-        self.assertEqual(self.relayed(addr(60), spent=False), [addr(60)])
-        self.assertEqual((addr(60) in self.key.known, self.intake.stats()["displaced"]), (True, 2))
+    def test_so_it_does_where_a_relays_ticket_stands_for_its_slots(self):
+        self.offer(*[forge(beacon(A, 1), 500 + k) for k in range(8)], src=THERE)
+        checked = self.relayed(addr(60), spent=False)
+        self.assertEqual((len(checked), checked[0] in self.key.known, addr(60) in self.key.known), (1, True, True))
 
-    def test_an_echo_that_comes_later_has_no_share_in_it(self):
+    def test_the_relay_whose_copy_was_checked_keeps_its_place_and_the_oldest_goes(self):
         relays = [addr(7, 5_000 + n) for n in range(intake.KNOWN_MAX)]
-        self.relayed(addr(60))
-        self.assertEqual([a in self.key.known for a in relays], [False] + [True] * 3)
+        checked = self.relayed(addr(60))
+        self.assertEqual(checked, relays[:1])
+        self.assertEqual([a in self.key.known for a in relays], [True, False, True, True])
 
     def test_a_frame_whose_first_copy_is_gone_is_the_next_ones(self):
         """What is remembered of who came first is as long as a copy waits, no longer."""

@@ -47,7 +47,7 @@ What this does not do:
   each honest frame is then verified only as often as chance picks it among them. Other keys are unaffected and
   every refusal is counted, but nothing before the signature can tell the two apart. That station is then outside what
   this guarantees.
-- **The first to be heard with a new frame has the share.** A relay without a key that is heard before the station, with
+- **The first to be heard with a new frame has the share**, whichever copy of it was checked. A relay without a key that is heard before the station, with
   copies of its frames and from a new port each, displaces it from the KNOWN_MAX known sources. It is counted
   (``displaced``), and the station is a stranger again until one of its own frames is heard first: outside the guarantee too.
 - **A station that is still a stranger, among many.** Until one of its frames verifies from a new address (a cold
@@ -194,7 +194,7 @@ class StreamQueue:
         self.lanes: dict = {}                           # Source -> Lane: every lane of the two rings below
         self.known, self.strange = deque(), deque()
         self.pool = 0                                   # datagrams waiting in the strangers' lanes
-        self.bytes: dict = {}                           # digest -> how many of the lanes it waits in
+        self.bytes: dict = {}                           # digest -> [how many of the lanes it waits in, who sent it first]
         self.known_next = True
 
     def put(self, source: Source, entry: tuple) -> Optional[tuple]:
@@ -218,7 +218,10 @@ class StreamQueue:
             (self.known if source.known else self.strange).append(lane)
         lane.queue.append(entry)
         lane.digests.add(entry[1])
-        self.bytes[entry[1]] = self.bytes.get(entry[1], 0) + 1
+        if (waits := self.bytes.get(entry[1])) is None:
+            self.bytes[entry[1]] = [1, entry[2]]
+        else:
+            waits[0] += 1
         source.queued += 1
         self.pool += not source.known
         return new, out
@@ -228,9 +231,10 @@ class StreamQueue:
         digest = entry[1]
         lane.digests.remove(digest)
         lane.source.queued -= 1
-        n = self.bytes.pop(digest)
-        if n > 1:
-            self.bytes[digest] = n - 1
+        waits = self.bytes[digest]
+        waits[0] -= 1
+        if not waits[0]:
+            del self.bytes[digest]
 
     def contended(self, source: Source) -> bool:
         """Whether datagrams of strangers other than ``source`` wait here (a lane of the crowd is anybody's)."""
@@ -254,6 +258,7 @@ class StreamQueue:
                 if not source.budget.ready(now):
                     continue
                 entry = lane.queue.popleft()
+                first = self.bytes[entry[1]][1]
                 self._out(lane, entry)
                 source.budget.take()
                 self.pool -= ring is self.strange
@@ -261,7 +266,7 @@ class StreamQueue:
                 if not lane.queue:
                     ring.pop()
                     del self.lanes[source]
-                return (*entry, source)
+                return entry, source, first
         return None
 
     def remove(self, source: Source, entry: tuple) -> None:
@@ -512,18 +517,19 @@ class Unlisted:
             return None
         self.bucket.take()
         data, at = self.ready.popleft()
-        return Ticket(data, None, None, at, None, None, None)
+        return Ticket((data, None, None, at), None, None, None, None)
 
 
 class Ticket:
     """A datagram whose turn has come. It holds one token of each bucket it might pay from until ``settle``; one out of a slot
     holds one of the slice's, and none of its station's: they are asked for when it has verified."""
 
-    __slots__ = ("data", "digest", "addr", "at", "budget", "key", "stream", "strange", "copies", "dropped")
+    __slots__ = ("data", "digest", "addr", "at", "budget", "key", "stream", "strange", "copies", "dropped",
+                 "first")
 
-    def __init__(self, data: bytes, digest: Optional[bytes], addr, at: int, source: Optional[Source],
-                 key: Optional[KeyQueue], stream: Optional[StreamQueue]):
-        self.data, self.digest, self.addr, self.at = data, digest, addr, at    # at: when it arrived
+    def __init__(self, entry: tuple, source: Optional[Source], first, key: Optional[KeyQueue], stream: Optional[StreamQueue]):
+        self.data, self.digest, self.addr, self.at = entry    # at: when it arrived
+        self.first = first                         # who sent these bytes first, of those that wait
         self.budget = source.budget if source is not None else None
         self.strange = source is not None and not source.known
         self.key, self.stream = key, stream
@@ -916,13 +922,15 @@ class Intake:
             self._slots.remove(key)
             if key.slot:
                 self._slots.append(key)
+            first = claim.entry[2]
             if claim.queued:
+                first = claim.stream.bytes[claim.entry[1]][1]
                 claim.stream.remove(claim.source, claim.entry)
                 if not claim.stream.lanes:
                     key.ready.remove(claim.stream)
                     self._unready(key)
             self.slice.take()
-            return Ticket(*claim.entry, self._slice, key, claim.stream)
+            return Ticket(claim.entry, self._slice, first, key, claim.stream)
         return None
 
     def waiting(self) -> bool:
@@ -975,6 +983,9 @@ class Intake:
             self.verified += 1
             if fresh and t.key is not None:
                 self.refused["backlog"] += t.key.know(t.addr)
+                if t.first not in t.key.known:     # it was heard first, and a copy that came behind it was checked
+                    t.key.admit(t.first, now)
+                    self.refused["backlog"] += t.key.know(t.first)
                 for addr in t.copies:
                     t.key.renew(addr, now)
                 self._unready(t.key)
