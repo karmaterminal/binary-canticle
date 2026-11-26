@@ -483,6 +483,14 @@ None of this is live `[open: §7.11]`.
 - The live pair trusts zone transfers by IP address. Moving that to keys is its own staged step
   (bootstrap#1872, source only).
 - No seat holds a per-host key yet. Custody is 🪨's, after 🕯's answer on where the earlier keys were made.
+- **One shared live update key exists** (🌿, 22:06Z, with receipts): `canticle-register.key`, in the primary's
+  `update-policy`. So registration today means "whoever holds that one key", not per-host scope.
+- **The pair serves the old zone.** SOA `2026112402` on both servers, and none of #1868's zones.
+  `rune` is NXDOMAIN, and `api.pluralkit.me` SERVFAILs. The router's fallback hides `rune` in a
+  ronan-only test (🌿).
+- **The pair itself:** elliott's `.153` is the primary and emeric's `.10` the secondary (IP-only, no
+  keys). Clients ask Pi-hole first (🌿).
+- **The controller is unknown**, so no read-only preflight can run yet (🌿).
 
 **Proposed: what the station side must do.**
 - **Enrolment.** Name how a station first comes to be registrable. That is the registrar's PTR enrolment
