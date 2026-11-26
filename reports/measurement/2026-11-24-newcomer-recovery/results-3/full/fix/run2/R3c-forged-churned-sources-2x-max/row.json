@@ -1,0 +1,62 @@
+{
+ "row": "R3c-forged-churned-sources-2x-max",
+ "python": "3.12.3",
+ "cryptography": "50.0.1",
+ "offered_per_s": 175630.9,
+ "sung": 57,
+ "at_daemon": 57,
+ "at_daemon_during_flood": 57,
+ "pushed": 57,
+ "send_to_record_ms": {
+  "p50": 13.7,
+  "p90": 19.9,
+  "p99": 46.6,
+  "max": 61.7
+ },
+ "send_to_push_ms": {
+  "p50": 5490.0,
+  "p90": 5951.1,
+  "p99": 6019.3,
+  "max": 6034.2
+ },
+ "kernel_drops": 3767,
+ "reported_socket_dropped": 3767,
+ "receive": {
+  "read": 100089430,
+  "repeats": 453,
+  "copies": 0,
+  "verified": 644,
+  "unverified": 855325,
+  "reserved": 285118,
+  "queued": 0,
+  "known": 1,
+  "displaced": 0,
+  "lapsed": 0,
+  "refused": {
+   "unlisted": 0,
+   "unverified": 99179707,
+   "over_rate": 0,
+   "backlog": 53301
+  }
+ },
+ "health_reasons_seen": [
+  "datagrams_refused",
+  "socket_drops"
+ ],
+ "admission": {
+  "verified": 57,
+  "duplicate": 453
+ },
+ "unverified": {
+  "bad_signature": 855325
+ },
+ "ear_live_overflow": null,
+ "daemon_cpu_rss": {
+  "cpu_max": 111.9,
+  "rss_max_kb": 35092,
+  "cpu_mean": 93.3
+ },
+ "load_at_start": 7.6,
+ "duration_s": 570.0,
+ "drain_s": 15.0
+}
