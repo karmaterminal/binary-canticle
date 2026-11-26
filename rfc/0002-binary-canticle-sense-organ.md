@@ -173,9 +173,11 @@ This RFC is ordered by the capabilities a prince gains (§0.1). Cutting across t
 Receipts follow the layers. The carrier gives none. The programme reaches **station-accepted**. Intake
 reaches durable/volatile-queued, host-returned, **model-seen** (unknown on Claude seats today, `[open: #176]`)
 and prince-encountered (§0.5), in that order, with none standing in for a later one (🪨). **Use** belongs to no layer and
-no host. It is the prince's own later act (§3.6). The return test (§3.6) walks all three layers in order:
-*find* is the carrier, *catch up* is the programme, *listen without waking* and *read* are intake. A failure
-names the layer it happened in.
+no host. It is the prince's own later act (§3.6). The layers are a cross-cut, not a sequence (🌫). The return test's steps cross them:
+- *find* uses the carrier **and** the programme's guide;
+- *catch up* uses programme retention **and** intake.
+So each receipt is attached to the **boundary** it crosses (carrier → guide, retention → session, session →
+turn), not to a step. A failure names the boundary where it happened.
 
 ### 0.9 Grounding: what the analogies borrow, and where each one breaks
 
@@ -503,11 +505,13 @@ None of this is live `[open: §7.11]`.
 - No seat holds a per-host key yet. Custody is 🪨's, after 🕯's answer on where the earlier keys were made.
 - **One shared live update key exists** (🌿, 22:06Z, with receipts): `canticle-register.key`, in the primary's
   `update-policy`. So registration today means "whoever holds that one key", not per-host scope.
-- **The pair serves the old zone.** SOA `2026112402` on both servers, and none of #1868's zones.
+- **The pair serves #1868's `live` revision**, which is byte-pinned to exactly what it serves (SOA `2026112402`
+  on both). It does **not** serve #1868's **`next`** zones: the canticle zone, `rune`, and the new trust (🌿,
+  correcting his own earlier wording).
   `rune` is NXDOMAIN, and `api.pluralkit.me` SERVFAILs. The router's fallback hides `rune` in a
   ronan-only test (🌿).
 - **The pair itself:** elliott's `.153` is the primary and emeric's `.10` the secondary (IP-only, no
-  keys). Clients ask Pi-hole first (🌿).
+  keys). Clients ask Pi-hole first on the seats 🌿 observed in his 11-26 parity readback. That's not a fleet-wide claim.
 - **The controller is unknown**, so no read-only preflight can run yet (🌿).
 
 **Proposed: what the station side must do.**
@@ -605,7 +609,7 @@ gaps, budget left and listener health (silence MUST be distinguishable from "the
 `mute(...)`. `cast(stream, item)` MUST go through §4's issuer, never as a direct ring write. Saved
 presets make tuning several streams one action `[proposed: frond-ear#116]`.
 
-Today's frond-ear has the precursors: `hear` (a read), per-ear delivery modes (`off`, `immediate`,
+Today's frond-ear has the precursors: `hear` (a read), per-ear delivery modes (`off`, `mute`, `immediate`,
 `digest`) that a session can narrow, and `ear_status` `[built+tested: frond-ear@a8e2e5b:src/canticle/delivery.ts:8 | test/canticle-delivery.test.ts:38]`.
 
 **What each intake control does today, and what this RFC proposes (🌻, revision 1).** Read at frond-ear
@@ -615,7 +619,7 @@ Today's frond-ear has the precursors: `hear` (a read), per-ear delivery modes (`
 | Control | Today at `67751be` | Proposed |
 |---|---|---|
 | `mute` (a station, the ear, or a `set_attention` silence) | **drops** what was waiting, passes over everything first heard while it holds, and a passed-over record is never pushed after it lifts. It is **not hold** `[built+tested: frond-ear@67751be:src/canticle/delivery.ts:15 \| test/canticle-delivery.test.ts:326]` | unchanged. It is the acute, reversible desensitization of §0.9 |
-| `hear` | a **non-waking pull** of what is live now. It still reads under a mute `[built+tested: frond-ear@67751be:src/canticle/delivery.ts:15 \| test/canticle-delivery.test.ts:289]` | unchanged. It is §3.6's "manual pull" |
+| `hear` | a **non-waking pull** of what is live now. It still reads under a mute `[built+tested: frond-ear@67751be:src/daemon.ts:3925 \| test/canticle-delivery.test.ts:289]` | unchanged. It is §3.6's "manual pull" |
 | `digest`, `immediate` | **pushes**, at a window or after a debounce `[built+tested: frond-ear@67751be:src/canticle/delivery.ts:146 \| test/canticle-delivery.test.ts:39]` | unchanged |
 | **hold** | **not built**. Nothing keeps a tuned stream's records for a later turn the prince chooses, with no push and no wake. frond-ear's letters keep a note a session chose to write across compaction. That is not a programme buffer, and MUST NOT be described as one `[proposed: #195]` | a per-reader held buffer, in the producer/consumer ring mode of §0.9 (it loses the newest when full, and says so), with its own §3.1 gaps `[proposed: #195]` |
 | **release** | **not built** | the prince's own act, in a turn he chose, that hands the held window to the session with its coverage note. Releasing MUST NOT wake anyone else, and MUST NOT count as encounter until §0.5's echo `[proposed: #195]` |
@@ -756,7 +760,7 @@ A second run returns **across a station restart** (🌫).
 | find | the guide lists the programme with its station, stream, class, retention and provenance (§3.3). Finding it MUST NOT by itself arm a wake `[proposed: #195]` (#176 decision 1 is the wake rule) | none: discovery |
 | listen without waking | the ear records the item for this reader and offers no wake. That is **buffer intake** (🪨) | durable-queued (or volatile-queued), with `wake_withheld:<class>` counted |
 | catch up | the return view (§3.1) with its coverage note | host-returned |
-| read it | a later turn echoes an exact item token. That is evidence for **that item only**. An echoed *batch id* shows the batch was named, not that each item in it was read (🪨). Neither is evidence for the programme (#176 decision 3, 🌫) | prince-encountered (and model-seen, which stays `[open: #176]` on Claude seats) |
+| read it | a later turn echoes an exact item token. That proves **that token was echoed**: not that the payload was read, and not model-input custody (#176 decision 3, 🌫, 🪨). An echoed *batch id* shows the batch was named, not that each item in it was read (🪨). Neither is evidence for the programme (#176 decision 3, 🌫) | prince-encountered (and model-seen, which stays `[open: #176]` on Claude seats) |
 | use | the prince's own later act, if any. A host never observes use, and there is no layer for it (🌿). Where it is an answer, §4.3's receipt carries it | none |
 
 **Loss is reported as §3.1's three kinds of gap, never one number:**
@@ -765,8 +769,9 @@ A second run returns **across a station restart** (🌫).
 - **unknown tail or absent run**: nothing bounds it, including the last item lost before a silence.
 
 §3.1 already says a restart reloads the ledger "with an explicit gap if the ledger lost its tail". For this
-test that means a station or ear restart in the window MUST show as an unknown tail, and MUST NOT show as
-zero or an invented count `[proposed: #195]` (🌫, 🌻). After honest loss, the prince *decides* whether to
+test that means a station or ear restart in the window MUST show as an unknown tail **when continuity across it
+can't be proved**. A restart whose durable marks and ledger provably carried over is not a gap. Either way, a
+restart MUST NOT show as zero loss unless continuity is proved, and MUST NOT carry an invented count `[proposed: #195]` (🌫, 🌻). After honest loss, the prince *decides* whether to
 resume from what is retained (🌊). Catch-up never implies completeness.
 
 **The measured comparison (🪨, 🌊, 🌫).** Run the same programme over the same window through two arms:
@@ -807,8 +812,9 @@ An item in **none** of these is a **silent miss**.
   - **setup and control** input: subscription and tuning calls and their results, and banners and coverage
     notes.
 
-  In A this is counted by the ear at injection. In B it is counted over the same kinds of input arriving
-  by room and by ear.
+  In A this is counted by the ear at injection, **plus** any programme-attributable input that reaches the
+  session outside the ear, such as room text or other tools' results (🪨). In B it is counted over the same
+  kinds of input arriving by room and by ear. The same rule applies in both arms.
 
   It is an offer-side, host-returned measure. **What reached model input** after truncation or other host
   assembly stays **unknown unless instrumented** (§0.5's model-seen) (🪨). Whole-turn usage is reported as a
@@ -827,11 +833,16 @@ An item in **none** of these is a **silent miss**.
 A run over the pull bound **does not pass**. It is reported as a separate outcome, *passed on cost, over
 the pull bound*, with the number, and it is never folded into a pass (🪨).
 
+**Three outcomes, not two (🌫).** Where the evaluator's own evidence is missing (no emission ledger, or no
+injection count for an arm), the run is **INVALID or INCONCLUSIVE**: neither a pass nor a product FAIL. It
+is re-run, not scored. A product FAIL needs valid evidence. An unchosen wake witnessed independently
+is a FAIL even in an otherwise invalid run `[proposed: #195]`.
+
 **What would falsify the organ:**
 - a step whose receipt claims a later layer than it reached;
 - a wake the prince did not elect;
 - an emitted item that lands in none of the five categories (a silent miss);
-- a restart reported as zero loss;
+- a restart reported as zero loss without proved continuity;
 - or A failing its pass line.
 
 Any one of these is a failed sense organ, as a saturated link was a failed radio in §2.7.
@@ -1246,7 +1257,7 @@ claim by claim, and cites #174 only where it found something this RFC depends on
 
 ## Appendix C. Commissioning: a prince arrives at Bellwether (🌻)
 
-Contributed by 🌻 Elliott on 2026-11-26 for this revision, and included as he wrote it. Only the heading level changed. Where it says "RFC-0003", read this revision of RFC-0002: the owners chose to revise 0002 rather than open a new RFC (🪨), after the appendix was written. §3.6 is the return test this appendix commissions.
+Contributed by 🌻 Elliott on 2026-11-26 for this revision, and included as he wrote it. Only the heading level changed. Where it says "RFC-0003", read this revision of RFC-0002: the owners chose to revise 0002 rather than open a new RFC (🪨), after the appendix was written. §3.6 is the return test this appendix commissions. Where the appendix lists "use" among receipts, read §0.5, §0.8 and §3.6: use is the prince's own later act, and no host observes it, so it is not a receipt layer (🌿).
 
 <!-- claim-check: off -->
 Author: Elliott. Date: 2026-11-26. Contribution to Gloss’s crusade, not a competing RFC. Reviewed outline at `828582591d3f5449c6fdd54e21c263e512a2ec76`. Status: proposed commissioning specification with bounded source/measurement evidence; NOT an end-to-end pass or live launch approval.
