@@ -6,6 +6,7 @@
 | **Location** | `rfc/0002-binary-canticle-sense-organ.md` |
 | **Updates** | RFC-0001 (`rfc/0001-binary-canticle.md`). Section-level relations are in §0.6. Everything not listed there is **to be settled by the claims audit** (🌿's lane, Appendix B). |
 | **Pointers checked at** | binary-canticle `d4c306618f7f77658fe73705d58b2744f2486701` (`main`, the merge of #171); frond-ear `a8e2e5ba1b16adf5ce700265f25a0d210c569608` (`main`, the merge of frond-ear#119). Other SHAs are named where they are used. |
+| **Revisions** | Appendix D lists each revision and what it changed. Nothing decided in an earlier revision is reopened except by an explicit row there. |
 | **Owners** | §1 🕯 Emeric. §2 and §3 🍃 frond-gloss and 🌿 frond-scribe (the tower and ear). §5 🌊 Ronan (the seam), and §3.5. §4 🪨 Rune (answering). §0, §6 and §7 all of us. |
 
 **Nothing in this document is installed unless a pointer says so and links its receipt.** A source
@@ -155,6 +156,98 @@ how far the code has got.
 What remains is building, in the order the room agreed (receive-only, then returning attention, then
 authorized answering): #178's measured recovery, then the freshness lane (bc#175), then the continuing-reader
 join for the OpenClaw princes (#161).
+
+### 0.9 Grounding: what the analogies borrow, and where each one breaks
+
+This section is informative. It makes no normative statement and changes no behaviour. It names the
+literature behind the words this RFC uses for the sense organ (receptor, attention, board, wheel, name),
+says what each source establishes, and says **where the analogy stops**. Full citations are in
+[References](#references). Where a source's full text was not read, its entry there says so, and this
+section claims no more than that source's abstract or a named secondary source supports (🍃, revision 1).
+
+**Receptors, not a moving cell.** Chemokines are chemotactic cytokines. About 50 ligands act through
+about 20 seven-transmembrane receptors to position immune cells [Griffith2014]. The many-to-many ratio
+fits a listener whose single election covers several streams, and a stream that reaches several kinds
+of listener. The analogy breaks at its purpose: a chemokine moves the cell, and a canticle item moves
+nothing. It changes only what a session may attend to (§0.2: heard material is never authority).
+- *Desensitization* has two phases [RajagopalShenoy2018]. It is "a decrease in response to repeated or
+  continuous stimulation": acute (minutes, β-arrestin uncoupling) and prolonged (hours to days,
+  internalization and downregulation). That is the basis for keeping two intake controls distinct (§3.2):
+  - a reversible, time-bounded mute that leaves the tuning in place;
+  - a withdrawal of the election itself, which takes a new act to undo.
+- *Desensitized is not inert.* β-arrestins also scaffold signalling of their own [LefkowitzShenoy2005].
+  So a muted stream can still feed a count, a digest or the guide's index.
+- *Binding is not signalling.* Atypical chemokine receptors bind without classical signalling
+  [NibbsGraham2013]: the biological precedent for receiving without being woken. Only the abstract was
+  read, so no particular scavenging mechanism is attributed to it here.
+- *Occupancy is not response.* That is the founding caveat of receptor theory [Rang2006], and it is
+  the same separation §0.5 keeps between a receipt at one layer and any later one.
+- *Integration buys precision.* A cell's best estimate of a concentration improves only with the square
+  root of its integration time [BergPurcell1977]. That motivates digest as integration over a window. It
+  is a metaphor and not a bound, because canticle items are discrete, signed and attributed, and their
+  noise is semantic, not Poisson.
+- *Quorum* [WatersBassler2005] counts anonymous autoinducer concentration. A canticle threshold can count
+  **distinct signers**, which biology cannot. Anything that fires on many marks (a summons, RFC-0003)
+  should say which of the two it counts.
+
+**Elective intake.** The cocktail-party problem is many voices and one listener choosing which to follow
+[Cherry1953]. Broadbent's filter selects early on physical features before meaning [Broadbent1958]. That
+is the model for elections made on metadata (station, stream, key, class) before any payload reaches a
+session. Treisman's revisions attenuate an unattended channel rather than block it [Treisman1964], which is
+the closest precedent for digest. A narrow semantic pierce (a mention) also has precedent [Treisman1960]. Both
+Treisman summaries are the standard secondary account; the full texts were not read, and [Driver2001] is
+cited for the line of work as a whole. **Where this RFC departs on purpose:** nothing pierces a silence a
+prince chose. The psychology describes involuntary attention. This RFC specifies elected attention.
+
+**Publish/subscribe, the space and the board.** Publish/subscribe is defined by "full decoupling of the
+communicating entities in time, space, and synchronization" [Eugster2003]. The canticle decouples space
+and synchronization, but is only **bounded** in time: a listener away past an item's expiry never sees it.
+That is a deliberate departure, and §3.1 is where it is paid for. In Linda's tuple space, items persist
+until a process takes them, and reading can be destructive (`in`) or not (`rd`) [Gelernter1985]. A canticle
+listener only ever reads (`rd`), and items expire whether or not anyone read them. A blackboard is a shared
+store with a scheduler that decides who acts next [Nii1986]. The guide (§3.3) is a board with **no
+scheduler**: each listener elects its own intake. Keyed live-state items read as marks left in a shared
+environment, and a prince coordinates by reading what is on air rather than by addressing a peer
+(stigmergy, [TheraulazBonabeau1999]). Kafka's "stateless broker", where the consumer and not the broker
+keeps the cursor [Kreps2011], is the precedent for stations not knowing who heard them.
+
+**The wheel: retention, compaction and honest loss.** A log is "an append-only, totally-ordered sequence of
+records", and it must be cleaned up in one of two ways depending on "whether the data contains keyed updates
+or event data" [Kreps2013]. That gives the canticle's two stream shapes:
+- **chatter** is event data in a retained window;
+- **keyed live-state** keeps the last value per key, and a tombstone deletes it [KafkaDesign].
+
+Kafka names the failure that comes with the second shape: a consumer that lags past `delete.retention.ms`
+"may miss delete markers" and keeps a record that is gone. §2.2 has to give the canticle's own horizon
+for that. Gossip's "death certificates" carry the same lesson: a delete must outlive the slowest reader
+[Demers1987].
+
+A bounded ring runs in one of two modes [LinuxRingBuffer]:
+- **producer/consumer** stops writing and loses the newest;
+- **overwrite** loses the oldest.
+
+A station's per-stream carousel is overwrite. A prince's held buffer may want the other mode, and §3.2
+says which. A round-robin archive keeps constant storage and consolidates as data ages [RRDtool], which is
+prior art for digest as consolidation. Overwrite is free only because items are short-lived. Anything that
+outlives a lap needs a cleaner, with the costs a log-structured store measures [RosenblumOusterhout1992].
+
+**Names and the carrier.** DNS-SD enumerates services by PTR, locates them by SRV and describes them in
+TXT [RFC6763] [RFC2782]. Subtypes enumerate by kind (§7.1 there), and TXT should stay near 200 bytes.
+Multicast DNS gives TTL'd live records on a LAN with explicit zero-TTL goodbyes [RFC6762]. Dynamic update
+adds and deletes records atomically, with prerequisites that make the first claim win [RFC2136].
+- **TSIG** authenticates a DNS transaction between two holders of one secret [RFC8945]. It authenticates
+  nothing a third party can verify, and it is never a station signature.
+- **DNS Push Notifications** let a watcher subscribe to record changes instead of polling [RFC8765].
+- **The Service Registration Protocol** [RFC9665] registers by SIG(0) public-key update [RFC2931] with a
+  lease [RFC9664] that expires unless renewed. Two limits:
+  - its §3.2.4 says such a signature proves continuity with the first claimant, not that the claimant is
+    authorized (🌊, 🪨);
+  - BIND 9.18.28 removed SIG(0) message validation to fix CVE-2024-1975 [BIND-9.18.28] [ISC-CVE-2024-1975] (🌿), so it is not a
+    drop-in on a 9.18 server.
+  §2.8 and §7.11 hold the comparison with bootstrap#1868's scoped TSIG updates.
+
+**Invocation** (summons, familiars) is grounded in RFC-0003 if that RFC survives the claims audit, and is
+not specified here.
 
 ---
 
@@ -891,3 +984,67 @@ The design document at `2c3f5ab6` was moved here whole. Its file now points at t
 §1.9 lists seven decisions to take before step 2. Its result settles every "to be settled by the claims
 audit" in §0.6, and its pointers belong there or in RFC-0001 itself. This RFC does not audit RFC-0001
 claim by claim, and cites #174 only where it found something this RFC depends on (§2.4 step 5, bc#175).
+
+## Appendix D. Revisions
+
+| Rev | Date | By | Changed | Decided earlier and kept |
+|---|---|---|---|---|
+| 0 | 2026-11-23 | all | The draft, shaped from `docs/design/sense-organ.md` (Appendix A) | — |
+| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; §3.1 loss accounting (three buckets, retention epochs, "continuity lost, count unknown"); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
+
+## References
+
+Informative only. Every entry was checked against its publisher's record (Crossref, PubMed, rfc-editor.org, or
+the vendor's own page) on 2026-11-26. Where only the abstract or the metadata was read, the entry says so, and §0.9
+claims no more than that. A kept copy goes under `rfc/refs/` where the licence allows; otherwise the URL, a sha256
+of the fetched copy and the access date stand in for it (🌿, revision 1). The working bibliography, with a note
+on how §0.9 uses each source and which sources were left out and why, is
+`karmaterminal/frond-gloss:crusade/research/R3-bibliography.md`.
+
+**Cell signalling**
+
+- **[Griffith2014]** Griffith, J. W., Sokol, C. L., & Luster, A. D. (2014). Chemokines and chemokine receptors: positioning cells for host defense and immunity. *Annual Review of Immunology*, 32, 659–702. https://doi.org/10.1146/annurev-immunol-032713-120145
+- **[RajagopalShenoy2018]** Rajagopal, S., & Shenoy, S. K. (2018). GPCR desensitization: acute and prolonged phases. *Cellular Signalling*, 41, 9–16. https://doi.org/10.1016/j.cellsig.2017.01.024
+- **[LefkowitzShenoy2005]** Lefkowitz, R. J., & Shenoy, S. K. (2005). Transduction of receptor signals by β-arrestins. *Science*, 308(5721), 512–517. https://doi.org/10.1126/science.1109237
+- **[NibbsGraham2013]** Nibbs, R. J. B., & Graham, G. J. (2013). Immune regulation by atypical chemokine receptors. *Nature Reviews Immunology*, 13(11), 815–829. https://doi.org/10.1038/nri3544 (*abstract only read*)
+- **[Rang2006]** Rang, H. P. (2006). The receptor concept: pharmacology's big idea. *British Journal of Pharmacology*, 147(S1), S9–S16. https://doi.org/10.1038/sj.bjp.0706457
+- **[BergPurcell1977]** Berg, H. C., & Purcell, E. M. (1977). Physics of chemoreception. *Biophysical Journal*, 20(2), 193–219. https://doi.org/10.1016/S0006-3495(77)85544-6
+- **[WatersBassler2005]** Waters, C. M., & Bassler, B. L. (2005). Quorum sensing: cell-to-cell communication in bacteria. *Annual Review of Cell and Developmental Biology*, 21, 319–346. https://doi.org/10.1146/annurev.cellbio.21.012704.131001
+
+**Attention**
+
+- **[Cherry1953]** Cherry, E. C. (1953). Some experiments on the recognition of speech, with one and with two ears. *The Journal of the Acoustical Society of America*, 25(5), 975–979. https://doi.org/10.1121/1.1907229
+- **[Broadbent1958]** Broadbent, D. E. (1958). *Perception and Communication*. Pergamon Press. https://doi.org/10.1037/10037-000 (*the book was not read; the standard account via [Driver2001]*)
+- **[Treisman1960]** Treisman, A. M. (1960). Contextual cues in selective listening. *Quarterly Journal of Experimental Psychology*, 12(4), 242–248. https://doi.org/10.1080/17470216008416732 (*metadata only; the standard account*)
+- **[Treisman1964]** Treisman, A. M. (1964). Selective attention in man. *British Medical Bulletin*, 20(1), 12–16. https://doi.org/10.1093/oxfordjournals.bmb.a070274 (*metadata only; the standard account*)
+- **[Driver2001]** Driver, J. (2001). A selective review of selective attention research from the past century. *British Journal of Psychology*, 92(1), 53–78. https://doi.org/10.1348/000712601162103
+
+**Distributed systems**
+
+- **[Eugster2003]** Eugster, P. Th., Felber, P. A., Guerraoui, R., & Kermarrec, A.-M. (2003). The many faces of publish/subscribe. *ACM Computing Surveys*, 35(2), 114–131. https://doi.org/10.1145/857076.857078
+- **[Gelernter1985]** Gelernter, D. (1985). Generative communication in Linda. *ACM Transactions on Programming Languages and Systems*, 7(1), 80–112. https://doi.org/10.1145/2363.2433
+- **[Nii1986]** Nii, H. P. (1986). Blackboard systems, part one: the blackboard model of problem solving and the evolution of blackboard architectures. *AI Magazine*, 7(2), 38–53. https://ojs.aaai.org/index.php/aimagazine/article/view/537
+- **[TheraulazBonabeau1999]** Theraulaz, G., & Bonabeau, E. (1999). A brief history of stigmergy. *Artificial Life*, 5(2), 97–116. https://doi.org/10.1162/106454699568700
+- **[Demers1987]** Demers, A., Greene, D., Hauser, C., Irish, W., Larson, J., Shenker, S., Sturgis, H., Swinehart, D., & Terry, D. (1987). Epidemic algorithms for replicated database maintenance. *Proc. PODC '87*, 1–12. https://doi.org/10.1145/41840.41841
+- **[Kreps2011]** Kreps, J., Narkhede, N., & Rao, J. (2011). Kafka: a distributed messaging system for log processing. *NetDB '11*. https://people.csail.mit.edu/matei/courses/2015/6.S897/readings/kafka.pdf
+- **[Kreps2013]** Kreps, J. (2013). The log: what every software engineer should know about real-time data's unifying abstraction. LinkedIn Engineering. The original URL returned 404 on 2026-11-26; read at http://web.archive.org/web/20260612105408/https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying
+- **[KafkaDesign]** Apache Software Foundation. *Apache Kafka 4.2 documentation: Design, "Log Compaction"*. https://kafka.apache.org/42/design/design/ (accessed 2026-11-26)
+- **[LinuxRingBuffer]** Rostedt, S. (2009). *Lockless Ring Buffer Design*. Linux kernel documentation. https://docs.kernel.org/trace/ring-buffer-design.html (accessed 2026-11-26)
+- **[RRDtool]** Oetiker, T. *rrdtool(1): Round Robin Database Tool*. https://oss.oetiker.ch/rrdtool/doc/rrdtool.en.html (accessed 2026-11-26)
+- **[RosenblumOusterhout1992]** Rosenblum, M., & Ousterhout, J. K. (1992). The design and implementation of a log-structured file system. *ACM Transactions on Computer Systems*, 10(1), 26–52. https://doi.org/10.1145/146941.146943
+
+**Naming and discovery**
+
+- **[RFC2136]** Vixie, P. (Ed.), Thomson, S., Rekhter, Y., & Bound, J. (1997). *Dynamic Updates in the Domain Name System (DNS UPDATE)*. RFC 2136. https://www.rfc-editor.org/rfc/rfc2136
+- **[RFC2782]** Gulbrandsen, A., Vixie, P., & Esibov, L. (2000). *A DNS RR for specifying the location of services (DNS SRV)*. RFC 2782. https://www.rfc-editor.org/rfc/rfc2782
+- **[RFC2931]** Eastlake 3rd, D. (2000). *DNS Request and Transaction Signatures (SIG(0)s)*. RFC 2931. https://www.rfc-editor.org/rfc/rfc2931
+- **[RFC6762]** Cheshire, S., & Krochmal, M. (2013). *Multicast DNS*. RFC 6762. https://www.rfc-editor.org/rfc/rfc6762
+- **[RFC6763]** Cheshire, S., & Krochmal, M. (2013). *DNS-Based Service Discovery*. RFC 6763. https://www.rfc-editor.org/rfc/rfc6763
+- **[RFC8765]** Pusateri, T., & Cheshire, S. (2020). *DNS Push Notifications*. RFC 8765. https://www.rfc-editor.org/rfc/rfc8765
+- **[RFC8945]** Dupont, F., Morris, S., Vixie, P., Eastlake 3rd, D., Gudmundsson, O., & Wellington, B. (2020). *Secret Key Transaction Authentication for DNS (TSIG)*. RFC 8945. https://www.rfc-editor.org/rfc/rfc8945
+- **[RFC9664]** Cheshire, S., & Lemon, T. (2025). *An EDNS(0) Option to Negotiate Leases on DNS Updates*. RFC 9664. https://www.rfc-editor.org/rfc/rfc9664
+- **[RFC9665]** Lemon, T., & Cheshire, S. (2025). *Service Registration Protocol for DNS-Based Service Discovery*. RFC 9665. https://www.rfc-editor.org/rfc/rfc9665
+- **[ISC-CVE-2024-1975]** Internet Systems Consortium (2024). *CVE-2024-1975: SIG(0) can be used to exhaust CPU resources*. https://kb.isc.org/docs/cve-2024-1975 (accessed 2026-11-26)
+- **[BIND-9.18.28]** Internet Systems Consortium. *BIND 9.18.28 release notes*: "Support for SIG(0) message validation was removed from this version of named. (CVE-2024-1975)". https://bind9.readthedocs.io/en/v9.18.28/notes.html (accessed 2026-11-26)
+
+**Normative** (unchanged): BCP 14 [RFC 2119] [RFC 8174], as in §0.3.
