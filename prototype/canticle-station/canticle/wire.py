@@ -376,16 +376,28 @@ def local_expiry_ms(it: Item | Pluck, clock_offset_ms: int = 0, first_heard_ms: 
     A PLUCK does not carry its target's class, so it clamps to the largest class max TTL: its
     ``expires_at`` must equal its target's (§9.7), which cannot be later than that (#60).
     """
+    exp = _expires_eff(it)
+    local = exp + clock_offset_ms
+    if first_heard_ms is not None:
+        local = min(local, local_expiry_cap_ms(it, first_heard_ms))
+    return local
+
+
+def _expires_eff(it: Item | Pluck) -> int:
     if isinstance(it, Item):
         spec = CLASSES.get(it.cls)
         max_ttl_s = spec.max_ttl_s if spec else MAX_CLAMP_TTL_S
     else:
         max_ttl_s = MAX_CLAMP_TTL_S
-    exp = min(it.expires_at, it.issued_at + max_ttl_s * 1000)
-    local = exp + clock_offset_ms
-    if first_heard_ms is not None:
-        local = min(local, first_heard_ms + (exp - it.issued_at))
-    return local
+    return min(it.expires_at, it.issued_at + max_ttl_s * 1000)
+
+
+def local_expiry_cap_ms(it: Item | Pluck, first_heard_ms: int) -> int:
+    """The latest a receiver may hold ``it``, whatever δ̂ is or becomes: first hearing plus its signed
+    life (§14.6.3). ``local_expiry_ms`` never exceeds it, so state kept until then outlives the item
+    under any later δ̂ (#175)."""
+    exp = _expires_eff(it)
+    return first_heard_ms + (exp - it.issued_at)
 
 
 def parse(
