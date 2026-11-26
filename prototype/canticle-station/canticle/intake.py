@@ -31,7 +31,8 @@ What is spent, and by whom:
   the keys, on a bucket of their own, so no flood of other keys or of the queues spends it. In a key's turn the sources that
   were not tried come first, in the order they came; those that were and did not fail (a replay, a place that was lost) behind
   them, in turn; those whose frame failed behind those. One turn in SLOT_M, and one check of the slice, is for one that was tried. Nothing
-  but a new frame moves a source up. A newcomer is then checked within (S + 1) rounds of the keys, S being the sources that were not tried
+  but a new frame moves a source up; what it has waiting takes its tier again when it sends again, since its marks may have ended or been
+  forgotten meanwhile. A newcomer is then checked within (S + 1) rounds of the keys, S being the sources that were not tried
   before it, whatever the flood's rate: once, since each is then behind it;
 - a known place is a lease: it ends LEASE_S after the daemon first verified the newest frame that its source delivered, by the
   daemon's own clock. An exact repeat renews it to that frame's age and no further, and gives a place to nobody;
@@ -106,7 +107,7 @@ SLOT_MAX, SLOT_M = 64, 4                    # sources with a datagram in a key's
 MARKS_MAX = 256                             # sources a key remembers as tried, for as long as a newcomer may wait for them all: RETAIN
 RETAIN = 2.0 * (MARKS_MAX + 1) / SLICE_RATE    # rounds of the slice it takes to try them, twice over, in seconds per key
 UNTRIED, TRIED, DEMOTED = range(3)          # a source's tier in a key's slot
-NEVER = float("-inf")
+NEVER, EVER = float("-inf"), float("inf")
 UNLISTED_RATE, UNLISTED_BURST = 500.0, 500.0  # datagrams of no listed key examined a second, all together
 UNLISTED_DEPTH = 64
 KNOWN_MAX, KNOWN_DEPTH = 4, 64              # known sources per key; datagrams waiting per stream and known source, or
@@ -301,12 +302,13 @@ class StreamQueue:
 
 
 class Claim:
-    """A newcomer's datagram that has a place in its key's slot, and in its source's lane too while it is ``queued``."""
+    """A newcomer's datagram that has a place in its key's slot, and in its source's lane too while it is ``queued``. Its tier is
+    what its source's marks said when it was placed or moved, and they say so ``until`` then, unless they are marked again."""
 
-    __slots__ = ("entry", "stream", "source", "queued", "tier")
+    __slots__ = ("entry", "stream", "source", "queued", "tier", "until")
 
-    def __init__(self, entry: tuple, stream: StreamQueue, source: Source, queued: bool, tier: int):
-        self.entry, self.stream, self.source, self.queued, self.tier = entry, stream, source, queued, tier
+    def __init__(self, entry: tuple, stream: StreamQueue, source: Source, queued: bool, tier: int, until: float):
+        self.entry, self.stream, self.source, self.queued, self.tier, self.until = entry, stream, source, queued, tier, until
 
 
 class Slot:
@@ -332,13 +334,21 @@ class Slot:
         del self.rings[self.claims.pop(addr).tier][addr]
         self.room = len(self.rings[UNTRIED]) < SLOT_MAX
 
-    def move(self, addr, tier: int) -> None:
-        """What an address has waiting goes behind the others of its tier, when there is room for it."""
-        claim, new = self.claims.get(addr), self.rings[tier]
-        if claim is not None and claim.tier != tier and len(new) < SLOT_MAX:
+    def move(self, addr, tier: int, until: float) -> None:
+        """What an address has waiting goes behind the others of its tier, when there is room for it. Else it stays where it
+        is, and is looked at again when its source sends."""
+        claim = self.claims.get(addr)
+        if claim is None:
+            return
+        if claim.tier != tier:
+            new = self.rings[tier]
+            if len(new) >= SLOT_MAX:
+                claim.until = NEVER
+                return
             new[addr] = self.rings[claim.tier].pop(addr)
             claim.tier = tier
             self.room = len(self.rings[UNTRIED]) < SLOT_MAX
+        claim.until = until
 
     def pick(self, now: float, again: bool, ready: Callable[[StreamQueue], bool]) -> Optional[Claim]:
         """The next one whose stream is ``ready``; the others keep their turns. The untried come first, and one turn in SLOT_M is
@@ -415,8 +425,16 @@ class KeyQueue:
         return got
 
     def tier(self, addr, now: float) -> int:
+        return self.standing(addr, now)[0]
+
+    def standing(self, addr, now: float) -> tuple:
+        """A source's tier in the key's slot, and until when its marks keep it there unless it is marked again."""
         tried, failed = self.marks.get(addr, (NEVER, NEVER))
-        return DEMOTED if now - failed < self.retain else TRIED if now - tried < self.retain else UNTRIED
+        if now < (until := failed + self.retain):
+            return DEMOTED, until
+        if now < (until := tried + self.retain):
+            return TRIED, until
+        return UNTRIED, EVER
 
     def mark(self, addr, now: float, failed: bool) -> None:
         """A frame from ``addr`` was checked, and was not new: it failed, or it is a replay. Either is evidence against the frame,
@@ -433,8 +451,10 @@ class KeyQueue:
         self.marks[addr] = now, failed
         self.marks.move_to_end(addr)
         if len(self.marks) > MARKS_MAX:
-            self.marks.popitem(last=False)
-        self.slot.move(addr, self.tier(addr, now))
+            claim = self.slot.claims.get(self.marks.popitem(last=False)[0])
+            if claim is not None:
+                claim.until = NEVER                # it is forgotten, so untried: what it sends next finds it so
+        self.slot.move(addr, *self.standing(addr, now))
 
     def know(self, addr) -> int:
         """A new frame of this key was verified from ``addr``. Returns how many waiting datagrams that displaced."""
@@ -796,7 +816,11 @@ class Intake:
         new, out = got
         slot = key.slot
         refused = source if got is NO_PLACE else out[1] if out is not None and key.lost(out[:1]) else None
-        if (slot.room or addr in key.marks) and addr not in slot.claims and not source.known and self._stand(
+        held = None if source.known else slot.claims.get(addr)
+        if held is not None:
+            if now >= held.until:                  # its marks ended, were forgotten or found no room while it waited
+                slot.move(addr, *key.standing(addr, now))
+        elif not source.known and (slot.room or addr in key.marks) and self._stand(
                 key, entry, stream, source, got is not NO_PLACE, now):
             # It wakes the loop for an untried one alone, which else comes back for the queues.
             new = new or len(slot.rings[UNTRIED]) == len(slot) == 1 and self.slice.ready(now)
@@ -820,13 +844,13 @@ class Intake:
         copies = stream.bytes.get(entry[1])
         if stream.pool <= own or (copies is not None and copies[0] > queued):
             return False
-        tier = key.tier(entry[2], now)
+        tier, until = key.standing(entry[2], now)
         slot = key.slot
         if len(slot.rings[tier]) >= SLOT_MAX:
             return False
         if not len(slot):
             self._slots.append(key)
-        slot.add(Claim(entry, stream, source, queued, tier))
+        slot.add(Claim(entry, stream, source, queued, tier, until))
         return True
 
     def _place_unlisted(self, datagrams: list) -> bool:

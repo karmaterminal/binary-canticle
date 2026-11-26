@@ -576,7 +576,9 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
   turn: a replay (an old beacon verifies for ever), a source whose last frame was admitted, one that lost its known place. Those whose frame failed come last. One turn in four is for one that was
   tried, the two kinds in turn, and they have a quarter of the slice's checks, whatever else is idle: the same forgers are not checked over and over. Nothing but a frame admitted as new moves a source up, and then to the second tier; a replay leaves a failure as it is. A key
   remembers the latest 256 sources that were tried, for twice the rounds it takes to try them all; a flood that opens a new port for every datagram
-  turns that memory over in 0.2 s (256 at 1 500 checks a second), and a source is then untried again. Being tried is evidence against a frame, and no proof against its source. So a
+  turns that memory over in 0.2 s (256 at 1 500 checks a second), and a source is then untried again. What a source has waiting in the slot takes the tier its marks
+  give whenever the source sends another datagram (a copy of one that waits in its lane is not looked at): its marks may have ended, or been forgotten, while it waited,
+  or the tier may have had no room when it was marked (🍃, #178). Being tried is evidence against a frame, and no proof against its source. So a
   newcomer is checked within **(S + 1) rounds of the keys, K/500 s each (a third more where tried ones wait), whatever the flood's rate**, S being the sources of its own
   key that are not tried yet: 0 where its key is not forged, and each costs its turn once. That holds for at most 63 sources that start with it, and for 256 that
   stay. An echo of a frame that waits takes no slot, and a known source's copy stands for a slot's. A verified ITEM or PLUCK out of a slot that

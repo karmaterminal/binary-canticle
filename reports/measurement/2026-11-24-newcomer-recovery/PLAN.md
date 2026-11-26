@@ -277,3 +277,62 @@ consequence stated here: **sources that were tried have at most 125 checks a sec
 
 - **All of `d49645b`'s rows stay, as that commit's.** The gate is judged on the new commit: **E1, E2, N0, N0c, N1, N1c, N2, I, E3 and J run again on it**, `slice` only where `base` (and `head`) already ran the same harness (their runs are not repeated); INVALID runs are completed as declared. Results go to `results-2/`.
 - Before that, one diagnostic, not evidence for any gate: **AB**, R3 and R4a of #171's harness for 60 s, `base`, `old` (`d49645b`) and `new` in turn, three times: the share dropped at the socket. Its purpose is to not spend five hours on E2 if the reader is still outrun sooner.
+
+## Added 2026-11-26 09:40Z, before any run on the new code: 🍃's finding, the change, and the third set
+
+**What has run.** Everything declared for `72db59f` (`new`, results-2/). The lane stopped at 23:53Z on 11-25 in E2's run 2; its queue was not a child of the
+session and went on alone to E2's runs 2-4 and the completion of every cell with an underdriven run, `new` and `base`, until 03:35Z on 11-26 (`b0047e2`, copied
+as it was written). Nothing of this lane ran beside it.
+
+**What 🍃 found** ([#178, review 6068314339](https://github.com/karmaterminal/binary-canticle/pull/178#pullrequestreview-6068314339)), in `8495138` and so in
+`72db59f`: a claim is no longer re-tiered when its source sends again. On `d49645b` (`slice`), `_stand` moved a claim to its source's current tier on each of the
+source's datagrams; since `8495138` a datagram from an address that has a claim is looked at once and nothing moves it, so it keeps the tier it was made with until
+it is served (one turn in SLOT_M, on the retries' bucket). The commit didn't say so. **So the two earlier sets measured two rules:** `slice` (results/) with
+re-tiering, `new` (results-2/: E1, E2, N0-N2, I, J, E3) without it.
+
+**The change**, RED first, each its own commit:
+
+- `a7d65f3`: 🍃's two tests as he gave them (the demotion ended; the mark was forgotten), the nearest sibling (a move that found its tier's ring full left a failed
+  source in an untried place), and the boundary of the fix (an exact copy of bytes waiting in the source's lane re-tiers nothing; its next other datagram does).
+  All four fail on `72db59f`; the first three pass on `d49645b` and fail on `8495138`.
+- `00b44d7`: 🍃's line. The four pass. Its reader cost was not measured.
+- `dfa0414`: the same rule at `72db59f`'s reader cost. 🍃's line asks the key for the tier on every datagram of a source that has a claim, and on a flood
+  from ports held open (E2's R3: two producers, one socket each) that is every datagram. Now a claim carries `until`, when its marks stop giving its tier; its
+  source's next datagram looks only from then, or at once when the key forgot the source or the move found no room. ConsistencyTest's random traffic checks at every
+  step that no claim's tier differs from its marks before `until`, and that a claimant's datagram leaves its claim at its marks' tier or that tier's ring full: red
+  on `72db59f` and on three mutants, green on 🍃's line and here. Station suite 599 OK.
+
+`offer()` per datagram (`bench_offer.py`, results-3/bench-offer.log: the minimum of 11 interleaved runs on ronan, load 17, a diagnostic and no row):
+
+| flood | base | `72db59f` | 🍃's line | `dfa0414` |
+|---|---|---|---|---|
+| 40 ports held open | 1.14 µs | 1.18 | 1.31 | 1.19 |
+| 4 ports held open | 0.94 | 0.98 | 1.09 | 0.99 |
+| churned | 1.24 | 1.29 | 1.32 | 1.31 |
+| old beacons replayed | 0.57 | 0.59 | 0.59 | 0.59 |
+
+**Which rows it could affect, from the code.** It moves something only when an address that is not known has a claim waiting in its key's slot, sends a datagram
+that is not a copy of one waiting in its lane, and its marks changed meanwhile: they ended (`retain`, 1.03 s × K: 16.4 s at K = 16), the key forgot it (MARKS_MAX
+other sources of the key marked since: 0.17 s in a churned flood of the key), or its tier's ring was full when it was marked.
+
+- **Churned floods of the newcomer's own key: N0, and E3's `cold-start-churn-*` and `relay-*-then-churn` rows, and I's own-key phase.** A churned flood forgets
+  in 0.17 s, and an address does come back: the kernel's ephemeral ports on loopback (28 000) turn over every 1.4 s at 20 000/s and every 0.3 s at 100 000/s, so
+  forgers' addresses return, and a newcomer's port may be one a forger had a moment before. 🍃's own-key correlation (d49645b: first frame > 1 s in 21 of 40
+  runs; 72db59f: 28 of 40) is about these. *These rows could change; they are outside the guarantee on every tree and stay so.*
+- **Floods from ports held open (N0c, N1c, N2, J; E1 and E2's R3, R4a):** each forger is checked again within a fraction of a second, so its marks are renewed
+  long before they end; the key remembers all of them (40 ≤ 256); no ring fills (40 ≤ 64). Nothing moves. Its cost there is measured above.
+- **N1 (other keys, churned):** the newcomer's key is not forged, so the newcomer never has a claim. **Known sources** (R1, R2, R4b, F5, the inverse rows'
+  stations once known, I-b's replays, which are repeats) never have one; their datagrams now skip one lookup.
+
+**The third set.** The gate is judged on the code that would merge, as on 11-25: **every row runs again on it**, with the declared harness, runs and bar unchanged,
+results in results-3/. The tree `fix` is a `git archive` of the commit that adds this section (its `intake.py` is `dfa0414`'s), and so is the harness. `new`'s and
+`slice`'s rows stay as those commits'. 🌫's floor stands: an underdriven run stays INVALID and in the tables, its cell is completed (`complete.py`, at most as many
+runs again as declared), a deadline missed in an INVALID run fails its cell, and a cell short of valid runs is INVALID, never PASS.
+
+1. **AB** (a diagnostic first, deciding nothing): R3 and R4a of #171's harness for 60 s flat out, `new` and `fix` in turn, three times; the share dropped at the
+   socket. If `fix` is outrun where `new` is not, the queue stops and the lane says so before E2.
+2. E1; N0; E3; I; J; E2 run 0 (R and F rows); N0c; N1; N1c; N2; E2 runs 1-4; then the completions. The rows the change could affect come first.
+
+**The host is shared.** At 09:20Z on 11-26 its load was 15-30 (a self-hosted CI runner and other lanes' tests), and the producers run at `nice -n 19`, which is how
+runs were underdriven on 11-25. Before each step of the queue (a harness invocation, an E2 row, a completion), it waits until the one-minute load average is below
+8, for at most 15 minutes, and then starts anyway; the wait is logged, and each run records `load_before` as it always has. Nothing is chosen by how it ended.

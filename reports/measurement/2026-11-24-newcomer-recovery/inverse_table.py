@@ -1,12 +1,13 @@
-"""The inverse rows' table. Usage: inverse_table.py <inverse_rows.py's out.json>"""
+"""The inverse rows' table. Usage: inverse_table.py <inverse_rows.py's out.json>..."""
 
 import json
 import sys
 from collections import defaultdict
 
 cells = defaultdict(list)
-for r in json.load(open(sys.argv[1])):
-    cells[r["row"], r["tree"]].append(r)
+for f in sys.argv[1:]:
+    for r in json.load(open(f)):
+        cells[r["row"], r["tree"]].append(r)
 print("| row | tree | runs | what | passed |")
 print("|---|---|---|---|---|")
 for (row, tree), rs in sorted(cells.items()):
