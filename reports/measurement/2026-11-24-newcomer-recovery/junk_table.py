@@ -10,7 +10,7 @@ cells = defaultdict(list)
 for f in sys.argv[1:]:
     for r in json.load(open(f)):
         cells[r["row"], r["tree"]].append(r)
-DECLARED = {"new": 5, "slice": 5, "head": 3, "base": 3}
+DECLARED = {"fix": 5, "new": 5, "slice": 5, "head": 3, "base": 3}
 print("| row | tree | runs | items of each station during the flood, of 57, per run | worst latency, ms | offered /s | drops: kernel (reported) | verdict |")
 print("|---|---|---|---|---|---|---|---|")
 for (row, tree), rs in sorted(cells.items(), key=lambda kv: (kv[0][0].split("-")[0], int(kv[0][0].split("-")[2]), kv[0][1])):
