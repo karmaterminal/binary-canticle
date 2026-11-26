@@ -40,10 +40,30 @@ claims. This harness has no OpenClaw gateway dependency.
 
 Use the station development Python environment (Python 3.11+, cryptography >=45)
 and a local k6 binary. Do not install a new dependency set just for this harness.
-No root, network namespaces, xk6 extension, external server or hosted runner.
+Manual acceptance runs stay on the local host: no root, network namespaces,
+xk6 extension or external server. CI runs only the bounded tests described below.
 
     PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
       -s prototype/load-testing/tests -v
+
+The two real-k6 timeout probes resolve `CANTICLE_K6` first, then `k6` on
+`PATH`. Without a binary they skip by default; set `CANTICLE_REQUIRE_K6=1`
+to make absence a failure instead. For an explicit local acceptance run:
+
+    CANTICLE_REQUIRE_K6=1 CANTICLE_K6="$(command -v k6)" \
+      PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+      -s prototype/load-testing/tests -v
+
+CI now fetches the official k6 v2.0.0 Linux amd64 archive into runner-temporary
+storage, checks it against `.github/ci/k6-linux-amd64.sha256` before extraction
+or execution, and sets both `CANTICLE_K6` and `CANTICLE_REQUIRE_K6=1` for this
+suite. Missing or corrupted k6 fails the job instead of silently skipping its
+two real-k6 timeout/reap probes. This changes no system package, root privilege,
+workflow permission or secret boundary. The CI probes are accelerated loopback
+cleanup tests, not the acceptance smoke, a timing benchmark or a live host run.
+The historical Python 3.11 receipt for #189 remains 50 counted, 48 passed,
+2 skipped; it is not retroactively a real-k6 execution result. Local 50/50
+results included a local binary.
 
 First run the fixed low-load smoke: six offers, one VU, at least 250 ms between
 completed iterations; a 1,000 ms per-offer delivery deadline. This is **closed
@@ -51,7 +71,7 @@ loop** scheduling, not a promised constant arrival rate. k6 owns the iteration
 budget, pacing, VUs, checks, thresholds and JSON summary.
 
     PYTHONDONTWRITEBYTECODE=1 python3 prototype/load-testing/run.py \
-      --k6 /home/figs/.local/bin/k6 --out /tmp/canticle-k6-smoke
+      --k6 "$(command -v k6)" --out /tmp/canticle-k6-smoke
     python3 prototype/load-testing/verify.py /tmp/canticle-k6-smoke
 
 Use NEW output directories outside the repository; old artifacts are never
@@ -64,7 +84,7 @@ in both the failure and censored-latency populations. There is no special
 "negative passes" threshold: the k6 run **must fail** (normally exit 99).
 
     PYTHONDONTWRITEBYTECODE=1 python3 prototype/load-testing/run.py \
-      --k6 /home/figs/.local/bin/k6 --out /tmp/canticle-k6-negative --drop-first
+      --k6 "$(command -v k6)" --out /tmp/canticle-k6-negative --drop-first
     # The prior command MUST be nonzero; inspect it, do not hide it with || true.
     python3 prototype/load-testing/verify.py /tmp/canticle-k6-negative --negative
 
@@ -109,6 +129,9 @@ positive → mandatory negative → fresh positive, plus verifier base/revert RE
 and current GREEN. `manifest.json` pins the measured source bytes and runtime.
 The structural mutation tests deliberately use synthetic process fields; those
 are verifier tests, never process-run receipts.
+The verifier tests also read all three committed real process receipts above.
+Historical source manifests stay pinned to their measured commits; later
+portability, comments and supervision changes do not silently refresh them.
 
 ## What latency means
 
@@ -193,8 +216,9 @@ The unit suite covers parameter/request bounds, duplicate ids, dropped and
 missing-arrival denominators, success timing, late records, hash mismatch,
 conservation, real loopback receipt/drop, submission failure, normal cleanup,
 scenario exceptions, failure after partial startup and an accelerated supervisor
-wall-timeout probe using the real local k6 executable when present. It is separate from the
-k6 acceptance runs; a green unit suite is not a k6 run.
+wall-timeout probes using the real k6 executable (required in CI, optional
+locally). These are separate from k6 acceptance runs; a green unit suite is not
+an acceptance smoke or a latency result.
 
 ## Deliberate exclusions
 

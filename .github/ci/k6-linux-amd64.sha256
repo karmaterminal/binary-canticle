@@ -1,0 +1,4 @@
+# Grafana k6 v2.0.0 official release archive, Linux amd64 (ubuntu-24.04 runner).
+# Upstream release asset digest and k6-v2.0.0-checksums.txt agree on this pin.
+# https://github.com/grafana/k6/releases/tag/v2.0.0
+2ae87d976f6cdba17185bdd980d8819a3a98e9092c6f0638cd58272ecefc8b90  k6-v2.0.0-linux-amd64.tar.gz

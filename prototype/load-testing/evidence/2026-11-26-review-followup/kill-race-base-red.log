@@ -1,0 +1,47 @@
+test_group_exiting_between_term_timeout_and_kill_is_reaped (test_process_supervisor.ProcessSupervisorTest.test_group_exiting_between_term_timeout_and_kill_is_reaped) ... ERROR
+
+======================================================================
+ERROR: test_group_exiting_between_term_timeout_and_kill_is_reaped (test_process_supervisor.ProcessSupervisorTest.test_group_exiting_between_term_timeout_and_kill_is_reaped)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/var/tmp/elliott-bc-k6-followup-20261126/prototype/load-testing/run.py", line 47, in stop_child
+    await asyncio.wait_for(child.wait(), 2)
+  File "/usr/lib/python3.14/asyncio/tasks.py", line 486, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/var/tmp/elliott-bc-k6-followup-20261126/prototype/load-testing/tests/test_process_supervisor.py", line 48, in wait_for_exit
+    return await original_wait()
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/unittest/mock.py", line 2342, in _execute_mock_call
+    raise result
+TimeoutError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/asyncio/runners.py", line 128, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/var/tmp/elliott-bc-k6-followup-20261126/prototype/load-testing/tests/test_process_supervisor.py", line 54, in test_group_exiting_between_term_timeout_and_kill_is_reaped
+    self.assertTrue(await supervisor.stop_child(child))
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/tmp/elliott-bc-k6-followup-20261126/prototype/load-testing/run.py", line 49, in stop_child
+    os.killpg(child.pid, signal.SIGKILL)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/unittest/mock.py", line 1176, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/unittest/mock.py", line 1180, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/unittest/mock.py", line 1245, in _execute_mock_call
+    raise result
+ProcessLookupError
+
+----------------------------------------------------------------------
+Ran 1 test in 0.005s
+
+FAILED (errors=1)

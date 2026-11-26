@@ -3,7 +3,6 @@ import asyncio
 import json
 from pathlib import Path
 import sys
-import time
 import tempfile
 import socket
 from types import SimpleNamespace
@@ -19,6 +18,7 @@ from canticle.station import Station, StreamConfig
 from canticle.manifest import StationEntry
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 import run as supervisor
+from k6_support import k6_binary
 
 
 class BoundsTest(unittest.TestCase):
@@ -140,9 +140,7 @@ class FixtureTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(f.ledger.rows, {})
 
     async def test_supervisor_wall_timeout_reaps_real_k6_and_releases_fixture(self):
-        binary = Path("/home/figs/.local/bin/k6")
-        if not binary.is_file():
-            self.skipTest("optional real-k6 timeout probe needs local binary")
+        binary = k6_binary(self)
         real_wait = asyncio.wait_for
         async def short_child_wait(aw, timeout):
             return await real_wait(aw, .05 if timeout == 55 else timeout)

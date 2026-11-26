@@ -26,6 +26,9 @@ class VerifyTest(unittest.TestCase):
     def test_real_receipt_controls(self):
         self.assertTrue(verify(self.root, negative=True)["verified"])
         self.assertTrue(verify(HERE / "evidence/2026-11-23-smoke/smoke")["verified"])
+        self.assertTrue(verify(HERE / "evidence/2026-11-24-processes/positive")["verified"])
+        self.assertTrue(verify(HERE / "evidence/2026-11-24-processes/repeat")["verified"])
+        self.assertTrue(verify(HERE / "evidence/2026-11-24-processes/negative", negative=True)["verified"])
 
     def test_negative_json_cannot_hide_successful_process_exit(self):
         self.mutate("process.json", lambda p: p.update(k6_exit_code=0, supervisor_exit_code=0))

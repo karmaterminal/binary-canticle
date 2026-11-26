@@ -46,7 +46,11 @@ async def stop_child(child):
         try:
             await asyncio.wait_for(child.wait(), 2)
         except TimeoutError:
-            os.killpg(child.pid, signal.SIGKILL)
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                # The group may exit after TERM times out but before KILL.
+                pass
             await asyncio.wait_for(child.wait(), 2)
     return child.returncode is not None
 

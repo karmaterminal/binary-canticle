@@ -1,0 +1,22 @@
+{
+  "base": "4aff42b979cc5eaa982213d7a855f2d461de9d53",
+  "python": "3.14.8",
+  "k6": "k6 v2.0.0 (commit/8c3be52cc1, go1.26.3, linux/amd64)",
+  "source_sha256": {
+    "prototype/load-testing/run.py": "eb0ec5e14519d78b8a41b98470e7c9fa852f4c3fa481d4ee235ea77cd2b5ec69",
+    "prototype/load-testing/verify.py": "d35511f0a32802ab8cba356e45e7f0518067ffadb50ed8b92cf19dc3a2bc7807",
+    "prototype/load-testing/fixtures/__init__.py": "207db6894bd54f493a1f65dfa11de9111ed844ea9e2eac34905809cc8b42f3f4",
+    "prototype/load-testing/fixtures/loopback.py": "9a48cc7950f00987dd1e1ff4308906b1f160b962ebd9afd88f8dc2912f8f7dce",
+    "prototype/load-testing/fixtures/processes.py": "abe557f5921ac56f8025cb96d262638de21ca85bec2a34bd2d2bbf76223b0a43",
+    "prototype/load-testing/tests/k6_support.py": "3e838f3b2354020d22544dbee470b3ec9ff00edc62ddcd5256702caf3bbd1156",
+    "prototype/load-testing/tests/test_k6_support.py": "afce019f4c2462ec5099e5c455f51f8b024bc83a81c415bc0800f33cb4db5bac",
+    "prototype/load-testing/tests/test_loopback.py": "d0b0a251e264fc807bfc24da9fff5d3934f4020fef1fbfd0d78115915d107104",
+    "prototype/load-testing/tests/test_process_receipts.py": "7d94fa6145c7e83a967acaa116aafb1c1e22fb43e32be389922d2dbb17d88cac",
+    "prototype/load-testing/tests/test_process_reconnect.py": "e60b9295587c039edaff1208441dc7c8627e72aa4f8549bb35351c49b59aca17",
+    "prototype/load-testing/tests/test_process_supervisor.py": "337855d91ce0773e1ef5760cb1a7c3f12bb3475546cddd4c7c2490c0d4c2d3c3",
+    "prototype/load-testing/tests/test_processes.py": "71244bb28092ddc0bf2a3773bd20ba0468e93ce9f56e5b36b97c561e86b3b6f7",
+    "prototype/load-testing/tests/test_verify.py": "30a4cd7b4a6a76deb899aed93f89b99363d0728f8bcdfb90dd22ccc9eb4f57ed",
+    "prototype/load-testing/scenarios/smoke.js": "73061081bdb0f39806bdb636b9d3e8f4c8122e3118a925afc3f87141e7ebdf17",
+    "prototype/canticle-station/canticle/runner.py": "4fb214ce571923eab8b0e638b9d2b4fcc99a4f94ffa956697aa51fb9db397946"
+  }
+}
