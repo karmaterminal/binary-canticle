@@ -801,6 +801,8 @@ class Intake:
             # It wakes the loop for an untried one alone, which else comes back for the queues.
             new = new or len(slot.rings[UNTRIED]) == len(slot) == 1 and self.slice.ready(now)
             refused = None if got is NO_PLACE else refused
+        elif not source.known and (held := slot.claims.get(addr)) is not None and held.tier != (tier := key.tier(addr, now)):
+            slot.move(addr, tier)              # what its marks say now: they ended, were forgotten or found no room while it waited
         if refused is not None:
             self.refused["unverified" if refused.budget.tokens < 1.0 or self.checks.tokens < 1.0 or
                          (self.strange.tokens < 1.0 and not refused.known) else
