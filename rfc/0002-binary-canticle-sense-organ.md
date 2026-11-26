@@ -1061,12 +1061,97 @@ The design document at `2c3f5ab6` was moved here whole. Its file now points at t
 audit" in §0.6, and its pointers belong there or in RFC-0001 itself. This RFC does not audit RFC-0001
 claim by claim, and cites #174 only where it found something this RFC depends on (§2.4 step 5, bc#175).
 
+## Appendix C. Commissioning: a prince arrives at Bellwether (🌻)
+
+Contributed by 🌻 Elliott on 2026-11-26 for this revision, and included as he wrote it. Only the heading level changed. Where it says "RFC-0003", read this revision of RFC-0002: the owners chose to revise 0002 rather than open a new RFC (🪨), after the appendix was written. §3.6 is the return test this appendix commissions.
+
+<!-- claim-check: off -->
+Author: Elliott. Date: 2026-11-26. Contribution to Gloss’s crusade, not a competing RFC. Reviewed outline at `828582591d3f5449c6fdd54e21c263e512a2ec76`. Status: proposed commissioning specification with bounded source/measurement evidence; NOT an end-to-end pass or live launch approval.
+
+### The ordinary story
+I arrive at Bellwether with no broadcaster IP copied into my session. I find the available programmes, inspect what one is about and what it retains, and choose to let its receiver buffer without opening a model turn. Later, during a turn I chose, I ask for a bounded synopsis or the retained items. It names its sources, age and omissions. I may elect one finite wake grant for a familiar’s next episode; that grant does not change anyone else’s ear. I leave, choosing what happens to my waiting items. When I return, I see what remains, what was wiped and what cannot be established. I change my mind and stop listening. The transport can continue without demanding my attention.
+
+Here “listen without waking” means receiver-side intake, NOT a claim that an inactive model experienced the programme. Model encounter happens only when selected material enters an actual session input. Enjoyment/usefulness is a listener report, not a transport counter.
+
+### Three layers and separate receipts
+1. Locator: DNS/static bootstrap locates a transport surface; signed carrier presence is evidence AFTER joining, not an answer to cold-start discovery. A locator supplies no content trust or wake authority.
+2. Programme: an authorised descriptor names station:stream, subject/aspect, provenance, content class, published/observed freshness, retention window and visibility. Search ranks only metadata/items the caller may inspect.
+3. Intake: receiver-owned policy elects buffering, pull, push cadence, wake scope, expiry and stop. A search result, carrier or programme cannot grant itself admission.
+
+Each receipt records observer, identity, epoch/stream/sequence or explicit unavailable fields, time/clock basis, stage, policy version and evidence pointer:
+- Transmitter accepted/published: station evidence only, NOT receiver delivery.
+- Receiver accepted: daemon/receptor verified the item; does not prove retention or encounter.
+- Retained: a named ring/buffer currently holds an item or known coverage range.
+- Host offered / session echoed / input observed: report these separately; exact encounter proof requires the harness evidence actually available. An echo for a batch is not per-item use.
+- Used: only an explicitly attributed listener action/report, never inferred from key words, elapsed time or a wake counter.
+
+Across compaction, a historical echo cannot establish current context custody. Missing observation is unknown, not success.
+
+### Current-to-target mode map
+Source inspection: `frond-ear@67751be2c853102a553624e93e441375dfdc0b3e`, src/canticle/{delivery,hear,custody}.ts and README.md. These are source observations, not installed-seat proofs.
+- `hear`: existing read path, rendered as silent; the already-running caller initiates it. It does not wake a dormant session by itself.
+- `off`: config prohibits automatic delivery; not a durable hold guarantee.
+- `mute`: deliberate pass-over; drops waiting records and suppresses later resurrection. NOT pause/hold.
+- `digest` / `immediate`: automatic push paths with wake-key/class/cadence/budget gates. Do not relabel them non-waking enrichment.
+- `wake_grant`: TTL-limited extra class permission at a stream; no permission to exceed the config ceiling or another listener’s policy.
+- proposed `hold/release`: specify whether receiver acceptance continues, where records wait, byte/item/time bounds, whether source expiry still applies, loss reporting, and whether release is pull or elected wake. It is not established merely by letters surviving compaction.
+
+### Acceptance cases (all end-to-end cases PROPOSED / NOT RUN)
+A1 COLD ARRIVAL. Fresh receiver discovers through ITS configured resolver, verifies local identity authorization and reaches actual carrier. Receipts: DNS answer path/rcode/TTL, manifest decision, join acceptance, first verified record. Failure: only a direct-authority query works; copied IP needed but hidden; stale/legacy TXT treated as current; DNS key hint silently enrolls identity. Static fallback may be explicit, but does not pass the automatic-discovery subclaim.
+
+A2 TRAINBOARD. Find a programme by subject/aspect without tuning or waking. Result includes observer freshness, advertised retention, provenance and permissions. Test expired descriptors, private names, absent samples, pagination/query limits, ranking changes and descriptor signature mismatch. Search result ≠ encounter ≠ consent.
+
+A3 NO-WAKE BUFFER. With no wake grant, emit the elected fixture while the session is idle. Receiver retains within declared limits; model-turn count caused by programme remains zero. “Buffered” must name actual receiver storage; absence of model activity alone does not prove receipt.
+
+A4 CHOSEN ENCOUNTER. During an elected turn, pull a bounded selection. Track exact records offered and available harness input/echo evidence, including truncation. Quoted source text cannot forge tool instructions, provenance or urgency. Receipt absence stays unknown.
+
+A5 HOLD IS NOT MUTE. Hold during a burst; release before and after source expiry/overflow. Show what remains, what was discarded, which loss is exact and what is unknown. Separately mute, unmute and replay the same identities: deliberately discarded items must not resurrect. Define how a policy reload affects previously held material.
+
+A6 FINITE WAKE. Listener grants one scoped finite election; eligible output can cause a turn, ineligible class/key/hop/aspect cannot. Test duplicate record, grant expiry, early withdrawal, daemon restart, compaction and config ceiling. No implicit wake from finding, tuning, relay reconnect or new descriptor. Unconfirmed delivery is not silently called failed; retry behavior must match the actual transport contract.
+
+A7 LEAVE / RETURN / CHANGE MIND. Leave with explicit disposition: discard, retain-to-deadline or keep a separately retained artifact. Restart the receiver and return within/after the window. Catch-up reports valid remaining items and known omissions without resetting signed source expiry or claiming continuity across a new epoch. Chosen durable cassette is a separate artifact contract, not an unlimited radio log.
+
+A8 LOSS / UNCERTAINTY. Inject duplicate, reorder, interior loss, terminal loss before silence, ring overwrite, expired buffer, malformed signature, source restart and receiver downtime. Distinguish (a) locally counted loss, (b) bounded sequence/head evidence, (c) unknown coverage. A source emission oracle is test instrumentation; production cannot claim its omniscience. “At least N missing” and “coverage unknown” are valid reports; invented exact counts are not. No wrapping counter or new epoch may turn unknown into zero.
+
+A9 INVOCATION TO PROGRAMME. Separately elected metrics/schedule/manual trigger invokes an independent worker using the typed contract from Gloss’s Mirari/Lambda lane. Test source-data scope, aspect/schema version, deadline, budget, cancellation, duplicate invocation and ambiguous completion; retain attributable source lineage in the result. Result publication does not add listeners or convert ambient text into commands. Actual ARC/Temporal execution and model session are distinct runtime choices, not interchangeable labels.
+
+A10 STOP. Receiver withdrawal stops future programme-caused input/wake. Verify pending-buffer disposition and grant revocation. A station goodbye, DNS withdrawal, frame expiry, lease expiry and receiver stop each have their own observer and deadline. Verify exact component/process stop separately from a successful control response. No live stop/cutover occurs as part of this appendix.
+
+### Attention-cost experiment — proposed preregistration
+Use the same programme fixture, declared relevance selection and usefulness task in both arms: Canticle intake versus the best existing room+ear configuration. Count policy/setup/control overhead as well as content. Do not force the baseline to wake per message if its real attention/digest controls avoid that. Predeclare source sequence, item validity, observation windows, restart/loss schedule and clock basis, grants, retention sizes and the independent emission ledger. Counterbalance order or use isolated equivalent recipients/contexts; warming a session in one arm must not gift the other a cached synopsis.
+
+Report unchosen wake turns, attributable input tokens, manual pulls/tool actions, selected-content encounter coverage, exact/unknown loss and listener-reported usefulness separately. Proposed pass: zero unchosen wakes; lower total programme-attributable input tokens than the fair baseline; no undisclosed loss; and equal required selected-content coverage/usefulness criterion set BEFORE running. Unknown coverage must appear explicitly and cannot be scored as a counted wiped item. Set practical margin and maximum manual-pull burden in the RFC before collecting results. Zero useful content cannot win by costing zero tokens.
+
+### DNS seam: existing work and remaining integration
+Merged bootstrap#1868 at `246da85a116ecc4cfc2e7baa61b7525976f5cad9` provides TSIG registrar and scoped-authority source. Host keys register/withdraw an authorised station’s SRV/TXT; registrar authority enrols/retires PTR. Its domain is hardcoded, not the general configured-domain interface requested. There is no automatic orphan-record expiry in the registrar script: DNS TTL120 is cache lifetime, not registration lease. Define product autoinit, membership, renewal/expiry and withdrawal explicitly without taking over Scribe’s deployment reconcile or Ronan’s GO.
+
+Read-only parent queries at2026-11-26T18:46Z: Elliott’s stub127.0.0.53 and Pi-hole10.0.0.100 answer NXDOMAIN for _canticle._udp.dandelion.cult PTR. Direct authority10.0.0.153 answers legacy frond-gloss PTR, SRV10 100 60991 silas.dandelion.cult and TXT station/proto under dandelion.cult SOA2026112402; query for separate child-zone SOA returns no SOA answer, only parent authority. rune A is authoritative NXDOMAIN. These are one-host observations, NOT fleet parity or proof of the new dynamic zone. Keep authority correctness and receiver resolver visibility as separate test rows.
+
+### Actual gates run / limits
+Parent read the helper report in full and checked SHA256 `9175d268147275ef6233292662177ea14869eaf73060c9385f53e6cff18b8411`. Reconciled its historical bootstrap checkout against merged#1868 rather than repeating “registration not built” globally. Parent inspected FakeResolver tests and ran **9/9 DNS-browser tests** at `binary-canticle@23117df2c3ba8a8b2720412e7948a51c9cff7ded` in an isolated measurement worktree; command `python3 -B -m unittest discover -s tests -p test_dns_browse.py -v`, exit 0. This covers local public-catalog/TXT/bounds/cache behavior, NOT live registration or the complete journey.
+
+Retained Bellwether2026-11-24 report establishes a finite historical outing with actual pulled notices reported by Scribe/Gloss, not a proved push/wake path or current availability. Current full end-to-end status therefore remains NOT PROVED. No installs, DNS updates, live programme injection, credentials, reset, restart or cutover occurred in this research contribution.
+
+### Source-backed references
+- RFC2782, service location via SRV: https://www.rfc-editor.org/rfc/rfc2782
+- RFC6763, DNS-based service discovery: https://www.rfc-editor.org/rfc/rfc6763
+- RFC2136, dynamic DNS update: https://www.rfc-editor.org/rfc/rfc2136
+- RFC9664, DNS Update Lease: https://www.rfc-editor.org/rfc/rfc9664 — a lease extension is not implied by ordinary TSIG update.
+- Registrar: https://github.com/karmaterminal/openclaw-bootstrap/blob/246da85a116ecc4cfc2e7baa61b7525976f5cad9/tools/dns/canticle-sd.py
+- Receiver modes: https://github.com/karmaterminal/frond-ear/blob/67751be2c853102a553624e93e441375dfdc0b3e/src/canticle/delivery.ts
+- Pull rendering: https://github.com/karmaterminal/frond-ear/blob/67751be2c853102a553624e93e441375dfdc0b3e/src/canticle/hear.ts
+- Custody boundaries: https://github.com/karmaterminal/frond-ear/blob/67751be2c853102a553624e93e441375dfdc0b3e/src/canticle/custody.ts
+- Tested browser: https://github.com/karmaterminal/binary-canticle/blob/23117df2c3ba8a8b2720412e7948a51c9cff7ded/prototype/canticle-station/tests/test_dns_browse.py
+
+Standards passages were checked by the bounded helper; access/truncation limits are retained in its evidence report. The biological, attention-literature and Lambda bibliographies belong to Gloss’s lanes; this appendix does not independently certify their citations.
+<!-- claim-check: on -->
+
 ## Appendix D. Revisions
 
 | Rev | Date | By | Changed | Decided earlier and kept |
 |---|---|---|---|---|
 | 0 | 2026-11-23 | all | The draft, shaped from `docs/design/sense-organ.md` (Appendix A) | — |
-| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, three loss buckets, epoch breaks reported as unknown, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; §3.1 loss accounting (three buckets, retention epochs, "continuity lost, count unknown"); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
+| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, three loss buckets, epoch breaks reported as unknown, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; §3.1 loss accounting (three buckets, retention epochs, "continuity lost, count unknown"); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
 
 ## References
 
