@@ -561,7 +561,7 @@ This paragraph says what it searches and what a search may and may not do. Every
   session, the early-selection model of attention [Broadbent1958] [Driver2001].
 - **A search is a look, not an arrival.** Results are labelled as metadata or preview, as `peek` is. A
   payload excerpt in a result counts as exposure. A search MUST NOT wake a session, MUST NOT tune a
-  stream, and MUST NOT mark anything heard (§3.1).
+  stream, and MUST NOT mark anything heard (§3.1) `[proposed: #195]`.
 - **Kinds without a second index.** Streams of one kind can be enumerated as DNS-SD subtypes [RFC6763]
   (§7.1 there) under the station's carrier (§2.8). Where the house resolver supports DNS Push
   [RFC8765], the board watches stations come and go instead of polling. Otherwise it states its polling
