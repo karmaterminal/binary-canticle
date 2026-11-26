@@ -35,7 +35,8 @@ def score(plan):
         facts[ident] = fact
     require(0 < len(facts) <= 100, "bounded nonempty facts required")
     expected = sorted(plan["facts"], key=lambda f: f["id"])
-    require(set(plan["arms"]) == {"discord", "pull", "grant"}, "three named arms required")
+    require(isinstance(plan["arms"], dict) and set(plan["arms"]) == {"discord", "pull", "grant"},
+            "three named arms required")
     output = {}
     for name, arm in plan["arms"].items():
         require(type(arm["available"]) is bool, "availability must be explicit")
@@ -44,7 +45,9 @@ def score(plan):
             continue
         require(sorted(arm["opportunities"], key=lambda f: f["id"]) == expected,
                 "unmatched facts/times/hashes: an empty Discord arm is not a baseline")
-        require(type(arm["census_complete"]) is bool, "invocation census completeness required")
+        # True declares all invocations AND all notice/use annotations in this
+        # window are listed; it is not inferred from delivery or verified here.
+        require(type(arm["census_complete"]) is bool, "invocation/annotation census completeness required")
         turns = {}
         for turn in arm["turns"]:
             ident, when = turn["id"], turn["started_ms"]
@@ -90,24 +93,33 @@ def score(plan):
             if turn_id in credited:
                 used.add(fact_id)
         complete = arm["census_complete"]
-        count = len(credited)
+        count, observed = len(credited), len(turns)
         output[name] = {
             "assessment": "trace-scored" if complete else "unknown",
-            "observed_model_invocations": len(turns), "budgeted_invocations": count,
+            "observed_model_invocations": observed, "budgeted_invocations": count,
+            "over_budget_invocations": observed - count,
             "reported_delivered": sorted(delivered), "reported_noticed": sorted(noticed),
             "reported_used": sorted(used), "late_notice_ids": sorted(late),
             "over_budget_notice_ids": sorted(beyond),
             "missing_notice_ids": sorted(set(facts) - noticed.keys()) if complete else None,
-            "noticed_per_invocation": len(noticed) / count if complete and count else None,
-            "empty_invocations": count - len(set(first_turn.values())) if complete else None,
+            "noticed_per_invocation": len(noticed) / observed if complete and observed else None,
+            "empty_invocations": observed - len(set(first_turn.values())) if complete else None,
         }
     b, c = output["pull"], output["grant"]
-    comparison = "unknown"
-    if b["assessment"] == c["assessment"] == "trace-scored":
+    comparison = notice_yield = "unknown"
+    if (b["assessment"] == c["assessment"] == "trace-scored"
+            and (b["reported_noticed"] or c["reported_noticed"])):
         missed_from_pull = set(b["reported_noticed"]) - set(c["reported_noticed"])
         comparison = "fail" if missed_from_pull else "no-additional-trace-miss"
+        b_count, c_count = b["observed_model_invocations"], c["observed_model_invocations"]
+        if b_count and c_count:
+            # Compare exact integer ratios, not rounded display floats. This is
+            # a separate trace-only column, never an economic acceptance rule.
+            lower = len(c["reported_noticed"]) * b_count < len(b["reported_noticed"]) * c_count
+            notice_yield = "fail" if lower else "no-lower-trace-yield"
     return {"v": "canticle-day-score/0", "claim": "synthetic declared metadata only; no live encounter or value proof",
-            "arms": output, "grant_vs_pull_no_extra_miss": comparison}
+            "arms": output, "grant_vs_pull_no_extra_miss": comparison,
+            "grant_vs_pull_notice_yield": notice_yield}
 
 
 def main():

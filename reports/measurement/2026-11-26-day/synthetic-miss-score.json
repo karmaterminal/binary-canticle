@@ -6,6 +6,7 @@
       "assessment": "trace-scored",
       "observed_model_invocations": 1,
       "budgeted_invocations": 1,
+      "over_budget_invocations": 0,
       "reported_delivered": [
         "opening"
       ],
@@ -23,6 +24,7 @@
       "assessment": "trace-scored",
       "observed_model_invocations": 1,
       "budgeted_invocations": 1,
+      "over_budget_invocations": 0,
       "reported_delivered": [
         "opening"
       ],
@@ -40,6 +42,7 @@
       "assessment": "trace-scored",
       "observed_model_invocations": 1,
       "budgeted_invocations": 1,
+      "over_budget_invocations": 0,
       "reported_delivered": [
         "opening"
       ],
@@ -54,5 +57,6 @@
       "empty_invocations": 1
     }
   },
-  "grant_vs_pull_no_extra_miss": "fail"
+  "grant_vs_pull_no_extra_miss": "fail",
+  "grant_vs_pull_notice_yield": "fail"
 }

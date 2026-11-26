@@ -22,6 +22,99 @@ def fixture():
 
 
 class ScorerTest(unittest.TestCase):
+    def test_complete_census_absent_annotation_is_a_declared_miss(self):
+        p=fixture(); a=p["arms"]["grant"]
+        a["census_complete"]=True; a["noticed"]=[]
+        result=score(p)
+        self.assertEqual(result["arms"]["grant"]["assessment"],"trace-scored")
+        self.assertEqual(result["arms"]["grant"]["missing_notice_ids"],["opening"])
+        self.assertEqual(result["grant_vs_pull_no_extra_miss"],"fail")
+
+    def test_same_absence_with_incomplete_census_is_unknown(self):
+        p=fixture(); a=p["arms"]["grant"]
+        a["census_complete"]=False; a["noticed"]=[]
+        result=score(p)
+        self.assertIsNone(result["arms"]["grant"]["missing_notice_ids"])
+        self.assertIsNone(result["arms"]["grant"]["noticed_per_invocation"])
+        self.assertEqual(result["grant_vs_pull_no_extra_miss"],"unknown")
+        self.assertEqual(result["grant_vs_pull_notice_yield"],"unknown")
+
+    def test_equal_and_better_notice_yield_are_explicit_not_economic_passes(self):
+        for extra_pull_turns in [0,3]:
+            p=fixture(); a=p["arms"]["pull"]
+            a["turns"].extend(dict(id="extra-"+str(i),started_ms=200+i,receipt="synthetic:empty") for i in range(extra_pull_turns))
+            with self.subTest(extra_pull_turns=extra_pull_turns):
+                self.assertEqual(score(p)["grant_vs_pull_notice_yield"],"no-lower-trace-yield")
+
+    def test_zero_invocations_cannot_establish_a_yield(self):
+        p=fixture(); a=p["arms"]["pull"]; a["turns"]=[]; a["noticed"]=[]
+        result=score(p)
+        self.assertEqual(result["grant_vs_pull_notice_yield"],"unknown")
+        self.assertIsNone(result["arms"]["pull"]["noticed_per_invocation"])
+
+    def test_unavailable_or_incomplete_cost_comparison_is_unknown(self):
+        for arm_name in ["pull","grant"]:
+            for unavailable in [False,True]:
+                p=fixture()
+                if unavailable: p["arms"][arm_name]={"available":False}
+                else: p["arms"][arm_name]["census_complete"]=False
+                with self.subTest(arm=arm_name,unavailable=unavailable):
+                    self.assertEqual(score(p)["grant_vs_pull_notice_yield"],"unknown")
+
+    def test_better_yield_cannot_erase_an_extra_miss(self):
+        p=fixture(); fact=dict(id="closing",body_sha256="b"*64,issued_ms=0,expires_ms=900)
+        p["facts"].append(fact)
+        for a in p["arms"].values(): a["opportunities"].append(deepcopy(fact))
+        a=p["arms"]["pull"]
+        a["turns"].extend(dict(id="extra-"+str(i),started_ms=200+i,receipt="synthetic:empty") for i in range(9))
+        a["noticed"].append(dict(fact_id="closing",turn_id=a["turns"][0]["id"],noticed_ms=100,receipt="synthetic:explicit-output"))
+        result=score(p)
+        self.assertEqual(result["grant_vs_pull_notice_yield"],"no-lower-trace-yield")
+        self.assertEqual(result["grant_vs_pull_no_extra_miss"],"fail")
+
+    def test_zero_notice_cli_is_unknown_and_cost_failure_is_not_a_miss_exit(self):
+        with tempfile.TemporaryDirectory(prefix="canticle-day-cost-") as directory:
+            path=Path(directory)/"trace.json"
+            for mode,expected in [("empty",3),("cost-fail",0)]:
+                p=fixture()
+                if mode=="empty":
+                    for name in ["pull","grant"]: p["arms"][name]["noticed"]=[]
+                else:
+                    p["arms"]["grant"]["turns"].extend(dict(id="extra-"+str(i),started_ms=200+i,receipt="synthetic:empty") for i in range(14))
+                path.write_text(json.dumps(p))
+                result=subprocess.run([sys.executable,str(Path(__file__).with_name("scorer.py")),str(path)],capture_output=True,text=True)
+                with self.subTest(mode=mode):
+                    self.assertEqual(result.returncode,expected,result.stderr)
+                    parsed=json.loads(result.stdout)
+                    self.assertEqual(parsed["grant_vs_pull_notice_yield"],"unknown" if mode=="empty" else "fail")
+
+    def test_arms_list_cannot_masquerade_as_the_three_named_objects(self):
+        p=fixture(); p["arms"]=["discord","pull","grant"]
+        with self.assertRaisesRegex(ValueError,"three named arms required"):
+            score(p)
+
+    def test_complete_zero_notice_pair_is_unknown_not_vacuous_success(self):
+        p=fixture()
+        for name in ["pull","grant"]:
+            p["arms"][name]["noticed"]=[]
+        result=score(p)
+        self.assertEqual(result["grant_vs_pull_no_extra_miss"],"unknown")
+
+    def test_fifteen_vs_one_same_fact_fails_separate_cost_comparison(self):
+        p=fixture(); a=p["arms"]["grant"]
+        a["turns"].extend(dict(id="extra-"+str(i),started_ms=200+i,receipt="synthetic:empty") for i in range(14))
+        result=score(p)
+        self.assertEqual(result["grant_vs_pull_no_extra_miss"],"no-additional-trace-miss")
+        self.assertEqual(result["grant_vs_pull_notice_yield"],"fail")
+
+    def test_sixteen_invocations_all_remain_in_yield_denominator(self):
+        p=fixture(); a=p["arms"]["grant"]
+        a["turns"].extend(dict(id="extra-"+str(i),started_ms=200+i,receipt="synthetic:empty") for i in range(15))
+        result=score(p)["arms"]["grant"]
+        self.assertEqual(result["noticed_per_invocation"],1/16)
+        self.assertEqual(result["budgeted_invocations"],15)
+        self.assertEqual(result["over_budget_invocations"],1)
+
     def test_cli_control_miss_and_unknown_have_distinct_exits(self):
         with tempfile.TemporaryDirectory(prefix="canticle-day-synthetic-") as directory:
             path=Path(directory)/"trace.json"

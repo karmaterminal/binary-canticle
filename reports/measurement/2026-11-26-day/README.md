@@ -64,8 +64,19 @@ extractor, replay driver, host instrumentation or model judge. It makes no
 network/model calls and imports no live/private session material. It ignores
 extra fields such as tool-call lists rather than counting them as turns.
 It requires three named arms; an explicitly unavailable grant arm stays
-unavailable, not a zero result imputed for OpenClaw. Complete trace declarations
-permit trace-only missing-notice counts; incomplete declarations remain unknown.
+unavailable, not a zero result imputed for OpenClaw.
+
+**Completeness contract.** In each available synthetic arm, `census_complete: true`
+is a caller declaration that **all actual model invocations and all notice/use
+annotations in the entire window** are listed, including empty/unrelated turns,
+late annotations and over-budget turns/annotations. It must not mean only that
+the invocation list is complete. If either census or annotation coverage is
+incomplete or uncertain, set this flag to false. True permits trace-only missing
+notice counts: an absent fact-id annotation is a declared miss, even if delivery
+is present. False keeps misses, per-invocation yield and paired comparisons
+unknown; absence is not a zero or a pass. The scorer cannot attest the truth of
+this flag, audit an output, or discover a caller's omitted annotations.
+
 First budgeted invocations are ordered by started_ms then invocation id. Expired
 notices and over-budget notices are retained but not credited. Each notice requires
 its own noticed_ms and each use its own used_ms, no earlier than its invocation
@@ -75,12 +86,35 @@ that same invocation; another invocation in the same millisecond proves no
 causal order. These times, like receipts, are synthetic declarations. Duplicate notice
 rows gain nothing; noticing the same fact on another invocation is an empty
 invocation for the new-fact measure. Reported use remains a separate column.
+
+**Invocation cost and paired columns.** `noticed_per_invocation` divides qualified,
+distinct budget-credited noticed facts by **all observed model invocations**,
+including over-budget invocations. `budgeted_invocations` and
+`over_budget_invocations` separately expose the credit window and its overrun;
+no turn is silently dropped from cost. `empty_invocations` counts all observed
+invocations without a new credited notice, not a claim that their output was
+empty. Budget-excess notices remain uncredited but are reported separately.
+
+`grant_vs_pull_no_extra_miss` asks only whether grant omitted a fact pull noticed.
+If neither arm has any qualified notice, it is unknown, not a vacuous success.
+The independent `grant_vs_pull_notice_yield` column compares noticed facts per
+observed invocation by exact integer cross-products: lower grant yield is fail;
+equal/higher yield is no-lower-trace-yield. Zero invocation denominators,
+incomplete/unavailable arms and no-notice pairs remain unknown. For the same one
+fact, grant's 15 invocations versus pull's one therefore fail the cost column,
+although the miss-only column reports no extra miss. Neither column overrides
+the other, proves compliance with the budget, or supplies an economic/live pass.
+
 Fact ids must bind to a normalized, exact identity in any future extractor;
 this prototype does not resolve a keyed refresh or reconcile mutable truth.
 
 CLI exits: **0** = no additional grant-vs-pull miss in declared synthetic notices;
 **1** = planted/other extra trace miss; **2** = invalid input; **3** = unknown or
-unavailable comparison. Exit 0 is NOT a whole-evaluation or economic pass.
+unavailable/no-notice comparison. Exit 0 is **miss-only**: it can coexist with
+`grant_vs_pull_notice_yield: fail` (for example, 15 grant invocations versus one
+pull invocation). Consumers must inspect the separate cost column and overrun
+counts; exit 0 is NOT cost equality, budget acceptance, a whole-evaluation or an
+economic pass.
 Run synthetic-miss.json and require exit 1: retaining delivery while removing
 only the notice must fail the no-additional-miss comparison.
 
