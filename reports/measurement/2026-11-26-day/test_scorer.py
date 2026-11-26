@@ -14,7 +14,7 @@ def fixture():
     arm = dict(available=True, opportunities=deepcopy(facts), census_complete=True,
                turns=[dict(id="reader/session/invocation-1", started_ms=100, receipt="synthetic:host-start")],
                delivered=[dict(fact_id="opening", receipt="synthetic:host-returned")],
-               noticed=[dict(fact_id="opening", turn_id="reader/session/invocation-1", receipt="synthetic:explicit-output")],
+               noticed=[dict(fact_id="opening", turn_id="reader/session/invocation-1", noticed_ms=100, receipt="synthetic:explicit-output")],
                used=[])
     return dict(v="canticle-day-trace/0", source_kind="synthetic", budget=15,
                 window_ms=[0,1000], facts=facts,
@@ -36,10 +36,54 @@ class ScorerTest(unittest.TestCase):
                     self.assertEqual(result.returncode,expected,result.stderr)
                     if mode!="invalid": self.assertIn("synthetic declared metadata",json.loads(result.stdout)["claim"])
 
+    def test_non_object_cli_is_invalid_not_extra_miss(self):
+        with tempfile.TemporaryDirectory(prefix="canticle-day-invalid-") as directory:
+            path=Path(directory)/"trace.json"
+            for value in [None, [], 1, "trace"]:
+                path.write_text(json.dumps(value))
+                result=subprocess.run([sys.executable,str(Path(__file__).with_name("scorer.py")),str(path)],capture_output=True,text=True)
+                with self.subTest(value=value):
+                    self.assertEqual(result.returncode,2)
+                    self.assertNotIn("Traceback",result.stderr)
+
+    def test_invocation_can_cross_expiry_but_notice_is_late(self):
+        p=fixture(); p["arms"]["grant"]["noticed"][0]["noticed_ms"]=950
+        self.assertEqual(score(p)["arms"]["grant"]["reported_noticed"],[])
+
+    def test_fact_issued_during_invocation_can_be_noticed_after_issue(self):
+        p=fixture(); p["facts"][0]["issued_ms"]=150
+        for arm in p["arms"].values():
+            arm["opportunities"][0]["issued_ms"]=150
+            arm["noticed"][0]["noticed_ms"]=200
+        self.assertEqual(score(p)["arms"]["grant"]["reported_noticed"],["opening"])
+
+    def test_equal_time_other_invocation_cannot_justify_use(self):
+        p=fixture(); a=p["arms"]["grant"]
+        a["turns"]=[dict(id=ident,started_ms=100,receipt="synthetic:"+ident) for ident in ["a-use","z-notice"]]
+        a["noticed"][0]["turn_id"]="z-notice"
+        a["used"]=[dict(fact_id="opening",turn_id="a-use",used_ms=100,receipt="synthetic:action")]
+        with self.assertRaisesRegex(ValueError,"use requires"):
+            score(p)
+
+    def test_equal_time_own_notice_still_allows_use(self):
+        p=fixture(); a=p["arms"]["grant"]
+        a["turns"]=[dict(id=ident,started_ms=100,receipt="synthetic:"+ident) for ident in ["a-other","z-use"]]
+        a["noticed"]=[dict(fact_id="opening",turn_id=ident,noticed_ms=100,receipt="synthetic:notice:"+ident) for ident in ["a-other","z-use"]]
+        a["used"]=[dict(fact_id="opening",turn_id="z-use",used_ms=100,receipt="synthetic:action")]
+        self.assertEqual(score(p)["arms"]["grant"]["reported_used"],["opening"])
+
     def test_non_object_json_rejected(self):
         for value in [None, [], 1, "trace"]:
             with self.subTest(value=value), self.assertRaisesRegex(ValueError,"trace object required"):
                 score(value)
+
+    def test_committed_synthetic_controls_match_retained_outputs(self):
+        root=Path(__file__).parent
+        for name in ["control","miss"]:
+            with self.subTest(name=name):
+                trace=json.loads((root/("synthetic-"+name+".json")).read_text())
+                expected=json.loads((root/("synthetic-"+name+"-score.json")).read_text())
+                self.assertEqual(score(trace),expected)
 
     def test_matched_control(self):
         result=score(fixture())
@@ -83,18 +127,18 @@ class ScorerTest(unittest.TestCase):
     def test_repeat_notice_on_later_invocation_is_empty(self):
         p=fixture(); a=p["arms"]["grant"]
         a["turns"].append(dict(id="later",started_ms=200,receipt="synthetic:host-start-2"))
-        a["noticed"].insert(0,dict(fact_id="opening",turn_id="later",receipt="synthetic:repeat"))
+        a["noticed"].insert(0,dict(fact_id="opening",turn_id="later",noticed_ms=200,receipt="synthetic:repeat"))
         self.assertEqual(score(p)["arms"]["grant"]["empty_invocations"],1)
 
     def test_use_requires_independent_notice(self):
         p=fixture(); a=p["arms"]["grant"]; a["noticed"]=[]
-        a["used"]=[dict(fact_id="opening",turn_id=a["turns"][0]["id"],receipt="synthetic:action")]
+        a["used"]=[dict(fact_id="opening",turn_id=a["turns"][0]["id"],used_ms=100,receipt="synthetic:action")]
         with self.assertRaisesRegex(ValueError,"use requires"):
             score(p)
 
     def test_explicit_use_is_separate(self):
         p=fixture(); a=p["arms"]["grant"]
-        a["used"]=[dict(fact_id="opening",turn_id=a["turns"][0]["id"],receipt="synthetic:action")]
+        a["used"]=[dict(fact_id="opening",turn_id=a["turns"][0]["id"],used_ms=100,receipt="synthetic:action")]
         self.assertEqual(score(p)["arms"]["grant"]["reported_used"],["opening"])
 
     def test_unmatched_discord_arm_rejected(self):
@@ -129,6 +173,7 @@ class ScorerTest(unittest.TestCase):
 
     def test_expired_notice_is_late_not_success(self):
         p=fixture(); p["arms"]["grant"]["turns"][0]["started_ms"]=900
+        p["arms"]["grant"]["noticed"][0]["noticed_ms"]=900
         a=score(p)["arms"]["grant"]
         self.assertEqual(a["reported_noticed"],[])
         self.assertEqual(a["late_notice_ids"],["opening"])

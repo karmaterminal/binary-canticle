@@ -67,7 +67,12 @@ It requires three named arms; an explicitly unavailable grant arm stays
 unavailable, not a zero result imputed for OpenClaw. Complete trace declarations
 permit trace-only missing-notice counts; incomplete declarations remain unknown.
 First budgeted invocations are ordered by started_ms then invocation id. Expired
-notices and over-budget notices are retained but not credited. Duplicate notice
+notices and over-budget notices are retained but not credited. Each notice requires
+its own noticed_ms and each use its own used_ms, no earlier than its invocation
+start and inside the window. TTL is checked at noticed_ms, never invocation start.
+A use requires a strictly earlier qualified notice, or an equal-time notice in
+that same invocation; another invocation in the same millisecond proves no
+causal order. These times, like receipts, are synthetic declarations. Duplicate notice
 rows gain nothing; noticing the same fact on another invocation is an empty
 invocation for the new-fact measure. Reported use remains a separate column.
 Fact ids must bind to a normalized, exact identity in any future extractor;

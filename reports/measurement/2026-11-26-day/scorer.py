@@ -58,13 +58,15 @@ def score(plan):
         for row in arm["delivered"]:
             require(row["fact_id"] in facts and bool(row.get("receipt")), "delivery needs known fact and receipt")
             delivered.add(row["fact_id"])
-        noticed, first_turn, late, beyond, used = {}, {}, set(), set(), set()
+        noticed, first_turn, notice_events, late, beyond, used = {}, {}, {}, set(), set(), set()
         # A notice is an explicit trace annotation citing an output, not a push,
         # an optimistic tool-return stamp, or a token echo equated to full text.
         for row in arm["noticed"]:
             fact_id, turn_id = row["fact_id"], row["turn_id"]
             require(fact_id in facts and turn_id in turns and bool(row.get("receipt")), "invalid notice evidence")
-            fact, when = facts[fact_id], turns[turn_id]["started_ms"]
+            fact, when = facts[fact_id], row["noticed_ms"]
+            require(type(when) is int and turns[turn_id]["started_ms"] <= when < end,
+                    "notice time outside invocation/window")
             require(when >= fact["issued_ms"], "notice precedes issue")
             if turn_id not in credited:
                 beyond.add(fact_id)
@@ -72,13 +74,18 @@ def score(plan):
             if when >= fact["expires_ms"]:
                 late.add(fact_id)
                 continue
+            notice_events.setdefault(fact_id, []).append((when, turn_id))
             if fact_id not in noticed or (when, turn_id) < (noticed[fact_id], first_turn[fact_id]):
                 noticed[fact_id] = when
                 first_turn[fact_id] = turn_id
         for row in arm["used"]:
             fact_id, turn_id = row["fact_id"], row["turn_id"]
             require(fact_id in facts and turn_id in turns and bool(row.get("receipt")), "invalid use evidence")
-            require(fact_id in noticed and noticed[fact_id] <= turns[turn_id]["started_ms"],
+            used_ms = row["used_ms"]
+            require(type(used_ms) is int and turns[turn_id]["started_ms"] <= used_ms < end,
+                    "use time outside invocation/window")
+            require(any(when < used_ms or (when == used_ms and source_turn == turn_id)
+                        for when, source_turn in notice_events.get(fact_id, [])),
                     "use requires its own prior/this-turn notice")
             if turn_id in credited:
                 used.add(fact_id)

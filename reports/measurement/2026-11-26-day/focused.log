@@ -1,11 +1,17 @@
 test_cli_control_miss_and_unknown_have_distinct_exits (test_scorer.ScorerTest.test_cli_control_miss_and_unknown_have_distinct_exits) ... ok
+test_committed_synthetic_controls_match_retained_outputs (test_scorer.ScorerTest.test_committed_synthetic_controls_match_retained_outputs) ... ok
 test_delivery_is_not_notice_or_use (test_scorer.ScorerTest.test_delivery_is_not_notice_or_use) ... ok
 test_duplicate_invocation_rejected_not_silently_collapsed (test_scorer.ScorerTest.test_duplicate_invocation_rejected_not_silently_collapsed) ... ok
+test_equal_time_other_invocation_cannot_justify_use (test_scorer.ScorerTest.test_equal_time_other_invocation_cannot_justify_use) ... ok
+test_equal_time_own_notice_still_allows_use (test_scorer.ScorerTest.test_equal_time_own_notice_still_allows_use) ... ok
 test_expired_notice_is_late_not_success (test_scorer.ScorerTest.test_expired_notice_is_late_not_success) ... ok
 test_explicit_use_is_separate (test_scorer.ScorerTest.test_explicit_use_is_separate) ... ok
+test_fact_issued_during_invocation_can_be_noticed_after_issue (test_scorer.ScorerTest.test_fact_issued_during_invocation_can_be_noticed_after_issue) ... ok
 test_invalid_budget_rejected (test_scorer.ScorerTest.test_invalid_budget_rejected) ... ok
+test_invocation_can_cross_expiry_but_notice_is_late (test_scorer.ScorerTest.test_invocation_can_cross_expiry_but_notice_is_late) ... ok
 test_many_tool_calls_in_one_invocation_cost_one (test_scorer.ScorerTest.test_many_tool_calls_in_one_invocation_cost_one) ... ok
 test_matched_control (test_scorer.ScorerTest.test_matched_control) ... ok
+test_non_object_cli_is_invalid_not_extra_miss (test_scorer.ScorerTest.test_non_object_cli_is_invalid_not_extra_miss) ... ok
 test_non_object_json_rejected (test_scorer.ScorerTest.test_non_object_json_rejected) ... ok
 test_non_synthetic_input_rejected (test_scorer.ScorerTest.test_non_synthetic_input_rejected) ... ok
 test_over_budget_notice_not_credited (test_scorer.ScorerTest.test_over_budget_notice_not_credited) ... ok
@@ -20,6 +26,6 @@ test_unmatched_discord_arm_rejected (test_scorer.ScorerTest.test_unmatched_disco
 test_use_requires_independent_notice (test_scorer.ScorerTest.test_use_requires_independent_notice) ... ok
 
 ----------------------------------------------------------------------
-Ran 20 tests in 0.199s
+Ran 26 tests in 0.322s
 
 OK

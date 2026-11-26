@@ -1,0 +1,32 @@
+test_invocation_can_cross_expiry_but_notice_is_late (test_scorer.ScorerTest.test_invocation_can_cross_expiry_but_notice_is_late) ... FAIL
+test_equal_time_other_invocation_cannot_justify_use (test_scorer.ScorerTest.test_equal_time_other_invocation_cannot_justify_use) ... FAIL
+
+======================================================================
+FAIL: test_invocation_can_cross_expiry_but_notice_is_late (test_scorer.ScorerTest.test_invocation_can_cross_expiry_but_notice_is_late)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/var/tmp/elliott-bc-day-measure-20261126/reports/measurement/2026-11-26-day/test_scorer.py", line 51, in test_invocation_can_cross_expiry_but_notice_is_late
+    self.assertEqual(score(p)["arms"]["grant"]["reported_noticed"],[])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: ['opening'] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+'opening'
+
+- ['opening']
++ []
+
+======================================================================
+FAIL: test_equal_time_other_invocation_cannot_justify_use (test_scorer.ScorerTest.test_equal_time_other_invocation_cannot_justify_use)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/var/tmp/elliott-bc-day-measure-20261126/reports/measurement/2026-11-26-day/test_scorer.py", line 65, in test_equal_time_other_invocation_cannot_justify_use
+    with self.assertRaisesRegex(ValueError,"use requires"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.001s
+
+FAILED (failures=2)
