@@ -320,6 +320,22 @@ tape.
   not `station:stream` names, so a shared group still brings the whole group onto the host
   `[open: §7.3]`.
 
+**Withdrawals and what a ring may keep (🍃, revision 1).** §2.1's two shapes are the two cleanup
+disciplines of a log [Kreps2013]. Latest-state is compaction to the last value per key. Ordered events
+are a retained window. Compaction's known failure is the ghost: a reader away longer than a delete marker
+lives keeps a value that is gone [KafkaDesign] [Demers1987].
+- **On air, the canticle already closes that failure.** RFC-0001 §7 keeps a PLUCK looping until its
+  target's expiry, and every item carries a signed `expires_at`. So no on-air value outlives its own
+  withdrawal. (RFC-0001 §7; this section changes nothing there.)
+- **Retention reopens it.** Anything that keeps an item past its wire expiry (a ring per retention class,
+  a prince's held buffer (§3.2), the guide's index (§3.3)) MUST keep the item's PLUCK, or a durable mark
+  of it, for as long as it keeps the item. It MUST show a withdrawn item as withdrawn, never as current
+  `[proposed: #195]`.
+- **Which end a full buffer loses** is a choice to state, not leave implicit [LinuxRingBuffer]:
+  - a station's carousel evicts by depth, losing the oldest, as an honest gap (RFC-0001 §7);
+  - a reader's held buffer SHOULD lose the newest and report it as a local omission (§3.1), so that
+    what the prince comes back to is a contiguous window `[proposed: #195]`.
+
 ### 2.3 Licensing, carriage and tuning are separate
 
 - **Licensing:** the signed manifest says who may transmit under a station name. (RFC-0001 §10.3; the
@@ -1163,7 +1179,7 @@ Standards passages were checked by the bounded helper; access/truncation limits 
 | Rev | Date | By | Changed | Decided earlier and kept |
 |---|---|---|---|---|
 | 0 | 2026-11-23 | all | The draft, shaped from `docs/design/sense-organ.md` (Appendix A) | — |
-| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§3.2** a today-and-proposed table for intake (mute drops and is not hold; hold and release are unbuilt). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
+| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§2.2** withdrawals and retention (on air the PLUCK already closes compaction's ghost; anything retained past wire expiry must keep the PLUCK; which end a full buffer loses). **§3.2** a today-and-proposed table for intake (mute drops and is not hold; hold and release are unbuilt). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
 
 ## References
 
