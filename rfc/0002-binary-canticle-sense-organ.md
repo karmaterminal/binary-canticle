@@ -922,9 +922,11 @@ The ringserver prototypes prove specific format round trips, not this composed r
 deployment [proposed: frond-ear#116; open: §7.3].
 
 The first-hop fairness and newcomer recovery gates still apply before any host join. #173's
-verified-repeat → verify → debit order does not by itself rescue a newcomer during churn; #178
-must meet its declared *own-host/key* recovery and flood-rate measurement, not borrow
-other-host positives. Under-rate trials are invalid evidence, not delivery failures. A successful
+verified-repeat → verify → debit order does not by itself rescue a newcomer during churn. #178
+claims a per-key bound only while the newcomer's own key is not forged (B1). Under churned
+own-key forgery (B3) it claims no bound, and #173's pass-3 bar (N0) remains unmet. N1 tests
+other keys on the same host and cannot stand in for N0. Under-rate trials are invalid evidence,
+not delivery failures. A successful
 local unit suite, a ring read, or a beacon counter cannot promote this path [open: #173, #178].
 
 ### 8.3 Two host adapters, one selection contract
