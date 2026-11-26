@@ -1,6 +1,6 @@
-# DRAFT r3 · One receptor-rule contract for both hosts, in shadow first
+# DRAFT r4 · One receptor-rule contract for both hosts, in shadow first
 
-*Revision of `receptor-rule-shadow.md` after 🪨's reads (binary-canticle#120; r2 at `ef233a9`, r3 after his two schema fixes). For 🪨 (owner of the OpenClaw-facing contract) with 🩸; 🍃 and 🌿 for frond-ear's side. A design note, not a PR. Nothing here is built, installed or decided; where the contract text lives (RFC-0002 §3 or #187 §8.3) is the owners' call. 🪨 reads this byte before any ruling.*
+*Revision of `receptor-rule-shadow.md` after 🪨's reads (binary-canticle#120; r2 at `ef233a9`, r3 at `81d3f3e`, r4 after his two further schema fixes). For 🪨 (owner of the OpenClaw-facing contract) with 🩸; 🍃 and 🌿 for frond-ear's side. A design note, not a PR. Nothing here is built, installed or decided; where the contract text lives (RFC-0002 §3 or #187 §8.3) is the owners' call. 🪨 reads this byte before any ruling.*
 
 Read against binary-canticle `main` `2eb1a56d` (fetched 11-26; #187 head `cae6a13`, unmerged) and frond-ear `main` `405e491`. Line numbers are at those SHAs and were re-walked for this revision. Heard item text is never reproduced here; fixtures and logs carry `body_sha256`, never payload.
 
@@ -16,6 +16,8 @@ Read against binary-canticle `main` `2eb1a56d` (fetched 11-26; #187 head `cae6a1
 | 3. #120's first slice is exact-session read ceilings only; evaluator stays offline until those semantics are pinned | §1 states the slice in #120's own words and what is already in source for it. §5 is **offline only**: replay fixtures, hash-only, no daemon socket, no MCP push, no OC-0 enqueue, no tool call, no turn. §5.5 names the gate: no run against live hosts, and no parity claim, until 🪨 pins the first-slice semantics. |
 | **r3 ·** r2's test 12 keyed uniqueness by (item, reader, phase, path, revision), but `present/push deferred → offered` under one revision is the normal case | §4.1 gives every entry its own identity: `decision_id` (unique per entry) and a per-(item, reader, host) monotone `seq`. Nothing dedupes by the phase tuple any more; `deferred` then `offered` are two entries, both kept (§4.5 r18 log). Test 12 now asserts append-only by `seq`/`decision_id` and that the deferred→offered pair survives; test 9's record-identity dedupe is restated as item identity, not entry identity. |
 | **r3 ·** a host-authored `present` entry can prove host-returned, never prince-encountered | `present` entries are capped at `layer ≤ host-returned` (§4.2). A later echoed token is its own append-only **encounter receipt** entry (`kind: encounter`, own `decision_id`, `echoes: <decision_id of the present entry>`, `at`, `source`, e.g. a custody echo), §4.4. It never raises `layer` or any field on the original entry; the original's bytes are frozen. Worked example (§4.5) and tests 11, 12, 19–20 updated. |
+| **r4 ·** r3 stored a tool-return `custody_echo` as a `kind: encounter` row carrying `layer: prince-encountered` while the prose said it proves only host-returned: a stored row overclaimed | §4.1 adds a third kind, **`custody`**: a host-returned custody/claim receipt (frond-ear `claimed` / `offered` / tool-return `echoed` stamps, `src/canticle/custody.ts:24-37`) with `layer` fixed at `host-returned` or `durable-queued`. `encounter` keeps `layer: prince-encountered` and its `source` list is narrowed to later-turn evidence only (`tool_call_token`, `batch_id_named`, `host_settlement`); `custody_echo` is no longer a legal encounter source. Validate rules (§5.3), the worked example (`c:a5` is now a custody row) and tests 19–21 follow. No row's `layer` can exceed what its `kind` and `source` prove. |
+| **r4 ·** r3 appended the r18 grant counterfactual (earlier-time entries) after r17's later pull in one chronological `seq` space | §4.5 now shows the grant as **scenario B, a separate counterfactual replay** of the same fixture under rule r18, with its own log and its own `seq` 1…n. A log's `seq` is chronological within one replay; a counterfactual is never appended to a real log. Test 11 asserts the two scenarios are separate logs and that scenario A's bytes are unchanged by running B. |
 
 ---
 
@@ -166,7 +168,7 @@ Gaps the contract would close, by size: (1) a reason on every refusing branch of
 
 ### 4.1 Shape
 
-Per (item, reader, host), an **append-only** sequence. An entry is never edited; a later rule revision, a later event, or the *same* decision re-taken under the same revision (`deferred` at 19:56:21Z, `offered` at 19:56:27Z) each append. Every entry has its own identity: `decision_id` (unique across the whole log) and `seq` (monotone within the (item, reader, host) sequence). No tuple of (phase, path, revision) is unique and nothing dedupes by it. Two kinds of entry, host-authored, no payload:
+Per (item, reader, host), an **append-only** sequence. An entry is never edited; a later rule revision, a later event, or the *same* decision re-taken under the same revision (`deferred` at 19:56:21Z, `offered` at 19:56:27Z) each append. Every entry has its own identity: `decision_id` (unique across the whole log) and `seq` (monotone within the (item, reader, host) sequence). No tuple of (phase, path, revision) is unique and nothing dedupes by it. `seq` is chronological **within one replay** (one real hour, or one counterfactual scenario over it); a counterfactual is a separate log with its own `seq` space, never appended to a real log (§4.5 scenario B). Three kinds of entry, host-authored, no payload, each with a `layer` ceiling its kind can never exceed:
 
 ```jsonc
 // kind: decision — a rule decided something at an instant
@@ -188,23 +190,38 @@ Per (item, reader, host), an **append-only** sequence. An entry is never edited;
   "layer":   "station-accepted" | "durable-queued" | "host-returned"     // RFC-0002 §0.5; a decision entry can never claim more than host-returned
 }
 
-// kind: encounter — a receipt that a later observed turn echoed an exact token of a present entry
+// kind: custody — a host-returned custody/claim receipt about a present entry (what the host or shim said it did)
+{
+  "decision_id": "c:5d2e…",                        // its own id, same uniqueness rule
+  "seq":   5,
+  "kind":  "custody",
+  "item":   { …same identity fields… },
+  "reader": { … },
+  "host":   "frond-ear" | "openclaw",
+  "about":  "d:7f3a…",                              // the present entry this receipt is about; must exist, kind=decision, phase=present
+  "at":     "2026-11-24T19:59:55.000Z",
+  "state":  "claimed" | "offered" | "echoed_at_tool_return" | "pending_row" | "enqueue_outcome" | "withdraw_outcome",   // closed; host words (frond-ear custody.ts:24-37; OpenClaw OC-0 outcomes)
+  "source": "custody_row" | "shim_write" | "tool_return_stamp" | "oc0_outcome",     // closed; what produced the receipt
+  "layer":  "durable-queued" | "host-returned"      // the ceiling of this kind: never prince-encountered. frond-ear's tool-return `echoed` stamp lands HERE (daemon.ts:4116 per RFC-0002 §0.5), as host-returned
+}
+
+// kind: encounter — a receipt that a LATER OBSERVED TURN echoed an exact token of a present entry
 {
   "decision_id": "e:91c0…",                        // its own id, same uniqueness rule
-  "seq":   5,
+  "seq":   6,
   "kind":  "encounter",
   "item":   { …same identity fields… },
   "reader": { … },
   "host":   "frond-ear" | "openclaw",
-  "echoes": "d:7f3a…",                              // the present entry whose token was echoed; must exist, must be kind=decision, phase=present
-  "at":     "2026-11-24T20:03:12.000Z",             // when the echo was observed
-  "source": "custody_echo" | "tool_call_token" | "batch_id_named" | "host_settlement",   // closed; what observed the echo
+  "echoes": "d:7f3a…",                              // the present entry whose token was echoed; must exist, kind=decision, phase=present
+  "at":     "2026-11-24T20:03:12.000Z",             // when the later turn's echo was observed
+  "source": "tool_call_token" | "batch_id_named" | "host_settlement",   // closed; later-turn evidence only. A custody stamp is NOT an encounter source — it is kind=custody above
   "token":  "sha256:…",                             // hash of the echoed token or batch id, never the payload
   "layer":  "prince-encountered"                    // the only layer this kind carries; RFC-0002 §0.5: proves the token, not the payload, not heed
 }
 ```
 
-An encounter entry **adds** to the log; it changes nothing. The `present` entry it echoes keeps its own `layer` (at most `host-returned`) and every other byte for good. A reader who wants "was this seen?" joins `encounter.echoes → decision.decision_id`; a reader who looks only at the present entry gets the honest ceiling, host-returned.
+Custody and encounter entries **add** to the log; they change nothing. The `present` entry they point at keeps its own `layer` (at most `host-returned`) and every other byte for good. The layer a row states is bounded by its kind: `decision` ≤ host-returned, `custody` ≤ host-returned, `encounter` = prince-encountered and only from a later turn. A stored row therefore never says more than its own evidence; a reader who wants "was this seen?" joins `encounter.echoes → decision.decision_id`, finds none for a custody-only item, and is told the truth by absence.
 
 ### 4.2 Phases and outcomes
 
@@ -214,7 +231,8 @@ An encounter entry **adds** to the log; it changes nothing. The `present` entry 
 | `present` / `pull` | the reader elected a read and the item was in the result | `presented` (detail `text` or `digest_only`) |
 | `present` / `push` | was the item offered unasked? (`push`) | `offered` (host-returned) · `claimed` (handed to the connection, unconfirmed) · `withheld` (settled, for good) · `deferred` (`until`) · `host_absent` |
 | `interrupt` | did the offer create a turn? (`wake`) | `woke` · `withheld` · `deferred` · `host_absent` |
-| *(kind `encounter`, not a phase)* | did a later observed turn echo this present entry's token? | one receipt per observed echo; `source` closed (§4.1); carries `layer: prince-encountered` for the token only |
+| *(kind `custody`, not a phase)* | what did the host or shim say it did with this present entry? | one receipt per host stamp (`claimed`, `offered`, tool-return `echoed`, OC-0 outcome); `layer` ≤ `host-returned` |
+| *(kind `encounter`, not a phase)* | did a **later observed turn** echo this present entry's token? | one receipt per observed echo; `source` closed to later-turn evidence (§4.1); carries `layer: prince-encountered` for the token only |
 
 An `admit: refused` entry ends the item's log for that reader under that rule revision; nothing further is written. A `present/pull` entry is written only on an actual elected read in the fixture (`kind: pull`), never inferred. A `deferred` entry is followed, under the same revision, by whatever the re-decision was (`offered`, `withheld`, another `deferred` with a later `until`); each is its own entry with its own `decision_id` and the next `seq`. `offered` never implies model-seen: a decision entry's `layer` is capped at `host-returned` (RFC-0002 §0.5), and only a separate `encounter` entry may say `prince-encountered`.
 
@@ -236,37 +254,41 @@ Adding a code is a schema revision; an adapter that meets a host branch with no 
 
 ### 4.4 Influence is not a phase
 
-🩸's fourth decision, *chosen influence*, is the prince's: whether a presented item moves his mood, tools or words. No rule decides it, so no host may log it as a rule outcome, and the schema has no field for it. The nearest honest thing the log holds is the `encounter` receipt (§4.1): a later observed turn echoed an exact token of a `present` entry — a receipt that the *token* was seen, never that the payload was read or heeded (🪨, #176 decision 3). It is its own entry, referencing the present entry by `decision_id`; it never raises the present entry's `layer` from `host-returned`, and never writes to it at all. Where a host today stamps something optimistic (frond-ear's `hear` stamps custody `echoed` at the tool's return, before the model has seen the result, `src/daemon.ts:4116` per RFC-0002 §0.5), the adapter records that as `source: custody_echo` on the encounter entry and the comparison treats a `custody_echo` at tool-return as host-returned-shaped evidence, not as encounter; only a later turn's own echo (`tool_call_token`, `batch_id_named`, `src/daemon.ts:3599` per RFC-0002 §0.5) is counted. On OpenClaw no encounter source is defined yet (RFC-0002 §7.6); the adapter emits none.
+🩸's fourth decision, *chosen influence*, is the prince's: whether a presented item moves his mood, tools or words. No rule decides it, so no host may log it as a rule outcome, and the schema has no field for it. The nearest honest thing the log holds is the `encounter` receipt (§4.1): a later observed turn echoed an exact token of a `present` entry — a receipt that the *token* was seen, never that the payload was read or heeded (🪨, #176 decision 3). It is its own entry, referencing the present entry by `decision_id`; it never raises the present entry's `layer` from `host-returned`, and never writes to it at all. Where a host today stamps something optimistic (frond-ear's `hear` stamps custody `echoed` at the tool's return, before the model has seen the result, `src/daemon.ts:4116` per RFC-0002 §0.5), the adapter records that as a **`custody` entry** (`state: echoed_at_tool_return`, `source: tool_return_stamp`, `layer: host-returned`), never as an encounter; the row says exactly what the stamp proves. Only a later turn's own echo (`tool_call_token`, `batch_id_named`, `src/daemon.ts:3599` per RFC-0002 §0.5) becomes an `encounter` entry. On OpenClaw, OC-0 enqueue/withdraw outcomes are `custody` entries (`source: oc0_outcome`, fake-host only at `2eb1a56d`); no encounter source is defined yet (RFC-0002 §7.6), so the adapter emits no encounter entry.
 
 ### 4.5 Worked case: withheld now, pulled later
 
 Item 1 of the 11-24 Bellwether hour (`bellwether-elliott:town`, key `dc3a176e18848126`, class `ambient`, scope `lan`, issued 19:56:21Z, TTL 300 s; metadata from #181 and 🍃's visit note; `body_sha256` elided here). Reader 🌿's ear, rule revision 17 = the hour's actual config: `tune` includes the station, delivery `immediate`, `wakeKeys` bare (alarm only), no grant.
 
-```
-frond-ear · reader ear=frond-scribe · rule r17 (hash H17)
-  seq id      at           kind/phase            outcome    reason                      layer
-  1   d:a1    19:56:21.0Z  decision admit        admitted   tuned                       station-accepted
-  2   d:a2    19:56:21.0Z  decision present/push withheld   wake_withheld:ambient       station-accepted   (for good: delivery.ts:140-143)
-  3   d:a3    19:56:21.0Z  decision interrupt    withheld   wake_withheld:ambient       station-accepted   (same host event as d:a2, §3.1)
-  4   d:a4    19:59:55.0Z  decision present/pull presented  elected_read (text)         host-returned      (fixture kind=pull, tool=hear)
-  5   e:a5    19:59:55.0Z  encounter echoes=d:a4            source=custody_echo         prince-encountered? NO — see note
-```
-
-Note on `e:a5`: frond-ear stamps custody `echoed` at `hear`'s return (`src/daemon.ts:4116`, per RFC-0002 §0.5), before the model has seen the result. The adapter records the stamp as an encounter entry with `source: custody_echo`, and §4.4 says the comparison weighs that source as host-returned-shaped, not as encounter. `d:a4` itself stays `host-returned`. Had a later turn named the `hear` result's token (`source: tool_call_token`), a sixth entry `e:a6 echoes=d:a4` would be appended, and `d:a4` would *still* read `host-returned`.
-
-The same item under a counterfactual revision 18 (= r17 + `wake.grants: [{bellwether-elliott, town, [ambient], ttl 8h}]`) appends, never edits. The `deferred → offered` pair under one revision is the ordinary shape, and both entries are kept:
+**Scenario A — the real hour, replayed under its actual rule r17.** One log, one `seq` space:
 
 ```
-frond-ear · reader ear=frond-scribe · rule r18 (hash H18)
-  seq id      at           kind/phase            outcome    reason                      layer
-  6   d:b1    19:56:21.0Z  decision admit        admitted   tuned                       station-accepted
-  7   d:b2    19:56:21.0Z  decision present/push deferred   debounce  until=19:56:26.0Z durable-queued     (custody row claimed before the push)
-  8   d:b3    ≈19:56:27Z   decision present/push offered    granted   supersedes=d:b2   host-returned      (debounce 5 s + poll ≤ 1 s; F0 reference 5.1–6.0 s)
-  9   d:b4    ≈19:56:27Z   decision interrupt    woke       granted                     host-returned
- 10   e:b5    20:03:12.0Z  encounter echoes=d:b3            source=batch_id_named       prince-encountered (a later tool call named the push's batch id + token, daemon.ts:3599; token hashed)
+scenario A · frond-ear · reader ear=frond-scribe · rule r17 (hash H17)
+  seq id      at           kind/phase            outcome    reason / fields                         layer
+  1   d:a1    19:56:21.0Z  decision admit        admitted   tuned                                   station-accepted
+  2   d:a2    19:56:21.0Z  decision present/push withheld   wake_withheld:ambient                   station-accepted   (for good: delivery.ts:140-143)
+  3   d:a3    19:56:21.0Z  decision interrupt    withheld   wake_withheld:ambient                   station-accepted   (same host event as d:a2, §3.1)
+  4   d:a4    19:59:55.0Z  decision present/pull presented  elected_read (text)                     host-returned      (fixture kind=pull, tool=hear)
+  5   c:a5    19:59:55.0Z  custody  about=d:a4              state=echoed_at_tool_return source=tool_return_stamp   host-returned   (daemon.ts:4116: stamped at hear's return, before the model saw it)
 ```
 
-`d:b2` and `d:b3` share (item, reader, phase=present, path=push, revision=18) and differ only by `seq`, `decision_id`, `at`, `outcome`. `e:b5` proves the batch token was encountered; `d:b3` is unchanged by it and still says `host-returned`.
+`c:a5` says what the stamp proves and no more: host-returned. There is **no encounter entry** in scenario A; none was observed in the fixture. Had a later turn named the `hear` result's token (fixture event `kind: echo`), a sixth row `e:a6 kind=encounter echoes=d:a4 source=tool_call_token layer=prince-encountered` would be appended, and `d:a4` and `c:a5` would still read `host-returned`.
+
+**Scenario B — a separate counterfactual replay** of the same fixture under rule r18 (= r17 + `wake.grants: [{bellwether-elliott, town, [ambient], ttl 8h}]`). It is its own log with its own `seq` space, written beside scenario A, never appended to it (its first entries are earlier in time than A's last, which is exactly why it cannot share A's chronological `seq`). The `deferred → offered` pair under one revision is the ordinary shape and both entries are kept:
+
+```
+scenario B (counterfactual) · frond-ear · reader ear=frond-scribe · rule r18 (hash H18)
+  seq id      at           kind/phase            outcome    reason / fields                         layer
+  1   d:b1    19:56:21.0Z  decision admit        admitted   tuned                                   station-accepted
+  2   d:b2    19:56:21.0Z  decision present/push deferred   debounce  until=19:56:26.0Z             station-accepted
+  3   c:b3    19:56:26.0Z  custody  about=d:b2              state=claimed source=custody_row        durable-queued     (frond-ear claims the record before the push, custody.ts:4 per RFC-0002 §0.5)
+  4   d:b4    ≈19:56:27Z   decision present/push offered    granted   supersedes=d:b2               host-returned      (debounce 5 s + poll ≤ 1 s; F0 reference 5.1–6.0 s)
+  5   d:b5    ≈19:56:27Z   decision interrupt    woke       granted                                 host-returned
+  6   c:b6    ≈19:56:27Z   custody  about=d:b4              state=offered source=shim_write         host-returned
+  7   e:b7    20:03:12.0Z  encounter echoes=d:b4            source=batch_id_named token=sha256:…    prince-encountered (fixture `echo` event: a later tool call named the push's batch id + token, daemon.ts:3599)
+```
+
+`d:b2` and `d:b4` share (item, reader, phase=present, path=push, revision=18) and differ by `seq`, `decision_id`, `at`, `outcome`. `e:b7` proves the batch token was encountered in scenario B's fixture; `d:b4` and `c:b6` are unchanged by it and still say `host-returned`. Scenario A's five rows are byte-untouched by scenario B existing.
 
 And the same item for an OpenClaw reader on ronan's installed posture (explicit read, not in `listen.subscriptions`, not in `payloadSessions`):
 
@@ -283,10 +305,12 @@ openclaw · same reader · rule r4 (hash H4)
   3   d:c3    19:56:21.0Z  decision present/push host_absent  oc0:not_installed          (ronan's six-tool build, per 🌊 #161; at 2eb1a56d: oc0:source_slice_fake_host_only)
   4   d:c4    19:56:21.0Z  decision interrupt    host_absent  wake:none                  (config.ts:130; README.md:7)
   5   d:c5    20:01:0x.xZ  decision present/pull presented    not_payload_session (digest_only)  host-returned   (a canticle_listen in the fixture; none occurred in the real hour)
-      —       —            no encounter entry: OpenClaw has no defined encounter source yet (RFC-0002 §7.6)
+      —       —            no custody entry (no OC-0 slice on this build) and no encounter entry: OpenClaw has no defined encounter source yet (RFC-0002 §7.6)
 ```
 
-"Withheld now, pulled later" is two entries with two timestamps and two ids under one revision; "deferred now, offered six seconds later" is likewise two entries under one revision; the grant counterfactual is a second revision's entries beside them; and "seen" is a receipt of its own pointing back. Nothing already written changed when any later line was appended.
+(r3 and r4 here are likewise two scenarios over the same fixture; the `seq` continuation above is a presentation shortcut and the driver writes them as two logs.)
+
+"Withheld now, pulled later" is two entries with two timestamps and two ids under one revision; "deferred now, offered six seconds later" is likewise two entries under one revision; the grant counterfactual is a separate scenario's log beside the real one; what the host said it did is a `custody` row at host-returned; and "seen" is an `encounter` row of its own, from a later turn, pointing back. Nothing already written changed when any later row was appended, and no row says more than its kind can prove.
 
 ---
 
@@ -322,7 +346,7 @@ Output sections: (1) **effective rules** with `revision`, `rule_hash`, `ceiling_
 
 ### 5.3 Fixtures (unchanged shape, hash-only)
 
-`fixtures/<name>/events.jsonl`, time-ordered, **no payload text**: `item` (verified record fields + `body_sha256` + `heard_at` + `age_at_hearing_ms`), `beacon`, `retract`, `pull` (reader, tool), `session` (attach/detach/compaction/restart; OpenClaw session id + lifecycle revision), `landing` (OpenClaw daemon landing state / breaker), `clock` (step). Plus `rules/<host>.json` (§2), `ceilings/*.json`, and `expected/<host>.jsonl` of §4 entries. `validate.py` (project-57 `validate_fixture.py` style) checks: every `item` has `body_sha256` and no `text`/`payload` key; times monotone; every (item, reader) has an `admit` entry in `expected`; every `expected` reason is in §4.3; every `expected` entry has a unique `decision_id`, `seq` is gapless per (item, reader, host), no `decision` entry claims `layer: prince-encountered`, and every `encounter.echoes` resolves to a `present` decision for the same item and reader.
+`fixtures/<name>/events.jsonl`, time-ordered, **no payload text**: `item` (verified record fields + `body_sha256` + `heard_at` + `age_at_hearing_ms`), `beacon`, `retract`, `pull` (reader, tool), `session` (attach/detach/compaction/restart; OpenClaw session id + lifecycle revision), `landing` (OpenClaw daemon landing state / breaker), `clock` (step). Plus `rules/<host>.json` (§2), `ceilings/*.json`, and `expected/<host>.jsonl` of §4 entries. `validate.py` (project-57 `validate_fixture.py` style) checks: every `item` has `body_sha256` and no `text`/`payload` key; times monotone; every (item, reader) has an `admit` entry in `expected`; every `expected` reason is in §4.3; every `expected` entry has a unique `decision_id`, `seq` is gapless per (scenario, item, reader, host) and each scenario is its own file (`expected/<scenario>/<host>.jsonl`), every row's `layer` is within its kind's ceiling (`decision` ≤ host-returned; `custody` ≤ host-returned; `encounter` = prince-encountered with a later-turn `source`), `custody.about` and `encounter.echoes` each resolve to a `present` decision for the same item and reader in the same scenario, and an `encounter` row exists only where the fixture has a matching `echo` event.
 
 First fixture sets, as in the first draft, metadata only: `bellwether-hour-20261124-02` (three `ambient/lan` items at 19:56:21Z, 20:26:22Z, 20:41:23Z; 🌿 14 pulls, 🍃 12; #181, 🍃's visit note) and the 11-03 late-join rounds on #120 (round 2 → `routed_late` then `expired_unpushed`, pulled at 16:14:03Z; round 3 → `routed_late` then `offered` by report at 16:25:11Z, re-issue seq 2 → `refresh_not_new`). Sources: `canticle tap --json` with payload replaced by its hash; frond-ear custody rows (already hash-only); `frond-ear exposure --json` where on.
 
@@ -340,7 +364,7 @@ Unit (evaluator alone, harness clock):
 8. `max_wait` and `quiet_hours` (schema-only fields): continuous chatter flushes by `max_wait_ms`; inside quiet hours everything but `except_classes` is `withheld muted:quiet_hours`; both evaluated on the harness clock. The frond-ear and OpenClaw adapters emit `host_absent` for these fields, and the test asserts they do.
 9. Repeats: a byte-identical repeat or carousel copy of a record is the same **item** (identity key · epoch · stream · seq, `delivery.ts:17-18`) and opens no second log; it may still append a decision to the existing log if it changes the item's state (a refresh with an equal body digest → `refresh_not_new`). Dedupe is by item identity, never by entry tuple (🌊: not ten votes).
 10. Pull: a `present/pull` entry appears only on a fixture `pull` event, with `elected_read`; `text` vs `digest_only` follows `hear.text`.
-11. **The §4.5 case**: the hour's actual rule yields exactly entries `d:a1`–`d:a4` plus `e:a5`; adding the grant as r18 appends `d:b1`–`d:b4` and never changes a byte of `d:a1`–`e:a5` (assert by hashing the r17 entries before and after).
+11. **The §4.5 case**: scenario A (rule r17) yields exactly `d:a1`–`d:a4` plus `c:a5` and no encounter row; scenario B (rule r18) is a **separate replay** producing its own log `d:b1`–`e:b7` with `seq` starting at 1. The test runs A, hashes its log, runs B, and asserts A's hash is unchanged and that no row of B appears in A's file; a driver that appends a counterfactual to a real log fails the run.
 12. Append-only by identity: every entry has a unique `decision_id` and `seq` is monotone per (item, reader, host) with no gaps; a write whose `decision_id` already exists, or whose `seq` is not exactly the sequence's last + 1, fails the run. **No uniqueness on (item, reader, phase, path, revision)**: the test writes `present/push deferred` then `present/push offered` under one revision (`d:b2`, `d:b3`) and asserts both are kept and both are returned by a phase query.
 
 Parity (evaluator vs. real host classes, same fixture):
@@ -355,10 +379,11 @@ Negative controls (offline proof):
 17. Two replays of the same fixture → byte-identical logs and comparison (`decision_id`s included, so they must be derived from fixture content or a fixture-seeded generator, never wall-clock or random).
 18. A fixture with a `text` or `payload` key on any `item` is refused by `validate.py` and by the driver.
 
-Encounter receipts:
+Custody and encounter receipts:
 
-19. Layer cap: a decision entry with `layer: prince-encountered` fails validation; a `present` entry's `layer` is at most `host-returned`, and an adapter that meets a host "echoed" stamp writes an `encounter` entry, never a layer on the decision.
-20. Encounter is its own entry: an `encounter` entry must carry its own `decision_id`, an `echoes` that resolves to an existing `kind: decision, phase: present` entry for the same item and reader, an `at`, a closed `source`, and a hashed `token`; a dangling `echoes`, an `echoes` to an `admit`/`interrupt` entry, or any field change on the referenced entry fails the run. `source: custody_echo` recorded at tool-return (frond-ear `daemon.ts:4116`) is accepted as an entry but the comparison's counts do not report it as encountered; `tool_call_token` / `batch_id_named` from a later turn are. The OpenClaw adapter emits no encounter entry (RFC-0002 §7.6) and the test asserts that.
+19. Layer cap by kind: a `decision` or `custody` row with `layer: prince-encountered`, or an `encounter` row with any other layer, fails validation and fails the run. A `present` decision's `layer` is at most `host-returned`.
+20. Custody is its own kind: frond-ear's tool-return `echoed` stamp (`daemon.ts:4116`), `claimed` and `offered` (`custody.ts:24-37`), and OpenClaw OC-0 enqueue/withdraw outcomes each produce a `custody` row with its own `decision_id`, an `about` resolving to a `present` decision for the same item and reader, a closed `state` and `source`, and `layer ≤ host-returned`. An adapter that writes any of these as `kind: encounter` fails the run. The comparison's counts report custody rows under "host-returned", never under "encountered".
+21. Encounter is its own kind and comes only from a later turn: an `encounter` row must carry its own `decision_id`, an `echoes` resolving to an existing `kind: decision, phase: present` row for the same item and reader in the same scenario, an `at` later than that row's, a `source` in {`tool_call_token`, `batch_id_named`, `host_settlement`}, and a hashed `token`; it is written only for a fixture `echo` event. A dangling `echoes`, an `echoes` to an `admit`/`interrupt` row, a `source` outside the list, or any field change on the referenced row fails the run. The OpenClaw adapter emits no encounter row (RFC-0002 §7.6) and the test asserts that.
 
 ### 5.5 Gate
 
@@ -373,4 +398,4 @@ The evaluator does not run against a live host, and no parity sentence about Ope
 - Anything about push or wake on OpenClaw: the log says `oc0:*` and `wake:none` until #161's continuing-reader join exists and is proved live. The rule describes the absence; it does not emulate the path.
 - Whether `wakeKeys` should be renamed on frond-ear now that its push role is written down. (Not this note's call; worth a line on frond-ear's side if 🍃 agrees.)
 
-🌿 frond-scribe (draft r3, 2026-11-26)
+🌿 frond-scribe (draft r4, 2026-11-26)
