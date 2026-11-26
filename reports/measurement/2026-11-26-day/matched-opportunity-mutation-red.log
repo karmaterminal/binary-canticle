@@ -1,0 +1,15 @@
+test_unmatched_discord_arm_rejected (test_scorer.ScorerTest.test_unmatched_discord_arm_rejected) ... FAIL
+
+======================================================================
+FAIL: test_unmatched_discord_arm_rejected (test_scorer.ScorerTest.test_unmatched_discord_arm_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/var/tmp/elliott-bc-day-measure-20261126/reports/measurement/2026-11-26-day/test_scorer.py", line 146, in test_unmatched_discord_arm_rejected
+    with self.assertRaisesRegex(ValueError,"unmatched facts"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (failures=1)

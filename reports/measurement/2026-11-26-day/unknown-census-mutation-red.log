@@ -1,0 +1,18 @@
+test_unknown_census_never_turns_absence_into_zero_misses (test_scorer.ScorerTest.test_unknown_census_never_turns_absence_into_zero_misses) ... FAIL
+
+======================================================================
+FAIL: test_unknown_census_never_turns_absence_into_zero_misses (test_scorer.ScorerTest.test_unknown_census_never_turns_absence_into_zero_misses)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/var/tmp/elliott-bc-day-measure-20261126/reports/measurement/2026-11-26-day/test_scorer.py", line 158, in test_unknown_census_never_turns_absence_into_zero_misses
+    self.assertEqual(result["arms"]["grant"]["assessment"],"unknown")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'trace-scored' != 'unknown'
+- trace-scored
++ unknown
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

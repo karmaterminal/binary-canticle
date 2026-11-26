@@ -1,0 +1,62 @@
+{
+  "v": "canticle-day-score/0",
+  "claim": "synthetic declared metadata only; no live encounter or value proof",
+  "arms": {
+    "discord": {
+      "assessment": "trace-scored",
+      "observed_model_invocations": 1,
+      "budgeted_invocations": 1,
+      "over_budget_invocations": 0,
+      "reported_delivered": [
+        "opening"
+      ],
+      "reported_noticed": [
+        "opening"
+      ],
+      "reported_used": [],
+      "late_notice_ids": [],
+      "over_budget_notice_ids": [],
+      "missing_notice_ids": [],
+      "noticed_per_invocation": 1.0,
+      "empty_invocations": 0
+    },
+    "pull": {
+      "assessment": "trace-scored",
+      "observed_model_invocations": 1,
+      "budgeted_invocations": 1,
+      "over_budget_invocations": 0,
+      "reported_delivered": [
+        "opening"
+      ],
+      "reported_noticed": [
+        "opening"
+      ],
+      "reported_used": [],
+      "late_notice_ids": [],
+      "over_budget_notice_ids": [],
+      "missing_notice_ids": [],
+      "noticed_per_invocation": 1.0,
+      "empty_invocations": 0
+    },
+    "grant": {
+      "assessment": "trace-scored",
+      "observed_model_invocations": 1,
+      "budgeted_invocations": 1,
+      "over_budget_invocations": 0,
+      "reported_delivered": [
+        "opening"
+      ],
+      "reported_noticed": [
+        "opening"
+      ],
+      "reported_used": [],
+      "late_notice_ids": [],
+      "over_budget_notice_ids": [],
+      "missing_notice_ids": [],
+      "noticed_per_invocation": 1.0,
+      "empty_invocations": 0
+    }
+  },
+  "grant_vs_pull_no_extra_miss": "no-additional-trace-miss",
+  "grant_vs_pull_notice_yield": "no-lower-trace-yield"
+}
