@@ -1,0 +1,29 @@
+=== 11:09:49Z gate: load 6.46 8.07 11.95, waited 0 s for others and 0 s for load
+=== 11:09:49Z E1
+11:10:04Z fix R1-valid-other-key 0 57 of 57 {'p50': 9.5, 'p90': 14.6, 'p99': 18.6, 'max': 20.7} PASS offered 71408 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 965024, 'backlog': 2021}
+11:10:18Z fix R2-same-station 0 57 of 57 {'p50': 26.0, 'p90': 117.7, 'p99': 126.4, 'max': 141.3} PASS offered 35971 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 486214, 'backlog': 692}
+11:10:33Z fix R3-forged-claiming-quiet 0 57 of 57 {'p50': 11.8, 'p90': 18.4, 'p99': 21.3, 'max': 21.6} PASS offered 100006 drops 0 0 {'unlisted': 0, 'unverified': 1338765, 'over_rate': 0, 'backlog': 2449}
+11:10:48Z fix R3c-forged-churned-sources 0 57 of 57 {'p50': 18.0, 'p90': 28.2, 'p99': 61.9, 'max': 76.2} PASS offered 100002 drops 0 0 {'unlisted': 0, 'unverified': 1317263, 'over_rate': 0, 'backlog': 16967}
+11:11:07Z fix R4-replay-own-frames 0 57 of 57 {'p50': 16.9, 'p90': 18.3, 'p99': 19.6, 'max': 19.8} PASS offered 100007 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 0, 'backlog': 0}
+11:11:22Z fix R1-valid-other-key 1 57 of 57 {'p50': 9.5, 'p90': 13.8, 'p99': 16.9, 'max': 19.0} PASS offered 72881 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 984946, 'backlog': 2067}
+11:11:36Z fix R2-same-station 1 57 of 57 {'p50': 9.3, 'p90': 118.8, 'p99': 127.6, 'max': 128.9} PASS offered 36372 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 491788, 'backlog': 558}
+11:11:51Z fix R3-forged-claiming-quiet 1 57 of 57 {'p50': 10.9, 'p90': 18.1, 'p99': 20.7, 'max': 21.2} PASS offered 99136 drops 0 0 {'unlisted': 0, 'unverified': 1338963, 'over_rate': 0, 'backlog': 548}
+11:12:06Z fix R3c-forged-churned-sources 1 57 of 57 {'p50': 15.4, 'p90': 24.2, 'p99': 26.3, 'max': 28.8} PASS offered 100006 drops 0 0 {'unlisted': 0, 'unverified': 1326181, 'over_rate': 0, 'backlog': 8024}
+11:12:25Z fix R4-replay-own-frames 1 57 of 57 {'p50': 10.0, 'p90': 12.5, 'p99': 17.3, 'max': 19.1} PASS offered 100006 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 0, 'backlog': 0}
+11:12:40Z fix R1-valid-other-key 2 57 of 57 {'p50': 9.8, 'p90': 13.4, 'p99': 18.6, 'max': 22.6} PASS offered 71651 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 968483, 'backlog': 1855}
+11:12:55Z fix R2-same-station 2 57 of 57 {'p50': 9.8, 'p90': 118.8, 'p99': 125.5, 'max': 127.3} PASS offered 36441 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 492497, 'backlog': 769}
+11:13:10Z fix R3-forged-claiming-quiet 2 57 of 57 {'p50': 10.5, 'p90': 12.8, 'p99': 19.0, 'max': 19.1} PASS offered 100006 drops 0 0 {'unlisted': 0, 'unverified': 1338342, 'over_rate': 0, 'backlog': 2867}
+11:13:25Z fix R3c-forged-churned-sources 2 57 of 57 {'p50': 12.2, 'p90': 98.8, 'p99': 1010.1, 'max': 1019.6} PASS offered 100006 drops 85724 85724 {'unlisted': 0, 'unverified': 1123520, 'over_rate': 0, 'backlog': 125955}
+11:13:44Z fix R4-replay-own-frames 2 57 of 57 {'p50': 18.7, 'p90': 1013.8, 'p99': 1027.8, 'max': 1046.7} PASS offered 96259 drops 223762 223762 {'unlisted': 0, 'unverified': 0, 'over_rate': 0, 'backlog': 0}
+11:13:58Z fix R1-valid-other-key 3 57 of 57 {'p50': 25.8, 'p90': 529.1, 'p99': 1019.0, 'max': 1041.5} PASS offered 49902 drops 18873 18873 {'unlisted': 0, 'unverified': 0, 'over_rate': 644907, 'backlog': 11876}
+11:14:13Z fix R2-same-station 3 57 of 57 {'p50': 46.6, 'p90': 184.9, 'p99': 390.9, 'max': 1068.3} PASS offered 26349 drops 3191 3191 {'unlisted': 0, 'unverified': 0, 'over_rate': 353201, 'backlog': 136}
+11:14:27Z fix R3-forged-claiming-quiet 3 57 of 57 {'p50': 21.5, 'p90': 468.8, 'p99': 1043.3, 'max': 2012.7} PASS offered 100006 drops 161995 161995 {'unlisted': 0, 'unverified': 1024512, 'over_rate': 0, 'backlog': 155762}
+11:14:42Z fix R3c-forged-churned-sources 3 57 of 57 {'p50': 14.2, 'p90': 21.0, 'p99': 27.6, 'max': 32.4} PASS offered 99997 drops 0 0 {'unlisted': 0, 'unverified': 1327836, 'over_rate': 0, 'backlog': 6249}
+11:15:01Z fix R4-replay-own-frames 3 57 of 57 {'p50': 10.2, 'p90': 25.9, 'p99': 38.8, 'max': 43.3} PASS offered 100006 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 0, 'backlog': 0}
+11:15:16Z fix R1-valid-other-key 4 57 of 57 {'p50': 9.3, 'p90': 12.2, 'p99': 19.2, 'max': 25.6} PASS offered 72594 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 980953, 'backlog': 2171}
+11:15:30Z fix R2-same-station 4 57 of 57 {'p50': 9.2, 'p90': 102.5, 'p99': 127.3, 'max': 132.3} PASS offered 36491 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 493503, 'backlog': 443}
+11:15:45Z fix R3-forged-claiming-quiet 4 57 of 57 {'p50': 10.6, 'p90': 18.2, 'p99': 19.6, 'max': 19.9} PASS offered 100006 drops 0 0 {'unlisted': 0, 'unverified': 1339698, 'over_rate': 0, 'backlog': 1499}
+11:16:00Z fix R3c-forged-churned-sources 4 57 of 57 {'p50': 13.8, 'p90': 20.4, 'p99': 28.3, 'max': 28.9} PASS offered 99998 drops 0 0 {'unlisted': 0, 'unverified': 1333050, 'over_rate': 0, 'backlog': 1029}
+11:16:19Z fix R4-replay-own-frames 4 57 of 57 {'p50': 8.6, 'p90': 19.8, 'p99': 55.6, 'max': 56.4} PASS offered 100006 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 0, 'backlog': 0}
+=== 11:16:49Z gate: load 7.64 9.50 11.29, waited 0 s for others and 30 s for load
+=== 11:16:49Z N0
