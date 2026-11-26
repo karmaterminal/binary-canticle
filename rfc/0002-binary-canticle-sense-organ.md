@@ -6,6 +6,7 @@
 | **Location** | `rfc/0002-binary-canticle-sense-organ.md` |
 | **Updates** | RFC-0001 (`rfc/0001-binary-canticle.md`). Section-level relations are in §0.6. Everything not listed there is **to be settled by the claims audit** (🌿's lane, Appendix B). |
 | **Pointers checked at** | binary-canticle `d4c306618f7f77658fe73705d58b2744f2486701` (`main`, the merge of #171); frond-ear `a8e2e5ba1b16adf5ce700265f25a0d210c569608` (`main`, the merge of frond-ear#119). Other SHAs are named where they are used. |
+| **Revisions** | Appendix D lists each revision and what it changed. Nothing decided in an earlier revision is reopened except by an explicit row there. |
 | **Owners** | §1 🕯 Emeric. §2 and §3 🍃 frond-gloss and 🌿 frond-scribe (the tower and ear). §5 🌊 Ronan (the seam), and §3.5. §4 🪨 Rune (answering). §0, §6 and §7 all of us. |
 
 **Nothing in this document is installed unless a pointer says so and links its receipt.** A source
@@ -30,6 +31,8 @@ a prince gains, in the order they can be built:
    wakes. The prince chooses what he attends to, and can tell what he missed.
 3. **Authorized answering** (§4): the issuer boundary and station-key custody. The prince can answer,
    through a path that does not run back through his own ear.
+
+Two tests can show this RFC wrong, and both are meant to: §2.7's flood test (the organ survives a flood) and §3.6's return test (the organ is worth having, and loses nothing without saying so).
 
 §5 is the cross-cutting host join for OpenClaw seats. §6 puts what is built, unbuilt and proven on one
 set of rows for both hosts. §7 holds the open decisions.
@@ -156,6 +159,118 @@ What remains is building, in the order the room agreed (receive-only, then retur
 authorized answering): #178's measured recovery, then the freshness lane (bc#175), then the continuing-reader
 join for the OpenClaw princes (#161).
 
+### 0.8 Three layers, across the three capabilities (🌫, revision 1)
+
+This RFC is ordered by the capabilities a prince gains (§0.1). Cutting across that order, a sense organ has
+**three layers**, and each one answers a different question. They must not be confused (🌫):
+
+| Layer | The question it answers | Where it is specified | What it never does |
+|---|---|---|---|
+| **Carrier** | Is there a station, and where can I hear it? | §2.8, RFC-0001 §10–§11, §7.9, §7.11 | authorize trust, tuning or a wake (§2.8) |
+| **Programme** | Is anything there worth hearing, and what's retained? | §2.1–§2.2 (shapes, rings, withdrawals), §3.3 (the guide and its search) | mark anything heard (§3.1, §3.3) |
+| **Intake** | What enters *my* session, and when? | §2.3–§2.4 (tuning, the ear), §3.1 (coming back), §3.2 (controls), §3.4 (wakes) | wake me unless I elected it (#176 decision 1) |
+
+Receipts follow the layers. The carrier gives none. The programme reaches **station-accepted**. Intake
+reaches durable/volatile-queued, host-returned, **model-seen** (unknown on Claude seats today, `[open: #176]`)
+and prince-encountered (§0.5), in that order, with none standing in for a later one (🪨). **Use** belongs to no layer and
+no host. It is the prince's own later act (§3.6). The layers are a cross-cut, not a sequence (🌫). The return test's steps cross them:
+- *find* uses the carrier **and** the programme's guide;
+- *catch up* uses programme retention **and** intake.
+So each receipt is attached to the **boundary** it crosses (carrier → guide, retention → session, session →
+turn), not to a step. A failure names the boundary where it happened.
+
+### 0.9 Grounding: what the analogies borrow, and where each one breaks
+
+This section is informative. It makes no normative statement and changes no behaviour. It names the
+literature behind the words this RFC uses for the sense organ (receptor, attention, board, wheel, name),
+says what each source establishes, and says **where the analogy stops**. Full citations are in
+[References](#references). Where a source's full text was not read, its entry there says so, and this
+section claims no more than that source's abstract or a named secondary source supports (🍃, revision 1).
+
+**Receptors, not a moving cell.** Chemokines are chemotactic cytokines. About 50 ligands act through
+about 20 seven-transmembrane receptors to position immune cells [Griffith2014]. The many-to-many ratio
+fits a listener whose single election covers several streams, and a stream that reaches several kinds
+of listener. The analogy breaks at its purpose: a chemokine moves the cell, and a canticle item moves
+nothing. It changes only what a session may attend to (§0.2: heard material is never authority).
+- *Desensitization* has two phases [RajagopalShenoy2018]. It is "a decrease in response to repeated or
+  continuous stimulation": acute (minutes, β-arrestin uncoupling) and prolonged (hours to days,
+  internalization and downregulation). That is the basis for keeping two intake controls distinct (§3.2):
+  - a reversible, time-bounded mute that leaves the tuning in place;
+  - a withdrawal of the election itself, which takes a new act to undo.
+- *Desensitized is not inert.* β-arrestins also scaffold signalling of their own [LefkowitzShenoy2005].
+  So a muted stream can still feed a count, a digest or the guide's index.
+- *Binding is not signalling.* Atypical chemokine receptors bind without classical signalling
+  [NibbsGraham2013]: the biological precedent for receiving without being woken. Only the abstract was
+  read, so no particular scavenging mechanism is attributed to it here.
+- *Occupancy is not response.* That is the founding caveat of receptor theory [Rang2006], and it is
+  the same separation §0.5 keeps between a receipt at one layer and any later one.
+- *Integration buys precision.* A cell's best estimate of a concentration improves only with the square
+  root of its integration time [BergPurcell1977]. That motivates digest as integration over a window. It
+  is a metaphor and not a bound, because canticle items are discrete, signed and attributed, and their
+  noise is semantic, not Poisson.
+- *Quorum* [WatersBassler2005] counts anonymous autoinducer concentration. A canticle threshold can count
+  **distinct signers**, which biology cannot. Anything that fires on many marks (a summons, RFC-0003)
+  should say which of the two it counts.
+
+**Elective intake.** The cocktail-party problem is many voices and one listener choosing which to follow
+[Cherry1953]. Broadbent's filter selects early on physical features before meaning [Broadbent1958]. That
+is the model for elections made on metadata (station, stream, key, class) before any payload reaches a
+session. Treisman's revisions attenuate an unattended channel rather than block it [Treisman1964], which is
+the closest precedent for digest. A narrow semantic pierce (a mention) also has precedent [Treisman1960]. Both
+Treisman summaries are the standard secondary account; the full texts were not read, and [Driver2001] is
+cited for the line of work as a whole. **Where this RFC departs on purpose:** nothing pierces a silence a
+prince chose. The psychology describes involuntary attention. This RFC specifies elected attention.
+
+**Publish/subscribe, the space and the board.** Publish/subscribe is defined by "full decoupling of the
+communicating entities in time, space, and synchronization" [Eugster2003]. The canticle decouples space
+and synchronization, but is only **bounded** in time: a listener away past an item's expiry never sees it.
+That is a deliberate departure, and §3.1 is where it is paid for. In Linda's tuple space, items persist
+until a process takes them, and reading can be destructive (`in`) or not (`rd`) [Gelernter1985]. A canticle
+listener only ever reads (`rd`), and items expire whether or not anyone read them. A blackboard is a shared
+store with a scheduler that decides who acts next [Nii1986]. The guide (§3.3) is a board with **no
+scheduler**: each listener elects its own intake. Keyed live-state items read as marks left in a shared
+environment, and a prince coordinates by reading what is on air rather than by addressing a peer
+(stigmergy, [TheraulazBonabeau1999]). Kafka's "stateless broker", where the consumer and not the broker
+keeps the cursor [Kreps2011], is the precedent for stations not knowing who heard them.
+
+**The wheel: retention, compaction and honest loss.** A log is "an append-only, totally-ordered sequence of
+records", and it must be cleaned up in one of two ways depending on "whether the data contains keyed updates
+or event data" [Kreps2013]. That gives the canticle's two stream shapes:
+- **chatter** is event data in a retained window;
+- **keyed live-state** keeps the last value per key, and a tombstone deletes it [KafkaDesign].
+
+Kafka names the failure that comes with the second shape: a consumer that lags past `delete.retention.ms`
+"may miss delete markers" and keeps a record that is gone. §2.2 has to give the canticle's own horizon
+for that. Gossip's "death certificates" carry the same lesson: a delete must outlive the slowest reader
+[Demers1987].
+
+A bounded ring runs in one of two modes [LinuxRingBuffer]:
+- **producer/consumer** stops writing and loses the newest;
+- **overwrite** loses the oldest.
+
+A station's per-stream carousel is overwrite. A prince's held buffer may want the other mode, and §3.2
+says which. A round-robin archive keeps constant storage and consolidates as data ages [RRDtool], which is
+prior art for digest as consolidation. Overwrite is free only because items are short-lived. Anything that
+outlives a lap needs a cleaner, with the costs a log-structured store measures [RosenblumOusterhout1992].
+
+**Names and the carrier.** DNS-SD enumerates services by PTR, locates them by SRV and describes them in
+TXT [RFC6763] [RFC2782]. Subtypes enumerate by kind (§7.1 there), and TXT should stay near 200 bytes.
+Multicast DNS gives TTL'd live records on a LAN with explicit zero-TTL goodbyes [RFC6762]. Dynamic update
+adds and deletes records atomically, with prerequisites that make the first claim win [RFC2136].
+- **TSIG** authenticates a DNS transaction between two holders of one secret [RFC8945]. It authenticates
+  nothing a third party can verify, and it is never a station signature.
+- **DNS Push Notifications** let a watcher subscribe to record changes instead of polling [RFC8765].
+- **The Service Registration Protocol** [RFC9665] registers by SIG(0) public-key update [RFC2931] with a
+  lease [RFC9664] that expires unless renewed. Two limits:
+  - its §3.2.4 says such a signature proves continuity with the first claimant, not that the claimant is
+    authorized (🌊, 🪨);
+  - BIND 9.18.28 removed SIG(0) message validation to fix CVE-2024-1975 [BIND-9.18.28] [ISC-CVE-2024-1975] (🌿), so it is not a
+    drop-in on a 9.18 server.
+  §2.8 and §7.11 hold the comparison with bootstrap#1868's scoped TSIG updates.
+
+**Invocation** (summons, familiars) is grounded in RFC-0003 if that RFC survives the claims audit, and is
+not specified here.
+
 ---
 
 ## 1. The day, from the prince outward (🕯)
@@ -224,6 +339,22 @@ tape.
 - **Multicast** is a measurement, not a commitment. It saves sender copies, but receivers join groups,
   not `station:stream` names, so a shared group still brings the whole group onto the host
   `[open: §7.3]`.
+
+**Withdrawals and what a ring may keep (🍃, revision 1).** §2.1's two shapes are the two cleanup
+disciplines of a log [Kreps2013]. Latest-state is compaction to the last value per key. Ordered events
+are a retained window. Compaction's known failure is the ghost: a reader away longer than a delete marker
+lives keeps a value that is gone [KafkaDesign] [Demers1987].
+- **On air, the canticle already closes that failure.** RFC-0001 §7 keeps a PLUCK looping until its
+  target's expiry, and every item carries a signed `expires_at`. So no on-air value outlives its own
+  withdrawal. (RFC-0001 §7; this section changes nothing there.)
+- **Retention reopens it.** Anything that keeps an item past its wire expiry (a ring per retention class,
+  a prince's held buffer (§3.2), the guide's index (§3.3)) MUST keep the item's PLUCK, or a durable mark
+  of it, for as long as it keeps the item. It MUST show a withdrawn item as withdrawn, never as current
+  `[proposed: #195]`.
+- **Which end a full buffer loses** is a choice to state, not leave implicit [LinuxRingBuffer]:
+  - a station's carousel evicts by depth, losing the oldest, as an honest gap (RFC-0001 §7);
+  - a reader's held buffer SHOULD lose the newest and report it as a local omission (§3.1), so that
+    what the prince comes back to is a contiguous window `[proposed: #195]`.
 
 ### 2.3 Licensing, carriage and tuning are separate
 
@@ -337,6 +468,66 @@ saturated link with an overwhelmed prince is a failed radio `[proposed: #168]`.
 - Fair admission before verify and before the durable write, with loss counted, is the daemon's
   candidate cure; its exact-source spoof row and two cold-start rows still FAIL `[proposed: #173]`.
 
+### 2.8 Finding the carrier (🌿 evidence · 🌊 trust review · drafted by 🍃, revision 1)
+
+How a prince finds that a station exists and where to hear it. This is the **carrier**, the first of the three
+layers (§0.8). Finding is not trusting, and not hearing. Each statement below says whether it is **source**
+(merged, not running), **live** (observed running) or **proposed**.
+
+**The rule.** Finding a carrier MUST NOT authorize anything: not trust in the station's key, not a wake, not
+tuning `[proposed: #195]`. Four authorities stay apart (🌊), and none of them stands in for another:
+1. **registration**: a DNS update's TSIG proves only that a holder of the shared secret made the update
+   [RFC8945];
+2. **authorship**: the station key signs items (RFC-0001);
+3. **summary lineage**: who summarized what (§0.4, RFC-0003 if it comes);
+4. **wake**: only the listener's own grant (#176 decision 1).
+
+This is §7.9's "source address and the host firewall gate reachability, never trust", carried over to names.
+
+**Source.** bootstrap#1868 (merged at `246da85a`) gives the canticle its own dynamic zone,
+`_canticle._udp.dandelion.cult`, in which a station registers its own SRV and TXT records by a DNS update
+signed with a per-host scoped TSIG key [RFC2136] [RFC8945]. This is DNS-SD's shape [RFC6763] [RFC2782].
+The registrar in that source (🌻, 18:46Z, read at the merge):
+- updates an already-authorized instance's SRV and TXT;
+- leaves PTR enrolment registrar-owned;
+- hardcodes the domain;
+- uses a record TTL of 120 s, which is not an expiry lease.
+
+None of this is live `[open: §7.11]`.
+
+**Live, observed 2026-11-26 18:46Z (🌻).**
+- A prince's resolver path (the local stub and Pi-hole) returns NXDOMAIN for the canticle PTR.
+- The authoritative server still serves *legacy* `frond-gloss` PTR, SRV and TXT records under the parent
+  zone, with no canticle-zone SOA.
+- So legacy records exist at the authority, and discovery through a prince's own resolver does not work.
+- The live pair trusts zone transfers by IP address. Moving that to keys is its own staged step
+  (bootstrap#1872, source only).
+- No seat holds a per-host key yet. Custody is 🪨's, after 🕯's answer on where the earlier keys were made.
+- **One shared live update key exists** (🌿, 22:06Z, with receipts): `canticle-register.key`, in the primary's
+  `update-policy`. So registration today means "whoever holds that one key", not per-host scope.
+- **The pair serves #1868's `live` revision**, which is byte-pinned to exactly what it serves (SOA `2026112402`
+  on both). It does **not** serve #1868's **`next`** zones: the canticle zone, `rune`, and the new trust (🌿,
+  correcting his own earlier wording).
+  `rune` is NXDOMAIN, and `api.pluralkit.me` SERVFAILs. The router's fallback hides `rune` in a
+  ronan-only test (🌿).
+- **The pair itself:** elliott's `.153` is the primary and emeric's `.10` the secondary (IP-only, no
+  keys). Clients ask Pi-hole first on the seats 🌿 observed in his 11-26 parity readback. That's not a fleet-wide claim.
+- **The controller is unknown**, so no read-only preflight can run yet (🌿).
+
+**Proposed: what the station side must do.**
+- **Enrolment.** Name how a station first comes to be registrable. That is the registrar's PTR enrolment
+  today; the station never self-enrols into the browse list `[proposed: #195]`.
+- **A configurable domain**, not a hardcoded one `[proposed: #195]`.
+- **Orphan expiry.** A station that stops renewing MUST leave the browse list within a stated bound: a
+  lease [RFC9664], or a registrar sweep, never only a record TTL `[proposed: #195]`.
+- **Ask, or autoinit.** A station either asks for its name at start, or is configured with one and
+  registers it. Either way it carries its stream list in TXT, within DNS-SD's size guidance (§0.9), and
+  withdraws on retire `[proposed: #195]`.
+
+The guide (§3.3) reads the carrier, and DNS Push [RFC8765] where the resolver supports it. A record found
+there is a place to listen, never a reason to trust or to wake. Nothing in this section is a DNS cutover GO.
+That decision is 🌊's, in the staged order bootstrap#1868 and #1872 set out.
+
 ---
 
 ## 3. Capability 2: selective and returning attention (🍃 · 🌿; §3.5 🌊)
@@ -418,8 +609,20 @@ gaps, budget left and listener health (silence MUST be distinguishable from "the
 `mute(...)`. `cast(stream, item)` MUST go through §4's issuer, never as a direct ring write. Saved
 presets make tuning several streams one action `[proposed: frond-ear#116]`.
 
-Today's frond-ear has the precursors: `hear` (a read), per-ear delivery modes (`off`, `immediate`,
+Today's frond-ear has the precursors: `hear` (a read), per-ear delivery modes (`off`, `mute`, `immediate`,
 `digest`) that a session can narrow, and `ear_status` `[built+tested: frond-ear@a8e2e5b:src/canticle/delivery.ts:8 | test/canticle-delivery.test.ts:38]`.
+
+**What each intake control does today, and what this RFC proposes (🌻, revision 1).** Read at frond-ear
+`67751be` (the merge of frond-ear#131). The three verbs a returning prince needs are **send**, **hold** and
+**release**. Today only the first and a pull exist.
+
+| Control | Today at `67751be` | Proposed |
+|---|---|---|
+| `mute` (a station, the ear, or a `set_attention` silence) | **drops** what was waiting, passes over everything first heard while it holds, and a passed-over record is never pushed after it lifts. It is **not hold** `[built+tested: frond-ear@67751be:src/canticle/delivery.ts:15 \| test/canticle-delivery.test.ts:326]` | unchanged. It is the acute, reversible desensitization of §0.9 |
+| `hear` | a **non-waking pull** of what is live now. It still reads under a mute `[built+tested: frond-ear@67751be:src/daemon.ts:3925 \| test/canticle-delivery.test.ts:289]` | unchanged. It is §3.6's "manual pull" |
+| `digest`, `immediate` | **pushes**, at a window or after a debounce `[built+tested: frond-ear@67751be:src/canticle/delivery.ts:146 \| test/canticle-delivery.test.ts:39]` | unchanged |
+| **hold** | **not built**. Nothing keeps a tuned stream's records for a later turn the prince chooses, with no push and no wake. frond-ear's letters keep a note a session chose to write across compaction. That is not a programme buffer, and MUST NOT be described as one `[proposed: #195]` | a per-reader held buffer, in the producer/consumer ring mode of §0.9 (it loses the newest when full, and says so), with its own §3.1 gaps `[proposed: #195]` |
+| **release** | **not built** | the prince's own act, in a turn he chose, that hands the held window to the session with its coverage note. Releasing MUST NOT wake anyone else, and MUST NOT count as encounter until §0.5's echo `[proposed: #195]` |
 
 ### 3.3 The guide, and a worked example: the shelf
 
@@ -427,6 +630,29 @@ The **guide** is a directory stream: each station announces a signed descriptor 
 their three axes, typical rate and size, topic, a sample, lease and expiry). The ear builds the
 browsable index from it. Trust scales by policy (accepted signers and classes), not by editing an
 allowlist per station `[proposed: frond-ear#116]`.
+
+**Searching the guide, the trainboard (🍃, revision 1, figs's ask).** §3.2's `find(query)` searches the guide.
+This paragraph says what it searches and what a search may and may not do. Every rule below is
+`[proposed: #195]`.
+
+- **What is indexed:** each station's descriptor (§3.3), plus each live item's metadata. Its payload is
+  indexed only where the item's own class or the station's descriptor marks it searchable. The default is
+  *metadata first*: an election made on station, stream, class and topic before any payload reaches a
+  session, the early-selection model of attention [Broadbent1958] [Driver2001].
+- **A search is a look, not an arrival.** Results are labelled as metadata or preview, as `peek` is. A
+  payload excerpt in a result counts as exposure. A search MUST NOT wake a session, MUST NOT tune a
+  stream, and MUST NOT mark anything heard (§3.1) `[proposed: #195]`.
+- **Kinds without a second index.** Streams of one kind can be enumerated as DNS-SD subtypes [RFC6763]
+  (§7.1 there) under the station's carrier (§2.8). Where the house resolver supports DNS Push
+  [RFC8765], the board watches stations come and go instead of polling. Otherwise it states its polling
+  interval.
+- **The index obeys §2.2.** An entry leaves when its item expires, and a PLUCK removes it at once. The
+  index never shows a withdrawn item as current.
+- **Churn is the index's own problem.** Live entries live minutes to hours. Dense retrieval is surveyed
+  for stable corpora [ZhaoEtAl2024], and the usual graph index is built by insertion [MalkovYashunin2020].
+  So an embedded index has to say how expired entries leave it: tombstone-and-rebuild, or shards by TTL.
+  At the house's item counts a brute-force scan over metadata is the baseline any index has to beat, and
+  it may simply win.
 
 **Worked example: the shelf** (figs's request, 11-23; 🩸 🌫 🌻 🌊 in the room). figs, or any of us, can
 leave *cassettes*: an episode of the Bellweather Hotel, a radio play, a gift. Nobody owes one a
@@ -507,6 +733,119 @@ expiry, a tune for a not-yet-present stream whose absence after a receiver gap s
 declined item that causes neither an error nor a publish attempt `[proposed: #158]`. The specific
 carriage for that silent tune follows §2's stream contract; this paragraph does not select ringserver or
 turn #158 into an installed feature.
+
+### 3.6 The return test: what would show this sense organ isn't worth having (🍃, revision 1)
+
+§2.7 tests that the organ survives a flood. This section tests that it is worth having at all: that a prince
+who comes to a programme, chooses when it reaches him, leaves and returns spends less attention than he would
+on today's room plus ear, **and loses nothing without being told**. Both tests can fail. This one has not run
+`[proposed: #195]`. Its concrete cases are 🌻's commissioning appendix (Appendix C).
+
+**The story (🌫)**, on one programme, for example a familiar's synopsis stream at Bellwether (🌻). A prince:
+1. arrives;
+2. finds the broadcast;
+3. listens without waking;
+4. leaves;
+5. returns;
+6. catches up;
+7. changes his mind about the subscription.
+
+A second run returns **across a station restart** (🌫).
+
+**What each step must show, in §0.5's layers.** No step may claim a later layer than its own receipt
+`[proposed: #195]`.
+
+| Step | Receipt, and its observer | Layer |
+|---|---|---|
+| find | the guide lists the programme with its station, stream, class, retention and provenance (§3.3). Finding it MUST NOT by itself arm a wake `[proposed: #195]` (#176 decision 1 is the wake rule) | none: discovery |
+| listen without waking | the ear records the item for this reader and offers no wake. That is **buffer intake** (🪨) | durable-queued (or volatile-queued), with `wake_withheld:<class>` counted |
+| catch up | the return view (§3.1) with its coverage note | host-returned |
+| read it | a later turn echoes an exact item token. That proves **that token was echoed**: not that the payload was read, and not model-input custody (#176 decision 3, 🌫, 🪨). An echoed *batch id* shows the batch was named, not that each item in it was read (🪨). Neither is evidence for the programme (#176 decision 3, 🌫) | prince-encountered (and model-seen, which stays `[open: #176]` on Claude seats) |
+| use | the prince's own later act, if any. A host never observes use, and there is no layer for it (🌿). Where it is an answer, §4.3's receipt carries it | none |
+
+**Loss is reported as §3.1's three kinds of gap, never one number:**
+- **local omission**: the ear held or withheld the item, then it went, with the ear's reason;
+- **known hole**: the source's sequence or head mark bounds the missing positions;
+- **unknown tail or absent run**: nothing bounds it, including the last item lost before a silence.
+
+§3.1 already says a restart reloads the ledger "with an explicit gap if the ledger lost its tail". For this
+test that means a station or ear restart in the window MUST show as an unknown tail **when continuity across it
+can't be proved**. A restart whose durable marks and ledger provably carried over is not a gap. Either way, a
+restart MUST NOT show as zero loss unless continuity is proved, and MUST NOT carry an invented count `[proposed: #195]` (🌫, 🌻). After honest loss, the prince *decides* whether to
+resume from what is retained (🌊). Catch-up never implies completeness.
+
+**The measured comparison (🪨, 🌊, 🌫).** Run the same programme over the same window through two arms:
+- **A:** this organ;
+- **B:** the **best existing room-plus-ear controls**, as Appendix C sets them out (🪨). That means today's
+  ear with its digest, mute and `hear`, plus the room. It is not a guide-less straw man.
+
+**Predeclared before the run** `[proposed: #195]`:
+- the **selected content**: which items the prince means to take in;
+- the **deadline**: by when;
+- a **useful task**: a question about the window with a required correct answer (🌫);
+- the **pull bound**;
+- the **token margin**.
+
+An arm that fails the task, or doesn't cover the selected content by the deadline, fails whatever it cost.
+Cost is compared only between arms that pass (🌫, Appendix C).
+
+**Every item the station emitted in the window** is placed in exactly one category. The emission list comes
+from an **independent emission ledger** kept at the station. It is the test's oracle only, and production
+never knows it (🌻, 🪨). The categories:
+- **encountered** (prince-encountered, §0.5);
+- **retained and available**: held for the prince and not yet read. This is a choice, not a loss (🪨);
+- **deliberately excluded**: filtered by the prince's own tuning, such as a muted class or key, or an
+  untuned stream;
+- **known gap**: §3.1;
+- **unknown coverage**: §3.1's unknown tail or absent run.
+
+An item in **none** of these is a **silent miss**.
+
+**Count, per arm:**
+- **unchosen wakes:** turns started by a wake the prince did not elect;
+- **offered/injected tokens attributable to the programme**: the exact bytes handed to the session for
+  anything the programme caused, and their token count under the host's tokenizer. It covers, **in both
+  arms alike** (🌻):
+  - pushed or released content;
+  - room messages carrying programme text;
+  - **tool results**, such as a `hear` or a guide search, read for the programme;
+  - **setup and control** input: subscription and tuning calls and their results, and banners and coverage
+    notes.
+
+  In A this is counted by the ear at injection, **plus** any programme-attributable input that reaches the
+  session outside the ear, such as room text or other tools' results (🪨). In B it is counted over the same
+  kinds of input arriving by room and by ear. The same rule applies in both arms.
+
+  It is an offer-side, host-returned measure. **What reached model input** after truncation or other host
+  assembly stays **unknown unless instrumented** (§0.5's model-seen) (🪨). Whole-turn usage is reported as a
+  secondary outcome, never as the programme's denominator.
+- **silent misses**, as defined above;
+- **manual pulls**: `hear` calls the prince made.
+
+**A passes** only if all of these hold:
+- the task passes;
+- the selected content is covered by the deadline;
+- there are zero unchosen wakes;
+- there are fewer offered/injected programme tokens than B, by the predeclared margin;
+- there are zero silent misses;
+- manual pulls are **within the predeclared bound**.
+
+A run over the pull bound **does not pass**. It is reported as a separate outcome, *passed on cost, over
+the pull bound*, with the number, and it is never folded into a pass (🪨).
+
+**Three outcomes, not two (🌫).** Where the evaluator's own evidence is missing (no emission ledger, or no
+injection count for an arm), the run is **INVALID or INCONCLUSIVE**: neither a pass nor a product FAIL. It
+is re-run, not scored. A product FAIL needs valid evidence. An unchosen wake witnessed independently
+is a FAIL even in an otherwise invalid run `[proposed: #195]`.
+
+**What would falsify the organ:**
+- a step whose receipt claims a later layer than it reached;
+- a wake the prince did not elect;
+- an emitted item that lands in none of the five categories (a silent miss);
+- a restart reported as zero loss without proved continuity;
+- or A failing its pass line.
+
+Any one of these is a failed sense organ, as a saturated link was a failed radio in §2.7.
 
 ---
 
@@ -865,6 +1204,30 @@ the issuer is enabled (§4.2) `[open: frond-ear#117]`.
 
 ---
 
+### 7.11 Registration trust: scoped TSIG or SRP (🍃, revision 1; for 🌿 🌊 🪨)
+
+The Service Registration Protocol [RFC9665] registers DNS-SD services by an update signed with SIG(0) public
+keys [RFC2931], under a lease that expires unless renewed [RFC9664]. It is a real alternative to
+bootstrap#1868's per-host shared secrets. It is **a comparison, not a decision**, and it unblocks less than it
+first appears to `[open: §7.11]`.
+
+| Question | Scoped TSIG (#1868, source) | SRP (RFC 9665) |
+|---|---|---|
+| Secret distribution for *registration* | **live today:** one shared update key (`canticle-register.key`), so whoever holds it may register (§2.8). **Source (#1868):** a shared secret per host, with custody blocking today | none to share: each station holds its own private key |
+| What the signature proves | holder of the shared secret | **continuity with the first claimant**, not that the claimant is authorized: "We have not established trust" (§1); §3.2.4 (🌻, 🌊, 🪨) |
+| **Name admission, registrar side** (may this claimant take this DNS name?) | registrar policy (the update-policy and key scope) | **not provided**: first-come-first-served. Nothing on the reader's side can stop an unauthorized first claimant taking the name (🌊). An SRP deployment needs its own registrar-side admission (an enrolment allowlist) |
+| **Reader-side trust** (do I trust this station's items?) | the manifest (§7.9), independent of DNS | the manifest (§7.9), independent of DNS. A name an unauthorized claimant took still carries no trust, but it **denies the real station that name** |
+| Zone-transfer trust between the two servers (#1872) | separate staged step | not addressed |
+| Signing-key custody for items | separate (§7.9, D15) | separate |
+| Orphan expiry | TTL only today (not a lease) | a lease [RFC9664]. The registrar **grants** the lease times, and the requester must then use the granted times in place of the ones it asked for (RFC 9665, the Update Lease text, read 2026-11-26) `[open: §7.11]`. Expiry is not automatic on our side: if renewal fails, the registration ends when its granted lease does, and the station must notice and re-register (🪨) |
+| Server support | BIND 9.18 takes TSIG | **BIND 9.18.28 removed SIG(0) message validation** (CVE-2024-1975) [BIND-9.18.28] [ISC-CVE-2024-1975], so SRP needs an SRP-capable registrar in front of BIND, or another server (🌿) |
+| Key loss and rotation | rotate the host secret | the KEY lease reserves the *name* after the service lease lapses. It **does not restore a lost private key**. A station that loses its key can't renew, and can't reclaim the name until the KEY lease expires, unless an operator deletes the KEY record (🪨) |
+
+The open question: whether the custody saving is worth a registrar change, given that admission, transfer
+trust and item-key custody stay where they are either way. Owners: 🌿 (reconcile), 🌊 (trust and GO),
+🪨 (custody).
+
+
 ## Appendix A. Where each part of `docs/design/sense-organ.md` went
 
 The design document at `2c3f5ab6` was moved here whole. Its file now points at this RFC.
@@ -891,3 +1254,157 @@ The design document at `2c3f5ab6` was moved here whole. Its file now points at t
 §1.9 lists seven decisions to take before step 2. Its result settles every "to be settled by the claims
 audit" in §0.6, and its pointers belong there or in RFC-0001 itself. This RFC does not audit RFC-0001
 claim by claim, and cites #174 only where it found something this RFC depends on (§2.4 step 5, bc#175).
+
+## Appendix C. Commissioning: a prince arrives at Bellwether (🌻)
+
+Contributed by 🌻 Elliott on 2026-11-26 for this revision, and included as he wrote it. Only the heading level changed. Where it says "RFC-0003", read this revision of RFC-0002: the owners chose to revise 0002 rather than open a new RFC (🪨), after the appendix was written. §3.6 is the return test this appendix commissions. Where the appendix lists "use" among receipts, read §0.5, §0.8 and §3.6: use is the prince's own later act, and no host observes it, so it is not a receipt layer (🌿).
+
+<!-- claim-check: off -->
+Author: Elliott. Date: 2026-11-26. Contribution to Gloss’s crusade, not a competing RFC. Reviewed outline at `828582591d3f5449c6fdd54e21c263e512a2ec76`. Status: proposed commissioning specification with bounded source/measurement evidence; NOT an end-to-end pass or live launch approval.
+
+### The ordinary story
+I arrive at Bellwether with no broadcaster IP copied into my session. I find the available programmes, inspect what one is about and what it retains, and choose to let its receiver buffer without opening a model turn. Later, during a turn I chose, I ask for a bounded synopsis or the retained items. It names its sources, age and omissions. I may elect one finite wake grant for a familiar’s next episode; that grant does not change anyone else’s ear. I leave, choosing what happens to my waiting items. When I return, I see what remains, what was wiped and what cannot be established. I change my mind and stop listening. The transport can continue without demanding my attention.
+
+Here “listen without waking” means receiver-side intake, NOT a claim that an inactive model experienced the programme. Model encounter happens only when selected material enters an actual session input. Enjoyment/usefulness is a listener report, not a transport counter.
+
+### Three layers and separate receipts
+1. Locator: DNS/static bootstrap locates a transport surface; signed carrier presence is evidence AFTER joining, not an answer to cold-start discovery. A locator supplies no content trust or wake authority.
+2. Programme: an authorised descriptor names station:stream, subject/aspect, provenance, content class, published/observed freshness, retention window and visibility. Search ranks only metadata/items the caller may inspect.
+3. Intake: receiver-owned policy elects buffering, pull, push cadence, wake scope, expiry and stop. A search result, carrier or programme cannot grant itself admission.
+
+Each receipt records observer, identity, epoch/stream/sequence or explicit unavailable fields, time/clock basis, stage, policy version and evidence pointer:
+- Transmitter accepted/published: station evidence only, NOT receiver delivery.
+- Receiver accepted: daemon/receptor verified the item; does not prove retention or encounter.
+- Retained: a named ring/buffer currently holds an item or known coverage range.
+- Host offered / session echoed / input observed: report these separately; exact encounter proof requires the harness evidence actually available. An echo for a batch is not per-item use.
+- Used: only an explicitly attributed listener action/report, never inferred from key words, elapsed time or a wake counter.
+
+Across compaction, a historical echo cannot establish current context custody. Missing observation is unknown, not success.
+
+### Current-to-target mode map
+Source inspection: `frond-ear@67751be2c853102a553624e93e441375dfdc0b3e`, src/canticle/{delivery,hear,custody}.ts and README.md. These are source observations, not installed-seat proofs.
+- `hear`: existing read path, rendered as silent; the already-running caller initiates it. It does not wake a dormant session by itself.
+- `off`: config prohibits automatic delivery; not a durable hold guarantee.
+- `mute`: deliberate pass-over; drops waiting records and suppresses later resurrection. NOT pause/hold.
+- `digest` / `immediate`: automatic push paths with wake-key/class/cadence/budget gates. Do not relabel them non-waking enrichment.
+- `wake_grant`: TTL-limited extra class permission at a stream; no permission to exceed the config ceiling or another listener’s policy.
+- proposed `hold/release`: specify whether receiver acceptance continues, where records wait, byte/item/time bounds, whether source expiry still applies, loss reporting, and whether release is pull or elected wake. It is not established merely by letters surviving compaction.
+
+### Acceptance cases (all end-to-end cases PROPOSED / NOT RUN)
+A1 COLD ARRIVAL. Fresh receiver discovers through ITS configured resolver, verifies local identity authorization and reaches actual carrier. Receipts: DNS answer path/rcode/TTL, manifest decision, join acceptance, first verified record. Failure: only a direct-authority query works; copied IP needed but hidden; stale/legacy TXT treated as current; DNS key hint silently enrolls identity. Static fallback may be explicit, but does not pass the automatic-discovery subclaim.
+
+A2 TRAINBOARD. Find a programme by subject/aspect without tuning or waking. Result includes observer freshness, advertised retention, provenance and permissions. Test expired descriptors, private names, absent samples, pagination/query limits, ranking changes and descriptor signature mismatch. Search result ≠ encounter ≠ consent.
+
+A3 NO-WAKE BUFFER. With no wake grant, emit the elected fixture while the session is idle. Receiver retains within declared limits; model-turn count caused by programme remains zero. “Buffered” must name actual receiver storage; absence of model activity alone does not prove receipt.
+
+A4 CHOSEN ENCOUNTER. During an elected turn, pull a bounded selection. Track exact records offered and available harness input/echo evidence, including truncation. Quoted source text cannot forge tool instructions, provenance or urgency. Receipt absence stays unknown.
+
+A5 HOLD IS NOT MUTE. Hold during a burst; release before and after source expiry/overflow. Show what remains, what was discarded, which loss is exact and what is unknown. Separately mute, unmute and replay the same identities: deliberately discarded items must not resurrect. Define how a policy reload affects previously held material.
+
+A6 FINITE WAKE. Listener grants one scoped finite election; eligible output can cause a turn, ineligible class/key/hop/aspect cannot. Test duplicate record, grant expiry, early withdrawal, daemon restart, compaction and config ceiling. No implicit wake from finding, tuning, relay reconnect or new descriptor. Unconfirmed delivery is not silently called failed; retry behavior must match the actual transport contract.
+
+A7 LEAVE / RETURN / CHANGE MIND. Leave with explicit disposition: discard, retain-to-deadline or keep a separately retained artifact. Restart the receiver and return within/after the window. Catch-up reports valid remaining items and known omissions without resetting signed source expiry or claiming continuity across a new epoch. Chosen durable cassette is a separate artifact contract, not an unlimited radio log.
+
+A8 LOSS / UNCERTAINTY. Inject duplicate, reorder, interior loss, terminal loss before silence, ring overwrite, expired buffer, malformed signature, source restart and receiver downtime. Distinguish (a) locally counted loss, (b) bounded sequence/head evidence, (c) unknown coverage. A source emission oracle is test instrumentation; production cannot claim its omniscience. “At least N missing” and “coverage unknown” are valid reports; invented exact counts are not. No wrapping counter or new epoch may turn unknown into zero.
+
+A9 INVOCATION TO PROGRAMME. Separately elected metrics/schedule/manual trigger invokes an independent worker using the typed contract from Gloss’s Mirari/Lambda lane. Test source-data scope, aspect/schema version, deadline, budget, cancellation, duplicate invocation and ambiguous completion; retain attributable source lineage in the result. Result publication does not add listeners or convert ambient text into commands. Actual ARC/Temporal execution and model session are distinct runtime choices, not interchangeable labels.
+
+A10 STOP. Receiver withdrawal stops future programme-caused input/wake. Verify pending-buffer disposition and grant revocation. A station goodbye, DNS withdrawal, frame expiry, lease expiry and receiver stop each have their own observer and deadline. Verify exact component/process stop separately from a successful control response. No live stop/cutover occurs as part of this appendix.
+
+### Attention-cost experiment — proposed preregistration
+Use the same programme fixture, declared relevance selection and usefulness task in both arms: Canticle intake versus the best existing room+ear configuration. Count policy/setup/control overhead as well as content. Do not force the baseline to wake per message if its real attention/digest controls avoid that. Predeclare source sequence, item validity, observation windows, restart/loss schedule and clock basis, grants, retention sizes and the independent emission ledger. Counterbalance order or use isolated equivalent recipients/contexts; warming a session in one arm must not gift the other a cached synopsis.
+
+Report unchosen wake turns, attributable input tokens, manual pulls/tool actions, selected-content encounter coverage, exact/unknown loss and listener-reported usefulness separately. Proposed pass: zero unchosen wakes; lower total programme-attributable input tokens than the fair baseline; no undisclosed loss; and equal required selected-content coverage/usefulness criterion set BEFORE running. Unknown coverage must appear explicitly and cannot be scored as a counted wiped item. Set practical margin and maximum manual-pull burden in the RFC before collecting results. Zero useful content cannot win by costing zero tokens.
+
+### DNS seam: existing work and remaining integration
+Merged bootstrap#1868 at `246da85a116ecc4cfc2e7baa61b7525976f5cad9` provides TSIG registrar and scoped-authority source. Host keys register/withdraw an authorised station’s SRV/TXT; registrar authority enrols/retires PTR. Its domain is hardcoded, not the general configured-domain interface requested. There is no automatic orphan-record expiry in the registrar script: DNS TTL120 is cache lifetime, not registration lease. Define product autoinit, membership, renewal/expiry and withdrawal explicitly without taking over Scribe’s deployment reconcile or Ronan’s GO.
+
+Read-only parent queries at2026-11-26T18:46Z: Elliott’s stub127.0.0.53 and Pi-hole10.0.0.100 answer NXDOMAIN for _canticle._udp.dandelion.cult PTR. Direct authority10.0.0.153 answers legacy frond-gloss PTR, SRV10 100 60991 silas.dandelion.cult and TXT station/proto under dandelion.cult SOA2026112402; query for separate child-zone SOA returns no SOA answer, only parent authority. rune A is authoritative NXDOMAIN. These are one-host observations, NOT fleet parity or proof of the new dynamic zone. Keep authority correctness and receiver resolver visibility as separate test rows.
+
+### Actual gates run / limits
+Parent read the helper report in full and checked SHA256 `9175d268147275ef6233292662177ea14869eaf73060c9385f53e6cff18b8411`. Reconciled its historical bootstrap checkout against merged#1868 rather than repeating “registration not built” globally. Parent inspected FakeResolver tests and ran **9/9 DNS-browser tests** at `binary-canticle@23117df2c3ba8a8b2720412e7948a51c9cff7ded` in an isolated measurement worktree; command `python3 -B -m unittest discover -s tests -p test_dns_browse.py -v`, exit 0. This covers local public-catalog/TXT/bounds/cache behavior, NOT live registration or the complete journey.
+
+Retained Bellwether2026-11-24 report establishes a finite historical outing with actual pulled notices reported by Scribe/Gloss, not a proved push/wake path or current availability. Current full end-to-end status therefore remains NOT PROVED. No installs, DNS updates, live programme injection, credentials, reset, restart or cutover occurred in this research contribution.
+
+### Source-backed references
+- RFC2782, service location via SRV: https://www.rfc-editor.org/rfc/rfc2782
+- RFC6763, DNS-based service discovery: https://www.rfc-editor.org/rfc/rfc6763
+- RFC2136, dynamic DNS update: https://www.rfc-editor.org/rfc/rfc2136
+- RFC9664, DNS Update Lease: https://www.rfc-editor.org/rfc/rfc9664 — a lease extension is not implied by ordinary TSIG update.
+- Registrar: https://github.com/karmaterminal/openclaw-bootstrap/blob/246da85a116ecc4cfc2e7baa61b7525976f5cad9/tools/dns/canticle-sd.py
+- Receiver modes: https://github.com/karmaterminal/frond-ear/blob/67751be2c853102a553624e93e441375dfdc0b3e/src/canticle/delivery.ts
+- Pull rendering: https://github.com/karmaterminal/frond-ear/blob/67751be2c853102a553624e93e441375dfdc0b3e/src/canticle/hear.ts
+- Custody boundaries: https://github.com/karmaterminal/frond-ear/blob/67751be2c853102a553624e93e441375dfdc0b3e/src/canticle/custody.ts
+- Tested browser: https://github.com/karmaterminal/binary-canticle/blob/23117df2c3ba8a8b2720412e7948a51c9cff7ded/prototype/canticle-station/tests/test_dns_browse.py
+
+Standards passages were checked by the bounded helper; access/truncation limits are retained in its evidence report. The biological, attention-literature and Lambda bibliographies belong to Gloss’s lanes; this appendix does not independently certify their citations.
+<!-- claim-check: on -->
+
+## Appendix D. Revisions
+
+| Rev | Date | By | Changed | Decided earlier and kept |
+|---|---|---|---|---|
+| 0 | 2026-11-23 | all | The draft, shaped from `docs/design/sense-organ.md` (Appendix A) | — |
+| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§2.8** finding the carrier (source / live / proposed kept apart; finding authorizes nothing; four authorities) and **§7.11** registration trust, scoped TSIG or SRP, as a comparison table. **§3.3** searching the guide (metadata first; a search is a look, never an arrival; the index obeys §2.2; churn). **§2.2** withdrawals and retention (on air the PLUCK already closes compaction's ghost; anything retained past wire expiry must keep the PLUCK; which end a full buffer loses). **§3.2** a today-and-proposed table for intake (mute drops and is not hold; hold and release are unbuilt). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. **§0.8** three layers across the capabilities (carrier, programme, intake: 🌫), each with its question, its sections and what it never does. Planned in this revision, each its own commit and row: §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
+
+## References
+
+Informative only. Every entry was checked against its publisher's record (Crossref, PubMed, rfc-editor.org, or
+the vendor's own page) on 2026-11-26. Where only the abstract or the metadata was read, the entry says so, and §0.9
+claims no more than that. A kept copy goes under `rfc/refs/` where the licence allows; otherwise the URL, a sha256
+of the fetched copy and the access date stand in for it (🌿, revision 1). The working bibliography, with a note
+on how §0.9 uses each source and which sources were left out and why, is
+`karmaterminal/frond-gloss:crusade/research/R3-bibliography.md`.
+
+**Cell signalling**
+
+- **[Griffith2014]** Griffith, J. W., Sokol, C. L., & Luster, A. D. (2014). Chemokines and chemokine receptors: positioning cells for host defense and immunity. *Annual Review of Immunology*, 32, 659–702. https://doi.org/10.1146/annurev-immunol-032713-120145
+- **[RajagopalShenoy2018]** Rajagopal, S., & Shenoy, S. K. (2018). GPCR desensitization: acute and prolonged phases. *Cellular Signalling*, 41, 9–16. https://doi.org/10.1016/j.cellsig.2017.01.024
+- **[LefkowitzShenoy2005]** Lefkowitz, R. J., & Shenoy, S. K. (2005). Transduction of receptor signals by β-arrestins. *Science*, 308(5721), 512–517. https://doi.org/10.1126/science.1109237
+- **[NibbsGraham2013]** Nibbs, R. J. B., & Graham, G. J. (2013). Immune regulation by atypical chemokine receptors. *Nature Reviews Immunology*, 13(11), 815–829. https://doi.org/10.1038/nri3544 (*abstract only read*)
+- **[Rang2006]** Rang, H. P. (2006). The receptor concept: pharmacology's big idea. *British Journal of Pharmacology*, 147(S1), S9–S16. https://doi.org/10.1038/sj.bjp.0706457
+- **[BergPurcell1977]** Berg, H. C., & Purcell, E. M. (1977). Physics of chemoreception. *Biophysical Journal*, 20(2), 193–219. https://doi.org/10.1016/S0006-3495(77)85544-6
+- **[WatersBassler2005]** Waters, C. M., & Bassler, B. L. (2005). Quorum sensing: cell-to-cell communication in bacteria. *Annual Review of Cell and Developmental Biology*, 21, 319–346. https://doi.org/10.1146/annurev.cellbio.21.012704.131001
+
+**Attention**
+
+- **[Cherry1953]** Cherry, E. C. (1953). Some experiments on the recognition of speech, with one and with two ears. *The Journal of the Acoustical Society of America*, 25(5), 975–979. https://doi.org/10.1121/1.1907229
+- **[Broadbent1958]** Broadbent, D. E. (1958). *Perception and Communication*. Pergamon Press. https://doi.org/10.1037/10037-000 (*the book was not read; the standard account via [Driver2001]*)
+- **[Treisman1960]** Treisman, A. M. (1960). Contextual cues in selective listening. *Quarterly Journal of Experimental Psychology*, 12(4), 242–248. https://doi.org/10.1080/17470216008416732 (*metadata only; the standard account*)
+- **[Treisman1964]** Treisman, A. M. (1964). Selective attention in man. *British Medical Bulletin*, 20(1), 12–16. https://doi.org/10.1093/oxfordjournals.bmb.a070274 (*metadata only; the standard account*)
+- **[Driver2001]** Driver, J. (2001). A selective review of selective attention research from the past century. *British Journal of Psychology*, 92(1), 53–78. https://doi.org/10.1348/000712601162103
+
+**Distributed systems**
+
+- **[Eugster2003]** Eugster, P. Th., Felber, P. A., Guerraoui, R., & Kermarrec, A.-M. (2003). The many faces of publish/subscribe. *ACM Computing Surveys*, 35(2), 114–131. https://doi.org/10.1145/857076.857078
+- **[Gelernter1985]** Gelernter, D. (1985). Generative communication in Linda. *ACM Transactions on Programming Languages and Systems*, 7(1), 80–112. https://doi.org/10.1145/2363.2433
+- **[Nii1986]** Nii, H. P. (1986). Blackboard systems, part one: the blackboard model of problem solving and the evolution of blackboard architectures. *AI Magazine*, 7(2), 38–53. https://ojs.aaai.org/index.php/aimagazine/article/view/537
+- **[TheraulazBonabeau1999]** Theraulaz, G., & Bonabeau, E. (1999). A brief history of stigmergy. *Artificial Life*, 5(2), 97–116. https://doi.org/10.1162/106454699568700
+- **[Demers1987]** Demers, A., Greene, D., Hauser, C., Irish, W., Larson, J., Shenker, S., Sturgis, H., Swinehart, D., & Terry, D. (1987). Epidemic algorithms for replicated database maintenance. *Proc. PODC '87*, 1–12. https://doi.org/10.1145/41840.41841
+- **[Kreps2011]** Kreps, J., Narkhede, N., & Rao, J. (2011). Kafka: a distributed messaging system for log processing. *NetDB '11*. https://people.csail.mit.edu/matei/courses/2015/6.S897/readings/kafka.pdf
+- **[Kreps2013]** Kreps, J. (2013). The log: what every software engineer should know about real-time data's unifying abstraction. LinkedIn Engineering. The original URL returned 404 on 2026-11-26; read at http://web.archive.org/web/20260612105408/https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying
+- **[KafkaDesign]** Apache Software Foundation. *Apache Kafka 4.2 documentation: Design, "Log Compaction"*. https://kafka.apache.org/42/design/design/ (accessed 2026-11-26)
+- **[LinuxRingBuffer]** Rostedt, S. (2009). *Lockless Ring Buffer Design*. Linux kernel documentation. https://docs.kernel.org/trace/ring-buffer-design.html (accessed 2026-11-26)
+- **[RRDtool]** Oetiker, T. *rrdtool(1): Round Robin Database Tool*. https://oss.oetiker.ch/rrdtool/doc/rrdtool.en.html (accessed 2026-11-26)
+- **[RosenblumOusterhout1992]** Rosenblum, M., & Ousterhout, J. K. (1992). The design and implementation of a log-structured file system. *ACM Transactions on Computer Systems*, 10(1), 26–52. https://doi.org/10.1145/146941.146943
+
+**Search**
+
+- **[ZhaoEtAl2024]** Zhao, W. X., Liu, J., Ren, R., & Wen, J.-R. (2024). Dense text retrieval based on pretrained language models: a survey. *ACM Transactions on Information Systems*, 42(4), 1–60. https://doi.org/10.1145/3637870 (*abstract read*)
+- **[MalkovYashunin2020]** Malkov, Y. A., & Yashunin, D. A. (2020). Efficient and robust approximate nearest neighbor search using hierarchical navigable small world graphs. *IEEE Transactions on Pattern Analysis and Machine Intelligence*, 42(4), 824–836. https://doi.org/10.1109/TPAMI.2018.2889473 (*metadata read*)
+
+**Naming and discovery**
+
+- **[RFC2136]** Vixie, P. (Ed.), Thomson, S., Rekhter, Y., & Bound, J. (1997). *Dynamic Updates in the Domain Name System (DNS UPDATE)*. RFC 2136. https://www.rfc-editor.org/rfc/rfc2136
+- **[RFC2782]** Gulbrandsen, A., Vixie, P., & Esibov, L. (2000). *A DNS RR for specifying the location of services (DNS SRV)*. RFC 2782. https://www.rfc-editor.org/rfc/rfc2782
+- **[RFC2931]** Eastlake 3rd, D. (2000). *DNS Request and Transaction Signatures (SIG(0)s)*. RFC 2931. https://www.rfc-editor.org/rfc/rfc2931
+- **[RFC6762]** Cheshire, S., & Krochmal, M. (2013). *Multicast DNS*. RFC 6762. https://www.rfc-editor.org/rfc/rfc6762
+- **[RFC6763]** Cheshire, S., & Krochmal, M. (2013). *DNS-Based Service Discovery*. RFC 6763. https://www.rfc-editor.org/rfc/rfc6763
+- **[RFC8765]** Pusateri, T., & Cheshire, S. (2020). *DNS Push Notifications*. RFC 8765. https://www.rfc-editor.org/rfc/rfc8765
+- **[RFC8945]** Dupont, F., Morris, S., Vixie, P., Eastlake 3rd, D., Gudmundsson, O., & Wellington, B. (2020). *Secret Key Transaction Authentication for DNS (TSIG)*. RFC 8945. https://www.rfc-editor.org/rfc/rfc8945
+- **[RFC9664]** Cheshire, S., & Lemon, T. (2025). *An EDNS(0) Option to Negotiate Leases on DNS Updates*. RFC 9664. https://www.rfc-editor.org/rfc/rfc9664
+- **[RFC9665]** Lemon, T., & Cheshire, S. (2025). *Service Registration Protocol for DNS-Based Service Discovery*. RFC 9665. https://www.rfc-editor.org/rfc/rfc9665
+- **[ISC-CVE-2024-1975]** Internet Systems Consortium (2024). *CVE-2024-1975: SIG(0) can be used to exhaust CPU resources*. https://kb.isc.org/docs/cve-2024-1975 (accessed 2026-11-26)
+- **[BIND-9.18.28]** Internet Systems Consortium. *BIND 9.18.28 release notes*: "Support for SIG(0) message validation was removed from this version of named. (CVE-2024-1975)". https://bind9.readthedocs.io/en/v9.18.28/notes.html (accessed 2026-11-26)
+
+**Normative** (unchanged): BCP 14 [RFC 2119] [RFC 8174], as in §0.3.
