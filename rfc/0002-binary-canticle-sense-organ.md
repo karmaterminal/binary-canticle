@@ -760,7 +760,7 @@ A second run returns **across a station restart** (🌫).
 | find | the guide lists the programme with its station, stream, class, retention and provenance (§3.3). Finding it MUST NOT by itself arm a wake `[proposed: #195]` (#176 decision 1 is the wake rule) | none: discovery |
 | listen without waking | the ear records the item for this reader and offers no wake. That is **buffer intake** (🪨) | durable-queued (or volatile-queued), with `wake_withheld:<class>` counted |
 | catch up | the return view (§3.1) with its coverage note | host-returned |
-| read it | a later turn echoes an exact item token. That proves **that token was echoed**: not that the payload was read, and not model-input custody (#176 decision 3, 🌫, 🪨). An echoed *batch id* shows the batch was named, not that each item in it was read (🪨). Neither is evidence for the programme (#176 decision 3, 🌫) | prince-encountered (and model-seen, which stays `[open: #176]` on Claude seats) |
+| read it | a later turn echoes an exact item token. That proves **that token was echoed**: not that the payload was read, and not model-input custody (#176 decision 3, 🌫, 🪨). An echoed *batch id* shows the batch was named, not that each item in it was read (🪨). Neither is evidence for the programme (#176 decision 3, 🌫) | token encounter; exact-item model-seen unproved `[open: #176]` |
 | use | the prince's own later act, if any. A host never observes use, and there is no layer for it (🌿). Where it is an answer, §4.3's receipt carries it | none |
 
 **Loss is reported as §3.1's three kinds of gap, never one number:**
