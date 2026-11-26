@@ -343,18 +343,18 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 
 ## E3: pass 2's scaled rows
 
-| row | new | base | slice |
-|---|---|---|---|
-| spoof-exact-source-100000 | **FAIL** (outside the supported guarantee); 4, 4, 2, 2, 2 of 20; max 4,080 ms | **FAIL** (outside the supported guarantee); 4, 2, 5, 2, 2 of 20; max 4,097 ms | **FAIL** (outside the supported guarantee); 2, 4, 1, 1, 0 of 20; max 2,090 ms |
-| spoof-exact-source-500 | PASS; 20, 20, 20, 20, 20 of 20; max 33 ms | PASS; 20, 20, 20, 20, 20 of 20; max 30 ms | PASS; 20, 20, 20, 20, 20 of 20; max 29 ms |
-| churn-established-100000 | PASS; 57, 57, 57, 57, 57 of 57; max 51 ms | PASS; 57, 57, 57, 57, 57 of 57; max 205 ms | PASS; 57, 57, 57, 57, 57 of 57; max 51 ms |
-| relay-first-then-churn-100000 | **FAIL** (outside the supported guarantee); 20, 20, 2, 20, 20 of 20; max 16,763 ms | **FAIL** (outside the supported guarantee); 2, 1, 20, 20, 10 of 20; max 17,296 ms | **FAIL** (outside the supported guarantee); 20, 20, 7, 0, 20 of 20; max 17,134 ms |
-| relay-after-then-churn-100000 | PASS; 20, 20, 20, 20, 20 of 20; max 98 ms | PASS; 20, 20, 20, 20, 20 of 20; max 47 ms | PASS; 20, 20, 20, 20, 20 of 20; max 40 ms |
-| cold-start-12-ports-20000 | PASS; 20, 20, 20, 20, 20 of 20; max 32 ms; first 22-30 ms | PASS; 20, 20, 20, 20, 20 of 20; max 44 ms; first 20-54 ms | PASS; 20, 20, 20, 20, 20 of 20; max 23 ms; first 26-33 ms |
-| cold-start-40-ports-20000 | PASS; 20, 20, 20, 20, 20 of 20; max 1,010 ms; first 18-40 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 4,027 ms; first 91-3,264 ms | PASS; 20, 20, 20, 20, 20 of 20; max 1,016 ms; first 24-45 ms |
-| cold-start-200-ports-20000 | PASS; 20, 20, 20, 20, 20 of 20; max 26 ms; first 10-25 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 2,016 ms; first 512-1,807 ms | PASS; 20, 20, 20, 20, 20 of 20; max 1,018 ms; first 23-61 ms |
-| cold-start-churn-own-host-20000 | **FAIL**; 20, 20, 20, 20, 20 of 20; max 4,023 ms; first 790-2,075 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 4,155 ms; first 168-3,664 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 4,030 ms; first 571-3,447 ms |
-| cold-start-churn-60000-hosts-20000 | **FAIL**; 20, 20, 20, 20, 20 of 20; max 17,336 ms; first 2,198-5,283 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 17,330 ms; first 2,779-6,903 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 4,029 ms; first 1,305-3,220 ms |
+| row | fix | new | base | slice |
+|---|---|---|---|---|
+| spoof-exact-source-100000 | **FAIL** (outside the supported guarantee); 0, 4, 2, 0, 1 of 20; max 2,070 ms | **FAIL** (outside the supported guarantee); 4, 4, 2, 2, 2 of 20; max 4,080 ms | **FAIL** (outside the supported guarantee); 4, 2, 5, 2, 2 of 20; max 4,097 ms | **FAIL** (outside the supported guarantee); 2, 4, 1, 1, 0 of 20; max 2,090 ms |
+| spoof-exact-source-500 | PASS; 20, 20, 20, 20, 20 of 20; max 106 ms | PASS; 20, 20, 20, 20, 20 of 20; max 33 ms | PASS; 20, 20, 20, 20, 20 of 20; max 30 ms | PASS; 20, 20, 20, 20, 20 of 20; max 29 ms |
+| churn-established-100000 | PASS; 57, 57, 57, 57, 57 of 57; max 69 ms | PASS; 57, 57, 57, 57, 57 of 57; max 51 ms | PASS; 57, 57, 57, 57, 57 of 57; max 205 ms | PASS; 57, 57, 57, 57, 57 of 57; max 51 ms |
+| relay-first-then-churn-100000 | **FAIL** (outside the supported guarantee); 20, 20, 20, 20, 1 of 20; max 16,325 ms | **FAIL** (outside the supported guarantee); 20, 20, 2, 20, 20 of 20; max 16,763 ms | **FAIL** (outside the supported guarantee); 2, 1, 20, 20, 10 of 20; max 17,296 ms | **FAIL** (outside the supported guarantee); 20, 20, 7, 0, 20 of 20; max 17,134 ms |
+| relay-after-then-churn-100000 | PASS; 20, 20, 20, 20, 20 of 20; max 54 ms | PASS; 20, 20, 20, 20, 20 of 20; max 98 ms | PASS; 20, 20, 20, 20, 20 of 20; max 47 ms | PASS; 20, 20, 20, 20, 20 of 20; max 40 ms |
+| cold-start-12-ports-20000 | PASS; 20, 20, 20, 20, 20 of 20; max 50 ms; first 10-64 ms | PASS; 20, 20, 20, 20, 20 of 20; max 32 ms; first 22-30 ms | PASS; 20, 20, 20, 20, 20 of 20; max 44 ms; first 20-54 ms | PASS; 20, 20, 20, 20, 20 of 20; max 23 ms; first 26-33 ms |
+| cold-start-40-ports-20000 | PASS; 20, 20, 20, 20, 20 of 20; max 1,017 ms; first 10-59 ms | PASS; 20, 20, 20, 20, 20 of 20; max 1,010 ms; first 18-40 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 4,027 ms; first 91-3,264 ms | PASS; 20, 20, 20, 20, 20 of 20; max 1,016 ms; first 24-45 ms |
+| cold-start-200-ports-20000 | PASS; 20, 20, 20, 20, 20 of 20; max 1,016 ms; first 19-36 ms | PASS; 20, 20, 20, 20, 20 of 20; max 26 ms; first 10-25 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 2,016 ms; first 512-1,807 ms | PASS; 20, 20, 20, 20, 20 of 20; max 1,018 ms; first 23-61 ms |
+| cold-start-churn-own-host-20000 | **FAIL**; 20, 20, 20, 20, 20 of 20; max 11,120 ms; first 596-4,176 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 4,023 ms; first 790-2,075 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 4,155 ms; first 168-3,664 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 4,030 ms; first 571-3,447 ms |
+| cold-start-churn-60000-hosts-20000 | **FAIL**; 20, 20, 20, 20, 20 of 20; max 4,020 ms; first 596-2,921 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 17,336 ms; first 2,198-5,283 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 17,330 ms; first 2,779-6,903 ms | **FAIL**; 20, 20, 20, 20, 20 of 20; max 4,029 ms; first 1,305-3,220 ms |
 
 ## I: the inverse rows
 
