@@ -771,33 +771,66 @@ resume from what is retained (🌊). Catch-up never implies completeness.
 
 **The measured comparison (🪨, 🌊, 🌫).** Run the same programme over the same window through two arms:
 - **A:** this organ;
-- **B:** the room plus today's ear: the guide-less baseline, with a prince pulling by `hear` when he wants to.
+- **B:** the **best existing room-plus-ear controls**, as Appendix C sets them out (🪨). That means today's
+  ear with its digest, mute and `hear`, plus the room. It is not a guide-less straw man.
 
-Both arms get **the same predeclared useful task**: a question about the window with a required correct
-answer. An arm that fails the task fails, whatever it cost, and cost is compared only between arms that pass
-it (🌫). Count, per arm:
+**Predeclared before the run** `[proposed: #195]`:
+- the **selected content**: which items the prince means to take in;
+- the **deadline**: by when;
+- a **useful task**: a question about the window with a required correct answer (🌫);
+- the **pull bound**;
+- the **token margin**.
 
+An arm that fails the task, or doesn't cover the selected content by the deadline, fails whatever it cost.
+Cost is compared only between arms that pass (🌫, Appendix C).
+
+**Every item the station emitted in the window** is placed in exactly one category. The emission list comes
+from an **independent emission ledger** kept at the station. It is the test's oracle only, and production
+never knows it (🌻, 🪨). The categories:
+- **encountered** (prince-encountered, §0.5);
+- **retained and available**: held for the prince and not yet read. This is a choice, not a loss (🪨);
+- **deliberately excluded**: filtered by the prince's own tuning, such as a muted class or key, or an
+  untuned stream;
+- **known gap**: §3.1;
+- **unknown coverage**: §3.1's unknown tail or absent run.
+
+An item in **none** of these is a **silent miss**.
+
+**Count, per arm:**
 - **unchosen wakes:** turns started by a wake the prince did not elect;
-- **model-input tokens the ear injected for the programme**, counted by the ear at injection (the exact bytes it handed to the session, and their token count under the host's tokenizer). A host's per-turn usage covers the whole turn and **can't be attributed** to the programme (🪨). Each arm also reports whole-turn usage, as unattributed context, and never as the programme's cost;
-- **silent misses:** items the station emitted in the window (from an **independent emission ledger** kept
-  at the station, which is ground truth for the run, 🌻) that appear neither as encountered nor as any of
-  §3.1's gaps, **nor as filtered by the prince's own tuning**. An item the prince's elected filter excluded (a muted class or key, an untuned stream) is not silent loss. It is counted separately as *filtered by election* (🪨);
-- **manual pulls:** `hear` calls the prince made.
+- **offered/injected tokens attributable to the programme**: the exact bytes handed to the session for
+  anything the programme caused, and their token count under the host's tokenizer. It covers, **in both
+  arms alike** (🌻):
+  - pushed or released content;
+  - room messages carrying programme text;
+  - **tool results**, such as a `hear` or a guide search, read for the programme;
+  - **setup and control** input: subscription and tuning calls and their results, and banners and coverage
+    notes.
 
-**A passes** only if all five hold:
+  In A this is counted by the ear at injection. In B it is counted over the same kinds of input arriving
+  by room and by ear.
+
+  It is an offer-side, host-returned measure. **What reached model input** after truncation or other host
+  assembly stays **unknown unless instrumented** (§0.5's model-seen) (🪨). Whole-turn usage is reported as a
+  secondary outcome, never as the programme's denominator.
+- **silent misses**, as defined above;
+- **manual pulls**: `hear` calls the prince made.
+
+**A passes** only if all of these hold:
 - the task passes;
+- the selected content is covered by the deadline;
 - there are zero unchosen wakes;
-- it spends fewer model-input tokens than B;
+- there are fewer offered/injected programme tokens than B, by the predeclared margin;
 - there are zero silent misses;
-- its manual pulls stay within a bound **declared before the run**, or the run reports them as a named
-  tradeoff with the number.
+- manual pulls are **within the predeclared bound**.
 
-The margin on tokens is also fixed before the run, never after `[proposed: #195]`.
+A run over the pull bound **does not pass**. It is reported as a separate outcome, *passed on cost, over
+the pull bound*, with the number, and it is never folded into a pass (🪨).
 
 **What would falsify the organ:**
 - a step whose receipt claims a later layer than it reached;
 - a wake the prince did not elect;
-- an item lost without being reported as one of §3.1's gaps;
+- an emitted item that lands in none of the five categories (a silent miss);
 - a restart reported as zero loss;
 - or A failing its pass line.
 
