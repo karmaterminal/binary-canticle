@@ -345,3 +345,21 @@ runs were underdriven on 11-25. Before each step of the queue (a harness invocat
 - **The wait before a step is at most 5 minutes for an E2 row** (and still 15 for every other step). The host's load stayed at 10-14 through AB's
   first gates, so a wait of 15 minutes before each of E2's 35 rows would add up to 9 hours and, from what AB saw, rarely find the load below 8. E2's rows have
   no rate floor; a loaded host is the harder case for them, never the easier.
+
+## Added 2026-11-26 20:00Z, the queue stopped between two runs: the host's load, and the order from here
+
+From about 17:40Z the shared host's load stayed at 12-22 (other lanes: an OpenClaw test run at 6 cores, the self-hosted CI runner, a long `du`). The
+producers run at `nice -n 19`, as declared, so they were starved: 13 of N1's 40 runs on `fix` were underdriven, and the first five of N1c's all were
+(14 500-18 070 of 20 000, and 65 200 of 100 000, in the lowest second), each run taking 6-9 minutes. The queue was stopped at 19:53:28Z, 4 s after the
+record of N1c's fifth run, so no run was cut short and none is discarded: what was recorded stays, INVALID where it is.
+
+What ran on `fix` until then: E1, N0, E3, I, J, E2 run 0, N0c and N1 complete, N1c's first five runs. The rest, in this order:
+
+1. **E2 runs 1-4** next, its rows as before (a wait of at most 5 minutes before each). They have no rate floor, and their result does not depend on
+   how hard the producers could push.
+2. **N1c, then N2, a round at a time**: one run of each of the row's cells (`newcomer_rows.py` with the next run count), each round after a wait for the
+   one-minute load to be below 8 of at most 60 minutes.
+3. **The completions**, the rule of `complete.py` unchanged (a cell short of valid runs gets the next run, until it has the declared number or twice as
+   many runs), each run after a wait of at most 30 minutes.
+
+Nothing is chosen by how it ended; the floor stays.
