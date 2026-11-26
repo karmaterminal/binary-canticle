@@ -1,0 +1,25 @@
+test_cli_control_miss_and_unknown_have_distinct_exits (test_scorer.ScorerTest.test_cli_control_miss_and_unknown_have_distinct_exits) ... ok
+test_delivery_is_not_notice_or_use (test_scorer.ScorerTest.test_delivery_is_not_notice_or_use) ... ok
+test_duplicate_invocation_rejected_not_silently_collapsed (test_scorer.ScorerTest.test_duplicate_invocation_rejected_not_silently_collapsed) ... ok
+test_expired_notice_is_late_not_success (test_scorer.ScorerTest.test_expired_notice_is_late_not_success) ... ok
+test_explicit_use_is_separate (test_scorer.ScorerTest.test_explicit_use_is_separate) ... ok
+test_invalid_budget_rejected (test_scorer.ScorerTest.test_invalid_budget_rejected) ... ok
+test_many_tool_calls_in_one_invocation_cost_one (test_scorer.ScorerTest.test_many_tool_calls_in_one_invocation_cost_one) ... ok
+test_matched_control (test_scorer.ScorerTest.test_matched_control) ... ok
+test_non_object_json_rejected (test_scorer.ScorerTest.test_non_object_json_rejected) ... ok
+test_non_synthetic_input_rejected (test_scorer.ScorerTest.test_non_synthetic_input_rejected) ... ok
+test_over_budget_notice_not_credited (test_scorer.ScorerTest.test_over_budget_notice_not_credited) ... ok
+test_planted_miss_fails_comparison (test_scorer.ScorerTest.test_planted_miss_fails_comparison) ... ok
+test_pushes_never_create_model_invocations (test_scorer.ScorerTest.test_pushes_never_create_model_invocations) ... ok
+test_repeat_notice_on_later_invocation_is_empty (test_scorer.ScorerTest.test_repeat_notice_on_later_invocation_is_empty) ... ok
+test_same_ids_with_different_hash_or_lifetime_rejected (test_scorer.ScorerTest.test_same_ids_with_different_hash_or_lifetime_rejected) ... ok
+test_same_notice_twice_does_not_gain_a_fact_or_turn (test_scorer.ScorerTest.test_same_notice_twice_does_not_gain_a_fact_or_turn) ... ok
+test_unavailable_openclaw_grant_not_imputed (test_scorer.ScorerTest.test_unavailable_openclaw_grant_not_imputed) ... ok
+test_unknown_census_never_turns_absence_into_zero_misses (test_scorer.ScorerTest.test_unknown_census_never_turns_absence_into_zero_misses) ... ok
+test_unmatched_discord_arm_rejected (test_scorer.ScorerTest.test_unmatched_discord_arm_rejected) ... ok
+test_use_requires_independent_notice (test_scorer.ScorerTest.test_use_requires_independent_notice) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.199s
+
+OK

@@ -1,0 +1,7 @@
+{
+  "reports/measurement/2026-11-26-day/scorer.py": "5a51096400d72f562095c741b506b9aaf060a9779889ee255f283ef02e0f4563",
+  "reports/measurement/2026-11-26-day/test_scorer.py": "e7a94402d9a6cdfef17d935f1bbe0b27a41be8abb522aa508d0626abdfa0cf98",
+  "reports/measurement/2026-11-26-day/synthetic-control.json": "cb804c0f43e14b1115956e357526f72d1aadeca48fca83c7ffd8827d184b628a",
+  "reports/measurement/2026-11-26-day/synthetic-miss.json": "7388913e0e61a7f165232381c43798faf198741660417425dd4c12bd97ce0580",
+  ".github/workflows/tests.yml": "7c0f0528e5e7a9b9a53273b5268679e553901a16efd7999c3d60eb65bdf15bc4"
+}
