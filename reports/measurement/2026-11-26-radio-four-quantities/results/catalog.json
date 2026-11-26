@@ -1,0 +1,196 @@
+{
+ "code": {
+  "binary_canticle_clone": "ba980e32eaa203390a59b73806bdfaf04a14abb3",
+  "frond_ear_clone": "405e49183f76ed03066fe4d93bd4f75c2cdcc541"
+ },
+ "host": {
+  "nproc": 20,
+  "uname": "Linux 7.0.0-1019-nvidia aarch64"
+ },
+ "manifest": {
+  "distinct_stream_names": 9,
+  "format": "canticle-fleet/spike-0",
+  "licensed_pairs": 15,
+  "mtime_ms": 1795330683948,
+  "public_streams": 1,
+  "revoked": 0,
+  "scopes_per_station": [
+   1,
+   1,
+   2,
+   2,
+   2,
+   2,
+   2,
+   3
+  ],
+  "signed": false,
+  "stations": 8,
+  "stations_per_class": {
+   "advisory": 1,
+   "ambient": 1,
+   "chatter": 7,
+   "finding-ref": 1,
+   "live-state": 3
+  },
+  "streams_per_station": [
+   5,
+   3,
+   2,
+   1,
+   1,
+   1,
+   1,
+   1
+  ]
+ },
+ "openclaw_binding": {
+  "delivery_mode": "explicit",
+  "enabled": true,
+  "extension_digest": {
+   "all": "e1db0d52540e8b52d7a49d6a3ac6342e86f1be1b979e8616caf23294b1617d48",
+   "files": {
+    "index.ts": "a1a2c3f9aa992c230fa29a0dee17db0d4adc766b78c89cb4e55ad115a36979ae",
+    "src/binding.ts": "6083e810a77d86d9c8eeef2272caa83e596757e88e7f31ee6da2473bb2f59f0f",
+    "src/config.ts": "1b7ddb02e88731f8b4acdd6f20df2ca2850952681646c3f44d8125ff88e96ae8",
+    "src/daemon.ts": "c698085692216273e44e2c74ec3cb666b2d1763ae81f07b10f5d8a1d00908497",
+    "src/framing.ts": "13f75b46053c66a80d05f6eed5f927202df810e466a89408368a1d17e91536f4",
+    "src/journal.ts": "2a38a87ce89e13cf7b911f3f61f3d8c0b48fb62320467cf1119e9bd1e2cd1d3a",
+    "src/outbox.ts": "7b1085a5459a0fca549600f202a3d20f195bec0c846f727d5ed00a36051c6add",
+    "src/policy.ts": "0a25d969ca824c7dd408da2df9a1ff5a6479075720d3e314f39f2107c76bae4e",
+    "src/receive.ts": "335867de5cb28c9949a4458f51f48363bc746452f7b445beb34b56805a2ac2ea",
+    "src/records.ts": "92758651792ae0b26bba96bd9f88737f728ea76e31c893e11425502247c5c25b",
+    "src/render.ts": "ffb2708e09b889c407e0a6bcd042b24d27a72b52a15bd1edbb4d2cae72b0a9d0",
+    "src/station.ts": "154d644a241870ca4c85a805e907bd6937664f667a34edc72c9fa7bb5773fbef",
+    "src/store.ts": "5b540ba9c4c21c1fd099d2c3d00b682af0a9798f5b1f816c4c9631bf031a30be",
+    "src/tools.ts": "ac71a15ce0caa5f8aa74a3a0ab9aa8dc9479edf05fb659a6c582010a8b46aa1b"
+   }
+  },
+  "include_self": false,
+  "payload_sessions": 0,
+  "publish_enabled": false,
+  "resolved_pairs": 1,
+  "tune_patterns": 1
+ },
+ "processes": [
+  {
+   "multicast": false,
+   "role": "canticle daemon",
+   "started_at_ms": 1795330683420
+  },
+  {
+   "beacon_ms": 1000,
+   "peers": 4,
+   "role": "canticle station",
+   "started_at_ms": 1794280376740,
+   "streams": 3
+  },
+  {
+   "beacon_ms": 1000,
+   "peers": 4,
+   "role": "canticle station",
+   "started_at_ms": 1794676609700,
+   "streams": 1
+  },
+  {
+   "role": "frond-ear daemon",
+   "started_at_ms": 1795543518930
+  },
+  {
+   "role": "openclaw gateway",
+   "started_at_ms": 1794911408780
+  }
+ ],
+ "seat_frond_ear": {
+  "binding": "lan",
+  "config_mtime_ms": 1795526529998,
+  "delivery_ceiling": "off",
+  "delivery_station_entries": 3,
+  "enabled": true,
+  "exposure_enabled": false,
+  "muted": false,
+  "patterns": [
+   {
+    "matches": 0,
+    "pairs": [],
+    "pattern": "P1",
+    "station_wildcard": true
+   },
+   {
+    "matches": 1,
+    "pairs": [
+     {
+      "allowlisted": false,
+      "licensed_classes": [
+       "advisory",
+       "chatter",
+       "finding-ref",
+       "live-state"
+      ],
+      "mode": "immediate",
+      "wake_classes_x_licensed": []
+     }
+    ],
+    "pattern": "P2",
+    "station_wildcard": false
+   },
+   {
+    "matches": 1,
+    "pairs": [
+     {
+      "allowlisted": false,
+      "licensed_classes": [
+       "advisory",
+       "chatter",
+       "finding-ref",
+       "live-state"
+      ],
+      "mode": "immediate",
+      "wake_classes_x_licensed": []
+     }
+    ],
+    "pattern": "P3",
+    "station_wildcard": false
+   },
+   {
+    "matches": 1,
+    "pairs": [
+     {
+      "allowlisted": true,
+      "licensed_classes": [
+       "chatter",
+       "live-state"
+      ],
+      "mode": "immediate",
+      "wake_classes_x_licensed": [
+       "chatter"
+      ]
+     }
+    ],
+    "pattern": "P4",
+    "station_wildcard": false
+   },
+   {
+    "matches": 1,
+    "pairs": [
+     {
+      "allowlisted": true,
+      "licensed_classes": [
+       "ambient"
+      ],
+      "mode": "immediate",
+      "wake_classes_x_licensed": []
+     }
+    ],
+    "pattern": "P5",
+    "station_wildcard": false
+   }
+  ],
+  "resolved_pairs": 4,
+  "resolved_stations": 3,
+  "source": "host-daemon",
+  "wake_keys": 2,
+  "wake_keys_bare": 1
+ },
+ "t": 1795684226355
+}

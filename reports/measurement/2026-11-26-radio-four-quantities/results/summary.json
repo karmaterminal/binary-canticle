@@ -1,0 +1,460 @@
+{
+ "integrity": {
+  "daemon_process_starts_seen": 1,
+  "daemon_runs_seen": 1,
+  "fast_samples": 271,
+  "frond_ear_counts_monotonic": true,
+  "frond_ear_samples": 24,
+  "health_counters_monotonic": true,
+  "health_reasons": [],
+  "health_records": 270,
+  "health_states": [
+   "ok"
+  ],
+  "hello_manifest_matches_local_file": [
+   true
+  ],
+  "peers_closed_delta": 0,
+  "probe_events": [
+   "start",
+   "connected",
+   "disconnected:deadline",
+   "end"
+  ],
+  "records_dropped_delta": 0,
+  "udp_drops_monotonic": true
+ },
+ "q1_catalog": {
+  "beacon_age_le_30s": {
+   "max": 5,
+   "median": 5.0,
+   "min": 5
+  },
+  "beacon_age_le_5s": {
+   "max": 5,
+   "median": 5.0,
+   "min": 5
+  },
+  "code": {
+   "beacon_catalog_bound": 136,
+   "dedup_quota_per_key": 12500,
+   "max_streams_per_station": 32
+  },
+  "distinct_stream_names": 9,
+  "licensed_pairs": 15,
+  "licensed_stations": 8,
+  "local_stations": [
+   {
+    "beacon_ms": 1000,
+    "peers": 4,
+    "streams": 3
+   },
+   {
+    "beacon_ms": 1000,
+    "peers": 4,
+    "streams": 1
+   }
+  ],
+  "on_air_at_end": 5,
+  "presence_at_end_by_state": {
+   "ROOT_UNKNOWN": 5,
+   "UNOBSERVABLE:signed_off": 1
+  },
+  "presence_changes_in_window": 0,
+  "public_streams": 1,
+  "signed": false,
+  "stations_per_class": {
+   "advisory": 1,
+   "ambient": 1,
+   "chatter": 7,
+   "finding-ref": 1,
+   "live-state": 3
+  },
+  "stations_with_a_beacon_this_run": 6,
+  "stations_with_items_in_window": 1,
+  "streams_per_station": [
+   5,
+   3,
+   2,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "streams_with_items_in_window": 1
+ },
+ "q2_traffic": {
+  "bytes_per_s": {
+   "estimate": 930.1932429102077,
+   "estimate_high": 1305.4663132410815,
+   "estimate_low": 785.0876557156032,
+   "observed_first_copies": 0.2810157156923859
+  },
+  "counter_deltas": {
+   "admission.duplicate": 274,
+   "admission.verified": 4,
+   "beacon.verified": 13461,
+   "disposition.no_op": 274,
+   "disposition.surface": 4,
+   "retract.superseded": 4
+  },
+  "daemon": {
+   "cpu_s": 11.55,
+   "rss_kib_max": 24652
+  },
+  "datagrams": {
+   "beacon": 13461,
+   "item": 278,
+   "kernel_dropped": 0,
+   "pluck": 0,
+   "total": 13739,
+   "unverified": 0
+  },
+  "derived_bytes": {
+   "beacons": {
+    "bytes": 2449902,
+    "bytes_high": 3459477,
+    "bytes_low": 2059533,
+    "datagrams": 13461,
+    "size": 182,
+    "size_high": 257,
+    "size_low": 153,
+    "streams_per_beacon_assumed": 2
+   },
+   "repeats": {
+    "bytes": 51786,
+    "bytes_high": 51786,
+    "bytes_low": 51786,
+    "datagrams": 274,
+    "mean_bytes": 189
+   }
+  },
+  "first_copies": {
+   "bytes": 756,
+   "bytes_max": 189,
+   "bytes_mean": 189,
+   "bytes_min": 189,
+   "hop_nonzero": 0,
+   "items": 4,
+   "refresh": 4,
+   "wake_derived": 0
+  },
+  "items_split": {
+   "first_copies_counter": 4,
+   "first_copies_records": 4,
+   "repeats": 274,
+   "warmup_held": 0
+  },
+  "kernel_drops_this_socket_total": 0,
+  "live_items": {
+   "bytes_max": 189,
+   "bytes_mean": 189,
+   "bytes_min": 189,
+   "n": 5
+  },
+  "per_s": {
+   "beacon": 5.003640937744983,
+   "item": 0.10333646688159165,
+   "kernel_dropped": 0.0,
+   "pluck": 0.0,
+   "total": 5.106977404626575,
+   "unverified": 0.0
+  },
+  "record_v1": {
+   "bytes_to_probe_excl_frames": 333252,
+   "frame_records_to_probe": 4,
+   "non_frame_records_to_probe": {
+    "health": 270,
+    "landing_state": 1,
+    "retract": 4
+   },
+   "per_s": 0.10296475297194564,
+   "records_emitted": 277
+  },
+  "rx_queue_max_bytes": 0,
+  "seconds": 2690.241,
+  "share_beacon": 0.9797656306863672,
+  "whole_run": {
+   "beacons": 1687235,
+   "first_copies": 1122,
+   "items": 39102,
+   "per_s": {
+    "beacons": 4.736308198678102,
+    "first_copies": 0.0031496133015951125,
+    "items": 0.10976486570318368,
+    "plucks": 0.0,
+    "repeats": 0.10661525240158858,
+    "unverified": 0.0
+   },
+   "plucks": 0,
+   "repeats": 37980,
+   "seconds": 356234.208,
+   "unverified": 0
+  }
+ },
+ "q3_tuned": {
+  "frames": {
+   "by": {
+    "live|item|verified|surface|first|live-state|False|False": 4,
+    "snapshot|item|verified|surface|first|live-state|False|False": 1
+   },
+   "distinct": {
+    "stations": 1,
+    "stations_tuned_seat": 0,
+    "streams": 1,
+    "streams_surfaced": 1,
+    "streams_surfaced_tuned_seat": 0,
+    "streams_tuned_openclaw": 0,
+    "streams_tuned_seat": 0
+   },
+   "records": {
+    "live_in_window": 4,
+    "snapshot_entries": 1
+   },
+   "surfaced_by_class": {
+    "live-state": 5
+   },
+   "surfaced_by_tuned_seat": {
+    "False": 5
+   }
+  },
+  "frond_ear_canticle_counts_delta": {},
+  "frond_ear_delivery_counts_delta": {},
+  "frond_ear_delivery_counts_end": {
+   "not_allowlisted": 125,
+   "wake_withheld:ambient": 3
+  },
+  "frond_ear_live_set": {
+   "max": 4096,
+   "omitted_total_delta": 0,
+   "size_max": 1,
+   "size_min": 1,
+   "streams_max": 1
+  },
+  "frond_ear_receive": [
+   "ok/connected"
+  ],
+  "frond_ear_samples": {
+   "first_t": 1795684226513,
+   "last_t": 1795686926572,
+   "n": 24
+  },
+  "frond_ear_stations_by_state_end": {
+   "ROOT_UNKNOWN": 5,
+   "UNOBSERVABLE:signed_off": 1
+  },
+  "openclaw_binding": {
+   "delivery_mode": "explicit",
+   "enabled": true,
+   "include_self": false,
+   "payload_sessions": 0,
+   "publish_enabled": false,
+   "resolved_pairs": 1,
+   "tune_patterns": 1
+  },
+  "openclaw_journal": {
+   "bb0d9a2": {
+    "all_retained": {
+     "by_kind": {
+      "presence": 4835
+     },
+     "entries": 4835,
+     "first_at": 1795658871852,
+     "last_at": 1795669571629
+    },
+    "bad_lines": 0,
+    "window": {
+     "by_kind": {},
+     "heard": {},
+     "heard_stations": 0,
+     "heard_streams": 0
+    }
+   }
+  },
+  "seat": {
+   "binding": "lan",
+   "config_mtime_ms": 1795526529998,
+   "delivery_ceiling": "off",
+   "delivery_station_entries": 3,
+   "enabled": true,
+   "exposure_enabled": false,
+   "muted": false,
+   "patterns": [
+    {
+     "matches": 0,
+     "pairs": [],
+     "pattern": "P1",
+     "station_wildcard": true
+    },
+    {
+     "matches": 1,
+     "pairs": [
+      {
+       "allowlisted": false,
+       "licensed_classes": [
+        "advisory",
+        "chatter",
+        "finding-ref",
+        "live-state"
+       ],
+       "mode": "immediate",
+       "wake_classes_x_licensed": []
+      }
+     ],
+     "pattern": "P2",
+     "station_wildcard": false
+    },
+    {
+     "matches": 1,
+     "pairs": [
+      {
+       "allowlisted": false,
+       "licensed_classes": [
+        "advisory",
+        "chatter",
+        "finding-ref",
+        "live-state"
+       ],
+       "mode": "immediate",
+       "wake_classes_x_licensed": []
+      }
+     ],
+     "pattern": "P3",
+     "station_wildcard": false
+    },
+    {
+     "matches": 1,
+     "pairs": [
+      {
+       "allowlisted": true,
+       "licensed_classes": [
+        "chatter",
+        "live-state"
+       ],
+       "mode": "immediate",
+       "wake_classes_x_licensed": [
+        "chatter"
+       ]
+      }
+     ],
+     "pattern": "P4",
+     "station_wildcard": false
+    },
+    {
+     "matches": 1,
+     "pairs": [
+      {
+       "allowlisted": true,
+       "licensed_classes": [
+        "ambient"
+       ],
+       "mode": "immediate",
+       "wake_classes_x_licensed": []
+      }
+     ],
+     "pattern": "P5",
+     "station_wildcard": false
+    }
+   ],
+   "resolved_pairs": 4,
+   "resolved_stations": 3,
+   "source": "host-daemon",
+   "wake_keys": 2,
+   "wake_keys_bare": 1
+  },
+  "seat_gate_model_surfaced": {
+   "untuned": 5
+  }
+ },
+ "q4_admitted": {
+  "custody_all_retained": {
+   "by": {
+    "hear|immediate|whole|echoed|hear": 3,
+    "immediate|immediate|whole|echoed|ack": 4
+   },
+   "by_day_utc": {
+    "2026-11-22": 2,
+    "2026-11-24": 5
+   },
+   "first_claimed_at": 1795331464413,
+   "last_claimed_at": 1795552925949,
+   "rows": 7
+  },
+  "custody_since_ms": 1795321760050,
+  "custody_window": {
+   "batches": 0,
+   "by": {},
+   "rows": 0
+  },
+  "daemon_journal": {
+   "by_type": {},
+   "lines": 0,
+   "unit": "canticle-daemon.service",
+   "unparsed": 0
+  },
+  "ear_attached_all_samples": true,
+  "ear_custody_end": {
+   "counts": {
+    "claimed": 0,
+    "echoed": 0,
+    "offered": 0,
+    "records": 0
+   },
+   "history": "complete",
+   "window_ms": 3600000
+  },
+  "ear_delivery_end": {
+   "ceiling": "off",
+   "debounce_ms": 5000,
+   "max_age_ms": 30000,
+   "max_pushes_per_hour": 60,
+   "mode": "off",
+   "station_modes": [
+    "immediate",
+    "immediate",
+    "immediate"
+   ],
+   "wake_keys": 2,
+   "window_ms": 60000
+  },
+  "exposure_enabled": false,
+  "exposure_rows": 0,
+  "frond_ear_journal": {
+   "by_event": {
+    "ear.batch_sent": 16,
+    "letters.released": 1,
+    "letters.settled": 1
+   },
+   "lines": 18,
+   "unit": "frond-ear.service",
+   "unparsed": 0
+  },
+  "held_words": [
+   "None"
+  ],
+  "openclaw_state_end": {
+   "b9ac8b8": {
+    "checkpoints": 1,
+    "checkpoints_since_t0": 0,
+    "mutes": 0,
+    "state_mtime_ms": 1795330685229,
+    "taint": 0,
+    "taint_overflow": false,
+    "taint_since_t0": 0
+   }
+  },
+  "pushes_last_hour_max": 0,
+  "store_counters_delta": {},
+  "store_counters_end": {
+   "canticle_pushes": 12,
+   "canticle_records_pushed": 12
+  },
+  "waiting_max": 0
+ },
+ "window": {
+  "seconds": 2701.287,
+  "t0": 1795684226307,
+  "t1": 1795686927594
+ }
+}

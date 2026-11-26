@@ -1,0 +1,54 @@
+{
+ "body_bytes": {
+  "max": 39,
+  "min": 39,
+  "n": 5
+ },
+ "by": {
+  "live|item|verified|surface|first|live-state|False|False": 4,
+  "snapshot|item|verified|surface|first|live-state|False|False": 1
+ },
+ "distinct": {
+  "stations": 1,
+  "stations_tuned_seat": 0,
+  "streams": 1,
+  "streams_surfaced": 1,
+  "streams_surfaced_tuned_seat": 0,
+  "streams_tuned_openclaw": 0,
+  "streams_tuned_seat": 0
+ },
+ "first_copies": {
+  "bytes": 756,
+  "bytes_max": 189,
+  "bytes_mean": 189,
+  "bytes_min": 189,
+  "hop_nonzero": 0,
+  "items": 4,
+  "refresh": 4,
+  "wake_derived": 0
+ },
+ "live_items": {
+  "bytes_max": 189,
+  "bytes_mean": 189,
+  "bytes_min": 189,
+  "n": 5
+ },
+ "plucks": 0,
+ "reasons": {},
+ "records": {
+  "live_in_window": 4,
+  "snapshot_entries": 1
+ },
+ "seat_gate_model_surfaced": {
+  "untuned": 5
+ },
+ "surfaced_by_class": {
+  "live-state": 5
+ },
+ "surfaced_by_tuned_seat": {
+  "False": 5
+ },
+ "t0": 1795684226307,
+ "t1": 1795686927594,
+ "warmup_held": 0
+}

@@ -1,0 +1,61 @@
+{
+ "custody": {
+  "all_retained": {
+   "by": {
+    "hear|immediate|whole|echoed|hear": 3,
+    "immediate|immediate|whole|echoed|ack": 4
+   },
+   "by_day_utc": {
+    "2026-11-22": 2,
+    "2026-11-24": 5
+   },
+   "first_claimed_at": 1795331464413,
+   "last_claimed_at": 1795552925949,
+   "rows": 7
+  },
+  "custody_since_ms": 1795321760050,
+  "exposure_rows": 0,
+  "window": {
+   "batches": 0,
+   "by": {},
+   "rows": 0
+  }
+ },
+ "daemon_journal": {
+  "by_type": {},
+  "lines": 0,
+  "unit": "canticle-daemon.service",
+  "unparsed": 0
+ },
+ "frond_ear_journal": {
+  "by_event": {
+   "ear.batch_sent": 16,
+   "letters.released": 1,
+   "letters.settled": 1
+  },
+  "lines": 18,
+  "unit": "frond-ear.service",
+  "unparsed": 0
+ },
+ "openclaw_journal": {
+  "bb0d9a2": {
+   "all_retained": {
+    "by_kind": {
+     "presence": 4835
+    },
+    "entries": 4835,
+    "first_at": 1795658871852,
+    "last_at": 1795669571629
+   },
+   "bad_lines": 0,
+   "window": {
+    "by_kind": {},
+    "heard": {},
+    "heard_stations": 0,
+    "heard_streams": 0
+   }
+  }
+ },
+ "t0": 1795684226307,
+ "t1": 1795686927594
+}
