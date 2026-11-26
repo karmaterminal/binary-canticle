@@ -448,6 +448,56 @@ saturated link with an overwhelmed prince is a failed radio `[proposed: #168]`.
 - Fair admission before verify and before the durable write, with loss counted, is the daemon's
   candidate cure; its exact-source spoof row and two cold-start rows still FAIL `[proposed: #173]`.
 
+### 2.8 Finding the carrier (🌿 evidence · 🌊 trust review · drafted by 🍃, revision 1)
+
+How a prince finds that a station exists and where to hear it. This is the **carrier**, the first of the three
+layers (§0.8). Finding is not trusting, and not hearing. Each statement below says whether it is **source**
+(merged, not running), **live** (observed running) or **proposed**.
+
+**The rule.** Finding a carrier MUST NOT authorize anything: not trust in the station's key, not a wake, not
+tuning `[proposed: #195]`. Four authorities stay apart (🌊), and none of them stands in for another:
+1. **registration**: a DNS update's TSIG proves only that a holder of the shared secret made the update
+   [RFC8945];
+2. **authorship**: the station key signs items (RFC-0001);
+3. **summary lineage**: who summarized what (§0.4, RFC-0003 if it comes);
+4. **wake**: only the listener's own grant (#176 decision 1).
+
+This is §7.9's "source address and the host firewall gate reachability, never trust", carried over to names.
+
+**Source.** bootstrap#1868 (merged at `246da85a`) gives the canticle its own dynamic zone,
+`_canticle._udp.dandelion.cult`, in which a station registers its own SRV and TXT records by a DNS update
+signed with a per-host scoped TSIG key [RFC2136] [RFC8945]. This is DNS-SD's shape [RFC6763] [RFC2782].
+The registrar in that source (🌻, 18:46Z, read at the merge):
+- updates an already-authorized instance's SRV and TXT;
+- leaves PTR enrolment registrar-owned;
+- hardcodes the domain;
+- uses a record TTL of 120 s, which is not an expiry lease.
+
+None of this is live `[open: §7.11]`.
+
+**Live, observed 2026-11-26 18:46Z (🌻).**
+- A prince's resolver path (the local stub and Pi-hole) returns NXDOMAIN for the canticle PTR.
+- The authoritative server still serves *legacy* `frond-gloss` PTR, SRV and TXT records under the parent
+  zone, with no canticle-zone SOA.
+- So legacy records exist at the authority, and discovery through a prince's own resolver does not work.
+- The live pair trusts zone transfers by IP address. Moving that to keys is its own staged step
+  (bootstrap#1872, source only).
+- No seat holds a per-host key yet. Custody is 🪨's, after 🕯's answer on where the earlier keys were made.
+
+**Proposed: what the station side must do.**
+- **Enrolment.** Name how a station first comes to be registrable. That is the registrar's PTR enrolment
+  today; the station never self-enrols into the browse list `[proposed: #195]`.
+- **A configurable domain**, not a hardcoded one `[proposed: #195]`.
+- **Orphan expiry.** A station that stops renewing MUST leave the browse list within a stated bound: a
+  lease [RFC9664], or a registrar sweep, never only a record TTL `[proposed: #195]`.
+- **Ask, or autoinit.** A station either asks for its name at start, or is configured with one and
+  registers it. Either way it carries its stream list in TXT, within DNS-SD's size guidance (§0.9), and
+  withdraws on retire `[proposed: #195]`.
+
+The guide (§3.3) reads the carrier, and DNS Push [RFC8765] where the resolver supports it. A record found
+there is a place to listen, never a reason to trust or to wake. Nothing in this section is a DNS cutover GO.
+That decision is 🌊's, in the staged order bootstrap#1868 and #1872 set out.
+
 ---
 
 ## 3. Capability 2: selective and returning attention (🍃 · 🌿; §3.5 🌊)
@@ -1085,6 +1135,29 @@ the issuer is enabled (§4.2) `[open: frond-ear#117]`.
 
 ---
 
+### 7.11 Registration trust: scoped TSIG or SRP (🍃, revision 1; for 🌿 🌊 🪨)
+
+The Service Registration Protocol [RFC9665] registers DNS-SD services by an update signed with SIG(0) public
+keys [RFC2931], under a lease that expires unless renewed [RFC9664]. It is a real alternative to
+bootstrap#1868's per-host shared secrets. It is **a comparison, not a decision**, and it unblocks less than it
+first appears to `[open: §7.11]`.
+
+| Question | Scoped TSIG (#1868, source) | SRP (RFC 9665) |
+|---|---|---|
+| Secret distribution for *registration* | a shared secret per host; custody blocks today | none to share: each station holds its own private key |
+| What the signature proves | holder of the shared secret | **continuity with the first claimant**, not that the claimant is authorized: "We have not established trust" (§1); §3.2.4 (🌻, 🌊, 🪨) |
+| Fleet admission (may this station claim this name?) | registrar policy | not provided; first-come-first-served. Still needs our manifest (§7.9) |
+| Zone-transfer trust between the two servers (#1872) | separate staged step | not addressed |
+| Signing-key custody for items | separate (§7.9, D15) | separate |
+| Orphan expiry | TTL only today (not a lease) | a lease [RFC9664] |
+| Server support | BIND 9.18 takes TSIG | **BIND 9.18.28 removed SIG(0) message validation** (CVE-2024-1975) [BIND-9.18.28] [ISC-CVE-2024-1975], so SRP needs an SRP-capable registrar in front of BIND, or another server (🌿) |
+| Key loss and rotation | rotate the host secret | the KEY lease protects the name after the service lapses. Losing the key loses the name until that lease ends |
+
+The open question: whether the custody saving is worth a registrar change, given that admission, transfer
+trust and item-key custody stay where they are either way. Owners: 🌿 (reconcile), 🌊 (trust and GO),
+🪨 (custody).
+
+
 ## Appendix A. Where each part of `docs/design/sense-organ.md` went
 
 The design document at `2c3f5ab6` was moved here whole. Its file now points at this RFC.
@@ -1202,7 +1275,7 @@ Standards passages were checked by the bounded helper; access/truncation limits 
 | Rev | Date | By | Changed | Decided earlier and kept |
 |---|---|---|---|---|
 | 0 | 2026-11-23 | all | The draft, shaped from `docs/design/sense-organ.md` (Appendix A) | — |
-| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§3.3** searching the guide (metadata first; a search is a look, never an arrival; the index obeys §2.2; churn). **§2.2** withdrawals and retention (on air the PLUCK already closes compaction's ghost; anything retained past wire expiry must keep the PLUCK; which end a full buffer loses). **§3.2** a today-and-proposed table for intake (mute drops and is not hold; hold and release are unbuilt). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
+| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§2.8** finding the carrier (source / live / proposed kept apart; finding authorizes nothing; four authorities) and **§7.11** registration trust, scoped TSIG or SRP, as a comparison table. **§3.3** searching the guide (metadata first; a search is a look, never an arrival; the index obeys §2.2; churn). **§2.2** withdrawals and retention (on air the PLUCK already closes compaction's ghost; anything retained past wire expiry must keep the PLUCK; which end a full buffer loses). **§3.2** a today-and-proposed table for intake (mute drops and is not hold; hold and release are unbuilt). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
 
 ## References
 
