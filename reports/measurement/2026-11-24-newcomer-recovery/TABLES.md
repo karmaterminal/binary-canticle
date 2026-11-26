@@ -6,15 +6,15 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 
 | row (sources-ports-rate-offset) | fix | new | base | slice |
 |---|---|---|---|---|
-| churn-40-20000-0 | – | PASS: worst first 0.03 s; first 0/5, items 0/100 | PASS: worst first 0.03 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
-| churn-40-20000-5 | – | **FAIL**: worst first 2.50 s; first 4/5, items 17/100 | **FAIL**: worst first 2.53 s; first 2/3, items 14/60 | **FAIL**: worst first 1.76 s; first 2/5, items 6/100 |
-| churn-40-20000-30 | – | **FAIL**: worst first 2.96 s; first 3/5, items 19/100 | **FAIL**: worst first 2.68 s; first 2/3, items 20/60 | **FAIL**: worst first 1.81 s; first 1/5, items 5/100 |
-| churn-40-20000-120 | – | **FAIL**: worst first 2.10 s; first 4/7, items 13/140 | **FAIL**: worst first 2.83 s; first 2/3, items 18/60 | **FAIL**: worst first 1.86 s; first 3/5, items 10/100 |
-| churn-40-100000-0 | – | **FAIL**: worst first 4.32 s; first 5/6, items 44/120 (lost 0, > 10 s 3) | **FAIL**: worst first 2.53 s; first 2/3, items 19/60 | **FAIL**: worst first 3.40 s; first 2/5, items 29/100 |
-| churn-40-100000-5 | – | **FAIL**: worst first 14.78 s; first 4/5, items 46/100 (lost 0, > 10 s 20) | **FAIL**: worst first 7.07 s; first 3/3, items 38/60 (lost 0, > 10 s 19) | **FAIL**: worst first 5.38 s; first 4/5, items 50/100 (lost 0, > 10 s 10) |
-| churn-40-100000-30 | – | **FAIL**: worst first 4.31 s; first 5/5, items 77/100 (lost 0, > 10 s 3) | **FAIL**: worst first 17.99 s; first 3/3, items 60/60 (lost 0, > 10 s 41) | **FAIL**: worst first 12.56 s; first 5/5, items 37/100 (lost 0, > 10 s 20) |
-| churn-40-100000-120 | – | **FAIL**: worst first 13.60 s; first 6/6, items 50/120 (lost 0, > 10 s 20) | **FAIL**: worst first 37.45 s; first 1/3, items 20/60 (lost 0, > 10 s 20) | **FAIL**: worst first 6.34 s; first 4/5, items 37/100 (lost 0, > 10 s 15) |
-| **cells passed** | **0 of 0** | **1 of 8** | **1 of 8** | **1 of 8** |
+| churn-40-20000-0 | PASS: worst first 0.03 s; first 0/5, items 0/100 | PASS: worst first 0.03 s; first 0/5, items 0/100 | PASS: worst first 0.03 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
+| churn-40-20000-5 | **FAIL**: worst first 2.33 s; first 4/5, items 15/100 | **FAIL**: worst first 2.50 s; first 4/5, items 17/100 | **FAIL**: worst first 2.53 s; first 2/3, items 14/60 | **FAIL**: worst first 1.76 s; first 2/5, items 6/100 |
+| churn-40-20000-30 | **FAIL**: worst first 1.77 s; first 3/5, items 10/100 | **FAIL**: worst first 2.96 s; first 3/5, items 19/100 | **FAIL**: worst first 2.68 s; first 2/3, items 20/60 | **FAIL**: worst first 1.81 s; first 1/5, items 5/100 |
+| churn-40-20000-120 | **FAIL**: worst first 1.80 s; first 2/5, items 8/100 | **FAIL**: worst first 2.10 s; first 4/7, items 13/140 | **FAIL**: worst first 2.83 s; first 2/3, items 18/60 | **FAIL**: worst first 1.86 s; first 3/5, items 10/100 |
+| churn-40-100000-0 | **FAIL**: worst first 6.49 s; first 3/5, items 27/100 (lost 0, > 10 s 17) | **FAIL**: worst first 4.32 s; first 5/6, items 44/120 (lost 0, > 10 s 3) | **FAIL**: worst first 2.53 s; first 2/3, items 19/60 | **FAIL**: worst first 3.40 s; first 2/5, items 29/100 |
+| churn-40-100000-5 | **FAIL**: worst first 2.97 s; first 5/5, items 42/100 | **FAIL**: worst first 14.78 s; first 4/5, items 46/100 (lost 0, > 10 s 20) | **FAIL**: worst first 7.07 s; first 3/3, items 38/60 (lost 0, > 10 s 19) | **FAIL**: worst first 5.38 s; first 4/5, items 50/100 (lost 0, > 10 s 10) |
+| churn-40-100000-30 | **FAIL**: worst first 3.61 s; first 4/5, items 41/100 | **FAIL**: worst first 4.31 s; first 5/5, items 77/100 (lost 0, > 10 s 3) | **FAIL**: worst first 17.99 s; first 3/3, items 60/60 (lost 0, > 10 s 41) | **FAIL**: worst first 12.56 s; first 5/5, items 37/100 (lost 0, > 10 s 20) |
+| churn-40-100000-120 | **FAIL**: worst first 15.46 s; first 5/5, items 69/100 (lost 0, > 10 s 26) | **FAIL**: worst first 13.60 s; first 6/6, items 50/120 (lost 0, > 10 s 20) | **FAIL**: worst first 37.45 s; first 1/3, items 20/60 (lost 0, > 10 s 20) | **FAIL**: worst first 6.34 s; first 4/5, items 37/100 (lost 0, > 10 s 15) |
+| **cells passed** | **1 of 8** | **1 of 8** | **1 of 8** | **1 of 8** |
 
 | row (sources-ports-rate-offset) | fix | new | base | slice |
 |---|---|---|---|---|
@@ -63,29 +63,38 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 | row | tree | runs judged | first frame: on time / late / missing | items: on time / late / missing, of 20 a run | verdict | the harness's own verdict |
 |---|---|---|---|---|---|---|
 | churn-40-20000-0 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
+| churn-40-20000-0 | fix | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 2: underdriven: 17990 of 20000 in its lowest second; run 4: underdriven: 18870 of 20000 in its lowest second) | PASS **(they differ)** |
 | churn-40-20000-0 | new | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | churn-40-20000-0 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | churn-40-20000-5 | base | 3 of 3 | 1 / 2 / 0 | 46 / 14 / 0 | **FAIL** | FAIL |
+| churn-40-20000-5 | fix | 3 of 5 | 1 / 2 / 0 | 54 / 6 / 0 | **FAIL** (run 0: underdriven: 11720 of 20000 in its lowest second; run 3: underdriven: 18790 of 20000 in its lowest second) | FAIL |
 | churn-40-20000-5 | new | 5 of 5 | 1 / 4 / 0 | 83 / 17 / 0 | **FAIL** | FAIL |
 | churn-40-20000-5 | slice | 5 of 5 | 3 / 2 / 0 | 94 / 6 / 0 | **FAIL** | FAIL |
 | churn-40-20000-30 | base | 3 of 3 | 1 / 2 / 0 | 40 / 20 / 0 | **FAIL** | FAIL |
+| churn-40-20000-30 | fix | 3 of 5 | 1 / 2 / 0 | 50 / 10 / 0 | **FAIL** (run 0: underdriven: 17820 of 20000 in its lowest second; run 4: underdriven: 18270 of 20000 in its lowest second) | FAIL |
 | churn-40-20000-30 | new | 5 of 5 | 2 / 3 / 0 | 81 / 19 / 0 | **FAIL** | FAIL |
 | churn-40-20000-30 | slice | 5 of 5 | 4 / 1 / 0 | 95 / 5 / 0 | **FAIL** | FAIL |
 | churn-40-20000-120 | base | 3 of 3 | 1 / 2 / 0 | 42 / 18 / 0 | **FAIL** | FAIL |
+| churn-40-20000-120 | fix | 3 of 5 | 1 / 2 / 0 | 52 / 8 / 0 | **FAIL** (run 1: underdriven: 18140 of 20000 in its lowest second; run 3: underdriven: 15400 of 20000 in its lowest second) | FAIL |
 | churn-40-20000-120 | new | 5 of 7 | 2 / 3 / 0 | 89 / 11 / 0 | **FAIL** (run 0: underdriven: 14460 of 20000 in its lowest second; run 3: underdriven: 17170 of 20000 in its lowest second) | FAIL |
 | churn-40-20000-120 | slice | 5 of 5 | 2 / 3 / 0 | 90 / 10 / 0 | **FAIL** | FAIL |
 | churn-40-100000-0 | base | 3 of 3 | 1 / 2 / 0 | 41 / 19 / 0 | **FAIL** | FAIL |
+| churn-40-100000-0 | fix | 4 of 5 | 1 / 3 / 0 | 53 / 27 / 0 | **FAIL** (run 0: underdriven: 73800 of 100000 in its lowest second) | FAIL |
 | churn-40-100000-0 | new | 5 of 6 | 1 / 4 / 0 | 61 / 39 / 0 | **FAIL** (run 4: underdriven: 94400 of 100000 in its lowest second) | FAIL |
 | churn-40-100000-0 | slice | 5 of 5 | 3 / 2 / 0 | 71 / 29 / 0 | **FAIL** | FAIL |
 | churn-40-100000-5 | base | 3 of 3 | 0 / 3 / 0 | 22 / 38 / 0 | **FAIL** | FAIL |
+| churn-40-100000-5 | fix | 4 of 5 | 0 / 4 / 0 | 45 / 35 / 0 | **FAIL** (run 3: underdriven: 91400 of 100000 in its lowest second) | FAIL |
 | churn-40-100000-5 | new | 5 of 5 | 1 / 4 / 0 | 54 / 46 / 0 | **FAIL** | FAIL |
 | churn-40-100000-5 | slice | 5 of 5 | 1 / 4 / 0 | 50 / 50 / 0 | **FAIL** | FAIL |
 | churn-40-100000-30 | base | 3 of 3 | 0 / 3 / 0 | 0 / 60 / 0 | **FAIL** | FAIL |
+| churn-40-100000-30 | fix | 4 of 5 | 1 / 3 / 0 | 48 / 32 / 0 | **FAIL** (run 3: underdriven: 75850 of 100000 in its lowest second) | FAIL |
 | churn-40-100000-30 | new | 5 of 5 | 0 / 5 / 0 | 23 / 77 / 0 | **FAIL** | FAIL |
 | churn-40-100000-30 | slice | 5 of 5 | 0 / 5 / 0 | 63 / 37 / 0 | **FAIL** | FAIL |
 | churn-40-100000-120 | base | 3 of 3 | 2 / 1 / 0 | 40 / 20 / 0 | **FAIL** | FAIL |
+| churn-40-100000-120 | fix | 3 of 5 | 0 / 3 / 0 | 18 / 42 / 0 | **FAIL** (run 3: underdriven: 77000 of 100000 in its lowest second; run 4: underdriven: 83600 of 100000 in its lowest second) | FAIL |
 | churn-40-100000-120 | new | 5 of 6 | 0 / 5 / 0 | 56 / 44 / 0 | **FAIL** (run 4: underdriven: 71850 of 100000 in its lowest second) | FAIL |
 | churn-40-100000-120 | slice | 5 of 5 | 1 / 4 / 0 | 63 / 37 / 0 | **FAIL** | FAIL |
+8 cells where the two verdicts differ, or with too few valid runs
 
 | row | tree | runs judged | first frame: on time / late / missing | items: on time / late / missing, of 20 a run | verdict | the harness's own verdict |
 |---|---|---|---|---|---|---|
@@ -215,6 +224,16 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 
 | tree | flood | R, /s | runs | heard at all | copies sent before the first was heard, per run | p, estimated (95 %) | 1 in | C, checks/s that failed (median) | C/R | first frame > 1.0 s: seen |
 |---|---|---|---|---|---|---|---|---|---|---|
+| fix | churn-40, offset 0 s | 20,000 | 5 | 5 | 2, 2, 2, 2, 2 | 50.0% (18.7%–81.3%) | 2 | 1,499 | 7.5% | 0 of 5 |
+| fix | churn-40, offset 5 s | 20,000 | 5 | 5 | 31, 6, 12, 12, 20 | 6.2% (2.0%–13.8%) | 16 | 1,492 | 7.5% | 4 of 5 |
+| fix | churn-40, offset 30 s | 20,000 | 5 | 5 | 2, 6, 20, 18, 11 | 8.8% (2.9%–19.3%) | 11 | 1,498 | 7.5% | 3 of 5 |
+| fix | churn-40, offset 120 s | 20,000 | 5 | 5 | 20, 6, 6, 5, 15 | 9.6% (3.2%–21.0%) | 10 | 1,498 | 7.5% | 2 of 5 |
+| fix | churn-40, offsets > 0, pooled | 20,000 | 15 | 15 | 2–31 | 7.9% (4.5%–12.7%) | 13 | 1,498 | 7.5% | 9 of 15 |
+| fix | churn-40, offset 0 s | 100,000 | 5 | 5 | 2, 5, 15, 84, 19 | 4.0% (1.3%–9.1%) | 25 | 1,498 | 1.5% | 3 of 5 |
+| fix | churn-40, offset 5 s | 100,000 | 5 | 5 | 34, 21, 45, 24, 20 | 3.5% (1.1%–7.9%) | 29 | 1,498 | 1.5% | 5 of 5 |
+| fix | churn-40, offset 30 s | 100,000 | 5 | 5 | 53, 6, 22, 30, 31 | 3.5% (1.2%–8.0%) | 28 | 1,497 | 1.5% | 4 of 5 |
+| fix | churn-40, offset 120 s | 100,000 | 5 | 5 | 51, 28, 70, 26, 106 | 1.8% (0.6%–4.1%) | 56 | 1,498 | 1.5% | 5 of 5 |
+| fix | churn-40, offsets > 0, pooled | 100,000 | 15 | 15 | 6–106 | 2.6% (1.5%–4.3%) | 38 | 1,498 | 1.5% | 14 of 15 |
 | new | churn-40, offset 0 s | 20,000 | 5 | 5 | 2, 2, 2, 2, 2 | 50.0% (18.7%–81.3%) | 2 | 1,500 | 7.5% | 0 of 5 |
 | new | churn-40, offset 5 s | 20,000 | 5 | 5 | 17, 11, 34, 7, 22 | 5.5% (1.8%–12.4%) | 18 | 1,500 | 7.5% | 4 of 5 |
 | new | churn-40, offset 30 s | 20,000 | 5 | 5 | 11, 44, 4, 8, 20 | 5.7% (1.9%–12.9%) | 17 | 1,498 | 7.5% | 3 of 5 |
@@ -251,18 +270,23 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 | row | tree | runs | quiet items during the flood, per run, of 57 | latency ms over the runs: p50, max | offered /s | socket drops: kernel (reported) | refused, by reason (median) | checks that failed (median) | verdict |
 |---|---|---|---|---|---|---|---|---|---|
 | R1-valid-other-key | base | 3 | 57, 57, 57 | 9–10, 16–34 | 71,205–73,034 | 0 (0) | over_rate 985,810, backlog 1,496 | 0 | PASS (3 of 3 runs) |
+| R1-valid-other-key | fix | 5 | 57, 57, 57, 57, 57 | 9–26, 19–1,042 | 49,902–72,881 | 0–18,873 (0–18,873) | over_rate 968,483, backlog 2,067 | 0 | PASS (5 of 5 runs) |
 | R1-valid-other-key | new | 5 | 57, 57, 57, 57, 57 | 11–13, 21–30 | 71,688–73,512 | 0 (0) | over_rate 970,816, backlog 2,416 | 0 | PASS (5 of 5 runs) |
 | R1-valid-other-key | slice | 5 | 57, 57, 57, 57, 57 | 10–10, 16–20 | 72,219–73,632 | 0 (0) | over_rate 987,873, backlog 2,247 | 0 | PASS (5 of 5 runs) |
 | R2-same-station | base | 3 | 57, 57, 57 | 9–11, 129–130 | 35,343–36,495 | 0 (0) | over_rate 492,789, backlog 776 | 0 | PASS (3 of 3 runs) |
+| R2-same-station | fix | 5 | 57, 57, 57, 57, 57 | 9–47, 127–1,068 | 26,349–36,491 | 0–3,191 (0–3,191) | over_rate 491,788, backlog 558 | 0 | PASS (5 of 5 runs) |
 | R2-same-station | new | 5 | 57, 57, 57, 57, 57 | 10–14, 128–140 | 34,656–36,597 | 0 (0) | over_rate 469,784, backlog 635 | 0 | PASS (5 of 5 runs) |
 | R2-same-station | slice | 5 | 57, 57, 57, 57, 57 | 8–11, 127–140 | 34,573–36,924 | 0 (0) | over_rate 492,239, backlog 810 | 0 | PASS (5 of 5 runs) |
 | R3-forged-claiming-quiet | base | 3 | 57, 57, 57 | 18–19, 22–22 | 100,006–100,007 | 0 (0) | unverified 1,338,912, backlog 2,285 | 13,888 | PASS (3 of 3 runs) |
+| R3-forged-claiming-quiet | fix | 5 | 57, 57, 57, 57, 57 | 10–22, 19–2,013 | 99,136–100,006 | 0–161,995 (0–161,995) | unverified 1,338,765, backlog 2,449 | 13,891 | PASS (5 of 5 runs) |
 | R3-forged-claiming-quiet | new | 5 | 57, 57, 57, 57, 57 | 11–15, 21–36 | 100,006–100,007 | 0 (0) | unverified 1,339,846, backlog 1,349 | 13,898 | PASS (5 of 5 runs) |
 | R3-forged-claiming-quiet | slice | 5 | 57, 57, 57, 57, 57 | 18–20, 23–27 | 100,006–100,007 | 0 (0) | unverified 1,339,798, backlog 1,399 | 13,893 | PASS (5 of 5 runs) |
 | R3c-forged-churned-sources | base | 3 | 57, 57, 57 | 19–20, 23–27 | 100,006–100,007 | 0 (0) | unverified 1,341,093, backlog 49 | 13,958 | PASS (3 of 3 runs) |
+| R3c-forged-churned-sources | fix | 5 | 57, 57, 57, 57, 57 | 12–18, 29–1,020 | 99,997–100,006 | 0–85,724 (0–85,724) | unverified 1,326,181, backlog 8,024 | 20,895 | PASS (5 of 5 runs) |
 | R3c-forged-churned-sources | new | 5 | 57, 57, 57, 57, 57 | 12–22, 22–79 | 100,006–100,007 | 0 (0) | unverified 1,333,338, backlog 889 | 20,923 | PASS (5 of 5 runs) |
 | R3c-forged-churned-sources | slice | 5 | 57, 57, 57, 57, 57 | 20–22, 31–38 | 100,006 | 0 (0) | unverified 1,334,026, backlog 233 | 20,869 | PASS (5 of 5 runs) |
 | R4-replay-own-frames | base | 3 | 57, 57, 57 | 17–18, 18–22 | 100,006 | 0 (0) | none | 0 | PASS (3 of 3 runs) |
+| R4-replay-own-frames | fix | 5 | 57, 57, 57, 57, 57 | 9–19, 19–1,047 | 96,259–100,007 | 0–223,762 (0–223,762) | none | 0 | PASS (5 of 5 runs) |
 | R4-replay-own-frames | new | 5 | 57, 57, 57, 57, 57 | 10–12, 14–20 | 100,006 | 0 (0) | none | 0 | PASS (5 of 5 runs) |
 | R4-replay-own-frames | slice | 5 | 57, 57, 57, 57, 57 | 18–18, 18–20 | 100,006 | 0 (0) | none | 0 | PASS (5 of 5 runs) |
 

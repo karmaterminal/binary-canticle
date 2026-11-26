@@ -27,3 +27,43 @@
 11:16:19Z fix R4-replay-own-frames 4 57 of 57 {'p50': 8.6, 'p90': 19.8, 'p99': 55.6, 'max': 56.4} PASS offered 100006 drops 0 0 {'unlisted': 0, 'unverified': 0, 'over_rate': 0, 'backlog': 0}
 === 11:16:49Z gate: load 7.64 9.50 11.29, waited 0 s for others and 30 s for load
 === 11:16:49Z N0
+11:17:54Z fix churn-40-20000-0 0 first 0.017 items min/med/max 0.0071 0.01 0.0227 | misses: first 0 items 0 lost 0 | offered 20000 low 19800 | drops 0 0 | cpu 25.03
+11:19:04Z fix churn-40-20000-5 0 first 2.3257 items min/med/max 0.01 1.0139 4.0247 | misses: first 1 items 7 lost 0 | offered 20000 low 11720 | drops 11375 11375 | cpu 25.47
+11:24:09Z fix churn-40-20000-30 0 first 0.086 items min/med/max 0.0088 0.0145 0.281 | misses: first 0 items 0 lost 0 | offered 20000 low 17820 | drops 0 0 | cpu 39.3
+11:28:44Z fix churn-40-20000-120 0 first 1.7967 items min/med/max 0.0068 1.0102 2.0149 | misses: first 1 items 5 lost 0 | offered 20000 low 19970 | drops 0 0 | cpu 67.47
+11:29:49Z fix churn-40-100000-0 0 first 0.0579 items min/med/max 0.0077 0.019 0.206 | misses: first 0 items 0 lost 0 | offered 100001 low 73800 | drops 0 0 | cpu 53.52
+11:30:59Z fix churn-40-100000-5 0 first 2.496 items min/med/max 0.0116 2.012 4.0201 | misses: first 1 items 10 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 58.2
+11:32:34Z fix churn-40-100000-30 0 first 3.6109 items min/med/max 1.0112 4.0076 4.0278 | misses: first 1 items 18 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 73.02
+11:35:39Z fix churn-40-100000-120 0 first 3.4076 items min/med/max 1.0112 2.0509 4.0243 | misses: first 1 items 15 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 151.39
+11:36:44Z fix churn-40-20000-0 1 first 0.0252 items min/med/max 0.0166 0.0196 0.0286 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 23.61
+11:37:54Z fix churn-40-20000-5 1 first 0.62 items min/med/max 0.0085 0.0188 1.0173 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 25.48
+11:39:29Z fix churn-40-20000-30 1 first 0.7121 items min/med/max 0.0086 0.0156 1.0267 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 34.13
+11:42:34Z fix churn-40-20000-120 1 first 0.622 items min/med/max 0.0076 0.0114 1.015 | misses: first 0 items 0 lost 0 | offered 20000 low 18140 | drops 0 0 | cpu 69.77
+11:43:39Z fix churn-40-100000-0 1 first 0.5085 items min/med/max 0.0084 0.0161 1.0209 | misses: first 0 items 0 lost 0 | offered 100002 low 98650 | drops 0 0 | cpu 56.47
+11:45:09Z fix churn-40-100000-5 1 first 1.8168 items min/med/max 0.0088 1.0153 2.0241 | misses: first 1 items 6 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 59.99
+11:48:34Z fix churn-40-100000-30 1 first 0.7216 items min/med/max 0.0112 0.0174 1.0188 | misses: first 0 items 0 lost 0 | offered 100001 low 99800 | drops 0 0 | cpu 79.49
+11:53:39Z fix churn-40-100000-120 1 first 2.1992 items min/med/max 0.0086 1.0174 4.0257 | misses: first 1 items 7 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 153.71
+11:54:44Z fix churn-40-20000-0 2 first 0.014 items min/med/max 0.0084 0.0094 0.0244 | misses: first 0 items 0 lost 0 | offered 20000 low 17990 | drops 0 0 | cpu 23.84
+11:55:54Z fix churn-40-20000-5 2 first 1.1674 items min/med/max 0.0074 0.0178 2.0118 | misses: first 1 items 1 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 26.96
+11:57:29Z fix churn-40-20000-30 2 first 1.7656 items min/med/max 0.0082 1.0133 2.0113 | misses: first 1 items 6 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 35.16
+12:00:34Z fix churn-40-20000-120 2 first 0.6258 items min/med/max 0.0073 0.0119 1.0171 | misses: first 0 items 0 lost 0 | offered 20000 low 19530 | drops 0 0 | cpu 70.6
+12:01:39Z fix churn-40-100000-0 2 first 1.4596 items min/med/max 0.008 1.0126 2.0177 | misses: first 1 items 2 lost 0 | offered 100002 low 98300 | drops 7063 7063 | cpu 52.41
+12:04:19Z fix churn-40-100000-5 2 first 2.9694 items min/med/max 1.0123 2.0194 4.025 | misses: first 1 items 13 lost 0 | offered 100002 low 99900 | drops 0 0 | cpu 54.27
+12:05:54Z fix churn-40-100000-30 2 first 1.9458 items min/med/max 0.0137 1.0257 2.0321 | misses: first 1 items 6 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 71.84
+12:08:59Z fix churn-40-100000-120 2 first 4.803 items min/med/max 2.0156 4.0183 17.3209 | misses: first 1 items 20 lost 0 | offered 100001 low 97400 | drops 0 0 | cpu 140.34
+12:13:54Z fix churn-40-20000-0 3 first 0.0249 items min/med/max 0.0079 0.0158 0.025 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 25.55
+12:15:05Z fix churn-40-20000-5 3 first 1.1775 items min/med/max 0.0085 0.0175 2.0143 | misses: first 1 items 2 lost 0 | offered 20000 low 18790 | drops 0 0 | cpu 29.09
+12:20:19Z fix churn-40-20000-30 3 first 1.614 items min/med/max 0.0087 0.5563 2.0212 | misses: first 1 items 4 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 35.39
+12:23:25Z fix churn-40-20000-120 3 first 0.5535 items min/med/max 0.0074 0.0114 1.015 | misses: first 0 items 0 lost 0 | offered 20000 low 15400 | drops 0 0 | cpu 72.43
+12:26:50Z fix churn-40-100000-0 3 first 6.4903 items min/med/max 4.0094 13.8606 17.3197 | misses: first 1 items 20 lost 0 | offered 100002 low 99900 | drops 0 0 | cpu 55.39
+12:28:00Z fix churn-40-100000-5 3 first 1.9836 items min/med/max 0.0085 1.0187 2.0279 | misses: first 1 items 7 lost 0 | offered 100001 low 91400 | drops 24288 24288 | cpu 52.93
+12:33:25Z fix churn-40-100000-30 3 first 2.2856 items min/med/max 0.0087 1.0171 4.0173 | misses: first 1 items 9 lost 0 | offered 100001 low 75850 | drops 14262 14262 | cpu 76.72
+12:36:40Z fix churn-40-100000-120 3 first 2.0878 items min/med/max 0.008 1.0185 4.0196 | misses: first 1 items 7 lost 0 | offered 100001 low 77000 | drops 62673 62673 | cpu 139.43
+12:41:05Z fix churn-40-20000-0 4 first 0.016 items min/med/max 0.007 0.0116 0.017 | misses: first 0 items 0 lost 0 | offered 20000 low 18870 | drops 0 0 | cpu 24.62
+12:43:45Z fix churn-40-20000-5 4 first 1.7931 items min/med/max 0.0083 1.0171 2.0165 | misses: first 1 items 5 lost 0 | offered 20000 low 19450 | drops 0 0 | cpu 25.33
+12:45:20Z fix churn-40-20000-30 4 first 1.0888 items min/med/max 0.0082 0.0189 1.1015 | misses: first 1 items 0 lost 0 | offered 20000 low 18270 | drops 0 0 | cpu 36.79
+12:48:45Z fix churn-40-20000-120 4 first 1.4145 items min/med/max 0.0066 0.5094 2.0203 | misses: first 1 items 3 lost 0 | offered 20000 low 19920 | drops 0 0 | cpu 68.03
+12:49:50Z fix churn-40-100000-0 4 first 1.6861 items min/med/max 0.0075 1.0114 2.0154 | misses: first 1 items 5 lost 0 | offered 100002 low 96050 | drops 0 0 | cpu 53.7
+12:51:00Z fix churn-40-100000-5 4 first 1.7938 items min/med/max 0.0071 1.0113 2.0192 | misses: first 1 items 6 lost 0 | offered 100002 low 99900 | drops 0 0 | cpu 54.4
+12:52:35Z fix churn-40-100000-30 4 first 2.3126 items min/med/max 0.0096 1.022 4.0227 | misses: first 1 items 8 lost 0 | offered 100001 low 99800 | drops 0 0 | cpu 79.4
+12:55:40Z fix churn-40-100000-120 4 first 15.4604 items min/med/max 14.1726 17.3172 25.1607 | misses: first 1 items 20 lost 0 | offered 100001 low 83600 | drops 0 0 | cpu 157.68
