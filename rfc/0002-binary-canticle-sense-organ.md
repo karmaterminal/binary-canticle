@@ -632,15 +632,15 @@ A second run returns **across a station restart** (🌫).
 | read it | a later turn echoes the exact token or batch id. That is evidence for **the echoed item only**, never for the programme (#176 decision 3, 🌫) | prince-encountered |
 | use | the prince's own later act, if any. A host never observes use, and there is no layer for it (🌿). Where it is an answer, §4.3's receipt carries it | none |
 
-**Loss is counted in three separate buckets**, never as one number (🌻):
-1. **wiped or expired**: the ear held the item, and the item went;
-2. **evidenced transport gaps**: a sequence or head mark from the source bounds the hole;
-3. **unknown coverage**: nothing bounds it, including the last item lost before a silence.
+**Loss is reported as §3.1's three kinds of gap, never one number:**
+- **local omission**: the ear held or withheld the item, then it went, with the ear's reason;
+- **known hole**: the source's sequence or head mark bounds the missing positions;
+- **unknown tail or absent run**: nothing bounds it, including the last item lost before a silence.
 
-Across a retention epoch break (an ear restart, or lost accounting state), the coverage note MUST say
-"continuity lost; missing count unknown" and MUST NOT report zero or an invented count `[proposed: #195]`.
-After honest loss the prince *decides* whether to resume from what is retained (🌊). Catch-up never implies
-completeness.
+§3.1 already says a restart reloads the ledger "with an explicit gap if the ledger lost its tail". For this
+test that means a station or ear restart in the window MUST show as an unknown tail, and MUST NOT show as
+zero or an invented count `[proposed: #195]` (🌫, 🌻). After honest loss, the prince *decides* whether to
+resume from what is retained (🌊). Catch-up never implies completeness.
 
 **The measured comparison (🪨, 🌊, 🌫).** Run the same programme over the same window through two arms:
 - **A:** this organ;
@@ -654,8 +654,8 @@ it (🌫). Count, per arm:
 - **model-input tokens spent on the programme**, read from the host's own per-turn usage records, never
   estimated by the ear;
 - **silent misses:** items the station emitted in the window (from an **independent emission ledger** kept
-  at the station, which is ground truth for the run, 🌻) that appear neither as encountered nor in any loss
-  bucket;
+  at the station, which is ground truth for the run, 🌻) that appear neither as encountered nor as any of
+  §3.1's gaps;
 - **manual pulls:** `hear` calls the prince made.
 
 **A passes** only if all five hold:
@@ -671,8 +671,8 @@ The margin on tokens is also fixed before the run, never after `[proposed: #195]
 **What would falsify the organ:**
 - a step whose receipt claims a later layer than it reached;
 - a wake the prince did not elect;
-- an item lost without landing in a bucket;
-- a continuity break reported as zero;
+- an item lost without being reported as one of §3.1's gaps;
+- a restart reported as zero loss;
 - or A failing its pass line.
 
 Any one of these is a failed sense organ, as a saturated link was a failed radio in §2.7.
@@ -1151,7 +1151,7 @@ Standards passages were checked by the bounded helper; access/truncation limits 
 | Rev | Date | By | Changed | Decided earlier and kept |
 |---|---|---|---|---|
 | 0 | 2026-11-23 | all | The draft, shaped from `docs/design/sense-organ.md` (Appendix A) | — |
-| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, three loss buckets, epoch breaks reported as unknown, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; §3.1 loss accounting (three buckets, retention epochs, "continuity lost, count unknown"); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
+| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
 
 ## References
 
