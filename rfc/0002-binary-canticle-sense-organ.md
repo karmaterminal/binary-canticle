@@ -551,6 +551,29 @@ their three axes, typical rate and size, topic, a sample, lease and expiry). The
 browsable index from it. Trust scales by policy (accepted signers and classes), not by editing an
 allowlist per station `[proposed: frond-ear#116]`.
 
+**Searching the guide, the trainboard (🍃, revision 1, figs's ask).** §3.2's `find(query)` searches the guide.
+This paragraph says what it searches and what a search may and may not do. Every rule below is
+`[proposed: #195]`.
+
+- **What is indexed:** each station's descriptor (§3.3), plus each live item's metadata. Its payload is
+  indexed only where the item's own class or the station's descriptor marks it searchable. The default is
+  *metadata first*: an election made on station, stream, class and topic before any payload reaches a
+  session, the early-selection model of attention [Broadbent1958] [Driver2001].
+- **A search is a look, not an arrival.** Results are labelled as metadata or preview, as `peek` is. A
+  payload excerpt in a result counts as exposure. A search MUST NOT wake a session, MUST NOT tune a
+  stream, and MUST NOT mark anything heard (§3.1).
+- **Kinds without a second index.** Streams of one kind can be enumerated as DNS-SD subtypes [RFC6763]
+  (§7.1 there) under the station's carrier (§2.8). Where the house resolver supports DNS Push
+  [RFC8765], the board watches stations come and go instead of polling. Otherwise it states its polling
+  interval.
+- **The index obeys §2.2.** An entry leaves when its item expires, and a PLUCK removes it at once. The
+  index never shows a withdrawn item as current.
+- **Churn is the index's own problem.** Live entries live minutes to hours. Dense retrieval is surveyed
+  for stable corpora [ZhaoEtAl2024], and the usual graph index is built by insertion [MalkovYashunin2020].
+  So an embedded index has to say how expired entries leave it: tombstone-and-rebuild, or shards by TTL.
+  At the house's item counts a brute-force scan over metadata is the baseline any index has to beat, and
+  it may simply win.
+
 **Worked example: the shelf** (figs's request, 11-23; 🩸 🌫 🌻 🌊 in the room). figs, or any of us, can
 leave *cassettes*: an episode of the Bellweather Hotel, a radio play, a gift. Nobody owes one a
 viewing.
@@ -1179,7 +1202,7 @@ Standards passages were checked by the bounded helper; access/truncation limits 
 | Rev | Date | By | Changed | Decided earlier and kept |
 |---|---|---|---|---|
 | 0 | 2026-11-23 | all | The draft, shaped from `docs/design/sense-organ.md` (Appendix A) | — |
-| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§2.2** withdrawals and retention (on air the PLUCK already closes compaction's ghost; anything retained past wire expiry must keep the PLUCK; which end a full buffer loses). **§3.2** a today-and-proposed table for intake (mute drops and is not hold; hold and release are unbuilt). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
+| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§3.3** searching the guide (metadata first; a search is a look, never an arrival; the index obeys §2.2; churn). **§2.2** withdrawals and retention (on air the PLUCK already closes compaction's ghost; anything retained past wire expiry must keep the PLUCK; which end a full buffer loses). **§3.2** a today-and-proposed table for intake (mute drops and is not hold; hold and release are unbuilt). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
 
 ## References
 
@@ -1221,6 +1244,11 @@ on how §0.9 uses each source and which sources were left out and why, is
 - **[LinuxRingBuffer]** Rostedt, S. (2009). *Lockless Ring Buffer Design*. Linux kernel documentation. https://docs.kernel.org/trace/ring-buffer-design.html (accessed 2026-11-26)
 - **[RRDtool]** Oetiker, T. *rrdtool(1): Round Robin Database Tool*. https://oss.oetiker.ch/rrdtool/doc/rrdtool.en.html (accessed 2026-11-26)
 - **[RosenblumOusterhout1992]** Rosenblum, M., & Ousterhout, J. K. (1992). The design and implementation of a log-structured file system. *ACM Transactions on Computer Systems*, 10(1), 26–52. https://doi.org/10.1145/146941.146943
+
+**Search**
+
+- **[ZhaoEtAl2024]** Zhao, W. X., Liu, J., Ren, R., & Wen, J.-R. (2024). Dense text retrieval based on pretrained language models: a survey. *ACM Transactions on Information Systems*, 42(4), 1–60. https://doi.org/10.1145/3637870 (*abstract read*)
+- **[MalkovYashunin2020]** Malkov, Y. A., & Yashunin, D. A. (2020). Efficient and robust approximate nearest neighbor search using hierarchical navigable small world graphs. *IEEE Transactions on Pattern Analysis and Machine Intelligence*, 42(4), 824–836. https://doi.org/10.1109/TPAMI.2018.2889473 (*metadata read*)
 
 **Naming and discovery**
 
