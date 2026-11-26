@@ -2169,6 +2169,9 @@ class ConsistencyTest(IntakeCase):
             self.assertEqual({a: c for ring in key.slot.rings for a, c in ring.items()}, key.slot.claims)
             self.assertEqual(sum(map(len, key.slot.rings)), len(key.slot))
             self.assertEqual(key.slot.room, len(key.slot.rings[intake.UNTRIED]) < intake.SLOT_MAX)
+            for at, c in key.slot.claims.items():
+                if self.now < c.until:                                   # what a claim's ``until`` promises
+                    self.assertEqual(c.tier, key.tier(at, self.now), at)
             for ring in key.slot.rings:
                 self.assertLessEqual(len(ring), intake.SLOT_MAX)
                 for at, c in ring.items():
@@ -2229,8 +2232,19 @@ class ConsistencyTest(IntakeCase):
                         self.assertEqual(b.burst - b.tokens, spent[b])
 
                 def offer():
-                    self.intake.offer([(r.choice(r.choice((good, bad, junk))), addr(r.randrange(8), r.randrange(6)))
-                                       for _ in range(r.randrange(1, 40))])
+                    batch = [(r.choice(r.choice((good, bad, junk))), addr(r.randrange(8), r.randrange(6)))
+                             for _ in range(r.randrange(1, 40))]
+                    if r.random() < 0.5:
+                        self.intake.offer(batch)
+                        return
+                    for d, a in batch:                                   # one at a time: what each arrival did
+                        before = self.intake.copied, self.intake.repeated
+                        self.intake.offer([(d, a)])
+                        key = self.intake.keys.get(d[4:12])
+                        held = key.slot.claims.get(a) if key is not None and a not in key.known else None
+                        if held is not None and (self.intake.copied, self.intake.repeated) == before:
+                            want = key.tier(a, self.now)                 # its source sent again: its marks' tier, if there is room
+                            self.assertTrue(held.tier == want or len(key.slot.rings[want]) >= intake.SLOT_MAX, (a, held.tier, want))
 
                 for _ in range(250):
                     self.now += r.choice((0, 0.001, 0.02, 0.2, 3))
