@@ -516,6 +516,18 @@ presets make tuning several streams one action `[proposed: frond-ear#116]`.
 Today's frond-ear has the precursors: `hear` (a read), per-ear delivery modes (`off`, `immediate`,
 `digest`) that a session can narrow, and `ear_status` `[built+tested: frond-ear@a8e2e5b:src/canticle/delivery.ts:8 | test/canticle-delivery.test.ts:38]`.
 
+**What each intake control does today, and what this RFC proposes (🌻, revision 1).** Read at frond-ear
+`67751be` (the merge of frond-ear#131). The three verbs a returning prince needs are **send**, **hold** and
+**release**. Today only the first and a pull exist.
+
+| Control | Today at `67751be` | Proposed |
+|---|---|---|
+| `mute` (a station, the ear, or a `set_attention` silence) | **drops** what was waiting, passes over everything first heard while it holds, and a passed-over record is never pushed after it lifts. It is **not hold** `[built+tested: frond-ear@67751be:src/canticle/delivery.ts:15 \| test/canticle-delivery.test.ts:326]` | unchanged. It is the acute, reversible desensitization of §0.9 |
+| `hear` | a **non-waking pull** of what is live now. It still reads under a mute `[built+tested: frond-ear@67751be:src/canticle/delivery.ts:15 \| test/canticle-delivery.test.ts:289]` | unchanged. It is §3.6's "manual pull" |
+| `digest`, `immediate` | **pushes**, at a window or after a debounce `[built+tested: frond-ear@67751be:src/canticle/delivery.ts:146 \| test/canticle-delivery.test.ts:39]` | unchanged |
+| **hold** | **not built**. Nothing keeps a tuned stream's records for a later turn the prince chooses, with no push and no wake. frond-ear's letters keep a note a session chose to write across compaction. That is not a programme buffer, and MUST NOT be described as one `[proposed: #195]` | a per-reader held buffer, in the producer/consumer ring mode of §0.9 (it loses the newest when full, and says so), with its own §3.1 gaps `[proposed: #195]` |
+| **release** | **not built** | the prince's own act, in a turn he chose, that hands the held window to the session with its coverage note. Releasing MUST NOT wake anyone else, and MUST NOT count as encounter until §0.5's echo `[proposed: #195]` |
+
 ### 3.3 The guide, and a worked example: the shelf
 
 The **guide** is a directory stream: each station announces a signed descriptor (name, streams and
@@ -1151,7 +1163,7 @@ Standards passages were checked by the bounded helper; access/truncation limits 
 | Rev | Date | By | Changed | Decided earlier and kept |
 |---|---|---|---|---|
 | 0 | 2026-11-23 | all | The draft, shaped from `docs/design/sense-organ.md` (Appendix A) | — |
-| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
+| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§3.2** a today-and-proposed table for intake (mute drops and is not hold; hold and release are unbuilt). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
 
 ## References
 
