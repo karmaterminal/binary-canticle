@@ -32,6 +32,8 @@ a prince gains, in the order they can be built:
 3. **Authorized answering** (§4): the issuer boundary and station-key custody. The prince can answer,
    through a path that does not run back through his own ear.
 
+Two tests can show this RFC wrong, and both are meant to: §2.7's flood test (the organ survives a flood) and §3.6's return test (the organ is worth having, and loses nothing without saying so).
+
 §5 is the cross-cutting host join for OpenClaw seats. §6 puts what is built, unbuilt and proven on one
 set of rows for both hosts. §7 holds the open decisions.
 
@@ -601,6 +603,80 @@ declined item that causes neither an error nor a publish attempt `[proposed: #15
 carriage for that silent tune follows §2's stream contract; this paragraph does not select ringserver or
 turn #158 into an installed feature.
 
+### 3.6 The return test: what would show this sense organ isn't worth having (🍃, revision 1)
+
+§2.7 tests that the organ survives a flood. This section tests that it is worth having at all: that a prince
+who comes to a programme, chooses when it reaches him, leaves and returns spends less attention than he would
+on today's room plus ear, **and loses nothing without being told**. Both tests can fail. This one has not run
+`[proposed: #195]`. Its concrete cases are 🌻's commissioning appendix (Appendix C).
+
+**The story (🌫)**, on one programme, for example a familiar's synopsis stream at Bellwether (🌻). A prince:
+1. arrives;
+2. finds the broadcast;
+3. listens without waking;
+4. leaves;
+5. returns;
+6. catches up;
+7. changes his mind about the subscription.
+
+A second run returns **across a station restart** (🌫).
+
+**What each step must show, in §0.5's layers.** No step may claim a later layer than its own receipt
+`[proposed: #195]`.
+
+| Step | Receipt, and its observer | Layer |
+|---|---|---|
+| find | the guide lists the programme with its station, stream, class, retention and provenance (§3.3). Finding it MUST NOT by itself arm a wake `[proposed: #195]` (#176 decision 1 is the wake rule) | none: discovery |
+| listen without waking | the ear records the item for this reader and offers no wake. That is **buffer intake** (🪨) | durable-queued (or volatile-queued), with `wake_withheld:<class>` counted |
+| catch up | the return view (§3.1) with its coverage note | host-returned |
+| read it | a later turn echoes the exact token or batch id. That is evidence for **the echoed item only**, never for the programme (#176 decision 3, 🌫) | prince-encountered |
+| use | the prince's own later act, if any. A host never observes use, and there is no layer for it (🌿). Where it is an answer, §4.3's receipt carries it | none |
+
+**Loss is counted in three separate buckets**, never as one number (🌻):
+1. **wiped or expired**: the ear held the item, and the item went;
+2. **evidenced transport gaps**: a sequence or head mark from the source bounds the hole;
+3. **unknown coverage**: nothing bounds it, including the last item lost before a silence.
+
+Across a retention epoch break (an ear restart, or lost accounting state), the coverage note MUST say
+"continuity lost; missing count unknown" and MUST NOT report zero or an invented count `[proposed: #195]`.
+After honest loss the prince *decides* whether to resume from what is retained (🌊). Catch-up never implies
+completeness.
+
+**The measured comparison (🪨, 🌊, 🌫).** Run the same programme over the same window through two arms:
+- **A:** this organ;
+- **B:** the room plus today's ear: the guide-less baseline, with a prince pulling by `hear` when he wants to.
+
+Both arms get **the same predeclared useful task**: a question about the window with a required correct
+answer. An arm that fails the task fails, whatever it cost, and cost is compared only between arms that pass
+it (🌫). Count, per arm:
+
+- **unchosen wakes:** turns started by a wake the prince did not elect;
+- **model-input tokens spent on the programme**, read from the host's own per-turn usage records, never
+  estimated by the ear;
+- **silent misses:** items the station emitted in the window (from an **independent emission ledger** kept
+  at the station, which is ground truth for the run, 🌻) that appear neither as encountered nor in any loss
+  bucket;
+- **manual pulls:** `hear` calls the prince made.
+
+**A passes** only if all five hold:
+- the task passes;
+- there are zero unchosen wakes;
+- it spends fewer model-input tokens than B;
+- there are zero silent misses;
+- its manual pulls stay within a bound **declared before the run**, or the run reports them as a named
+  tradeoff with the number.
+
+The margin on tokens is also fixed before the run, never after `[proposed: #195]`.
+
+**What would falsify the organ:**
+- a step whose receipt claims a later layer than it reached;
+- a wake the prince did not elect;
+- an item lost without landing in a bucket;
+- a continuity break reported as zero;
+- or A failing its pass line.
+
+Any one of these is a failed sense organ, as a saturated link was a failed radio in §2.7.
+
 ---
 
 ## 4. Capability 3: authorized answering (🪨)
@@ -990,7 +1066,7 @@ claim by claim, and cites #174 only where it found something this RFC depends on
 | Rev | Date | By | Changed | Decided earlier and kept |
 |---|---|---|---|---|
 | 0 | 2026-11-23 | all | The draft, shaped from `docs/design/sense-organ.md` (Appendix A) | — |
-| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; §3.1 loss accounting (three buckets, retention epochs, "continuity lost, count unknown"); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
+| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, three loss buckets, epoch breaks reported as unknown, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; §3.1 loss accounting (three buckets, retention epochs, "continuity lost, count unknown"); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
 
 ## References
 
