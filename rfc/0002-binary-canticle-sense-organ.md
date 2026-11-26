@@ -159,6 +159,23 @@ What remains is building, in the order the room agreed (receive-only, then retur
 authorized answering): #178's measured recovery, then the freshness lane (bc#175), then the continuing-reader
 join for the OpenClaw princes (#161).
 
+### 0.8 Three layers, across the three capabilities (🌫, revision 1)
+
+This RFC is ordered by the capabilities a prince gains (§0.1). Cutting across that order, a sense organ has
+**three layers**, and each one answers a different question. They must not be confused (🌫):
+
+| Layer | The question it answers | Where it is specified | What it never does |
+|---|---|---|---|
+| **Carrier** | Is there a station, and where can I hear it? | §2.8, RFC-0001 §10–§11, §7.9, §7.11 | authorize trust, tuning or a wake (§2.8) |
+| **Programme** | Is anything there worth hearing, and what's retained? | §2.1–§2.2 (shapes, rings, withdrawals), §3.3 (the guide and its search) | mark anything heard (§3.1, §3.3) |
+| **Intake** | What enters *my* session, and when? | §2.3–§2.4 (tuning, the ear), §3.1 (coming back), §3.2 (controls), §3.4 (wakes) | wake me unless I elected it (#176 decision 1) |
+
+Receipts follow the layers. The carrier gives none. The programme reaches **station-accepted**. Intake
+reaches durable/volatile-queued, host-returned and prince-encountered (§0.5). **Use** belongs to no layer and
+no host. It is the prince's own later act (§3.6). The return test (§3.6) walks all three layers in order:
+*find* is the carrier, *catch up* is the programme, *listen without waking* and *read* are intake. A failure
+names the layer it happened in.
+
 ### 0.9 Grounding: what the analogies borrow, and where each one breaks
 
 This section is informative. It makes no normative statement and changes no behaviour. It names the
@@ -1283,7 +1300,7 @@ Standards passages were checked by the bounded helper; access/truncation limits 
 | Rev | Date | By | Changed | Decided earlier and kept |
 |---|---|---|---|---|
 | 0 | 2026-11-23 | all | The draft, shaped from `docs/design/sense-organ.md` (Appendix A) | — |
-| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§2.8** finding the carrier (source / live / proposed kept apart; finding authorizes nothing; four authorities) and **§7.11** registration trust, scoped TSIG or SRP, as a comparison table. **§3.3** searching the guide (metadata first; a search is a look, never an arrival; the index obeys §2.2; churn). **§2.2** withdrawals and retention (on air the PLUCK already closes compaction's ghost; anything retained past wire expiry must keep the PLUCK; which end a full buffer loses). **§3.2** a today-and-proposed table for intake (mute drops and is not hold; hold and release are unbuilt). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. Planned in this revision, each its own commit and row: §0.8 three layers (carrier, programme, intake: 🌫); §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
+| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§2.8** finding the carrier (source / live / proposed kept apart; finding authorizes nothing; four authorities) and **§7.11** registration trust, scoped TSIG or SRP, as a comparison table. **§3.3** searching the guide (metadata first; a search is a look, never an arrival; the index obeys §2.2; churn). **§2.2** withdrawals and retention (on air the PLUCK already closes compaction's ghost; anything retained past wire expiry must keep the PLUCK; which end a full buffer loses). **§3.2** a today-and-proposed table for intake (mute drops and is not hold; hold and release are unbuilt). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. **§0.8** three layers across the capabilities (carrier, programme, intake: 🌫), each with its question, its sections and what it never does. Planned in this revision, each its own commit and row: §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
 
 ## References
 
