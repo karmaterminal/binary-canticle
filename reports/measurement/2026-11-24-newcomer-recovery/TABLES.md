@@ -9,53 +9,53 @@ Trees: `new` is `72db59fafb92b9630e1524e0e08b99a21cdda81f` (results-2/); `base` 
 | churn-40-20000-0 | PASS: worst first 0.03 s; first 0/5, items 0/100 | PASS: worst first 0.03 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
 | churn-40-20000-5 | **FAIL**: worst first 2.50 s; first 4/5, items 17/100 | **FAIL**: worst first 2.53 s; first 2/3, items 14/60 | **FAIL**: worst first 1.76 s; first 2/5, items 6/100 |
 | churn-40-20000-30 | **FAIL**: worst first 2.96 s; first 3/5, items 19/100 | **FAIL**: worst first 2.68 s; first 2/3, items 20/60 | **FAIL**: worst first 1.81 s; first 1/5, items 5/100 |
-| churn-40-20000-120 | **FAIL**: worst first 2.10 s; first 2/5, items 9/100 | **FAIL**: worst first 2.83 s; first 2/3, items 18/60 | **FAIL**: worst first 1.86 s; first 3/5, items 10/100 |
-| churn-40-100000-0 | **FAIL**: worst first 4.32 s; first 5/5, items 44/100 (lost 0, > 10 s 3) | **FAIL**: worst first 2.53 s; first 2/3, items 19/60 | **FAIL**: worst first 3.40 s; first 2/5, items 29/100 |
+| churn-40-20000-120 | **FAIL**: worst first 2.10 s; first 4/7, items 13/140 | **FAIL**: worst first 2.83 s; first 2/3, items 18/60 | **FAIL**: worst first 1.86 s; first 3/5, items 10/100 |
+| churn-40-100000-0 | **FAIL**: worst first 4.32 s; first 5/6, items 44/120 (lost 0, > 10 s 3) | **FAIL**: worst first 2.53 s; first 2/3, items 19/60 | **FAIL**: worst first 3.40 s; first 2/5, items 29/100 |
 | churn-40-100000-5 | **FAIL**: worst first 14.78 s; first 4/5, items 46/100 (lost 0, > 10 s 20) | **FAIL**: worst first 7.07 s; first 3/3, items 38/60 (lost 0, > 10 s 19) | **FAIL**: worst first 5.38 s; first 4/5, items 50/100 (lost 0, > 10 s 10) |
 | churn-40-100000-30 | **FAIL**: worst first 4.31 s; first 5/5, items 77/100 (lost 0, > 10 s 3) | **FAIL**: worst first 17.99 s; first 3/3, items 60/60 (lost 0, > 10 s 41) | **FAIL**: worst first 12.56 s; first 5/5, items 37/100 (lost 0, > 10 s 20) |
-| churn-40-100000-120 | **FAIL**: worst first 13.60 s; first 5/5, items 48/100 (lost 0, > 10 s 20) | **FAIL**: worst first 37.45 s; first 1/3, items 20/60 (lost 0, > 10 s 20) | **FAIL**: worst first 6.34 s; first 4/5, items 37/100 (lost 0, > 10 s 15) |
+| churn-40-100000-120 | **FAIL**: worst first 13.60 s; first 6/6, items 50/120 (lost 0, > 10 s 20) | **FAIL**: worst first 37.45 s; first 1/3, items 20/60 (lost 0, > 10 s 20) | **FAIL**: worst first 6.34 s; first 4/5, items 37/100 (lost 0, > 10 s 15) |
 | **cells passed** | **1 of 8** | **1 of 8** | **1 of 8** |
 
 | row (sources-ports-rate-offset) | new | base | slice |
 |---|---|---|---|
 | fixed-40-20000-0 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.02 s; first 0/3, items 0/60 | PASS: worst first 0.03 s; first 0/5, items 0/100 |
-| fixed-40-20000-5 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.09 s; first 0/3, items 0/60 | PASS: worst first 0.02 s; first 0/5, items 0/100 |
-| fixed-40-20000-30 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.09 s; first 0/3, items 0/60 | PASS: worst first 0.03 s; first 0/5, items 0/100 |
-| fixed-40-20000-120 | PASS: worst first 0.02 s; first 0/5, items 0/100 | **FAIL**: worst first 3.06 s; first 1/3, items 13/60 | PASS: worst first 0.03 s; first 0/5, items 0/100 |
+| fixed-40-20000-5 | PASS: worst first 0.04 s; first 0/7, items 0/140 | PASS: worst first 0.09 s; first 0/3, items 0/60 | PASS: worst first 0.02 s; first 0/5, items 0/100 |
+| fixed-40-20000-30 | PASS: worst first 0.04 s; first 0/6, items 0/120 | PASS: worst first 0.09 s; first 0/3, items 0/60 | PASS: worst first 0.03 s; first 0/5, items 0/100 |
+| fixed-40-20000-120 | PASS: worst first 0.03 s; first 0/8, items 0/160 | **FAIL**: worst first 3.06 s; first 1/3, items 13/60 | PASS: worst first 0.03 s; first 0/5, items 0/100 |
 | fixed-40-100000-0 | PASS: worst first 0.03 s; first 0/5, items 0/100 | PASS: worst first 0.32 s; first 0/3, items 0/60 | PASS: worst first 0.09 s; first 0/5, items 0/100 |
 | fixed-40-100000-5 | PASS: worst first 0.13 s; first 0/5, items 0/100 | **FAIL**: worst first 52.25 s; first 2/3, items 27/60 (lost 1, > 10 s 19) | PASS: worst first 0.07 s; first 0/5, items 0/100 |
-| fixed-40-100000-30 | PASS: worst first 0.04 s; first 0/5, items 0/100 | **FAIL**: worst first 4.70 s; first 1/3, items 20/60 (lost 0, > 10 s 4) | PASS: worst first 0.02 s; first 0/5, items 0/100 |
-| fixed-40-100000-120 | PASS: worst first 0.03 s; first 0/5, items 0/100 | **FAIL**: worst first 15.76 s; first 1/3, items 20/60 (lost 0, > 10 s 20) | PASS: worst first 0.02 s; first 0/5, items 0/100 |
+| fixed-40-100000-30 | PASS: worst first 0.04 s; first 0/7, items 0/140 | **FAIL**: worst first 4.70 s; first 1/3, items 20/60 (lost 0, > 10 s 4) | PASS: worst first 0.02 s; first 0/5, items 0/100 |
+| fixed-40-100000-120 | PASS: worst first 0.03 s; first 0/9, items 0/180 | **FAIL**: worst first 15.76 s; first 1/4, items 20/80 (lost 0, > 10 s 20) | PASS: worst first 0.02 s; first 0/5, items 0/100 |
 | **cells passed** | **8 of 8** | **4 of 8** | **8 of 8** |
 
 | row (sources-ports-rate-offset) | new | base | slice |
 |---|---|---|---|
 | xchurn-40-20000-0 | PASS: worst first 0.08 s; first 0/5, items 0/100 | PASS: worst first 0.03 s; first 0/3, items 0/60 | PASS: worst first 0.03 s; first 0/5, items 0/100 |
-| xchurn-40-20000-5 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.05 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
-| xchurn-40-20000-30 | PASS: worst first 0.11 s; first 0/5, items 0/100 | PASS: worst first 0.06 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
-| xchurn-40-20000-120 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.04 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
-| xchurn-40-100000-0 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.03 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
-| xchurn-40-100000-5 | PASS: worst first 0.05 s; first 0/5, items 0/100 | PASS: worst first 0.03 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
-| xchurn-40-100000-30 | PASS: worst first 0.06 s; first 0/5, items 0/100 | PASS: worst first 0.05 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
-| xchurn-40-100000-120 | PASS: worst first 0.03 s; first 0/5, items 0/100 | PASS: worst first 0.03 s; first 0/3, items 0/60 | PASS: worst first 0.06 s; first 0/5, items 0/100 |
+| xchurn-40-20000-5 | PASS: worst first 0.04 s; first 0/6, items 0/120 | PASS: worst first 0.05 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
+| xchurn-40-20000-30 | PASS: worst first 0.11 s; first 0/6, items 0/120 | PASS: worst first 0.06 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
+| xchurn-40-20000-120 | PASS: worst first 0.05 s; first 0/6, items 0/120 | PASS: worst first 0.04 s; first 0/4, items 0/80 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
+| xchurn-40-100000-0 | PASS: worst first 0.04 s; first 0/6, items 0/120 | PASS: worst first 0.03 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
+| xchurn-40-100000-5 | PASS: worst first 0.05 s; first 0/6, items 0/120 | PASS: worst first 0.03 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
+| xchurn-40-100000-30 | PASS: worst first 0.06 s; first 0/7, items 0/140 | PASS: worst first 0.05 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
+| xchurn-40-100000-120 | PASS: worst first 0.04 s; first 0/9, items 0/180 | PASS: worst first 0.03 s; first 0/3, items 0/60 | PASS: worst first 0.06 s; first 0/5, items 0/100 |
 | **cells passed** | **8 of 8** | **8 of 8** | **8 of 8** |
 
 | row (sources-ports-rate-offset) | new | base | slice |
 |---|---|---|---|
 | xfixed-40-20000-0 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.14 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
-| xfixed-40-20000-5 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.05 s; first 0/3, items 0/60 | PASS: worst first 0.06 s; first 0/5, items 0/100 |
-| xfixed-40-20000-30 | PASS: worst first 0.05 s; first 0/5, items 0/100 | PASS: worst first 0.13 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
-| xfixed-40-20000-120 | PASS: worst first 0.05 s; first 0/5, items 0/100 | PASS: worst first 0.04 s; first 0/3, items 0/60 | PASS: worst first 0.03 s; first 0/5, items 0/100 |
+| xfixed-40-20000-5 | PASS: worst first 0.04 s; first 0/6, items 0/120 | PASS: worst first 0.05 s; first 0/3, items 0/60 | PASS: worst first 0.06 s; first 0/5, items 0/100 |
+| xfixed-40-20000-30 | PASS: worst first 0.05 s; first 0/7, items 0/140 | PASS: worst first 0.13 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
+| xfixed-40-20000-120 | PASS: worst first 0.05 s; first 0/7, items 0/140 | PASS: worst first 0.04 s; first 0/3, items 0/60 | PASS: worst first 0.03 s; first 0/5, items 0/100 |
 | xfixed-40-100000-0 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.04 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
-| xfixed-40-100000-5 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.04 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
-| xfixed-40-100000-30 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.07 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
-| xfixed-40-100000-120 | PASS: worst first 0.05 s; first 0/5, items 0/100 | PASS: worst first 0.03 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
+| xfixed-40-100000-5 | PASS: worst first 0.05 s; first 0/7, items 0/140 | PASS: worst first 0.04 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
+| xfixed-40-100000-30 | PASS: worst first 0.04 s; first 0/6, items 0/120 | PASS: worst first 0.07 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
+| xfixed-40-100000-120 | PASS: worst first 0.05 s; first 0/7, items 0/140 | PASS: worst first 0.03 s; first 0/4, items 0/80 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
 | **cells passed** | **8 of 8** | **8 of 8** | **8 of 8** |
 
 | row (sources-ports-rate-offset) | new | base | slice |
 |---|---|---|---|
-| afixed-40-20000-5 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.61 s; first 0/3, items 0/60 | PASS: worst first 0.08 s; first 0/5, items 0/100 |
-| afixed-40-100000-5 | PASS: worst first 0.02 s; first 0/5, items 0/100 | **FAIL**: worst first 5.18 s; first 1/3, items 20/60 (lost 0, > 10 s 6) | PASS: worst first 0.06 s; first 0/5, items 0/100 |
+| afixed-40-20000-5 | PASS: worst first 0.04 s; first 0/6, items 0/120 | PASS: worst first 0.64 s; first 0/4, items 0/80 | PASS: worst first 0.08 s; first 0/5, items 0/100 |
+| afixed-40-100000-5 | PASS: worst first 0.03 s; first 0/8, items 0/160 | **FAIL**: worst first 5.18 s; first 1/3, items 20/60 (lost 0, > 10 s 6) | PASS: worst first 0.06 s; first 0/5, items 0/100 |
 | **cells passed** | **2 of 2** | **1 of 2** | **2 of 2** |
 
 ## N0-N2 by 🌫's comparator (hardened): INVALID runs named, cells complete or not
@@ -72,10 +72,10 @@ Trees: `new` is `72db59fafb92b9630e1524e0e08b99a21cdda81f` (results-2/); `base` 
 | churn-40-20000-30 | new | 5 of 5 | 2 / 3 / 0 | 81 / 19 / 0 | **FAIL** | FAIL |
 | churn-40-20000-30 | slice | 5 of 5 | 4 / 1 / 0 | 95 / 5 / 0 | **FAIL** | FAIL |
 | churn-40-20000-120 | base | 3 of 3 | 1 / 2 / 0 | 42 / 18 / 0 | **FAIL** | FAIL |
-| churn-40-20000-120 | new | 3 of 5 | 2 / 1 / 0 | 53 / 7 / 0 | **FAIL** (run 0: underdriven: 14460 of 20000 in its lowest second; run 3: underdriven: 17170 of 20000 in its lowest second) | FAIL |
+| churn-40-20000-120 | new | 5 of 7 | 2 / 3 / 0 | 89 / 11 / 0 | **FAIL** (run 0: underdriven: 14460 of 20000 in its lowest second; run 3: underdriven: 17170 of 20000 in its lowest second) | FAIL |
 | churn-40-20000-120 | slice | 5 of 5 | 2 / 3 / 0 | 90 / 10 / 0 | **FAIL** | FAIL |
 | churn-40-100000-0 | base | 3 of 3 | 1 / 2 / 0 | 41 / 19 / 0 | **FAIL** | FAIL |
-| churn-40-100000-0 | new | 4 of 5 | 0 / 4 / 0 | 41 / 39 / 0 | **FAIL** (run 4: underdriven: 94400 of 100000 in its lowest second) | FAIL |
+| churn-40-100000-0 | new | 5 of 6 | 1 / 4 / 0 | 61 / 39 / 0 | **FAIL** (run 4: underdriven: 94400 of 100000 in its lowest second) | FAIL |
 | churn-40-100000-0 | slice | 5 of 5 | 3 / 2 / 0 | 71 / 29 / 0 | **FAIL** | FAIL |
 | churn-40-100000-5 | base | 3 of 3 | 0 / 3 / 0 | 22 / 38 / 0 | **FAIL** | FAIL |
 | churn-40-100000-5 | new | 5 of 5 | 1 / 4 / 0 | 54 / 46 / 0 | **FAIL** | FAIL |
@@ -84,9 +84,8 @@ Trees: `new` is `72db59fafb92b9630e1524e0e08b99a21cdda81f` (results-2/); `base` 
 | churn-40-100000-30 | new | 5 of 5 | 0 / 5 / 0 | 23 / 77 / 0 | **FAIL** | FAIL |
 | churn-40-100000-30 | slice | 5 of 5 | 0 / 5 / 0 | 63 / 37 / 0 | **FAIL** | FAIL |
 | churn-40-100000-120 | base | 3 of 3 | 2 / 1 / 0 | 40 / 20 / 0 | **FAIL** | FAIL |
-| churn-40-100000-120 | new | 4 of 5 | 0 / 4 / 0 | 38 / 42 / 0 | **FAIL** (run 4: underdriven: 71850 of 100000 in its lowest second) | FAIL |
+| churn-40-100000-120 | new | 5 of 6 | 0 / 5 / 0 | 56 / 44 / 0 | **FAIL** (run 4: underdriven: 71850 of 100000 in its lowest second) | FAIL |
 | churn-40-100000-120 | slice | 5 of 5 | 1 / 4 / 0 | 63 / 37 / 0 | **FAIL** | FAIL |
-3 cells where the two verdicts differ, or with too few valid runs
 
 | row | tree | runs judged | first frame: on time / late / missing | items: on time / late / missing, of 20 a run | verdict | the harness's own verdict |
 |---|---|---|---|---|---|---|
@@ -94,13 +93,13 @@ Trees: `new` is `72db59fafb92b9630e1524e0e08b99a21cdda81f` (results-2/); `base` 
 | fixed-40-20000-0 | new | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | fixed-40-20000-0 | slice | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 4: underdriven: 16050 of 20000 in its lowest second) | PASS **(they differ)** |
 | fixed-40-20000-5 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| fixed-40-20000-5 | new | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 0: underdriven: 18010 of 20000 in its lowest second; run 3: underdriven: 17440 of 20000 in its lowest second) | PASS **(they differ)** |
+| fixed-40-20000-5 | new | 5 of 7 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 0: underdriven: 18010 of 20000 in its lowest second; run 3: underdriven: 17440 of 20000 in its lowest second) | PASS |
 | fixed-40-20000-5 | slice | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 3: underdriven: 17450 of 20000 in its lowest second) | PASS **(they differ)** |
 | fixed-40-20000-30 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| fixed-40-20000-30 | new | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 4: underdriven: 18390 of 20000 in its lowest second) | PASS **(they differ)** |
+| fixed-40-20000-30 | new | 5 of 6 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 4: underdriven: 18390 of 20000 in its lowest second) | PASS |
 | fixed-40-20000-30 | slice | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 2: underdriven: 17290 of 20000 in its lowest second) | PASS **(they differ)** |
 | fixed-40-20000-120 | base | 3 of 3 | 2 / 1 / 0 | 47 / 13 / 0 | **FAIL** | FAIL |
-| fixed-40-20000-120 | new | 2 of 5 | 2 / 0 / 0 | 40 / 0 / 0 | **INVALID**, 2 of 5 declared (run 0: underdriven: 18330 of 20000 in its lowest second; run 2: underdriven: 17820 of 20000 in its lowest second; run 3: underdriven: 16450 of 20000 in its lowest second) | PASS **(they differ)** |
+| fixed-40-20000-120 | new | 5 of 8 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 0: underdriven: 18330 of 20000 in its lowest second; run 2: underdriven: 17820 of 20000 in its lowest second; run 3: underdriven: 16450 of 20000 in its lowest second) | PASS |
 | fixed-40-20000-120 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | fixed-40-100000-0 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
 | fixed-40-100000-0 | new | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
@@ -109,12 +108,12 @@ Trees: `new` is `72db59fafb92b9630e1524e0e08b99a21cdda81f` (results-2/); `base` 
 | fixed-40-100000-5 | new | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | fixed-40-100000-5 | slice | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 3: underdriven: 79050 of 100000 in its lowest second; run 4: underdriven: 94500 of 100000 in its lowest second) | PASS **(they differ)** |
 | fixed-40-100000-30 | base | 3 of 3 | 2 / 1 / 0 | 40 / 20 / 0 | **FAIL** | FAIL |
-| fixed-40-100000-30 | new | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 0: underdriven: 69350 of 100000 in its lowest second; run 2: underdriven: 82500 of 100000 in its lowest second) | PASS **(they differ)** |
+| fixed-40-100000-30 | new | 5 of 7 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 0: underdriven: 69350 of 100000 in its lowest second; run 2: underdriven: 82500 of 100000 in its lowest second) | PASS |
 | fixed-40-100000-30 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
-| fixed-40-100000-120 | base | 2 of 3 | 1 / 1 / 0 | 20 / 20 / 0 | **FAIL** (run 1: underdriven: 87300 of 100000 in its lowest second) | FAIL |
-| fixed-40-100000-120 | new | 1 of 5 | 1 / 0 / 0 | 20 / 0 / 0 | **INVALID**, 1 of 5 declared (run 0: underdriven: 61750 of 100000 in its lowest second; run 1: underdriven: 71600 of 100000 in its lowest second; run 2: underdriven: 89200 of 100000 in its lowest second; run 3: underdriven: 79100 of 100000 in its lowest second) | PASS **(they differ)** |
+| fixed-40-100000-120 | base | 3 of 4 | 2 / 1 / 0 | 40 / 20 / 0 | **FAIL** (run 1: underdriven: 87300 of 100000 in its lowest second) | FAIL |
+| fixed-40-100000-120 | new | 5 of 9 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 0: underdriven: 61750 of 100000 in its lowest second; run 1: underdriven: 71600 of 100000 in its lowest second; run 2: underdriven: 89200 of 100000 in its lowest second; run 3: underdriven: 79100 of 100000 in its lowest second) | PASS |
 | fixed-40-100000-120 | slice | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 2: underdriven: 94700 of 100000 in its lowest second; run 4: underdriven: 93000 of 100000 in its lowest second) | PASS **(they differ)** |
-12 cells where the two verdicts differ, or with too few valid runs
+6 cells where the two verdicts differ, or with too few valid runs
 
 | row | tree | runs judged | first frame: on time / late / missing | items: on time / late / missing, of 20 a run | verdict | the harness's own verdict |
 |---|---|---|---|---|---|---|
@@ -122,27 +121,27 @@ Trees: `new` is `72db59fafb92b9630e1524e0e08b99a21cdda81f` (results-2/); `base` 
 | xchurn-40-20000-0 | new | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xchurn-40-20000-0 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xchurn-40-20000-5 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xchurn-40-20000-5 | new | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 2: underdriven: 15650 of 20000 in its lowest second) | PASS **(they differ)** |
+| xchurn-40-20000-5 | new | 5 of 6 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 2: underdriven: 15650 of 20000 in its lowest second) | PASS |
 | xchurn-40-20000-5 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xchurn-40-20000-30 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xchurn-40-20000-30 | new | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 2: underdriven: 18400 of 20000 in its lowest second) | PASS **(they differ)** |
+| xchurn-40-20000-30 | new | 5 of 6 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 2: underdriven: 18400 of 20000 in its lowest second) | PASS |
 | xchurn-40-20000-30 | slice | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 1: underdriven: 18130 of 20000 in its lowest second) | PASS **(they differ)** |
-| xchurn-40-20000-120 | base | 2 of 3 | 2 / 0 / 0 | 40 / 0 / 0 | **INVALID**, 2 of 3 declared (run 0: underdriven: 12360 of 20000 in its lowest second) | PASS **(they differ)** |
-| xchurn-40-20000-120 | new | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 2: underdriven: 18950 of 20000 in its lowest second) | PASS **(they differ)** |
+| xchurn-40-20000-120 | base | 3 of 4 | 3 / 0 / 0 | 60 / 0 / 0 | PASS (run 0: underdriven: 12360 of 20000 in its lowest second) | PASS |
+| xchurn-40-20000-120 | new | 5 of 6 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 2: underdriven: 18950 of 20000 in its lowest second) | PASS |
 | xchurn-40-20000-120 | slice | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 1: underdriven: 18320 of 20000 in its lowest second) | PASS **(they differ)** |
 | xchurn-40-100000-0 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xchurn-40-100000-0 | new | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 0: underdriven: 94150 of 100000 in its lowest second) | PASS **(they differ)** |
+| xchurn-40-100000-0 | new | 5 of 6 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 0: underdriven: 94150 of 100000 in its lowest second) | PASS |
 | xchurn-40-100000-0 | slice | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 0: underdriven: 48100 of 100000 in its lowest second) | PASS **(they differ)** |
 | xchurn-40-100000-5 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xchurn-40-100000-5 | new | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 3: underdriven: 88250 of 100000 in its lowest second) | PASS **(they differ)** |
+| xchurn-40-100000-5 | new | 5 of 6 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 3: underdriven: 88250 of 100000 in its lowest second) | PASS |
 | xchurn-40-100000-5 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xchurn-40-100000-30 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xchurn-40-100000-30 | new | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 1: underdriven: 83950 of 100000 in its lowest second; run 3: underdriven: 54750 of 100000 in its lowest second) | PASS **(they differ)** |
+| xchurn-40-100000-30 | new | 5 of 7 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 1: underdriven: 83950 of 100000 in its lowest second; run 3: underdriven: 54750 of 100000 in its lowest second) | PASS |
 | xchurn-40-100000-30 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xchurn-40-100000-120 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xchurn-40-100000-120 | new | 1 of 5 | 1 / 0 / 0 | 20 / 0 / 0 | **INVALID**, 1 of 5 declared (run 1: underdriven: 92350 of 100000 in its lowest second; run 2: underdriven: 64500 of 100000 in its lowest second; run 3: underdriven: 90950 of 100000 in its lowest second; run 4: underdriven: 92000 of 100000 in its lowest second) | PASS **(they differ)** |
+| xchurn-40-100000-120 | new | 5 of 9 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 1: underdriven: 92350 of 100000 in its lowest second; run 2: underdriven: 64500 of 100000 in its lowest second; run 3: underdriven: 90950 of 100000 in its lowest second; run 4: underdriven: 92000 of 100000 in its lowest second) | PASS |
 | xchurn-40-100000-120 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
-11 cells where the two verdicts differ, or with too few valid runs
+3 cells where the two verdicts differ, or with too few valid runs
 
 | row | tree | runs judged | first frame: on time / late / missing | items: on time / late / missing, of 20 a run | verdict | the harness's own verdict |
 |---|---|---|---|---|---|---|
@@ -150,68 +149,67 @@ Trees: `new` is `72db59fafb92b9630e1524e0e08b99a21cdda81f` (results-2/); `base` 
 | xfixed-40-20000-0 | new | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xfixed-40-20000-0 | slice | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 0: underdriven: 18320 of 20000 in its lowest second; run 2: underdriven: 18340 of 20000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-20000-5 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xfixed-40-20000-5 | new | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 2: underdriven: 18530 of 20000 in its lowest second) | PASS **(they differ)** |
+| xfixed-40-20000-5 | new | 5 of 6 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 2: underdriven: 18530 of 20000 in its lowest second) | PASS |
 | xfixed-40-20000-5 | slice | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 4: underdriven: 18780 of 20000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-20000-30 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xfixed-40-20000-30 | new | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 1: underdriven: 3690 of 20000 in its lowest second; run 4: underdriven: 18850 of 20000 in its lowest second) | PASS **(they differ)** |
+| xfixed-40-20000-30 | new | 5 of 7 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 1: underdriven: 3690 of 20000 in its lowest second; run 4: underdriven: 18850 of 20000 in its lowest second) | PASS |
 | xfixed-40-20000-30 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xfixed-40-20000-120 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xfixed-40-20000-120 | new | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 1: underdriven: 2280 of 20000 in its lowest second; run 4: underdriven: 18290 of 20000 in its lowest second) | PASS **(they differ)** |
+| xfixed-40-20000-120 | new | 5 of 7 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 1: underdriven: 2280 of 20000 in its lowest second; run 4: underdriven: 18290 of 20000 in its lowest second) | PASS |
 | xfixed-40-20000-120 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xfixed-40-100000-0 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
 | xfixed-40-100000-0 | new | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xfixed-40-100000-0 | slice | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 3: underdriven: 94300 of 100000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-100000-5 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xfixed-40-100000-5 | new | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 2: underdriven: 87150 of 100000 in its lowest second; run 4: underdriven: 89200 of 100000 in its lowest second) | PASS **(they differ)** |
+| xfixed-40-100000-5 | new | 5 of 7 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 2: underdriven: 87150 of 100000 in its lowest second; run 4: underdriven: 89200 of 100000 in its lowest second) | PASS |
 | xfixed-40-100000-5 | slice | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 1: underdriven: 94900 of 100000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-100000-30 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xfixed-40-100000-30 | new | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 3: underdriven: 87550 of 100000 in its lowest second) | PASS **(they differ)** |
+| xfixed-40-100000-30 | new | 5 of 6 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 3: underdriven: 87550 of 100000 in its lowest second) | PASS |
 | xfixed-40-100000-30 | slice | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 0: underdriven: 79850 of 100000 in its lowest second; run 1: underdriven: 67050 of 100000 in its lowest second) | PASS **(they differ)** |
-| xfixed-40-100000-120 | base | 2 of 3 | 2 / 0 / 0 | 40 / 0 / 0 | **INVALID**, 2 of 3 declared (run 1: underdriven: 86850 of 100000 in its lowest second) | PASS **(they differ)** |
-| xfixed-40-100000-120 | new | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 3: underdriven: 90350 of 100000 in its lowest second; run 4: underdriven: 93900 of 100000 in its lowest second) | PASS **(they differ)** |
+| xfixed-40-100000-120 | base | 3 of 4 | 3 / 0 / 0 | 60 / 0 / 0 | PASS (run 1: underdriven: 86850 of 100000 in its lowest second) | PASS |
+| xfixed-40-100000-120 | new | 5 of 7 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 3: underdriven: 90350 of 100000 in its lowest second; run 4: underdriven: 93900 of 100000 in its lowest second) | PASS |
 | xfixed-40-100000-120 | slice | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 1: underdriven: 92450 of 100000 in its lowest second; run 4: underdriven: 52200 of 100000 in its lowest second) | PASS **(they differ)** |
-13 cells where the two verdicts differ, or with too few valid runs
+6 cells where the two verdicts differ, or with too few valid runs
 
 | row | tree | runs judged | first frame: on time / late / missing | items: on time / late / missing, of 20 a run | verdict | the harness's own verdict |
 |---|---|---|---|---|---|---|
-| afixed-40-20000-5 | base | 2 of 3 | 2 / 0 / 0 | 40 / 0 / 0 | **INVALID**, 2 of 3 declared (run 0: underdriven: 17510 of 20000 in its lowest second) | PASS **(they differ)** |
-| afixed-40-20000-5 | new | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 0: underdriven: 18960 of 20000 in its lowest second) | PASS **(they differ)** |
+| afixed-40-20000-5 | base | 3 of 4 | 3 / 0 / 0 | 60 / 0 / 0 | PASS (run 0: underdriven: 17510 of 20000 in its lowest second) | PASS |
+| afixed-40-20000-5 | new | 5 of 6 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 0: underdriven: 18960 of 20000 in its lowest second) | PASS |
 | afixed-40-20000-5 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | afixed-40-100000-5 | base | 3 of 3 | 2 / 1 / 0 | 40 / 20 / 0 | **FAIL** | FAIL |
-| afixed-40-100000-5 | new | 2 of 5 | 2 / 0 / 0 | 40 / 0 / 0 | **INVALID**, 2 of 5 declared (run 1: underdriven: 94850 of 100000 in its lowest second; run 2: underdriven: 87300 of 100000 in its lowest second; run 4: underdriven: 93100 of 100000 in its lowest second) | PASS **(they differ)** |
+| afixed-40-100000-5 | new | 5 of 8 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 1: underdriven: 94850 of 100000 in its lowest second; run 2: underdriven: 87300 of 100000 in its lowest second; run 4: underdriven: 93100 of 100000 in its lowest second) | PASS |
 | afixed-40-100000-5 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
-3 cells where the two verdicts differ, or with too few valid runs
 
 ## N0c-N2: the worst first frame beside the bound
 
 | row | bound, s | new: worst first frame, s; runs inside | base: worst first frame, s; runs inside | slice: worst first frame, s; runs inside |
 |---|---|---|---|---|
-| afixed-40-20000-5 | 0.23 | 0.036; 5 of 5 | 0.610; 0 of 3 **OUTSIDE** | 0.075; 5 of 5 |
-| afixed-40-100000-5 | 0.23 | 0.019; 5 of 5 | 5.175; 0 of 3 **OUTSIDE** | 0.061; 5 of 5 |
+| afixed-40-20000-5 | 0.23 | 0.036; 6 of 6 | 0.643; 0 of 4 **OUTSIDE** | 0.075; 5 of 5 |
+| afixed-40-100000-5 | 0.23 | 0.030; 8 of 8 | 5.175; 0 of 3 **OUTSIDE** | 0.061; 5 of 5 |
 | fixed-40-20000-0 | 0.33 | 0.036; 5 of 5 | 0.022; 3 of 3 | 0.028; 5 of 5 |
-| fixed-40-20000-5 | 0.17 | 0.042; 5 of 5 | 0.095; 3 of 3 | 0.023; 5 of 5 |
-| fixed-40-20000-30 | 0.17 | 0.038; 5 of 5 | 0.093; 3 of 3 | 0.031; 5 of 5 |
-| fixed-40-20000-120 | 0.17 | 0.019; 5 of 5 | 3.062; 1 of 3 **OUTSIDE** | 0.031; 5 of 5 |
+| fixed-40-20000-5 | 0.17 | 0.042; 7 of 7 | 0.095; 3 of 3 | 0.023; 5 of 5 |
+| fixed-40-20000-30 | 0.17 | 0.038; 6 of 6 | 0.093; 3 of 3 | 0.031; 5 of 5 |
+| fixed-40-20000-120 | 0.17 | 0.032; 8 of 8 | 3.062; 1 of 3 **OUTSIDE** | 0.031; 5 of 5 |
 | fixed-40-100000-0 | 0.33 | 0.026; 5 of 5 | 0.324; 3 of 3 | 0.087; 5 of 5 |
 | fixed-40-100000-5 | 0.17 | 0.130; 5 of 5 | 52.246; 1 of 3 **OUTSIDE** | 0.069; 5 of 5 |
-| fixed-40-100000-30 | 0.17 | 0.037; 5 of 5 | 4.697; 2 of 3 **OUTSIDE** | 0.019; 5 of 5 |
-| fixed-40-100000-120 | 0.17 | 0.028; 5 of 5 | 15.756; 2 of 3 **OUTSIDE** | 0.024; 5 of 5 |
+| fixed-40-100000-30 | 0.17 | 0.040; 7 of 7 | 4.697; 2 of 3 **OUTSIDE** | 0.019; 5 of 5 |
+| fixed-40-100000-120 | 0.17 | 0.029; 9 of 9 | 15.756; 2 of 4 **OUTSIDE** | 0.024; 5 of 5 |
 | xchurn-40-20000-0 | 0.22 | 0.076; 5 of 5 | 0.033; 3 of 3 | 0.032; 5 of 5 |
-| xchurn-40-20000-5 | 0.22 | 0.043; 5 of 5 | 0.046; 3 of 3 | 0.046; 5 of 5 |
-| xchurn-40-20000-30 | 0.22 | 0.110; 5 of 5 | 0.055; 3 of 3 | 0.047; 5 of 5 |
-| xchurn-40-20000-120 | 0.22 | 0.038; 5 of 5 | 0.037; 3 of 3 | 0.053; 5 of 5 |
-| xchurn-40-100000-0 | 0.22 | 0.036; 5 of 5 | 0.027; 3 of 3 | 0.047; 5 of 5 |
-| xchurn-40-100000-5 | 0.22 | 0.050; 5 of 5 | 0.035; 3 of 3 | 0.047; 5 of 5 |
-| xchurn-40-100000-30 | 0.22 | 0.061; 5 of 5 | 0.049; 3 of 3 | 0.044; 5 of 5 |
-| xchurn-40-100000-120 | 0.22 | 0.029; 5 of 5 | 0.035; 3 of 3 | 0.058; 5 of 5 |
+| xchurn-40-20000-5 | 0.22 | 0.043; 6 of 6 | 0.046; 3 of 3 | 0.046; 5 of 5 |
+| xchurn-40-20000-30 | 0.22 | 0.110; 6 of 6 | 0.055; 3 of 3 | 0.047; 5 of 5 |
+| xchurn-40-20000-120 | 0.22 | 0.045; 6 of 6 | 0.038; 4 of 4 | 0.053; 5 of 5 |
+| xchurn-40-100000-0 | 0.22 | 0.036; 6 of 6 | 0.027; 3 of 3 | 0.047; 5 of 5 |
+| xchurn-40-100000-5 | 0.22 | 0.050; 6 of 6 | 0.035; 3 of 3 | 0.047; 5 of 5 |
+| xchurn-40-100000-30 | 0.22 | 0.061; 7 of 7 | 0.049; 3 of 3 | 0.044; 5 of 5 |
+| xchurn-40-100000-120 | 0.22 | 0.043; 9 of 9 | 0.035; 3 of 3 | 0.058; 5 of 5 |
 | xfixed-40-20000-0 | 0.22 | 0.040; 5 of 5 | 0.135; 3 of 3 | 0.039; 5 of 5 |
-| xfixed-40-20000-5 | 0.22 | 0.043; 5 of 5 | 0.050; 3 of 3 | 0.057; 5 of 5 |
-| xfixed-40-20000-30 | 0.22 | 0.045; 5 of 5 | 0.133; 3 of 3 | 0.045; 5 of 5 |
-| xfixed-40-20000-120 | 0.22 | 0.050; 5 of 5 | 0.038; 3 of 3 | 0.031; 5 of 5 |
+| xfixed-40-20000-5 | 0.22 | 0.043; 6 of 6 | 0.050; 3 of 3 | 0.057; 5 of 5 |
+| xfixed-40-20000-30 | 0.22 | 0.045; 7 of 7 | 0.133; 3 of 3 | 0.045; 5 of 5 |
+| xfixed-40-20000-120 | 0.22 | 0.050; 7 of 7 | 0.038; 3 of 3 | 0.031; 5 of 5 |
 | xfixed-40-100000-0 | 0.22 | 0.045; 5 of 5 | 0.036; 3 of 3 | 0.040; 5 of 5 |
-| xfixed-40-100000-5 | 0.22 | 0.044; 5 of 5 | 0.045; 3 of 3 | 0.047; 5 of 5 |
-| xfixed-40-100000-30 | 0.22 | 0.043; 5 of 5 | 0.068; 3 of 3 | 0.044; 5 of 5 |
-| xfixed-40-100000-120 | 0.22 | 0.045; 5 of 5 | 0.031; 3 of 3 | 0.053; 5 of 5 |
+| xfixed-40-100000-5 | 0.22 | 0.054; 7 of 7 | 0.045; 3 of 3 | 0.047; 5 of 5 |
+| xfixed-40-100000-30 | 0.22 | 0.043; 6 of 6 | 0.068; 3 of 3 | 0.044; 5 of 5 |
+| xfixed-40-100000-120 | 0.22 | 0.045; 7 of 7 | 0.031; 4 of 4 | 0.053; 5 of 5 |
 
 ## N0: copies sent until one was heard, against the lottery
 
@@ -220,13 +218,13 @@ Trees: `new` is `72db59fafb92b9630e1524e0e08b99a21cdda81f` (results-2/); `base` 
 | new | churn-40, offset 0 s | 20,000 | 5 | 5 | 2, 2, 2, 2, 2 | 50.0% (18.7%–81.3%) | 2 | 1,500 | 7.5% | 0 of 5 |
 | new | churn-40, offset 5 s | 20,000 | 5 | 5 | 17, 11, 34, 7, 22 | 5.5% (1.8%–12.4%) | 18 | 1,500 | 7.5% | 4 of 5 |
 | new | churn-40, offset 30 s | 20,000 | 5 | 5 | 11, 44, 4, 8, 20 | 5.7% (1.9%–12.9%) | 17 | 1,498 | 7.5% | 3 of 5 |
-| new | churn-40, offset 120 s | 20,000 | 5 | 5 | 7, 26, 4, 13, 5 | 9.1% (3.0%–20.0%) | 11 | 1,497 | 7.5% | 2 of 5 |
-| new | churn-40, offsets > 0, pooled | 20,000 | 15 | 15 | 4–44 | 6.4% (3.6%–10.4%) | 16 | 1,498 | 7.5% | 9 of 15 |
-| new | churn-40, offset 0 s | 100,000 | 5 | 5 | 21, 64, 39, 14, 19 | 3.2% (1.0%–7.3%) | 31 | 1,498 | 1.5% | 5 of 5 |
+| new | churn-40, offset 120 s | 20,000 | 7 | 7 | 7, 26, 4, 13, 5, 15, 15 | 8.2% (3.4%–16.2%) | 12 | 1,497 | 7.5% | 4 of 7 |
+| new | churn-40, offsets > 0, pooled | 20,000 | 17 | 17 | 4–44 | 6.5% (3.8%–10.1%) | 15 | 1,498 | 7.5% | 11 of 17 |
+| new | churn-40, offset 0 s | 100,000 | 6 | 6 | 21, 64, 39, 14, 19, 2 | 3.8% (1.4%–8.0%) | 26 | 1,498 | 1.5% | 5 of 6 |
 | new | churn-40, offset 5 s | 100,000 | 5 | 5 | 41, 36, 103, 2, 15 | 2.5% (0.8%–5.8%) | 39 | 1,498 | 1.5% | 4 of 5 |
 | new | churn-40, offset 30 s | 100,000 | 5 | 5 | 64, 45, 37, 46, 60 | 2.0% (0.6%–4.6%) | 50 | 1,498 | 1.5% | 5 of 5 |
-| new | churn-40, offset 120 s | 100,000 | 5 | 5 | 49, 18, 16, 101, 23 | 2.4% (0.8%–5.5%) | 41 | 1,500 | 1.5% | 5 of 5 |
-| new | churn-40, offsets > 0, pooled | 100,000 | 15 | 15 | 2–103 | 2.3% (1.3%–3.7%) | 44 | 1,498 | 1.5% | 14 of 15 |
+| new | churn-40, offset 120 s | 100,000 | 6 | 6 | 49, 18, 16, 101, 23, 13 | 2.7% (1.0%–5.8%) | 37 | 1,500 | 1.5% | 6 of 6 |
+| new | churn-40, offsets > 0, pooled | 100,000 | 16 | 16 | 2–103 | 2.4% (1.4%–3.9%) | 42 | 1,498 | 1.5% | 15 of 16 |
 | base | churn-40, offset 0 s | 20,000 | 3 | 3 | 2, 2, 2 | 50.0% (11.8%–88.2%) | 2 | 1,001 | 5.0% | 0 of 3 |
 | base | churn-40, offset 5 s | 20,000 | 3 | 3 | 15, 5, 35 | 5.5% (1.1%–15.1%) | 18 | 1,001 | 5.0% | 2 of 3 |
 | base | churn-40, offset 30 s | 20,000 | 3 | 3 | 4, 33, 38 | 4.0% (0.8%–11.2%) | 25 | 1,001 | 5.0% | 2 of 3 |
@@ -284,6 +282,29 @@ Trees: `new` is `72db59fafb92b9630e1524e0e08b99a21cdda81f` (results-2/); `base` 
 | new | run0 | R4a-replay-earlier-frames-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
 | new | run0 | R4b-replay-latest-item-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
 | new | run1 | R1-valid-other-key-4x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run1 | R2-same-station | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run1 | R3-forged-claiming-quiet-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run1 | R3c-forged-churned-sources-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run1 | R4a-replay-earlier-frames-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run1 | R4b-replay-latest-item-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run2 | R1-valid-other-key-4x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run2 | R2-same-station | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run2 | R3-forged-claiming-quiet-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run2 | R3c-forged-churned-sources-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run2 | R4a-replay-earlier-frames-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run2 | R4b-replay-latest-item-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run3 | R1-valid-other-key-4x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run3 | R2-same-station | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run3 | R3-forged-claiming-quiet-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run3 | R3c-forged-churned-sources-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run3 | R4a-replay-earlier-frames-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run3 | R4b-replay-latest-item-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run4 | R1-valid-other-key-4x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run4 | R2-same-station | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run4 | R3-forged-claiming-quiet-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run4 | R3c-forged-churned-sources-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run4 | R4a-replay-earlier-frames-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| new | run4 | R4b-replay-latest-item-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
 | slice | run0 | F0-quiet-only | 30 of 30 | 0 | 0 | 0 | 0 | yes | PASS |
 | slice | run0 | F2b-forged-own-key-2x-max | 30 of 30 | 0 | 0 | 0 | 0 | yes | PASS |
 | slice | run0 | F3b-unknown-key-2x-max | 30 of 30 | 0 | 0 | 0 | 0 | yes | PASS |
@@ -335,7 +356,7 @@ Trees: `new` is `72db59fafb92b9630e1524e0e08b99a21cdda81f` (results-2/); `base` 
 | junk-40-20000 | slice | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 42.9 | 20,002 | 0 (0) | PASS |
 | junk-40-100000 | base | 3 | 57/57/57/57; 57/57/57/57; 57/57/57/57 | 46.2 | 100,008 | 0 (0) | PASS |
 | junk-40-100000 | head | 3 | 57/57/57/57; 57/57/57/57; 57/57/57/57 | 80.1 | 100,008 | 0 (0) | PASS |
-| junk-40-100000 | new | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 1024.1 | 100,006 | 63596 (63596) | **INVALID**, 4 of 5 declared (run 1 underdriven: 29,250) |
+| junk-40-100000 | new | 6 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 1024.1 | 100,006 | 63596 (63596) | PASS (run 1 underdriven: 29,250) |
 | junk-40-100000 | slice | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 49.2 | 100,008 | 0 (0) | PASS |
 | junkall-40-20000 | base | 3 | 57/57/57/57; 57/57/57/57; 57/57/57/57 | 50.9 | 20,002 | 0 (0) | PASS |
 | junkall-40-20000 | head | 3 | 57/57/57/57; 57/57/57/57; 57/57/57/57 | 63.7 | 20,002 | 0 (0) | PASS |
