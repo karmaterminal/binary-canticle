@@ -88,7 +88,7 @@ class RestartReplayTest(unittest.TestCase):
     def test_residual_a_full_run_of_a_missed_epoch_rolls_the_floor_out(self):
         """🪨 on #175: what this does not close. δ̂ is the minimum of the last 16 samples, so 16 captured beacons
         of an epoch the receiver never heard push the honest floor out, and with no skew bound an old item
-        then lands. The same as a first join; `max_skew_s` is the bound for that. If this ever fails, the
+        then lands. The same as a first join; `max_skew_ms` is the bound for that. If this ever fails, the
         residual is closed: say so on #175."""
         lst = self.listener()
         self.heard_then_quiet(lst, self.st.poll(T0), T0)
@@ -122,6 +122,51 @@ class RestartReplayTest(unittest.TestCase):
         for f in old:
             fresh.hear(f, T0 + HOUR)
             self.assertEqual(fresh.last_dedup, "duplicate")
+
+    def test_a_lowered_offset_is_saved_before_the_next_datagram(self):
+        """A station an hour behind, then corrected: the lower δ̂ is saved on the beacon that lowers it, so a
+        crash before the next mark save can't bring the receiver back at +1 h, where an item an hour old
+        would land as fresh (the #175 replay again)."""
+        behind = Station(SK, [StreamConfig("chatter"), StreamConfig("root", cls="root")], epoch=1,
+                         rng=random.Random(1), now_ms=T0 - HOUR)
+        lst = self.listener()
+        for f in behind.poll(T0 - HOUR):
+            if kind(lst, f, T0) == wire.KIND_BEACON:
+                lst.hear(f, T0)                                  # sample +1 h
+        self.assertEqual(lst.stations[SK_ID()].offset_ms, HOUR)
+        t = T0 + 2_000
+        behind.sing(t, "chatter", text="sung after the correction, never heard", ttl_s=60)
+        frames = behind.poll(t)
+        beacons = [f for f in frames if kind(lst, f, t) == wire.KIND_BEACON]
+        items = [f for f in frames if kind(lst, f, t) == wire.KIND_ITEM]
+        self.assertTrue(beacons and items)
+        lst.hear(beacons[-1], t)                                 # the clock is corrected: δ̂ drops to 0
+        self.assertEqual(lst.stations[SK_ID()].offset_ms, 0)
+        fresh = self.listener()                                  # a crash: no tick, no forced save
+        self.assertEqual(fresh.stations[SK_ID()].offset_ms, 0)
+        self.assertNotIn("item", [e.kind for f in items for e in fresh.hear(f, t + HOUR)])
+
+    def test_a_resurfaced_item_keeps_its_local_expiry_not_the_cap(self):
+        """An item first heard late in its life has its dedup entry kept to the cap (first hearing + its
+        life), past its local expiry. Resurfaced after a restart, it must still expire at its local expiry,
+        worked out with the kept δ̂, not at the cap."""
+        self.st.sing(T0, "chatter", text="heard late", ttl_s=60)
+        self.st.poll(T0)                                         # its first loop is not heard
+        lst = self.listener()
+        frames = self.st.poll(T0 + 50_000)
+        items = [f for f in frames if kind(lst, f, T0 + 50_000) == wire.KIND_ITEM]
+        self.assertTrue(items)
+        for f in frames:
+            lst.hear(f, T0 + 50_000)
+        ident = [i for i in lst.current if i[3] == 1][0]
+        self.assertEqual(lst.current[ident].local_expiry, T0 + 60_000)
+        self.assertGreater(lst.dedup[ident][1], T0 + 100_000)   # the entry is kept to the cap
+        lst._save_if_dirty(force=True)
+        fresh = self.listener()
+        fresh.hear(items[0], T0 + 52_000)                        # a loop copy: the same bytes
+        self.assertEqual(fresh.last_dedup, "resurfaced")
+        self.assertEqual(fresh.current[ident].local_expiry, T0 + 60_000)
+        self.assertIn("expired", [e.kind for e in fresh.tick(T0 + 61_000)])
 
     def test_a_state_file_without_marks_still_loads_and_says_so(self):
         lst = self.listener()

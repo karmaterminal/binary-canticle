@@ -6,7 +6,10 @@ Landing into agent sessions (§14) is out of scope here.
 
 With ``state_path`` set, the safety state that must survive a restart (epoch
 maxima, dedup digests, sticky PLUCKs, supersession high-water marks; §5.2, §7.4,
-§7.7, §7.8) is written atomically after every change and loaded at start.
+§7.7, §7.8) is written atomically after every change and loaded at start. Each
+key's beacon mark and δ̂ samples (#175) are kept too, with one exception to "every
+change": a lowered δ̂ is saved at once, but a moved mark only within MARK_SAVE_MS
+(plus one tick), so a crash can let the last window's beacons be heard again.
 
 ``receptor_mode=True`` is the BC-2 behaviour the record v1 emitter needs
 (``records.py``, RFC §14.18.3): it reports the outcomes this listener is otherwise
@@ -277,7 +280,8 @@ class Listener:
         if not self._epoch_ok(f.key_id, b.epoch, now_ms, events):
             return events
         st = self._st(f.key_id)
-        # The mark survives a restart (#175): bseq > 0 is a mark this listener kept, not one it heard.
+        # A mark kept across a restart counts, as of its last save (#175): bseq > 0 is a mark this listener
+        # kept, not one it heard.
         if b.epoch == st.epoch_hwm and b.bseq <= st.bseq and (st.last_beacon is not None or st.bseq > 0):
             self.last_dedup = "duplicate"
             return events  # older or repeated beacon
@@ -713,8 +717,9 @@ class Listener:
                       for i, (d, r, m) in self.dedup.items()],
             "sticky_pluck": [[i[0].hex(), i[1], i[2], i[3], r] for i, r in self.sticky_pluck.items()],
             "hwm": [[k[0].hex(), k[1], k[2], *v] for k, v in self.hwm.items()],
-            # #175: a restarted listener keeps each key's beacon mark and δ̂, so a captured old beacon
-            # neither counts as new nor moves δ̂ (replays only raise a sample; δ̂ is their minimum).
+            # #175: a restarted listener keeps each key's beacon mark (as of its last save, ≤ MARK_SAVE_MS old)
+            # and δ̂ samples, so a captured beacon at or below the mark is a duplicate, and one above it can
+            # only add a larger sample (δ̂ is their minimum).
             "beacons": {k.hex(): [s.epoch_hwm, s.bseq, list(s.offsets)] for k, s in self.stations.items()
                         if s.epoch_hwm and (s.bseq or s.offsets)},
         }
