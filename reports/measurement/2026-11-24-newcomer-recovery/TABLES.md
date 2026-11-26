@@ -419,6 +419,56 @@ bench_offer.py, 2026-11-26T09:21:41Z, ronan, python 3.12.3, cryptography 50.0.1,
 | churned | 1.24 (1.25, 11 runs) | 1.29 (1.29, 11 runs) | 1.32 (1.33, 11 runs) | 1.31 (1.32, 11 runs) |
 | old beacons replayed | 0.57 (0.58, 11 runs) | 0.59 (0.60, 11 runs) | 0.59 (0.60, 11 runs) | 0.59 (0.60, 11 runs) |
 
+## AB, results-3/ (fix against new): what the reader read a second, 60 s flat out (diagnostic)
+
+| row | run | tree | offered /s | read by the daemon /s | dropped at the socket | quiet items on time | daemon CPU % | load before |
+|---|---|---|---|---|---|---|---|---|
+| R3 | 0 | new | 687,619 | 653,423 | 4.8 % | 6 of 6 | 94.8 | 7.8 |
+| R3 | 0 | fix | 821,777 | 652,451 | 20.4 % | 6 of 6 | 94.8 | 11.0 |
+| R3 | 1 | new | 745,820 | 611,604 | 17.8 % | 6 of 6 | 95.8 | 13.6 |
+| R3 | 1 | fix | 833,642 | 649,997 | 21.9 % | 6 of 6 | 94.4 | 7.7 |
+| R3 | 2 | new | 677,015 | 658,056 | 2.6 % | 6 of 6 | 94.6 | 7.3 |
+| R3 | 2 | fix | 617,625 | 614,361 | 0.4 % | 6 of 6 | 94.2 | 7.0 |
+| R4a | 0 | new | 650,195 | 649,115 | 0.0 % | 6 of 6 | 72.0 | 7.9 |
+| R4a | 0 | fix | 753,683 | 750,641 | 0.2 % | 6 of 6 | 71.9 | 9.5 |
+| R4a | 1 | new | 711,591 | 710,412 | 0.0 % | 6 of 6 | 72.0 | 7.6 |
+| R4a | 1 | fix | 571,783 | 570,769 | 0.0 % | 6 of 6 | 72.0 | 7.7 |
+| R4a | 2 | new | 695,103 | 693,948 | 0.0 % | 6 of 6 | 72.1 | 7.8 |
+| R4a | 2 | fix | 572,708 | 571,758 | 0.0 % | 6 of 6 | 72.1 | 7.9 |
+
+## AB, results-3/: the share dropped at the socket, 60 s flat out (diagnostic)
+
+```
+=== 09:27:13Z another lane measures, waiting: 1331755 bash reports/measurement/2026-11-26-radio-four-quantities/harness/run.sh reports/measurement/2026-11-26-radio-four-quantities/result
+=== 09:37:14Z another lane measures, waiting: 1331755 bash reports/measurement/2026-11-26-radio-four-quantities/harness/run.sh reports/measurement/2026-11-26-radio-four-quantities/result
+=== 09:47:15Z another lane measures, waiting: 1331755 bash reports/measurement/2026-11-26-radio-four-quantities/harness/run.sh reports/measurement/2026-11-26-radio-four-quantities/result
+=== 10:00:06Z gate: load 7.78 10.63 13.60, waited 1700 s for others and 270 s for load
+new 0 R3- offered 687619/s dropped 4.8 % on time 6 of 6 cpu 94.8 load 7.8
+=== 10:16:19Z gate: load 10.96 12.08 13.20, waited 0 s for others and 900 s for load
+fix 0 R3- offered 821777/s dropped 20.4 % on time 6 of 6 cpu 94.8 load 11.0
+=== 10:20:47Z gate: load 7.90 10.21 12.18, waited 0 s for others and 195 s for load
+new 0 R4a offered 650195/s dropped 0.0 % on time 6 of 6 cpu 72.0 load 7.9
+=== 10:36:59Z gate: load 9.54 9.79 10.67, waited 0 s for others and 900 s for load
+fix 0 R4a offered 753683/s dropped 0.2 % on time 6 of 6 cpu 71.9 load 9.5
+=== 10:53:12Z gate: load 13.56 19.32 18.81, waited 0 s for others and 900 s for load
+new 1 R3- offered 745820/s dropped 17.8 % on time 6 of 6 cpu 95.8 load 13.6
+=== 10:58:10Z gate: load 7.67 13.72 16.71, waited 0 s for others and 225 s for load
+fix 1 R3- offered 833642/s dropped 21.9 % on time 6 of 6 cpu 94.4 load 7.7
+=== 10:59:52Z gate: load 7.59 12.28 15.91, waited 0 s for others and 30 s for load
+new 1 R4a offered 711591/s dropped 0.0 % on time 6 of 6 cpu 72.0 load 7.6
+=== 11:01:49Z gate: load 7.65 10.87 14.95, waited 0 s for others and 45 s for load
+fix 1 R4a offered 571783/s dropped 0.0 % on time 6 of 6 cpu 72.0 load 7.7
+=== 11:03:46Z gate: load 7.34 10.01 14.17, waited 0 s for others and 45 s for load
+new 2 R3- offered 677015/s dropped 2.6 % on time 6 of 6 cpu 94.6 load 7.3
+=== 11:04:58Z gate: load 7.04 9.28 13.59, waited 0 s for others and 0 s for load
+fix 2 R3- offered 617625/s dropped 0.4 % on time 6 of 6 cpu 94.2 load 7.0
+=== 11:06:55Z gate: load 7.84 9.02 13.00, waited 0 s for others and 45 s for load
+new 2 R4a offered 695103/s dropped 0.0 % on time 6 of 6 cpu 72.1 load 7.8
+=== 11:08:08Z gate: load 7.90 8.74 12.61, waited 0 s for others and 0 s for load
+fix 2 R4a offered 572708/s dropped 0.0 % on time 6 of 6 cpu 72.1 load 7.9
+AB DONE
+```
+
 ## AB, results/: the share dropped at the socket, 60 s flat out (diagnostic)
 
 ```

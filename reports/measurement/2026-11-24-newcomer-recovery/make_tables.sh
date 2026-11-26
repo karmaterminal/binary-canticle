@@ -36,6 +36,8 @@ echo; echo "## J in virtual time (junk_model.py)"; echo
 cat results/junk-model.md
 echo; echo "## offer()'s cost per datagram (bench_offer.py, a diagnostic): the minimum of the runs, µs, and their median"; echo
 $PY bench_table.py results-3/bench-offer.log
+echo; echo "## AB, results-3/ (fix against new): what the reader read a second, 60 s flat out (diagnostic)"; echo
+$PY ab_table.py results-3/ab
 for ab in results-3/ab.log results/ab.log; do [ -e $ab ] || continue
   echo; echo "## AB, $(dirname $ab)/: the share dropped at the socket, 60 s flat out (diagnostic)"; echo; echo '```'; cat $ab; echo '```'; done
 } > TABLES.md 2>&1
