@@ -79,9 +79,13 @@ def _finding_body(req: dict, cls: Optional[str], kwargs: dict) -> None:
     kwargs["body"], kwargs["ctype"] = finding.encode(f), finding.CTYPE
 
 
-def _dispatch(station: Station, req: dict, socket_classes: frozenset) -> dict:
+def _dispatch(station: Station, req: dict, socket_classes: frozenset, *, cue_store=None, grant_loader=None) -> dict:
     op = req.get("op")
     now = now_ms()
+    if isinstance(op, str) and op.startswith("cue_"):
+        if cue_store is None:
+            return {"ok": False, "error": "cue scheduling is disabled; station needs an elected --cue-db"}
+        return cue_store.dispatch(req, now, socket_classes, grant_loader)
     if op == "sing":
         stream = station.streams.get(req.get("stream"))
         cls = req.get("class") or (stream.cfg.cls if stream else None)
@@ -133,12 +137,14 @@ def socket_grant(station: Station, requested=None) -> frozenset:
 
 async def run_station(station: Station, dests: list[tuple[str, int]], control_path: Optional[str] = None,
                       stop: Optional[asyncio.Event] = None, log: Callable[[str], None] = lambda s: None,
-                      socket_classes=None) -> None:
+                      socket_classes=None, *, cue_store=None, grant_loader=None) -> None:
     if station.grant is None:
         raise ValueError("a station behind a control socket needs its manifest grant (§10.4)")
     if station.host_binding:
         raise ValueError("run_station only sends UDP; it cannot carry host-scoped frames (§4.3)")
     allowed = socket_grant(station, socket_classes)
+    if cue_store is not None and (cue_store.station is not station or grant_loader is None):
+        raise ValueError("cue store must belong to this station and have a current manifest loader")
     stop = stop or asyncio.Event()
     wake = asyncio.Event()
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -156,7 +162,8 @@ async def run_station(station: Station, dests: list[tuple[str, int]], control_pa
             else:
                 line = await reader.readline()
                 try:
-                    resp = _dispatch(station, json.loads(line), allowed)
+                    resp = _dispatch(station, json.loads(line), allowed,
+                                     cue_store=cue_store, grant_loader=grant_loader)
                 except (ValueError, KeyError, TypeError) as e:
                     resp = {"ok": False, "error": str(e)}
             writer.write((json.dumps(resp) + "\n").encode())
@@ -185,6 +192,10 @@ async def run_station(station: Station, dests: list[tuple[str, int]], control_pa
 
     try:
         while not stop.is_set():
+            if cue_store is not None:
+                # Serialized with control requests: claim/cancel cannot interleave
+                # with sing. No client has to stay alive, and no per-cue sleep task.
+                cue_store.tick(now_ms(), allowed, grant_loader)
             for frame in station.poll(now_ms()):
                 send(frame)
             delay = max(0, min(station.next_due(), now_ms() + 500) - now_ms()) / 1000
