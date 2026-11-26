@@ -294,6 +294,17 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 
 | tree | run | row | on time (4.5 s) at the daemon, during the flood | late | missing | caught up after the flood | not pushed to the ear | the kernel's drops reported | verdict |
 |---|---|---|---|---|---|---|---|---|---|
+| fix | run0 | F0-quiet-only | 30 of 30 | 0 | 0 | 0 | 0 | yes | PASS |
+| fix | run0 | F2b-forged-own-key-2x-max | 30 of 30 | 0 | 0 | 0 | 0 | yes | PASS |
+| fix | run0 | F3b-unknown-key-2x-max | 30 of 30 | 0 | 0 | 0 | 0 | yes | PASS |
+| fix | run0 | F4-replay-other-key-2x-max | 30 of 30 | 0 | 0 | 0 | 0 | yes | PASS |
+| fix | run0 | F5-real-station-flood | 30 of 30 | 0 | 0 | 0 | 0 | yes | PASS |
+| fix | run0 | R1-valid-other-key-4x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| fix | run0 | R2-same-station | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| fix | run0 | R3-forged-claiming-quiet-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| fix | run0 | R3c-forged-churned-sources-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| fix | run0 | R4a-replay-earlier-frames-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
+| fix | run0 | R4b-replay-latest-item-2x-max | 57 of 57 | 0 | 0 | 0 | 0 | yes | PASS |
 | new | run0 | F0-quiet-only | 30 of 30 | 0 | 0 | 0 | 0 | yes | PASS |
 | new | run0 | F2b-forged-own-key-2x-max | 30 of 30 | 0 | 0 | 0 | 0 | yes | PASS |
 | new | run0 | F3b-unknown-key-2x-max | 30 of 30 | 0 | 0 | 0 | 0 | yes | PASS |
