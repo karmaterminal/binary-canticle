@@ -193,3 +193,45 @@ cold-start-churn-60000-hosts-20000 4 {'sung': 20, 'during_the_flood': 20, 'ever'
 {"row": "F5-real-station-flood", "python": "3.12.3", "cryptography": "50.0.1", "offered_per_s": 6202.3, "sung": 30, "at_daemon": 30, "at_daemon_during_flood": 30, "pushed": 30, "send_to_record_ms": {"p50": 13.4, "p90": 16.0, "p99": 17.7, "max": 17.8}, "send_to_push_ms": {"p50": 5742.5, "p90": 5958.3, "p99": 6001.5, "max": 6006.5}, "kernel_drops": 0, "reported_socket_dropped": 0, "receive": {"read": 1862348, "repeats": 231, "copies": 36, "verified": 4419, "unverified": 0, "reserved": 0, "queued": 0, "known": 2, "displaced": 0, "lapsed": 0, "refused": {"unlisted": 0, "unverified": 0, "over_rate": 1857571, "backlog": 91}}, "health_reasons_seen": ["datagrams_refused"], "admission": {"verified": 3789, "duplicate": 231}, "unverified": {}, "ear_live_overflow": null, "daemon_cpu_rss": {"cpu_max": 34.0, "rss_max_kb": 36800, "cpu_mean": 19.5}, "load_at_start": 5.41, "duration_s": 300.0, "drain_s": 15.0}
 === 15:26:33Z gate: load 5.57 5.24 6.61, waited 0 s for others and 0 s for load
 === 15:26:33Z N0c
+15:27:38Z fix fixed-40-20000-0 0 first 0.0146 items min/med/max 0.0066 0.0145 0.0238 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 18.39
+15:28:48Z fix fixed-40-20000-5 0 first 0.0217 items min/med/max 0.008 0.0178 0.0217 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 20.17
+15:30:23Z fix fixed-40-20000-30 0 first 0.0079 items min/med/max 0.007 0.0091 0.0908 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 26.84
+15:33:28Z fix fixed-40-20000-120 0 first 0.0239 items min/med/max 0.0069 0.0097 1.0096 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 54.39
+15:34:33Z fix fixed-40-100000-0 0 first 0.0146 items min/med/max 0.0085 0.018 0.2066 | misses: first 0 items 0 lost 0 | offered 100002 low 99900 | drops 0 0 | cpu 38.15
+15:35:43Z fix fixed-40-100000-5 0 first 0.0135 items min/med/max 0.008 0.0092 1.0086 | misses: first 0 items 0 lost 0 | offered 100002 low 99900 | drops 0 0 | cpu 38.33
+15:37:18Z fix fixed-40-100000-30 0 first 0.0083 items min/med/max 0.0077 0.0133 1.0108 | misses: first 0 items 0 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 49.59
+15:40:23Z fix fixed-40-100000-120 0 first 0.0195 items min/med/max 0.0075 0.0156 0.0752 | misses: first 0 items 0 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 115.53
+15:41:28Z fix fixed-40-20000-0 1 first 0.0135 items min/med/max 0.0077 0.0106 0.0191 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 20.68
+15:42:38Z fix fixed-40-20000-5 1 first 0.0245 items min/med/max 0.0069 0.0104 1.0131 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 22.18
+15:44:13Z fix fixed-40-20000-30 1 first 0.0232 items min/med/max 0.0072 0.0179 0.0231 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 30.32
+15:47:17Z fix fixed-40-20000-120 1 first 0.0215 items min/med/max 0.0074 0.012 0.0822 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 58.34
+15:48:22Z fix fixed-40-100000-0 1 first 0.0217 items min/med/max 0.0096 0.018 1.0223 | misses: first 0 items 0 lost 0 | offered 100002 low 99900 | drops 0 0 | cpu 38.86
+15:49:32Z fix fixed-40-100000-5 1 first 0.011 items min/med/max 0.0083 0.01 0.0885 | misses: first 0 items 0 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 43.27
+15:51:07Z fix fixed-40-100000-30 1 first 0.0991 items min/med/max 0.0088 0.0128 0.1148 | misses: first 0 items 0 lost 0 | offered 100000 low 96050 | drops 11187 11187 | cpu 58.91
+15:55:22Z fix fixed-40-100000-120 1 first 0.0129 items min/med/max 0.0121 0.0157 0.0947 | misses: first 0 items 0 lost 0 | offered 100001 low 99600 | drops 0 0 | cpu 113.83
+15:56:27Z fix fixed-40-20000-0 2 first 0.0267 items min/med/max 0.0118 0.0294 0.2463 | misses: first 0 items 0 lost 0 | offered 20000 low 19940 | drops 0 0 | cpu 21.13
+15:57:37Z fix fixed-40-20000-5 2 first 0.0178 items min/med/max 0.0119 0.0168 1.0173 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 22.28
+15:59:12Z fix fixed-40-20000-30 2 first 0.0614 items min/med/max 0.014 0.0431 1.0218 | misses: first 0 items 0 lost 0 | offered 20000 low 19560 | drops 0 0 | cpu 30.32
+16:02:17Z fix fixed-40-20000-120 2 first 0.0147 items min/med/max 0.0121 0.0158 1.0186 | misses: first 0 items 0 lost 0 | offered 20000 low 12050 | drops 0 0 | cpu 58.23
+16:04:52Z fix fixed-40-100000-0 2 first 0.034 items min/med/max 0.0124 0.0225 0.2717 | misses: first 0 items 0 lost 0 | offered 100002 low 99850 | drops 0 0 | cpu 33.83
+16:06:02Z fix fixed-40-100000-5 2 first 0.0115 items min/med/max 0.008 0.012 0.0717 | misses: first 0 items 0 lost 0 | offered 100002 low 99900 | drops 0 0 | cpu 42.59
+16:07:57Z fix fixed-40-100000-30 2 first 0.0083 items min/med/max 0.0079 0.0103 0.0924 | misses: first 0 items 0 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 58.87
+16:11:42Z fix fixed-40-100000-120 2 first 0.0387 items min/med/max 0.0083 0.0143 0.0914 | misses: first 0 items 0 lost 0 | offered 100001 low 76350 | drops 80857 80857 | cpu 100.91
+16:15:37Z fix fixed-40-20000-0 3 first 0.0368 items min/med/max 0.0084 0.0113 0.0367 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 21.6
+16:16:57Z fix fixed-40-20000-5 3 first 0.0195 items min/med/max 0.0082 0.0101 1.016 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 23.73
+16:18:32Z fix fixed-40-20000-30 3 first 0.0109 items min/med/max 0.008 0.0166 0.0706 | misses: first 0 items 0 lost 0 | offered 20000 low 19980 | drops 0 0 | cpu 30.44
+16:21:37Z fix fixed-40-20000-120 3 first 0.0218 items min/med/max 0.0075 0.0108 0.0217 | misses: first 0 items 0 lost 0 | offered 20000 low 19930 | drops 0 0 | cpu 60.87
+16:27:42Z fix fixed-40-100000-0 3 first 0.0213 items min/med/max 0.0082 0.0134 0.0843 | misses: first 0 items 0 lost 0 | offered 100001 low 99850 | drops 0 0 | cpu 43.52
+16:29:42Z fix fixed-40-100000-5 3 first 0.0217 items min/med/max 0.0087 0.0124 1.0208 | misses: first 0 items 0 lost 0 | offered 100001 low 99950 | drops 0 0 | cpu 38.99
+16:31:17Z fix fixed-40-100000-30 3 first 0.0276 items min/med/max 0.0085 0.0116 1.016 | misses: first 0 items 0 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 57.06
+16:34:22Z fix fixed-40-100000-120 3 first 0.0145 items min/med/max 0.0074 0.0096 0.0846 | misses: first 0 items 0 lost 0 | offered 100001 low 98150 | drops 7988 7988 | cpu 115.81
+16:39:16Z fix fixed-40-20000-0 4 first 0.0137 items min/med/max 0.0079 0.0097 0.0137 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 21.04
+16:40:26Z fix fixed-40-20000-5 4 first 0.0102 items min/med/max 0.0083 0.0181 0.0831 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 23.43
+16:42:01Z fix fixed-40-20000-30 4 first 0.0133 items min/med/max 0.0078 0.0182 1.0086 | misses: first 0 items 0 lost 0 | offered 20000 low 19990 | drops 0 0 | cpu 31.77
+16:45:06Z fix fixed-40-20000-120 4 first 0.0268 items min/med/max 0.0071 0.0102 1.0174 | misses: first 0 items 0 lost 0 | offered 20000 low 19360 | drops 0 0 | cpu 59.87
+16:46:11Z fix fixed-40-100000-0 4 first 0.0349 items min/med/max 0.0086 0.0112 0.1026 | misses: first 0 items 0 lost 0 | offered 100002 low 99900 | drops 0 0 | cpu 35.04
+16:47:41Z fix fixed-40-100000-5 4 first 0.0099 items min/med/max 0.0081 0.0121 0.0713 | misses: first 0 items 0 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 44.5
+16:49:36Z fix fixed-40-100000-30 4 first 0.0083 items min/med/max 0.0082 0.0111 0.0979 | misses: first 0 items 0 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 56.69
+16:52:51Z fix fixed-40-100000-120 4 first 0.0196 items min/med/max 0.0083 0.012 0.1061 | misses: first 0 items 0 lost 0 | offered 100001 low 99900 | drops 0 0 | cpu 100.96
+=== 16:52:51Z gate: load 7.97 8.97 9.25, waited 0 s for others and 0 s for load
+=== 16:52:51Z N1
