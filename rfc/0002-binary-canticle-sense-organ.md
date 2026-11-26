@@ -171,7 +171,8 @@ This RFC is ordered by the capabilities a prince gains (§0.1). Cutting across t
 | **Intake** | What enters *my* session, and when? | §2.3–§2.4 (tuning, the ear), §3.1 (coming back), §3.2 (controls), §3.4 (wakes) | wake me unless I elected it (#176 decision 1) |
 
 Receipts follow the layers. The carrier gives none. The programme reaches **station-accepted**. Intake
-reaches durable/volatile-queued, host-returned and prince-encountered (§0.5). **Use** belongs to no layer and
+reaches durable/volatile-queued, host-returned, **model-seen** (unknown on Claude seats today, `[open: #176]`)
+and prince-encountered (§0.5), in that order, with none standing in for a later one (🪨). **Use** belongs to no layer and
 no host. It is the prince's own later act (§3.6). The return test (§3.6) walks all three layers in order:
 *find* is the carrier, *catch up* is the programme, *listen without waking* and *read* are intake. A failure
 names the layer it happened in.
@@ -755,7 +756,7 @@ A second run returns **across a station restart** (🌫).
 | find | the guide lists the programme with its station, stream, class, retention and provenance (§3.3). Finding it MUST NOT by itself arm a wake `[proposed: #195]` (#176 decision 1 is the wake rule) | none: discovery |
 | listen without waking | the ear records the item for this reader and offers no wake. That is **buffer intake** (🪨) | durable-queued (or volatile-queued), with `wake_withheld:<class>` counted |
 | catch up | the return view (§3.1) with its coverage note | host-returned |
-| read it | a later turn echoes the exact token or batch id. That is evidence for **the echoed item only**, never for the programme (#176 decision 3, 🌫) | prince-encountered |
+| read it | a later turn echoes an exact item token. That is evidence for **that item only**. An echoed *batch id* shows the batch was named, not that each item in it was read (🪨). Neither is evidence for the programme (#176 decision 3, 🌫) | prince-encountered (and model-seen, which stays `[open: #176]` on Claude seats) |
 | use | the prince's own later act, if any. A host never observes use, and there is no layer for it (🌿). Where it is an answer, §4.3's receipt carries it | none |
 
 **Loss is reported as §3.1's three kinds of gap, never one number:**
@@ -777,11 +778,10 @@ answer. An arm that fails the task fails, whatever it cost, and cost is compared
 it (🌫). Count, per arm:
 
 - **unchosen wakes:** turns started by a wake the prince did not elect;
-- **model-input tokens spent on the programme**, read from the host's own per-turn usage records, never
-  estimated by the ear;
+- **model-input tokens the ear injected for the programme**, counted by the ear at injection (the exact bytes it handed to the session, and their token count under the host's tokenizer). A host's per-turn usage covers the whole turn and **can't be attributed** to the programme (🪨). Each arm also reports whole-turn usage, as unattributed context, and never as the programme's cost;
 - **silent misses:** items the station emitted in the window (from an **independent emission ledger** kept
   at the station, which is ground truth for the run, 🌻) that appear neither as encountered nor as any of
-  §3.1's gaps;
+  §3.1's gaps, **nor as filtered by the prince's own tuning**. An item the prince's elected filter excluded (a muted class or key, an untuned stream) is not silent loss. It is counted separately as *filtered by election* (🪨);
 - **manual pulls:** `hear` calls the prince made.
 
 **A passes** only if all five hold:
