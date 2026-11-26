@@ -1149,9 +1149,9 @@ first appears to `[open: §7.11]`.
 | Fleet admission (may this station claim this name?) | registrar policy | not provided; first-come-first-served. Still needs our manifest (§7.9) |
 | Zone-transfer trust between the two servers (#1872) | separate staged step | not addressed |
 | Signing-key custody for items | separate (§7.9, D15) | separate |
-| Orphan expiry | TTL only today (not a lease) | a lease [RFC9664] |
+| Orphan expiry | TTL only today (not a lease) | a lease [RFC9664]. The registrar **grants** the lease times, and the requester must then use the granted times in place of the ones it asked for (RFC 9665, the Update Lease text, read 2026-11-26) `[open: §7.11]`. Expiry is not automatic on our side: if renewal fails, the registration ends when its granted lease does, and the station must notice and re-register (🪨) |
 | Server support | BIND 9.18 takes TSIG | **BIND 9.18.28 removed SIG(0) message validation** (CVE-2024-1975) [BIND-9.18.28] [ISC-CVE-2024-1975], so SRP needs an SRP-capable registrar in front of BIND, or another server (🌿) |
-| Key loss and rotation | rotate the host secret | the KEY lease protects the name after the service lapses. Losing the key loses the name until that lease ends |
+| Key loss and rotation | rotate the host secret | the KEY lease reserves the *name* after the service lease lapses. It **does not restore a lost private key**. A station that loses its key can't renew, and can't reclaim the name until the KEY lease expires, unless an operator deletes the KEY record (🪨) |
 
 The open question: whether the custody saving is worth a registrar change, given that admission, transfer
 trust and item-key custody stay where they are either way. Owners: 🌿 (reconcile), 🌊 (trust and GO),
