@@ -1171,7 +1171,8 @@ first appears to `[open: §7.11]`.
 |---|---|---|
 | Secret distribution for *registration* | **live today:** one shared update key (`canticle-register.key`), so whoever holds it may register (§2.8). **Source (#1868):** a shared secret per host, with custody blocking today | none to share: each station holds its own private key |
 | What the signature proves | holder of the shared secret | **continuity with the first claimant**, not that the claimant is authorized: "We have not established trust" (§1); §3.2.4 (🌻, 🌊, 🪨) |
-| Fleet admission (may this station claim this name?) | registrar policy | not provided; first-come-first-served. Still needs our manifest (§7.9) |
+| **Name admission, registrar side** (may this claimant take this DNS name?) | registrar policy (the update-policy and key scope) | **not provided**: first-come-first-served. Nothing on the reader's side can stop an unauthorized first claimant taking the name (🌊). An SRP deployment needs its own registrar-side admission (an enrolment allowlist) |
+| **Reader-side trust** (do I trust this station's items?) | the manifest (§7.9), independent of DNS | the manifest (§7.9), independent of DNS. A name an unauthorized claimant took still carries no trust, but it **denies the real station that name** |
 | Zone-transfer trust between the two servers (#1872) | separate staged step | not addressed |
 | Signing-key custody for items | separate (§7.9, D15) | separate |
 | Orphan expiry | TTL only today (not a lease) | a lease [RFC9664]. The registrar **grants** the lease times, and the requester must then use the granted times in place of the ones it asked for (RFC 9665, the Update Lease text, read 2026-11-26) `[open: §7.11]`. Expiry is not automatic on our side: if renewal fails, the registration ends when its granted lease does, and the station must notice and re-register (🪨) |
