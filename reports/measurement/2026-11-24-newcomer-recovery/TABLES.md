@@ -361,12 +361,15 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 | row | tree | runs | what | passed |
 |---|---|---|---|---|
 | I-a | base | 3 | place after 0.27 s / 3.14 s, item misses 0 / 0, displaced 5; place after 0.01 s / 3.22 s, item misses 0 / 0, displaced 5; place after 0.28 s / 3.21 s, item misses 0 / 0, displaced 6 | 0 of 3 |
+| I-a | fix | 5 | place after 0.05 s / 0.01 s, item misses 0 / 0, displaced 2; place after 0.04 s / 0.01 s, item misses 0 / 0, displaced 2; place after 0.03 s / 0.02 s, item misses 0 / 0, displaced 2; place after 0.05 s / 0.05 s, item misses 0 / 0, displaced 2; place after 0.02 s / 0.06 s, item misses 0 / 0, displaced 3 | 5 of 5 |
 | I-a | new | 5 | place after 0.06 s / 0.04 s, item misses 0 / 0, displaced 2; place after 0.02 s / 0.01 s, item misses 0 / 0, displaced 2; place after 0.04 s / 0.03 s, item misses 0 / 0, displaced 3; place after 0.03 s / 0.04 s, item misses 0 / 0, displaced 3; place after 0.06 s / 0.05 s, item misses 0 / 0, displaced 2 | 5 of 5 |
 | I-a | slice | 5 | place after 0.04 s / 0.01 s, item misses 0 / 0, displaced 2; place after 0.02 s / 0.05 s, item misses 0 / 0, displaced 2; place after 0.02 s / 0.03 s, item misses 0 / 0, displaced 2; place after 0.01 s / 0.01 s, item misses 0 / 0, displaced 2; place after 0.02 s / 0.02 s, item misses 0 / 0, displaced 2 | 5 of 5 |
 | I-a-lead | base | 3 | place after 1.00 s / 4.31 s, item misses 0 / 9, displaced 5; place after 1.76 s / never, item misses 0 / 10, displaced 1; place after 0.53 s / 4.06 s, item misses 10 / 8, displaced 6 | 0 of 3 |
+| I-a-lead | fix | 5 | place after never / never, item misses 10 / 10, displaced 0; place after never / 4.39 s, item misses 10 / 9, displaced 1; place after never / never, item misses 10 / 10, displaced 0; place after 6.07 s / never, item misses 10 / 10, displaced 1; place after 2.58 s / never, item misses 0 / 10, displaced 1 | 0 of 5 |
 | I-a-lead | new | 5 | place after 7.35 s / 7.95 s, item misses 10 / 10, displaced 2; place after never / never, item misses 10 / 10, displaced 0; place after never / 4.01 s, item misses 10 / 7, displaced 1; place after never / never, item misses 10 / 10, displaced 0; place after never / never, item misses 10 / 10, displaced 0 | 0 of 5 |
 | I-a-lead | slice | 5 | place after never / 5.86 s, item misses 10 / 10, displaced 1; place after never / 0.20 s, item misses 10 / 10, displaced 2; place after never / never, item misses 10 / 10, displaced 0; place after 2.54 s / 4.12 s, item misses 0 / 7, displaced 2; place after 4.75 s / never, item misses 10 / 10, displaced 1 | 0 of 5 |
 | I-b | base | 3 | lease ended after never, never, never | 0 of 3 |
+| I-b | fix | 5 | lease ended after 60.15 s, 60.22 s, 60.20 s, 60.24 s, 60.06 s | 5 of 5 |
 | I-b | new | 5 | lease ended after 60.06 s, 60.24 s, 60.23 s, 60.05 s, 60.09 s | 5 of 5 |
 | I-b | slice | 5 | lease ended after 60.26 s, 60.22 s, 60.05 s, 60.20 s, 60.26 s | 5 of 5 |
 
@@ -375,18 +378,22 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 | row | tree | runs | items of each station during the flood, of 57, per run | worst latency, ms | offered /s | drops: kernel (reported) | verdict |
 |---|---|---|---|---|---|---|---|
 | junk-40-20000 | base | 3 | 57/57/57/57; 57/57/57/57; 57/57/57/57 | 44.2 | 20,002 | 0 (0) | PASS |
+| junk-40-20000 | fix | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 41.1 | 20,002 | 0 (0) | PASS |
 | junk-40-20000 | head | 3 | 57/57/57/57; 57/57/57/57; 57/57/57/57 | 64.1 | 20,002 | 0 (0) | PASS |
 | junk-40-20000 | new | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 233.0 | 19,838 | 0 (0) | PASS |
 | junk-40-20000 | slice | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 42.9 | 20,002 | 0 (0) | PASS |
 | junk-40-100000 | base | 3 | 57/57/57/57; 57/57/57/57; 57/57/57/57 | 46.2 | 100,008 | 0 (0) | PASS |
+| junk-40-100000 | fix | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 55.2 | 100,008 | 0 (0) | PASS |
 | junk-40-100000 | head | 3 | 57/57/57/57; 57/57/57/57; 57/57/57/57 | 80.1 | 100,008 | 0 (0) | PASS |
 | junk-40-100000 | new | 6 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 1024.1 | 100,006 | 63596 (63596) | PASS (run 1 underdriven: 29,250) |
 | junk-40-100000 | slice | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 49.2 | 100,008 | 0 (0) | PASS |
 | junkall-40-20000 | base | 3 | 57/57/57/57; 57/57/57/57; 57/57/57/57 | 50.9 | 20,002 | 0 (0) | PASS |
+| junkall-40-20000 | fix | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 85.3 | 20,002 | 0 (0) | PASS |
 | junkall-40-20000 | head | 3 | 57/57/57/57; 57/57/57/57; 57/57/57/57 | 63.7 | 20,002 | 0 (0) | PASS |
 | junkall-40-20000 | new | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 101.7 | 20,002 | 0 (0) | PASS |
 | junkall-40-20000 | slice | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 52.1 | 20,002 | 0 (0) | PASS |
 | junkall-40-100000 | base | 3 | 57/57/57/57; 57/57/57/57; 57/57/57/57 | 57.9 | 100,009 | 0 (0) | PASS |
+| junkall-40-100000 | fix | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 190.8 | 100,004 | 0 (0) | PASS |
 | junkall-40-100000 | head | 3 | 57/57/57/57; 57/57/57/57; 57/57/57/57 | 56.5 | 100,009 | 0 (0) | PASS |
 | junkall-40-100000 | new | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 113.3 | 100,009 | 0 (0) | PASS |
 | junkall-40-100000 | slice | 5 | 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57; 57/57/57/57 | 50.3 | 100,009 | 0 (0) | PASS |
