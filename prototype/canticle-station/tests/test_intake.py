@@ -1458,6 +1458,57 @@ class SlotTest(IntakeCase):
         self.offer(g := item(A, 2), src=HERE)
         self.assertEqual([self.waits(r) for r in self.TIERS], [[g], [], []])
 
+    def test_a_claim_whose_demotion_ended_moves_up_when_its_source_sends_again(self):
+        """🍃 (#178, review 6068314339): a claim is re-tiered when its source sends again, as on d49645b. Its source's marks
+        ended while it waited, and nothing else looks at them until its turn: one in SLOT_M, and on the retries' bucket."""
+        f = item(A, 1)
+        self.offer(f, src=HERE)
+        self.assertEqual([self.waits(r) for r in self.TIERS], [[f], [], []])
+        self.demote(HERE)
+        self.assertEqual([self.waits(r) for r in self.TIERS], [[], [], [f]])
+        self.now += self.intake.retain + 1                     # the demotion has ended
+        self.assertEqual(self.tier(HERE), "untried")
+        self.offer(item(A, 2), src=HERE)
+        self.assertEqual([self.waits(r) for r in self.TIERS], [[f], [], []])
+
+    def test_a_claim_whose_mark_was_forgotten_moves_up_when_its_source_sends_again(self):
+        """🍃's second: the key forgot its source (MARKS_MAX others were marked since), as a churned flood of its key does in
+        0.17 s. Forgetting re-tiers only the address that is marked, not the one it pushes out."""
+        f = item(A, 1)
+        self.offer(f, src=HERE)
+        self.demote(HERE)
+        self.demote(*[udp(40_000 + n) for n in range(intake.MARKS_MAX)])     # HERE is forgotten
+        self.assertNotIn(HERE, self.key.marks)
+        self.assertEqual(self.tier(HERE), "untried")
+        self.offer(item(A, 2), src=HERE)
+        self.assertEqual([self.waits(r) for r in self.TIERS], [[f], [], []])
+
+    def test_a_claim_that_found_no_room_to_go_down_goes_when_its_source_sends_again(self):
+        """The same rule, the other way: a source whose frame failed while its tier's ring was full kept its untried place,
+        ahead of the newcomers. When its source sends again and there is room, it takes the place its marks say."""
+        self.demote(*[addr(60 + n) for n in range(intake.SLOT_MAX)])
+        for n in range(intake.SLOT_MAX):
+            self.offer(item(A, 100 + n), src=addr(60 + n))       # the demoted ring is full
+        self.offer(f := item(A, 1), src=HERE)
+        self.demote(HERE)
+        self.assertEqual((self.tier(HERE), self.waits()), ("demoted", [f]))
+        with self.intake._lock:
+            self.key.slot.remove(addr(60))                       # one of them is served
+        self.offer(item(A, 2), src=HERE)
+        self.assertEqual((self.waits(), self.waits("demoted")[-1]), ([], f))
+
+    def test_an_exact_copy_of_what_waits_in_its_lane_re_tiers_nothing_and_its_next_frame_does(self):
+        """Unlike d49645b: a copy of bytes that already wait in the source's lane is counted and dropped before any look at the
+        slot, since replay floods send millions of them. A carousel's next frame, at the latest its next beacon, re-tiers."""
+        f = item(A, 1)
+        self.offer(f, src=HERE)
+        self.demote(HERE)
+        self.now += self.intake.retain + 1
+        self.offer(f, src=HERE)
+        self.assertEqual(self.waits("demoted"), [f])
+        self.offer(beacon(A, 1), src=HERE)
+        self.assertEqual([self.waits(r) for r in self.TIERS], [[f], [], []])
+
     def test_marks_are_a_bounded_number_the_oldest_forgotten_first_and_kept_for_the_longest_wait(self):
         self.demote(*[udp(40_000 + n) for n in range(3 * intake.MARKS_MAX)])
         self.assertEqual(list(self.key.marks), [udp(40_000 + n) for n in range(2 * intake.MARKS_MAX, 3 * intake.MARKS_MAX)])
