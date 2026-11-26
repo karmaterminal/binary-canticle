@@ -139,6 +139,7 @@ class ProcessFixture(Fixture):
             receive.close()
 
     async def start(self):
+        # Keep AF_UNIX paths below Linux's 108-byte limit, even with a long TMPDIR.
         self.temp = tempfile.TemporaryDirectory(prefix="canticle-k6-process-", dir="/tmp")
         self.root = Path(self.temp.name)  # TemporaryDirectory creates mode 0700.
         sk = Ed25519PrivateKey.generate()

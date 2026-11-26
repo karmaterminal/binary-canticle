@@ -6,20 +6,19 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 HERE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "canticle-station"))
 import run as supervisor
+from k6_support import k6_binary
 
 
 @unittest.skipUnless(sys.platform == "linux", "local process fixture requires Linux")
 class ProcessSupervisorTest(unittest.IsolatedAsyncioTestCase):
     async def test_real_k6_timeout_reaps_all_three_children(self):
-        binary = Path("/home/figs/.local/bin/k6")
-        if not binary.is_file():
-            self.skipTest("optional local k6 executable absent")
+        binary = k6_binary(self)
         real_wait = asyncio.wait_for
 
         async def accelerated(aw, timeout):
@@ -40,6 +39,21 @@ class ProcessSupervisorTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(set(cleanup["processes"]), {"station", "daemon"})
             self.assertTrue(all(r["reaped"] and r["exit_code"] == 0
                                 for r in cleanup["processes"].values()), cleanup)
+
+    async def test_group_exiting_between_term_timeout_and_kill_is_reaped(self):
+        child = SimpleNamespace(pid=12345, returncode=None)
+        original_wait = AsyncMock(side_effect=[TimeoutError(), -15])
+        async def wait_for_exit():
+            try:
+                return await original_wait()
+            finally:
+                if original_wait.await_count == 2:
+                    child.returncode = -15
+        child.wait = wait_for_exit
+        with patch.object(supervisor.os, "killpg", side_effect=[None, ProcessLookupError()]) as kill:
+            self.assertTrue(await supervisor.stop_child(child))
+        self.assertEqual(kill.call_count, 2)
+        self.assertEqual(original_wait.await_count, 2)
 
 
 if __name__ == "__main__":

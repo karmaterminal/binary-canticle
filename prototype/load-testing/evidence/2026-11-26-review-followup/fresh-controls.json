@@ -1,0 +1,206 @@
+{
+  "positive": {
+    "counts": {
+      "offered": 6,
+      "accepted": 6,
+      "delivered": 6,
+      "missed": 0,
+      "pending": 0,
+      "arrived": 6,
+      "late": 0,
+      "submit_errors": 0,
+      "duplicate_surface_records": 0
+    },
+    "process": {
+      "k6_exit_code": 0,
+      "supervisor_exit_code": 0,
+      "child_started": true,
+      "child_reaped": true
+    },
+    "cleanup": {
+      "tasks_done": true,
+      "unix_sockets_removed": true,
+      "temporary_state_removed": true,
+      "ports_rebindable": {
+        "daemon_udp": true,
+        "relay_udp": true,
+        "http_tcp": true,
+        "station_udp": true
+      },
+      "errors": [],
+      "ok": true,
+      "processes": {
+        "daemon": {
+          "pid": 2216771,
+          "started": true,
+          "started_ns": 2834931236581702,
+          "ready": true,
+          "ready_ns": 2834931381859569,
+          "child_started_ns": 2834931377216635,
+          "exit_code": 0,
+          "alive": false,
+          "term_sent": true,
+          "kill_sent": false,
+          "reaped": true,
+          "exit_observed_ns": 2834933392446411,
+          "handle_closed": true,
+          "reaped_ns": 2834933392441103
+        },
+        "station": {
+          "pid": 2216772,
+          "started": true,
+          "started_ns": 2834931383054141,
+          "ready": true,
+          "ready_ns": 2834931536773632,
+          "child_started_ns": 2834931531381156,
+          "exit_code": 0,
+          "alive": false,
+          "term_sent": true,
+          "kill_sent": false,
+          "reaped": true,
+          "exit_observed_ns": 2834933350953405,
+          "handle_closed": true,
+          "reaped_ns": 2834933350947748
+        }
+      },
+      "processes_reaped": true,
+      "k6_child_reaped": true
+    }
+  },
+  "negative": {
+    "counts": {
+      "offered": 6,
+      "accepted": 6,
+      "delivered": 5,
+      "missed": 1,
+      "pending": 0,
+      "arrived": 6,
+      "late": 0,
+      "submit_errors": 0,
+      "duplicate_surface_records": 0
+    },
+    "process": {
+      "k6_exit_code": 99,
+      "supervisor_exit_code": 99,
+      "child_started": true,
+      "child_reaped": true
+    },
+    "cleanup": {
+      "tasks_done": true,
+      "unix_sockets_removed": true,
+      "temporary_state_removed": true,
+      "ports_rebindable": {
+        "daemon_udp": true,
+        "relay_udp": true,
+        "http_tcp": true,
+        "station_udp": true
+      },
+      "errors": [],
+      "ok": true,
+      "processes": {
+        "daemon": {
+          "pid": 2216787,
+          "started": true,
+          "started_ns": 2834933604814047,
+          "ready": true,
+          "ready_ns": 2834933750129419,
+          "child_started_ns": 2834933748096258,
+          "exit_code": 0,
+          "alive": false,
+          "term_sent": true,
+          "kill_sent": false,
+          "reaped": true,
+          "exit_observed_ns": 2834936745909493,
+          "handle_closed": true,
+          "reaped_ns": 2834936745902299
+        },
+        "station": {
+          "pid": 2216818,
+          "started": true,
+          "started_ns": 2834933750785512,
+          "ready": true,
+          "ready_ns": 2834933894925938,
+          "child_started_ns": 2834933889100863,
+          "exit_code": 0,
+          "alive": false,
+          "term_sent": true,
+          "kill_sent": false,
+          "reaped": true,
+          "exit_observed_ns": 2834936704396931,
+          "handle_closed": true,
+          "reaped_ns": 2834936704390156
+        }
+      },
+      "processes_reaped": true,
+      "k6_child_reaped": true
+    }
+  },
+  "repeat": {
+    "counts": {
+      "offered": 6,
+      "accepted": 6,
+      "delivered": 6,
+      "missed": 0,
+      "pending": 0,
+      "arrived": 6,
+      "late": 0,
+      "submit_errors": 0,
+      "duplicate_surface_records": 0
+    },
+    "process": {
+      "k6_exit_code": 0,
+      "supervisor_exit_code": 0,
+      "child_started": true,
+      "child_reaped": true
+    },
+    "cleanup": {
+      "tasks_done": true,
+      "unix_sockets_removed": true,
+      "temporary_state_removed": true,
+      "ports_rebindable": {
+        "daemon_udp": true,
+        "relay_udp": true,
+        "http_tcp": true,
+        "station_udp": true
+      },
+      "errors": [],
+      "ok": true,
+      "processes": {
+        "daemon": {
+          "pid": 2217238,
+          "started": true,
+          "started_ns": 2834936987567398,
+          "ready": true,
+          "ready_ns": 2834937153435568,
+          "child_started_ns": 2834937143453656,
+          "exit_code": 0,
+          "alive": false,
+          "term_sent": true,
+          "kill_sent": false,
+          "reaped": true,
+          "exit_observed_ns": 2834939158186369,
+          "handle_closed": true,
+          "reaped_ns": 2834939158180781
+        },
+        "station": {
+          "pid": 2217362,
+          "started": true,
+          "started_ns": 2834937154348538,
+          "ready": true,
+          "ready_ns": 2834937308056225,
+          "child_started_ns": 2834937306799843,
+          "exit_code": 0,
+          "alive": false,
+          "term_sent": true,
+          "kill_sent": false,
+          "reaped": true,
+          "exit_observed_ns": 2834939116760341,
+          "handle_closed": true,
+          "reaped_ns": 2834939116753147
+        }
+      },
+      "processes_reaped": true,
+      "k6_child_reaped": true
+    }
+  }
+}

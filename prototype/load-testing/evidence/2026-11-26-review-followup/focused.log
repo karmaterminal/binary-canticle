@@ -1,0 +1,97 @@
+test_absent_optional_binary_skips (test_k6_support.K6DiscoveryTest.test_absent_optional_binary_skips) ... ok
+test_absent_required_binary_fails_not_skips (test_k6_support.K6DiscoveryTest.test_absent_required_binary_fails_not_skips) ... ok
+test_explicit_binary_wins_over_path (test_k6_support.K6DiscoveryTest.test_explicit_binary_wins_over_path) ... ok
+test_path_discovery (test_k6_support.K6DiscoveryTest.test_path_discovery) ... ok
+test_rejects_unbounded_or_ambiguous_parameters (test_loopback.BoundsTest.test_rejects_unbounded_or_ambiguous_parameters) ... ok
+test_exception_and_partial_startup_cleanup (test_loopback.FixtureTest.test_exception_and_partial_startup_cleanup) ... ok
+test_failed_record_close_does_not_skip_remaining_cleanup (test_loopback.FixtureTest.test_failed_record_close_does_not_skip_remaining_cleanup) ... ok
+test_fresh_run_plan_exists_before_submission (test_loopback.FixtureTest.test_fresh_run_plan_exists_before_submission) ... ok
+test_http_bounds_auth_and_metrics (test_loopback.FixtureTest.test_http_bounds_auth_and_metrics) ... ok
+test_real_negative_drops_all_copies_but_keeps_offered_population (test_loopback.FixtureTest.test_real_negative_drops_all_copies_but_keeps_offered_population) ... ok
+test_real_station_daemon_record_client_and_cleanup (test_loopback.FixtureTest.test_real_station_daemon_record_client_and_cleanup) ... ok
+test_relay_close_timeout_does_not_skip_remaining_cleanup (test_loopback.FixtureTest.test_relay_close_timeout_does_not_skip_remaining_cleanup) ... ok
+test_submission_failure_is_a_deadline_miss_not_removed (test_loopback.FixtureTest.test_submission_failure_is_a_deadline_miss_not_removed) ... ok
+test_supervisor_wall_timeout_reaps_real_k6_and_releases_fixture (test_loopback.FixtureTest.test_supervisor_wall_timeout_reaps_real_k6_and_releases_fixture) ... ok
+test_complete_listener_record_latency_not_submit_ack (test_loopback.LedgerTest.test_complete_listener_record_latency_not_submit_ack) ... ok
+test_duplicate_or_invalid_id_never_expands_population (test_loopback.LedgerTest.test_duplicate_or_invalid_id_never_expands_population) ... ok
+test_known_dropped_offer_remains_in_latency_and_miss_denominator (test_loopback.LedgerTest.test_known_dropped_offer_remains_in_latency_and_miss_denominator) ... ok
+test_late_record_does_not_rewrite_failure_as_success (test_loopback.LedgerTest.test_late_record_does_not_rewrite_failure_as_success) ... ok
+test_missing_arrival_or_wrong_hash_is_not_delivery (test_loopback.LedgerTest.test_missing_arrival_or_wrong_hash_is_not_delivery) ... ok
+test_pending_rejected_and_packet_conservation (test_loopback.LedgerTest.test_pending_rejected_and_packet_conservation) ... ok
+test_intermediate_startup_cancellation_closes_station_udp (test_loopback.StationStartupTest.test_intermediate_startup_cancellation_closes_station_udp) ... ok
+test_intermediate_startup_failure_closes_station_udp (test_loopback.StationStartupTest.test_intermediate_startup_failure_closes_station_udp) ... ok
+test_changed_startup_receipt_cannot_pass (test_process_receipts.ProcessReceiptTest.test_changed_startup_receipt_cannot_pass) ... ok
+test_cleanup_alive_cannot_pass (test_process_receipts.ProcessReceiptTest.test_cleanup_alive_cannot_pass) ... ok
+test_daemon_first_shutdown_cannot_pass (test_process_receipts.ProcessReceiptTest.test_daemon_first_shutdown_cannot_pass) ... ok
+test_dead_child_cannot_pass (test_process_receipts.ProcessReceiptTest.test_dead_child_cannot_pass) ... ok
+test_failed_exit_cannot_pass (test_process_receipts.ProcessReceiptTest.test_failed_exit_cannot_pass) ... ok
+test_forced_kill_cannot_pass (test_process_receipts.ProcessReceiptTest.test_forced_kill_cannot_pass) ... ok
+test_impossible_start_order_cannot_pass (test_process_receipts.ProcessReceiptTest.test_impossible_start_order_cannot_pass) ... ok
+test_missing_readiness_cannot_pass (test_process_receipts.ProcessReceiptTest.test_missing_readiness_cannot_pass) ... ok
+test_missing_reap_cannot_pass (test_process_receipts.ProcessReceiptTest.test_missing_reap_cannot_pass) ... ok
+test_open_handle_cannot_pass (test_process_receipts.ProcessReceiptTest.test_open_handle_cannot_pass) ... ok
+test_parent_cannot_masquerade_as_child (test_process_receipts.ProcessReceiptTest.test_parent_cannot_masquerade_as_child) ... ok
+test_same_process_cannot_masquerade_as_two_children (test_process_receipts.ProcessReceiptTest.test_same_process_cannot_masquerade_as_two_children) ... ok
+test_structural_control_only_not_process_evidence (test_process_receipts.ProcessReceiptTest.test_structural_control_only_not_process_evidence) ... ok
+test_unready_child_cannot_pass (test_process_receipts.ProcessReceiptTest.test_unready_child_cannot_pass) ... ok
+test_wrong_reaped_pid_cannot_pass (test_process_receipts.ProcessReceiptTest.test_wrong_reaped_pid_cannot_pass) ... ok
+test_new_offer_after_client_reconnect_keeps_identity_boundary (test_process_reconnect.RecordReconnectTest.test_new_offer_after_client_reconnect_keeps_identity_boundary) ... {"exit_code": 1, "artifacts": "/tmp/canticle-k6-timeout-_lflayne/receipt", "cleanup_ok": true, "failure": "TimeoutError: "}
+ok
+test_group_exiting_between_term_timeout_and_kill_is_reaped (test_process_supervisor.ProcessSupervisorTest.test_group_exiting_between_term_timeout_and_kill_is_reaped) ... ok
+test_real_k6_timeout_reaps_all_three_children (test_process_supervisor.ProcessSupervisorTest.test_real_k6_timeout_reaps_all_three_children) ... ok
+test_daemon_early_death_records_eof_and_cannot_green (test_processes.ProcessFixtureTest.test_daemon_early_death_records_eof_and_cannot_green) ... {"exit_code": 1, "artifacts": "/tmp/canticle-process-timeout-3fpc51s1/receipt", "cleanup_ok": true, "failure": "TimeoutError: "}
+ok
+test_distinct_real_processes_delivery_and_ordered_reap (test_processes.ProcessFixtureTest.test_distinct_real_processes_delivery_and_ordered_reap) ... ok
+test_failure_after_both_ready_still_cleans_every_resource (test_processes.ProcessFixtureTest.test_failure_after_both_ready_still_cleans_every_resource) ... ok
+test_mandatory_sequence_one_drop_preserves_failure_denominator (test_processes.ProcessFixtureTest.test_mandatory_sequence_one_drop_preserves_failure_denominator) ... ok
+test_partial_start_actual_station_failure_reaps_daemon_and_station (test_processes.ProcessFixtureTest.test_partial_start_actual_station_failure_reaps_daemon_and_station) ... Process canticle-fixture-station:
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/multiprocessing/process.py", line 320, in _bootstrap
+    self.run()
+    ~~~~~~~~^^
+  File "/usr/lib/python3.14/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/tmp/elliott-bc-k6-followup-20261126/prototype/load-testing/fixtures/processes.py", line 77, in _child_main
+    code = asyncio.run(run())
+  File "/usr/lib/python3.14/asyncio/runners.py", line 205, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/runners.py", line 128, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/var/tmp/elliott-bc-k6-followup-20261126/prototype/load-testing/fixtures/processes.py", line 71, in run
+    code = await asyncio.wait_for(operation, CHILD_WALL_SECONDS)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/asyncio/tasks.py", line 486, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/var/tmp/elliott-bc-k6-followup-20261126/prototype/canticle-station/canticle/runner.py", line 174, in run_station
+    server = await asyncio.start_unix_server(handle, path=control_path, limit=CONTROL_LINE_LIMIT)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/asyncio/streams.py", line 113, in start_unix_server
+    return await loop.create_unix_server(factory, path, **kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/asyncio/unix_events.py", line 311, in create_unix_server
+    sock.bind(path)
+    ~~~~~~~~~^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory
+ok
+test_process_start_exception_closes_unstarted_handle (test_processes.ProcessFixtureTest.test_process_start_exception_closes_unstarted_handle) ... ok
+test_readiness_timeout_reaps_started_child (test_processes.ProcessFixtureTest.test_readiness_timeout_reaps_started_child) ... ok
+test_station_early_death_cannot_make_report_green (test_processes.ProcessFixtureTest.test_station_early_death_cannot_make_report_green) ... ok
+test_stopped_child_requires_kill_is_reaped_and_reports_failure (test_processes.ProcessFixtureTest.test_stopped_child_requires_kill_is_reaped_and_reports_failure) ... ok
+test_missing_item_cannot_be_deleted_from_expected_plan (test_verify.VerifyTest.test_missing_item_cannot_be_deleted_from_expected_plan) ... ok
+test_missing_row_cannot_hide_in_aggregate_counts (test_verify.VerifyTest.test_missing_row_cannot_hide_in_aggregate_counts) ... ok
+test_negative_json_cannot_hide_successful_process_exit (test_verify.VerifyTest.test_negative_json_cannot_hide_successful_process_exit) ... ok
+test_real_receipt_controls (test_verify.VerifyTest.test_real_receipt_controls) ... ok
+test_success_verifier_rejects_negative_control (test_verify.VerifyTest.test_success_verifier_rejects_negative_control) ... ok
+test_unreaped_child_cannot_pass (test_verify.VerifyTest.test_unreaped_child_cannot_pass) ... ok
+
+----------------------------------------------------------------------
+Ran 55 tests in 15.231s
+
+OK

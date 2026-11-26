@@ -27,4 +27,9 @@ Focused harness/regression suite: **24/24 PASS** (`harness-tests.log`), includin
 
 ## Claim ceiling
 
+`source-sha256.json` pins the measured `665c0f6` source, not later revisions.
+In particular `run.py` and `verify.py` changed in the subsequent process-mode
+increment; compare the process evidence's own manifest for that measured head.
+Re-verifying a historical receipt is not re-executing its measurement.
+
 No flood/recovery capacity, offered-rate saturation, cross-host/LAN delivery, frond-ear push, same-session read/ack, model hearing, full RFC conformance or installation is proved. Missing items remain outside success-only latency percentiles and inside explicit miss counts; deadline-censored Trends are labelled as censored, not measured delivery. HTTP request duration is orchestration, not UDP transport latency. The native #171/#173 socket/fair-admission rows remain authoritative for their own declared workloads.

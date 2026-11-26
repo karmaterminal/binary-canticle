@@ -199,6 +199,7 @@ class Fixture:
         return t
 
     async def start(self):
+        # Keep AF_UNIX paths below Linux's 108-byte limit, even with a long TMPDIR.
         self.temp = tempfile.TemporaryDirectory(prefix="canticle-k6-", dir="/tmp")
         self.root = Path(self.temp.name)
         sk = Ed25519PrivateKey.generate()  # never serialized or retained

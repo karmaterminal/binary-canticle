@@ -1,0 +1,6 @@
+test_group_exiting_between_term_timeout_and_kill_is_reaped (test_process_supervisor.ProcessSupervisorTest.test_group_exiting_between_term_timeout_and_kill_is_reaped) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.003s
+
+OK

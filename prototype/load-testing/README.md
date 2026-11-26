@@ -45,13 +45,25 @@ No root, network namespaces, xk6 extension, external server or hosted runner.
     PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
       -s prototype/load-testing/tests -v
 
+The two real-k6 timeout probes resolve `CANTICLE_K6` first, then `k6` on
+`PATH`. Without a binary they skip by default; set `CANTICLE_REQUIRE_K6=1`
+to make absence a failure instead. For an explicit local acceptance run:
+
+    CANTICLE_REQUIRE_K6=1 CANTICLE_K6="$(command -v k6)" \
+      PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+      -s prototype/load-testing/tests -v
+
+The existing CI fixture step does not provision k6 or require these optional
+probes. Its Python 3.11 receipt for #189 is 50 counted, 48 passed, 2 skipped,
+not a real-k6 execution result. Local 50/50 results included a local binary.
+
 First run the fixed low-load smoke: six offers, one VU, at least 250 ms between
 completed iterations; a 1,000 ms per-offer delivery deadline. This is **closed
 loop** scheduling, not a promised constant arrival rate. k6 owns the iteration
 budget, pacing, VUs, checks, thresholds and JSON summary.
 
     PYTHONDONTWRITEBYTECODE=1 python3 prototype/load-testing/run.py \
-      --k6 /home/figs/.local/bin/k6 --out /tmp/canticle-k6-smoke
+      --k6 "$(command -v k6)" --out /tmp/canticle-k6-smoke
     python3 prototype/load-testing/verify.py /tmp/canticle-k6-smoke
 
 Use NEW output directories outside the repository; old artifacts are never
@@ -64,7 +76,7 @@ in both the failure and censored-latency populations. There is no special
 "negative passes" threshold: the k6 run **must fail** (normally exit 99).
 
     PYTHONDONTWRITEBYTECODE=1 python3 prototype/load-testing/run.py \
-      --k6 /home/figs/.local/bin/k6 --out /tmp/canticle-k6-negative --drop-first
+      --k6 "$(command -v k6)" --out /tmp/canticle-k6-negative --drop-first
     # The prior command MUST be nonzero; inspect it, do not hide it with || true.
     python3 prototype/load-testing/verify.py /tmp/canticle-k6-negative --negative
 
@@ -109,6 +121,9 @@ positive → mandatory negative → fresh positive, plus verifier base/revert RE
 and current GREEN. `manifest.json` pins the measured source bytes and runtime.
 The structural mutation tests deliberately use synthetic process fields; those
 are verifier tests, never process-run receipts.
+The verifier tests also read all three committed real process receipts above.
+Historical source manifests stay pinned to their measured commits; later
+portability, comments and supervision changes do not silently refresh them.
 
 ## What latency means
 

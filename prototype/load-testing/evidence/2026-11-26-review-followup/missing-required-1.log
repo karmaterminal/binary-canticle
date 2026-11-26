@@ -1,0 +1,41 @@
+test_supervisor_wall_timeout_reaps_real_k6_and_releases_fixture (test_loopback.FixtureTest.test_supervisor_wall_timeout_reaps_real_k6_and_releases_fixture) ... FAIL
+test_real_k6_timeout_reaps_all_three_children (test_process_supervisor.ProcessSupervisorTest.test_real_k6_timeout_reaps_all_three_children) ... FAIL
+
+======================================================================
+FAIL: test_supervisor_wall_timeout_reaps_real_k6_and_releases_fixture (test_loopback.FixtureTest.test_supervisor_wall_timeout_reaps_real_k6_and_releases_fixture)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/asyncio/runners.py", line 128, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/var/tmp/elliott-bc-k6-followup-20261126/prototype/load-testing/tests/test_loopback.py", line 143, in test_supervisor_wall_timeout_reaps_real_k6_and_releases_fixture
+    binary = k6_binary(self)
+  File "/var/tmp/elliott-bc-k6-followup-20261126/prototype/load-testing/tests/k6_support.py", line 13, in k6_binary
+    test.fail(message)
+    ~~~~~~~~~^^^^^^^^^
+AssertionError: k6 executable not found: /nonexistent/canticle-k6
+
+======================================================================
+FAIL: test_real_k6_timeout_reaps_all_three_children (test_process_supervisor.ProcessSupervisorTest.test_real_k6_timeout_reaps_all_three_children)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/asyncio/runners.py", line 128, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/var/tmp/elliott-bc-k6-followup-20261126/prototype/load-testing/tests/test_process_supervisor.py", line 21, in test_real_k6_timeout_reaps_all_three_children
+    binary = k6_binary(self)
+  File "/var/tmp/elliott-bc-k6-followup-20261126/prototype/load-testing/tests/k6_support.py", line 13, in k6_binary
+    test.fail(message)
+    ~~~~~~~~~^^^^^^^^^
+AssertionError: k6 executable not found: /nonexistent/canticle-k6
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.005s
+
+FAILED (failures=2)
