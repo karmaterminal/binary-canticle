@@ -336,3 +336,12 @@ runs again as declared), a deadline missed in an INVALID run fails its cell, and
 **The host is shared.** At 09:20Z on 11-26 its load was 15-30 (a self-hosted CI runner and other lanes' tests), and the producers run at `nice -n 19`, which is how
 runs were underdriven on 11-25. Before each step of the queue (a harness invocation, an E2 row, a completion), it waits until the one-minute load average is below
 8, for at most 15 minutes, and then starts anyway; the wait is logged, and each run records `load_before` as it always has. Nothing is chosen by how it ended.
+
+## Added 2026-11-26 10:35Z, with AB running (3 of its 12 runs done) and nothing of the third set run: how AB is read, and E2's wait
+
+- **AB is read by what the reader read a second**, beside the share dropped. #171's producers run flat out, so what they offer differs from run to run and
+  the share dropped with it. In AB's first R3 runs `new` was offered 688 000/s and dropped 4.8 %, `fix` 822 000/s and dropped 20.4 %, and both read
+  653 000/s. `ab_table.py` gives both. The stop rule is unchanged, on that reading: the queue stops before E2 if `fix` reads clearly less than `new`.
+- **The wait before a step is at most 5 minutes for an E2 row** (and still 15 for every other step). The host's load stayed at 10-14 through AB's
+  first gates, so a wait of 15 minutes before each of E2's 35 rows would add up to 9 hours and, from what AB saw, rarely find the load below 8. E2's rows have
+  no rate floor; a loaded host is the harder case for them, never the easier.
