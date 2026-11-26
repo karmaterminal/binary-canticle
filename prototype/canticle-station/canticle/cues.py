@@ -183,6 +183,15 @@ class CueStore:
             raise ValueError(f"current cue manifest cannot be read ({type(e).__name__})") from e
 
     def add(self, req, now, socket_classes, grant_loader):
+        # The socket pathname can name another station between a catalog read
+        # and this request. Enforce the elected full signer before even looking
+        # up an old cue or advancing the durable clock watermark (#155).
+        if "expected_public_key" in req:
+            expected = req["expected_public_key"]
+            if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected):
+                raise ValueError("expected_public_key must be 64 ASCII hex characters")
+            if bytes.fromhex(expected) != wire.public_key_bytes(self.station.sk):
+                raise ValueError("expected_public_key does not match this station")
         cue_id = _cue_id(req.get("id"))
         delay = _integer(req.get("in"), "in", 0, MAX_DELAY_S)
         duration = _integer(req.get("for"), "for", 1, MAX_DURATION_S)
@@ -367,7 +376,7 @@ class CueStore:
 
     def dispatch(self, req, now, socket_classes, grant_loader):
         op = req.get("op")
-        fields = {"cue_add": {"op", "id", "stream", "text", "loop", "in", "for", "not_after"},
+        fields = {"cue_add": {"op", "id", "stream", "text", "loop", "in", "for", "not_after", "expected_public_key"},
                   "cue_list": {"op", "limit", "after"}, "cue_show": {"op", "id"}, "cue_cancel": {"op", "id"},
                   "cue_capabilities": {"op"}}
         if op in fields and set(req) - fields[op]:
@@ -382,5 +391,6 @@ class CueStore:
             return {"ok": True, "cue": self.cancel(req.get("id"), now)}
         if op == "cue_capabilities":
             return {"ok": True, "capabilities": {"schema": "canticle-cue-control/1", "absolute_not_after": True,
+                                                   "exact_station_public_key": True,
                                                    "timestamp_unit": "unix_ms", "max_not_after": MAX_NOT_AFTER_MS}}
         return {"ok": False, "error": "unknown cue operation"}

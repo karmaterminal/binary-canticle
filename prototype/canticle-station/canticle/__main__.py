@@ -263,6 +263,8 @@ def cmd_cue(a) -> int:
         req.update({"in": a.delay, "for": a.duration})
         if a.not_after_ms is not None:
             req["not_after"] = a.not_after_ms
+        if a.expected_public_key is not None:
+            req["expected_public_key"] = a.expected_public_key
     elif a.cue_op == "list":
         req.update(limit=a.limit, after=a.after)
     elif a.cue_op != "capabilities":
@@ -845,9 +847,10 @@ def main(argv=None) -> int:
     ca.add_argument("--in", dest="delay", type=int, required=True, help="start after 0-86400 seconds on the station clock")
     ca.add_argument("--for", dest="duration", type=int, required=True, help="duration 1-3600 seconds, within stream default TTL")
     ca.add_argument("--not-after-ms", type=int, help="immutable originator expiry in Unix UTC milliseconds; never extends the relative window (#152)")
+    ca.add_argument("--expected-public-key", help="require this full 32-byte station public key (64 hex characters) before cue admission (#155)")
     ca.add_argument("--loop", choices=["fast", "normal", "slow"], default="normal")
     ca.set_defaults(fn=cmd_cue)
-    cp = cs.add_parser("capabilities", help="inspect the elected scheduler's absolute-expiry support without submitting text")
+    cp = cs.add_parser("capabilities", help="inspect the elected scheduler's expiry and exact-signer support without submitting text")
     cp.add_argument("--control", required=True)
     cp.set_defaults(fn=cmd_cue)
     cl = cs.add_parser("list", help="metadata only; payload text is never echoed")

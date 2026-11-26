@@ -19,7 +19,7 @@ them loop until they expire.
 | §11.2, §13.6, §15.7 Onboarding (#73) | `canticle doctor` checks Python, `cryptography` (with an RFC 8032 known answer), `stations.toml`, the manifest and the listener's UDP address, and only reports multicast. `stations.toml` locates the manifest and the listener's address. `canticle manifest verify` and `show` read the unsigned spike-0 manifest; manifests refuse small-order keys (§9.3) and key-ids that do not match their keys (§10.3). |
 | §6.7 Findings (FP-1, #112) | `canticle/finding.py`: the finding body (content type 11) and its strict reader. `canticle sing --finding` and `--body-ref`, and the control socket's `finding` and `body_ref` fields, put a keyed `advisory` finding and a `finding-ref` doorbell on air. `canticle tap` shows a finding field by field, with a host-authored line that attributes it to its signer. See [Findings](#findings-fp-1-112). |
 | §15.8 Background emitter (#58) | `canticle ambient`: paced, short-TTL items from a fixture file through the station's socket, with no model calls, capped cadence and size, and a bounded run. |
-| Local cue control extension (#147, parent #120; #152) | Opt-in `station --cue-db` and `cue add/list/show/cancel/capabilities`: a private, bounded SQLite table schedules one original ambient/chatter item per elected window. An optional immutable `not_after` bounds first acceptance by the originator's absolute expiry. Claims precede signing; uncertain results are never replayed. This local API is a prototype extension beyond the RFC §15.7–15.8 interfaces, with no new wire format. |
+| Local cue control extension (#147, parent #120; #152, #155) | Opt-in `station --cue-db` and `cue add/list/show/cancel/capabilities`: a private, bounded SQLite table schedules one original ambient/chatter item per elected window. An optional immutable `not_after` bounds first acceptance by the originator's absolute expiry. An optional `expected_public_key` checks the full elected signing identity before admission. Claims precede signing; uncertain results are never replayed. This local API is a prototype extension beyond the RFC §15.7–15.8 interfaces, with no new wire format. |
 | Shape-only live view (#133) | `canticle shape`: per named station, presence and beacon age; per stream, live count and newest age. Never content; no station without its owner's yes. |
 | Display grants (#137) | `canticle grant` sings a station's own yes to a display, scoped `presence` → `beacon` → `counts` → `river`; `canticle shape --display` shows only granted stations at their granted scope, and purges on revoke or narrowing. |
 | Typed beacons (#142) | `canticle beacon` sings a station's own beacon on its `beacon` stream: a versioned CBOR map of enumerated `state`/`asking`, optional `until` and up to four `refs`, never prose. `canticle.beacon.read` gives the typed shape; a missing, expired or unreadable beacon is unknown, never fine. |
@@ -316,7 +316,7 @@ An adapter can fail closed before submitting any text by querying the elected st
 The response is:
 
 ```json
-{"ok":true,"capabilities":{"schema":"canticle-cue-control/1","absolute_not_after":true,"timestamp_unit":"unix_ms","max_not_after":9007199254740991}}
+{"ok":true,"capabilities":{"schema":"canticle-cue-control/1","absolute_not_after":true,"exact_station_public_key":true,"timestamp_unit":"unix_ms","max_not_after":9007199254740991}}
 ```
 
 `canticle cue capabilities --control /path/to/private-cue-run/station.sock` provides the same probe.
@@ -331,6 +331,31 @@ canticle cue add --control /path/to/private-cue-run/station.sock \
   --id town-fixture-event-7 --stream weather --text "Fixture: the committed weather is rain." \
   --in 0 --for 60 --not-after-ms 1790000060000
 ```
+
+#### Exact station identity at admission (#155)
+
+A `public_catalog` read identifies the process that answered that connection. A later connection to
+the same pathname can reach a replacement station, so catalog inspection alone is not authority to
+publish as that station. A publisher that pins an elected station must require
+`cue_capabilities.exact_station_public_key: true` and send `expected_public_key` on every `cue_add`.
+The CLI spelling is `--expected-public-key HEX`. Its value is exactly 64 ASCII hexadecimal characters,
+encoding the full 32-byte Ed25519 public key; either hex case is accepted. Null, other types, whitespace,
+prefixes, wrong lengths and non-hex characters are refused.
+
+The serving station compares all 32 bytes to its own signing key **before** a cue lookup, a clock
+watermark update, a database write, a claim or a signature. A mismatch returns an error with no cue
+or stream-sequence side effect, including when the ID already exists. This is a local admission
+precondition, not a key import, grant or trust source. It does not change signed frame bytes, the
+receptor contract or the request's existing idempotent payload identity: the entire cue database is
+already bound to the station's full public key. A matching field may therefore be supplied when
+retrying an old cue, while a wrong field is always refused. Omitting the field retains the existing
+local operator API; adapters needing an exact signer must not omit it on fallback.
+
+The field is part of the documented local prototype control extension under RFC §5.1 and I-11.
+It protects against accidental connection to another conforming station after socket replacement;
+it is not authentication of a malicious same-user process or an OS sandbox. A station without this
+capability must not receive the protected add. An unsupported-field refusal must not be retried with
+the expected key removed.
 
 `ok: true` means the cue row was stored or recovered. Check its `state`: `pending` is queued;
 `accepted` is local carousel acceptance; `missed` is never submitted because its window ended;
