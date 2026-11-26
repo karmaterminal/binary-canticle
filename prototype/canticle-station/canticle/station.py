@@ -13,8 +13,9 @@ import os
 import random
 import statistics
 import tempfile
+import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Optional
 
@@ -148,8 +149,12 @@ class Station:
     def __init__(self, sk: Ed25519PrivateKey, streams, *, epoch: Optional[int] = None,
                  b_station: int = DEFAULT_B_STATION, beacon_period_ms: int = 1_000,
                  depth: int = DEFAULT_DEPTH, rng: Optional[random.Random] = None, now_ms: Optional[int] = None,
-                 grant=None, host_binding: bool = False):
+                 grant=None, host_binding: bool = False, derived_proposals: bool = False):
         self.sk = sk
+        # Unregistered #146 review adapter only. No CLI/runner path sets this flag. The station's
+        # normal owner must still serialize all operations (including poll and ordinary sing).
+        self._derived_proposals = derived_proposals is True
+        self._derived_proposal_lock = threading.RLock()
         self.key_id = key_id(wire.public_key_bytes(sk))
         # grant: this key's manifest entry (manifest.StationEntry). When set, sing() refuses any
         # class, scope or stream it does not grant, before a seq is allocated or anything signed.
@@ -339,6 +344,54 @@ class Station:
                           expires_at=it.expires_at, ttl_s=ttl_ms / 1000, loop_ms=oa.loop_ms, clamp=oa.clamp,
                           size=len(frame), superseded_seq=superseded,
                           ttl_clamped_from=float(ttl_s) if ttl_s is not None and ttl_s > st.cfg.default_ttl_s else None)
+
+    def _accept_derived_proposal(self, now_ms: int, stream: str, item: wire.Item, *,
+                                 expected_public_key: bytes) -> SingResult:
+        """Private effect boundary for the disabled-by-default #146 adapter, never a socket API.
+
+        Its caller authenticates the capability and holds the host policy/ledger lock. This method
+        independently checks the actual signer and manifest, then signs/queues existing frame-v2
+        lineage. It does not pass through ordinary sing, expose a model-selected parent parameter,
+        or refresh a derived item. A raw Item is not a capability and must never be made tool input.
+        """
+        if not self._derived_proposals:
+            raise NotGranted("derived proposal operation is disabled")
+        public_key = wire.public_key_bytes(self.sk)
+        if type(expected_public_key) is not bytes or public_key != expected_public_key:
+            raise NotGranted("derived proposal signer changed")
+        grant = self.grant
+        st = self._stream(stream)
+        spec = CLASS_BY_NAME["chatter"]
+        if (grant is None or grant.revoked or grant.public_key != public_key
+                or spec.code not in grant.classes or item.scope not in grant.scopes
+                or (grant.streams and stream not in grant.streams)):
+            raise NotGranted("derived proposal is not granted to this signer")
+        if (item.cls != spec.code or item.scope not in (SCOPES["host"], SCOPES["lan"])
+                or (item.scope == SCOPES["host"] and not self.host_binding)
+                or item.epoch != self.epoch or item.stream != st.sid or item.seq != st.head_seq + 1
+                or item.issued_at != now_ms or not 1 <= item.hop <= spec.hop_limit
+                or not item.derived_from or len(item.derived_from) > 4 or item.root is None
+                or item.body is None or item.body_ref is not None or item.state_key is not None
+                or item.ctype != CTYPES["text/plain; charset=utf-8"]
+                or item.flags not in (0, wire.Item.WAKE_DERIVED)):
+            raise NotGranted("derived proposal bounds")
+        item.body.decode("utf-8")
+        # The capability's absolute expiry is never restarted; the station may only shorten it.
+        requested_expiry = item.expires_at
+        expiry = min(requested_expiry, now_ms + int(min(st.cfg.default_ttl_s, spec.max_ttl_s) * 1000))
+        if expiry - now_ms <= STOP_BEFORE_EXPIRY_MS:
+            raise NotGranted("derived proposal expired")
+        item = replace(item, expires_at=expiry)
+        frame = wire.encode_item(self.sk, item)  # full codec bounds before a sequence is consumed
+        oa = _OnAir(frame=frame, kind=wire.KIND_ITEM, seq=item.seq, cls=item.cls,
+                    expires_at=expiry, req_loop_ms=self._req_loop("slow", item.cls), scope=item.scope)
+        st.head_seq = item.seq
+        self._admit(st, oa, now_ms)
+        return SingResult(stream=stream, seq=item.seq, epoch=item.epoch, issued_at=now_ms,
+                          expires_at=expiry, ttl_s=(expiry - now_ms) / 1000, loop_ms=oa.loop_ms,
+                          clamp=oa.clamp, size=len(frame),
+                          ttl_clamped_from=(requested_expiry - now_ms) / 1000
+                          if expiry < requested_expiry else None)
 
     def hush(self, now_ms: int, stream: str, seq: int, reason: int = 0) -> SingResult:
         """Pluck a live item: stop its loop, then loop a PLUCK until its expiry (§7.7)."""

@@ -1,11 +1,13 @@
 // The model-callable tools: names, parameter schemas and descriptions. Every tool is optional (an agent gets it only
 // through `tools.allow`), and each one acts on the binding of the plugin instance that registered it, never on
 // another. The publish tools are not offered at all unless publishing is enabled, nor to sub-agents (§15.5). A
-// refusal is a failed result (`details.ok: false`) whose text says what was refused and that nothing changed.
+// precondition refusal is a failed result (`details.ok: false`). A failed host exposure handoff instead retains
+// conservative taint and any durable pending fence while withholding the payload.
 
 import type { Binding, Caller, Result } from "./binding.ts";
 import type { Obj } from "./records.ts";
 import type { Discoverer } from "./discover.ts";
+import { fencePayloadExposure } from "./exposure.ts";
 
 export const READ_TOOLS = ["canticle_listen", "canticle_status", "canticle_mute", "canticle_discover"] as const;
 export const PUBLISH_TOOLS = ["canticle_sing", "canticle_hush", "canticle_outbox"] as const;
@@ -13,7 +15,7 @@ export const TOOL_NAMES = [...READ_TOOLS, ...PUBLISH_TOOLS] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
 
 /** What a tool factory receives from OpenClaw (the fields this plugin reads). */
-export type ToolContext = { sessionKey?: string; sessionId?: string; agentId?: string };
+export type ToolContext = { sessionKey?: string; sessionId?: string; agentId?: string; sandboxed?: boolean; assertInvocationCurrent?: () => void; toolBindings?: Readonly<Record<string, unknown>> };
 
 export type Tool = {
   name: ToolName;
@@ -160,7 +162,10 @@ export function callerOf(ctx: ToolContext): Caller {
   if (key === null) {
     return { sessionKey: "(no session)", sessionId: null, subagent: false, anonymous: true };
   }
-  return { sessionKey: key, sessionId: named(ctx.sessionId), subagent: isSubagent(key), anonymous: false };
+  return { sessionKey: key, sessionId: named(ctx.sessionId), subagent: isSubagent(key), anonymous: false,
+    ...(ctx.sandboxed !== undefined ? { sandboxed: ctx.sandboxed } : {}),
+    ...(typeof ctx.assertInvocationCurrent === "function" ? { assertInvocationCurrent: ctx.assertInvocationCurrent } : {}),
+  };
 }
 
 function named(v: unknown): string | null {
@@ -184,7 +189,7 @@ export function createTool(
     description: def.description,
     parameters: def.parameters,
     ...(def.network === true ? { resultContentSource: "network" as const } : {}),
-    async execute(_toolCallId, params) {
+    async execute(toolCallId, params) {
       const { binding, failure } = get();
       if (name === "canticle_discover") {
         const discover = get().discovery;
@@ -228,6 +233,19 @@ export function createTool(
         case "canticle_outbox":
           r = binding.outboxView(caller, p);
           break;
+      }
+      if (name === "canticle_listen" && r.details.untrusted === true) {
+        try {
+          await fencePayloadExposure(ctx, binding.cfg.listen.localReader, binding.cfg.binding,
+            toolCallId, r.text, binding.payloadSourcesOf(r));
+        } catch {
+          // The read may already have tainted/checkpointed, or the host may have durably fenced it.
+          // Do not clear either or expose payload in an error. The host reconciles uncertain custody.
+          return resultOf({
+            text: "[canticle:refused] canticle_listen: exposure_unavailable: payload withheld because its host exposure fence could not be established. Existing taint and pending custody remain; the host must reconcile the original read.",
+            details: { ok: false, refused: "exposure_unavailable" },
+          });
+        }
       }
       return resultOf(r);
     },

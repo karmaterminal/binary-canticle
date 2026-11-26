@@ -21,6 +21,8 @@ export function isNonSharedSessionKey(key: string, mainKey = "main"): boolean {
   return rest !== "main" && rest !== canonicalMain;
 }
 
+export type LocalReader = { sessionKey: string; sessionId: string; lifecycleRevision: string };
+
 export type BindingConfig = {
   /** Host session.mainKey, used only to reject shared main sessions from exact grants/targets. */
   mainKey: string;
@@ -32,7 +34,7 @@ export type BindingConfig = {
   station: { name: string; keyId: string } | null;
   /** payloadSessions: canonical exact, non-shared session keys that may read heard text. Every other session
    * reads digests only; wildcards, prefixes and shared/main keys are not payload grants. */
-  listen: { tune: Tune[]; includeSelf: boolean; payloadSessions: string[]; subscriptions: { sessionKey: string; tune: Tune[] }[] };
+  listen: { tune: Tune[]; includeSelf: boolean; payloadSessions: string[]; localReader: LocalReader | null; subscriptions: { sessionKey: string; tune: Tune[] }[] };
   journal: { maxEntries: number; maxBytes: number; maxAgeMs: number };
   publish: {
     enabled: boolean;
@@ -79,8 +81,27 @@ export function parseConfig(raw: unknown, mainKey = "main"): BindingConfig {
     station = { name, keyId };
   }
   const l = c.listen === undefined ? {} : obj(c.listen, "listen");
-  onlyKeys(l, ["tune", "includeSelf", "payloadSessions", "subscriptions"], "listen");
+  onlyKeys(l, ["tune", "includeSelf", "payloadSessions", "subscriptions", "localReader"], "listen");
   const tune = (l.tune === undefined ? ["*:*"] : strList(l.tune, "listen.tune")).map(parseTune);
+  const payloadSessions = l.payloadSessions === undefined ? [] : payloadSessionsOf(l.payloadSessions, canonicalMainKey);
+  const subscriptions = subscriptionsOf(l.subscriptions, canonicalMainKey);
+  let localReader: LocalReader | null = null;
+  if (l.localReader !== undefined) {
+    const r = obj(l.localReader, "listen.localReader");
+    onlyKeys(r, ["sessionKey", "sessionId", "lifecycleRevision"], "listen.localReader");
+    const sessionKey = str(r.sessionKey, "listen.localReader.sessionKey");
+    const sessionId = str(r.sessionId, "listen.localReader.sessionId");
+    const lifecycleRevision = str(r.lifecycleRevision, "listen.localReader.lifecycleRevision");
+    if (!isNonSharedSessionKey(sessionKey, canonicalMainKey) || !/^agent:[^:]+:subagent:/.test(sessionKey) ||
+        !sessionId.trim() || sessionId.length > 200 || !lifecycleRevision.trim() || lifecycleRevision.length > 200) {
+      throw new ConfigError("listen.localReader: exact local subagent key and nonempty bounded row identity required");
+    }
+    if (payloadSessions.length !== 1 || payloadSessions[0] !== sessionKey ||
+        subscriptions.length !== 1 || subscriptions[0]?.sessionKey !== sessionKey) {
+      throw new ConfigError("listen.localReader: the isolated binding must grant and subscribe only this exact reader");
+    }
+    localReader = { sessionKey, sessionId, lifecycleRevision };
+  }
   const j = c.journal === undefined ? {} : obj(c.journal, "journal");
   const p = c.publish === undefined ? {} : obj(c.publish, "publish");
   const enabled = p.enabled === undefined ? false : bool(p.enabled, "publish.enabled");
@@ -97,6 +118,9 @@ export function parseConfig(raw: unknown, mainKey = "main"): BindingConfig {
   onlyKeys(delivery, ["mode", "subscriptions"], "delivery");
   if (delivery.mode !== undefined && delivery.mode !== "explicit") {
     throw new ConfigError("delivery.mode: only \"explicit\" exists in this version; push and wake delivery are a separate opt-in");
+  }
+  if (localReader && (enabled || (delivery.subscriptions !== undefined && (!Array.isArray(delivery.subscriptions) || delivery.subscriptions.length !== 0)))) {
+    throw new ConfigError("listen.localReader: publishing and delivery subscriptions must remain disabled");
   }
   if (c.subscriptions !== undefined) {
     throw new ConfigError("subscriptions: top-level subscriptions are not accepted; move ambient consent subscriptions to delivery.subscriptions");
@@ -162,8 +186,9 @@ export function parseConfig(raw: unknown, mainKey = "main"): BindingConfig {
     listen: {
       tune,
       includeSelf: l.includeSelf === undefined ? false : bool(l.includeSelf, "listen.includeSelf"),
-      payloadSessions: l.payloadSessions === undefined ? [] : payloadSessionsOf(l.payloadSessions, canonicalMainKey),
-      subscriptions: subscriptionsOf(l.subscriptions, canonicalMainKey),
+      payloadSessions,
+      localReader,
+      subscriptions,
     },
     journal: {
       maxEntries: j.maxEntries === undefined ? 5_000 : int(j.maxEntries, "journal.maxEntries", 100, 100_000),
