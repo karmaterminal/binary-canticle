@@ -49,10 +49,28 @@ jobs:
         env:
           PYTHONPATH: prototype/canticle-station
         run: python -m unittest discover -s prototype/canticle-station/tests -v
-      - name: Run bounded load-fixture tests (loopback only, no k6 binary required)
+      - name: Fetch checksum-pinned k6 for bounded timeout probes
+        id: k6
+        shell: bash
+        run: |
+          set -euo pipefail
+          k6_dir="$(mktemp -d "$RUNNER_TEMP/canticle-k6.XXXXXX")"
+          archive=k6-v2.0.0-linux-amd64.tar.gz
+          curl --fail --location --silent --show-error --proto "=https" --proto-redir "=https" \
+            "https://github.com/grafana/k6/releases/download/v2.0.0/$archive" \
+            --output "$k6_dir/$archive"
+          (cd "$k6_dir" && sha256sum --check "$GITHUB_WORKSPACE/.github/ci/k6-linux-amd64.sha256")
+          tar --extract --gzip --no-same-owner --file "$k6_dir/$archive" --directory "$k6_dir" \
+            k6-v2.0.0-linux-amd64/k6
+          binary="$k6_dir/k6-v2.0.0-linux-amd64/k6"
+          "$binary" version
+          echo "binary=$binary" >> "$GITHUB_OUTPUT"
+      - name: Run bounded load-fixture tests (loopback only, real-k6 probes required)
         env:
           PYTHONPATH: prototype/canticle-station
           PYTHONDONTWRITEBYTECODE: "1"
+          CANTICLE_K6: ${{ steps.k6.outputs.binary }}
+          CANTICLE_REQUIRE_K6: "1"
         run: python -m unittest discover -s prototype/load-testing/tests -v
       - name: Check the pilot nft table with nft (root, throwaway network namespace)
         env:
