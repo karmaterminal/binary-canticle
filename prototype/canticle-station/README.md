@@ -59,6 +59,24 @@ receptor-record socket has no local station identity, so the existing station-si
 `public_catalog` read operation is the safe local identity surface for future publication.
 The spike manifest is unsigned; operators must secure its local file themselves.
 
+`canticle dns-find --domain example.org --manifest fleet.json --where 'streams=ops.*' [--where …]`
+is the same browse, keeping only the stations that satisfy every `--where` (AND, at most 8), each
+hit with a `matched_on` list of the key, the pattern and the values that matched. The keys are the
+three §13.2 TXT keys the browse checks against the manifest: `streams` takes a glob (`*` any run,
+`?` one character) over the station's **public** stream names, and `sid` (16 hex) and `k`
+(`ed25519:<base64>`) take one exact value. Keys are case-insensitive (RFC 6763 §6.4); values are
+exact, except that a key id is hex. Each predicate is evaluated on the manifest grant, before SRV
+or TXT is asked for: DNS decides only which enrolled names are candidates, never whether one
+matches, so a TXT can't add a stream or a key to a hit, and no TXT value is printed. `txtvers`,
+`carrier`, `mode`, `grp`, `mtu`, `prof` and `mfst` aren't checked against anything, so they can't be
+searched. A station class isn't a TXT key at all. A matching station whose TXT is malformed
+(`txt-invalid`) goes in `refused` with only its name and key id, and no locator. No match is an
+empty `stations` list with exit 0. A bad predicate exits 1 before any query. `truncated` still
+means that more than 32 instances were enumerated, so a miss covers only the first 32. Matching
+sees a station's whole public catalog; `public_streams` and each `values` list stop at 32.
+`dns_browse.find(domain, predicates, manifest=…, query=…)` is the same search as a function, whose
+only I/O is the `query(name, kind) -> Answer` it is given. A tool can call it without the CLI.
+
 Not implemented here, and still open work (see RFC-0001 §23.3):
 - relay leases for internet listeners (§11.3)
 - signed fleet manifests and the genesis pin; the manifest here is plain JSON (§10.3), so `stations.toml` refuses a `[trust]` table
@@ -924,6 +942,13 @@ CI (`.github/workflows/tests.yml`, job `station-tests`) runs the same suite from
   - distinctive item text absent from the view, JSON response, and static page;
   - no `/api/ring`, `/api/tune`, `/api/leave`, journal or item path; mutations return 405;
   - security headers/CSP, DNS rebinding, method and loopback-only boundaries.
+- `test_dns_browse.py` covers the DNS-SD browse and `dns-find` through an injected resolver:
+  - browse: the public catalog only, `sid`, `k` and `streams` mismatches, repeated, oversized and mixed-case
+    TXT keys, TTLs and the negative cache, the instance cap, and out-of-zone instances and SRV targets;
+  - find: a stream glob over public names only, exact `sid` and `k`, AND, no match as an empty list, a TXT
+    that cannot add a stream or a key, a malformed TXT refused without its locators, SRV and TXT asked only
+    for matching stations, an out-of-zone instance ignored though it would match, the instance and value
+    caps, invalid predicates refused before any query, and the `dns-find` command's output and exit codes.
 
 ## Vectors
 
