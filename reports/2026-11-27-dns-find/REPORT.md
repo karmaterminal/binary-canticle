@@ -21,8 +21,13 @@ findable by predicate yet.
 | docs/proof | this file, the PR body, prototype README § *Read-only DNS-SD browse slice* | in the lane | |
 | read-only inputs | bootstrap#1868 merge; bootstrap `main`; bootstrap#1872 head (open) | `246da85a116ecc4cfc2e7baa61b7525976f5cad9`; `e70096516db58267a6cd53070e7f462002bd106c`; `ba43623c2256691fe275f474b6006c6877c84902` | read with `git show`, nothing run |
 
-Commits: RED tests `ee4ad8b0572b14e84a290a734d791d88f3860874`, implementation
-`d8b269180096749ee385695a333a3c329b6ef3ce`, then docs.
+Commits:
+- RED tests `ee4ad8b0572b14e84a290a734d791d88f3860874`;
+- implementation `d8b269180096749ee385695a333a3c329b6ef3ce`;
+- docs `f5cf5ad852effacdf05e6beb659edba38edc4424`, the SHA that was reviewed;
+- RED for the review's findings `6358bb9543d780f02f09304b9d09c2bf0217ba83`;
+- their fix `a478d08baeb02c06e13e220d0862c0cfcaff38d2`;
+- then docs.
 
 ## The TXT keys that exist
 
@@ -77,20 +82,26 @@ refuses every other key, and refuses it before any query.
   strings or 4096 bytes, or bytes that were not UTF-8) goes in `refused` with its name and key id. No locator
   from that record is printed. A bad predicate raises `ValueError` before any query, and the CLI exits 1. No
   match is an empty `stations` list, exit 0.
-- **Case** (RFC 6763 §6.4): keys are case-insensitive. Values are opaque, so they're exact, with one exception:
-  a key id is hex. A `streams` glob may use only stream-name characters (`[a-z0-9.-]`), `*` and `?`, up to 64
-  bytes. An uppercase glob could never match a stream name (`ids.STREAM_NAME_RE`), so it's refused rather than
-  answered with an empty list.
+- **Case** (RFC 6763 §6.4): keys are case-insensitive US-ASCII; a non-ASCII key is refused rather than folded
+  (the Kelvin sign would otherwise become `k`). Values are opaque, so they're exact, with one exception: a key
+  id is hex. A `streams` glob may use only stream-name characters (`[a-z0-9.-]`), `*` and `?`, up to 64 bytes.
+  An uppercase glob could never match a stream name (`ids.STREAM_NAME_RE`), so it's refused rather than
+  answered with an empty list. For the same reason, `k` must be canonical base64.
 - **AND** is per station. `--where streams=ops.alarm --where streams=hymn` matches a station that has both,
   not one stream that is both.
 - **Bounds.** At most 8 predicates. The browse's caps stay: 32 instances (`truncated` then says that a miss
   covers only the first 32), 8 records, 128 cache entries, TTLs of 1–300 s, and dnspython's 2 s per query.
   Matching sees a station's whole public catalog. `public_streams` and each `values` list stop at 32, each with
-  a `_truncated` flag.
+  a `_truncated` flag. Matching time is bounded too: a glob is matched by a two-pointer wildcard matcher in
+  O(pattern × name), at most 64 × 64 steps a name. A regex backtracks instead (see the review below).
 - **The seam.** `find(domain, predicates, *, manifest, query, clock=time.monotonic)` does no I/O but the
   `query(name, kind) -> Answer` it is given, and returns a dict ready for `json.dumps`. A Python MCP tool can
-  call it directly. A TypeScript one (frond-ear, OpenClaw) can run `canticle dns-find` and parse its JSON, or
-  port about 70 lines: the rules are all in `Where.parse`, `Where.values` and `Browser.find`.
+  call it directly, with `KEY=PATTERN` strings or `Where` objects; a `Where` checks itself when it is made. A
+  TypeScript tool (frond-ear, OpenClaw) can run `canticle dns-find` and parse its JSON. Or it can port it, and a
+  port needs the browse's own rules as well as the predicate's:
+  - the browse: `_candidates` (zone, dedup, one unrevoked grant with a public catalog) and `_row` (TXT fail
+    closed, in-zone SRV targets). OpenClaw's `canticle_discover` already has them;
+  - the predicate: `Where`, `_glob` and `Browser.find`, about 100 lines with their docstrings.
 - **It is a look, not an arrival.** It wakes nothing, tunes nothing and marks nothing heard (RFC-0002 §3.3's
   rules for a search). It is not §3.3's `find(query)`, which searches the guide's signed descriptors. This one
   searches unsigned locators.
@@ -119,7 +130,24 @@ run is the 3.11 receipt.
   commit.
 - **GREEN** at `d8b2691`: the same 28 tests OK. The whole station suite: 476 tests OK in 92.8 s, and
   `git status --porcelain` showed nothing but the lane's own untracked files.
-- **Mutations** (each alone, on a copy outside the repository):
+- **Independent review** of `f5cf5ad` (pr-review-toolkit code reviewer, given the diff and the workorder's
+  requirements, not this report). It confirmed the security properties: no DNS-decided match, no private name,
+  no TXT value printed, no out-of-zone query, and `browse()` unchanged. It found these, all repaired here:
+
+  | finding | invariant, and where it lives | RED at `6358bb9` (on the `f5cf5ad` code) | fixed at `a478d08` |
+  | --- | --- | --- | --- |
+  | 1. a glob that cannot match backtracks exponentially (`'*' * 18 + 'z'`: 7.7 s; 30 stars: hours), before any DNS timeout, holding the GIL | matching is bounded in time; `Where.values` | `test_a_glob_that_cannot_match_returns_at_once` runs three such globs in a subprocess: `TimeoutExpired` at 10 s | `_glob`, a two-pointer matcher: the test takes well under a second. It agrees with `fnmatch.fnmatchcase` on 7,129,284 cases (exhaustive to pattern length 6 and name length 5, plus 20,000 random up to 64) |
+  | 2. glob semantics, the cap at exactly 32 and the output shape unpinned: three mutants survived | `*` may match nothing, `?` exactly one; `values_truncated` only past 32; find's top level is browse's plus `where` and `refused` | new tests pass on the old code, as they should: their controls are the mutants R2, R3, R4 and R8 below | the mutants are killed |
+  | 3. a `Where` built directly skipped every check | every predicate is checked, however it is made; `Where.__post_init__` | `test_a_where_built_directly_is_checked_as_parsed`: 5 × "ValueError not raised", and `Where('SID', …)` never matched | the checks moved into `__post_init__`; `parse` only splits |
+  | 4. non-canonical base64 `k` accepted, then never matching; a key's Unicode fold (the Kelvin sign as `k`) | a predicate that can never match is refused; keys are US-ASCII (RFC 6763 §6.4) | `test_invalid_predicates_are_refused_before_any_query`: both "ValueError not raised" | the canonical re-encoding is required, and both parts must be ASCII |
+  | 5. this report said a port needed only three functions | the browse's rules are part of any port | n/a (prose) | *The seam* above |
+
+  The nearest sibling, OpenClaw's `canticle_discover`, has an exact `stream` filter and no glob, so finding 1
+  does not reach it. There is no persistence, restart or partial-failure case: `find` keeps no state beyond a
+  `Browser`'s TTL cache, and it refuses a bad predicate before its first query.
+- **GREEN after the review** at `a478d08`: `test_dns_browse.py` 32 tests OK in 0.1 s. The whole station suite:
+  480 tests OK in 98.6 s, and the tree was clean but for the lane's own files.
+- **Mutations** at `d8b2691`, each alone, on a copy outside the repository; 9 of 9 killed:
 
   | mutation | killed by |
   | --- | --- |
@@ -133,7 +161,20 @@ run is the 3.11 receipt.
   | match only the printed 32 public names | `test_matching_sees_the_whole_public_catalog_and_bounds_what_it_prints` |
   | `sid` compared case-sensitively | `test_exact_sid_and_k` |
 
-  9 of 9 killed. The out-of-zone instance in the first test is `cael._canticle._udp.evilnet.org.`, whose suffix
+  After the review, the same nine (adapted to `_glob`) and eight more, on `a478d08`:
+
+  | mutation | killed by |
+  | --- | --- |
+  | R1 the regex glob back | `test_a_glob_that_cannot_match_returns_at_once` |
+  | R2 `?` may match nothing (acts as `*`) | `test_glob_wildcards`, `test_star_may_match_nothing_and_question_matches_exactly_one` |
+  | R3 `*` must match at least one character | `test_star_may_match_nothing_and_question_matches_exactly_one` |
+  | R4 `values_truncated` at exactly 32 | `test_matching_sees_the_whole_public_catalog_and_bounds_what_it_prints` |
+  | R5 a `Where` made directly is not checked | `test_a_where_built_directly_is_checked_as_parsed` and four more |
+  | R6 non-canonical `k` accepted | `test_a_where_built_directly_is_checked_as_parsed`, `test_invalid_predicates_are_refused_before_any_query` |
+  | R7 non-ASCII keys folded | `test_invalid_predicates_are_refused_before_any_query` |
+  | R8 `find` drops `authority` | `test_find_output_is_the_browse_output_plus_where_and_refused` |
+
+  17 of 17 killed. The out-of-zone instance in the first test is `cael._canticle._udp.evilnet.org.`, whose suffix
   is as long as `example.org`'s. Without the guard, slicing the service name off it leaves `cael`, a manifest
   name. So the mutant queries another zone and reports it as a hit, which is exactly what the test refuses.
 - **Browse unchanged.** `browse()` was split into choosing candidates and building rows. On three fixtures
