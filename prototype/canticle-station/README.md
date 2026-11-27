@@ -430,7 +430,7 @@ record per line.
   and the first `landing_state`, then the socket. A failure emits `fatal` (`state_locked`, `manifest_invalid`,
   `state_corrupt`, `state_not_durable`, `bind_failed`, `socket_failed`) and exits 1. SIGTERM or SIGINT emits
   `bye`, waits up to 2 s for it to reach each connection, closes them and removes the socket.
-- **Durable publish (write-ahead, #79 review).** Each tick, and each turn of at most 32 datagrams (group commit,
+- **Durable publish (write-ahead, #79 review).** Each tick, and each turn of at most 48 datagrams (group commit,
   #171), is one batch. The records it implies are held, the safety state is saved (one atomic replace), and only
   then are the records numbered and sent: nothing a datagram says counts as received until the save that covers
   it has landed. If the save fails, none of that batch is sent, retracts included, and no `rec_seq` is spent. The run
@@ -487,8 +487,9 @@ per manifest key; `last_datagram_at`; records emitted and dropped and connection
 since the last `health`) or `datagrams_refused` (the intake refused one that claimed a listed key). The host
 daemon's `health` also carries what was lost before it was heard, in two optional additions (#171):
 `records.socket_dropped`, the kernel's drop count for the daemon's socket, exact; and `receive`, the intake's
-fixed counters (`read`, `repeats`, `copies`, `verified`, `unverified`, `queued`, `known` and `displaced`, the sources
-that gained a share of their own and those that lost it to a newer one, and `refused` by reason).
+fixed counters (`read`, `repeats`, `copies`, `verified`, `unverified`, `reserved`, the checks the newcomers' slice
+paid for, `queued`, `known`, `displaced` and `lapsed`, the sources that gained a share of their own, those that lost it to a
+newer one and those whose lease ended, and `refused` by reason).
 `records.dropped` keeps its meaning: records dropped for a connection. The receptor keeps which tuples it surfaced, and which
 keys it quarantined, in the listener's state file (`"receptor"`), written with the listener's guards in one
 atomic replace per batch. At start, after `hello` and before the first `landing_state` (so before any
@@ -510,7 +511,8 @@ lower-epoch tuples as above. `canticle listen` behaves as before; `canticle tune
 - **Fair admission is ahead of the RFC (#171).** §14.1 puts the per-key rate among the cheap checks, before crypto,
   and dedup after it. The daemon debits a key only after its signature verifies, and drops exact copies of verified
   frames before it. §7.4 and §10.9 hold as written (a repeat is still a counted no-op). The per-source and per-key
-  queues are step 1's "per-key and per-source rate", with sizes the RFC does not give. `health` has two optional
+  queues are step 1's "per-key and per-source rate", with sizes the RFC does not give; so are the newcomers' slice and
+  the lease of a known place. `health` has two optional
   additions and two reasons that §14.18.3 does not list. An amendment has to say all of this, or the code goes.
 - `quarantine_strengthen` / `quarantine_rescind`: reserved in the RFC, not emitted. A local quarantine has no
   rescind here; it lasts until the daemon's state is removed with the daemon stopped.
@@ -541,7 +543,9 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
   places each one: in a bounded queue, among the repeats, or among the refused. It holds no state a sender can
   grow: a queue exists only for a key and a stream the manifest lists. Everything else shares: a listed key's
   other streams one queue, and all datagrams that name no listed key (or are not frames) one queue of 64,
-  examined at 500 a second.
+  examined at 500 a second. Its notification is a level trigger: at most one reader wake waits in the event loop,
+  and that turn keeps scheduling itself while the ready set is non-empty. Reader batches therefore cannot build a
+  second event-loop backlog ahead of client publication (#177).
 - **An exact repeat is dropped before verify.** A datagram whose SHA-256 is that of a frame already verified and
   accepted in this run is counted (`receive.repeats`, and `duplicate` as before) and dropped: no verify, no save, no
   debit. It still refreshes its stream's presence and the on-air item's count, as a repeat heard does. The digest is
@@ -560,9 +564,31 @@ nothing said so (#171, finding 1). `canticle/intake.py` decides which datagram i
 - **Who pays.** A frame that verified and was new debits its key's bucket (16 a second, burst 64) and its stream's (12
   and 48, below the key's, so siblings have room); beacons have their own (8 and 16). A check that comes to nothing
   is charged to its source: each of those 4 sources may spend 1 000 of them a second, all other sources claiming
-  the key share 1 000, and everything together may spend 2 000. That covers a forgery, and a replay that verifies and
+  the key share 1 000, and everything together may spend 2 000, strangers of all keys 1 500 of them, beside the slice's 500 (next). That covers a forgery, and a replay that verifies and
   changes nothing: an old beacon (it has no expiry, so it verifies whenever it is replayed), or a frame refused at steps
   3-4, which costs ten, because it makes a record each time. So neither spends the station's bucket.
+- **A slice of the checks is reserved for newcomers, per key** (#173's newcomer recovery; the order is 🍃's and 🌫's). Beside its queues a listed key has
+  one slot, where a source that has no known place has a claim on one of its datagrams, when others already wait in the stream that claims. The datagram
+  waits in its lane as before, and whichever comes first serves it; what a lane refuses or sheds still waits in the slot. The slots are
+  served in turn over the keys, 500 checks a second on a bucket of their own, in 16 places of a turn beside the queues' 32. Strangers pay for it: of the daemon's 2 000
+  their queues have 1 500, so what strangers cost is 2 000 as before, and an established station loses no turn to it.
+- **In a key's turn there are three tiers.** Sources that were not tried come first, in the order they came. Those that were tried and did not fail come behind them, in
+  turn: a replay (an old beacon verifies for ever), a source whose last frame was admitted, one that lost its known place. Those whose frame failed come last. One turn in four is for one that was
+  tried, the two kinds in turn, and they have a quarter of the slice's checks, whatever else is idle: the same forgers are not checked over and over. Nothing but a frame admitted as new moves a source up, and then to the second tier; a replay leaves a failure as it is. A key
+  remembers the latest 256 sources that were tried, for twice the rounds it takes to try them all; a flood that opens a new port for every datagram
+  turns that memory over in 0.2 s (256 at 1 500 checks a second), and a source is then untried again. What a source has waiting in the slot takes the tier its marks
+  give whenever the source sends another datagram (a copy of one that waits in its lane is not looked at): its marks may have ended, or been forgotten, while it waited,
+  or the tier may have had no room when it was marked (🍃, #178). Being tried is evidence against a frame, and no proof against its source. So a
+  newcomer is checked within **(S + 1) rounds of the keys, K/500 s each (a third more where tried ones wait), whatever the flood's rate**, S being the sources of its own
+  key that are not tried yet: 0 where its key is not forged, and each costs its turn once. That holds for at most 63 sources that start with it, and for 256 that
+  stay. An echo of a frame that waits takes no slot, and a known source's copy stands for a slot's. A verified ITEM or PLUCK out of a slot that
+  changes nothing costs its key's tried sources nine turns, and nobody else. A key or a stream that can't be served keeps its turn, so nothing that is served
+  meanwhile comes between. `receive.reserved` counts what the slice checked.
+- **A known place is a lease.** It ends 60 s after the daemon first verified the newest frame that its source delivered: the clock is the
+  daemon's monotonic one, and having nothing waiting means nothing. An exact repeat from a source that has a place renews it up to the
+  age of the frame it repeats and no further, so a source that stopped and replays one cached frame keeps its place no longer than if it were silent. A repeat
+  never gives a place. A new frame displaces the source whose last new frame is the oldest, as before. The end of a lease is counted
+  (`receive.lapsed`). A station that sends nothing new for 60 s (60 of the default beacons) is a stranger again. None of it authenticates a source.
 - **Beacons are timed when they arrive**, not when their turn comes, so the clock offset (§8.2) absorbs no queueing.
 - **A copy takes no second place.** The same bytes already waiting in the same queue get the same verdict, so a copy is
   counted (`receive.copies`) and not queued. It is neither a repeat (nothing has verified yet) nor refused.
@@ -594,8 +620,10 @@ What it does not do:
   then a stranger in any flood: **a FAIL, outside the supported guarantee.** `receive.displaced` counts it. A relay that
   is heard after the station displaces nothing.
 - **A station that is still a stranger, among many.** Until one of its frames verifies from a new source (a cold
-  start, or its restart on a new port) it competes with every other stranger claiming its key. If a flood shares its
-  lane, it is verified only as often as chance picks it there. Flooded at 20 000 a second from 12 or 40 ports of its own
+  start, or its restart on a new port) it competes with every other stranger claiming its key. **A flood that forges its own key and
+  opens a new port for every datagram is a FAIL, outside the supported guarantee**, and so is one from more sources than the key can hold demoted: each copy of the station's
+  is verified with chance (1 000 + 500) / the flood's rate at best, and no deadline follows. Other keys' newcomers are unaffected. What follows was measured on
+  #173 before the slice (above); the rows with it are in `reports/measurement/2026-11-24-newcomer-recovery/`. Flooded at 20 000 a second from 12 or 40 ports of its own
   host, its first valid frame was admitted within 0.1 s; from 200 ports its first items came up to 16 s late in one run,
   and in five others its first frame took up to 1,065 ms and its items up to 2,015 ms, a FAIL of the ≤1 s / ≤2 s deadline
   declared for pass 3; from a newly opened socket per datagram its first valid frame took up to 14 s and its

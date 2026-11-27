@@ -26,7 +26,7 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from canticle import runner, wire
+from canticle import intake, runner, wire
 from canticle.ids import stream_id
 from canticle.manifest import Manifest, StationEntry
 from canticle.station import Station, StreamConfig
@@ -419,7 +419,9 @@ class SourceChurnTest(FairAdmissionCase):
         health = self.row("R3 from a new socket per datagram", q.sung, totals,
                           note=f"{sum(t['opened'] for t in totals):,} sockets, {sources:,} sources")
         self.assertGreater(sources, 100_000)
-        self.assertLess(health["counters"]["unverified"]["bad_signature"], 20_000)
+        # What a key's strangers and the newcomers' slice may spend on checks that fail, and a second's worth to spare.
+        self.assertLess(health["counters"]["unverified"]["bad_signature"],
+                        (intake.SOURCE_RATE + intake.SLICE_RATE) * (QUIET_ITEMS * QUIET_INTERVAL_S + TAIL_S + 1))
         self.assertEqual((health["receive"].get("known"), health["receive"].get("displaced")), (1, 0))
 
     def test_a_relay_that_is_heard_first_takes_the_stations_share_and_it_is_counted(self):
