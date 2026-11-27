@@ -9,6 +9,7 @@
     python -m canticle daemon                                                # the host daemon: records over $XDG_RUNTIME_DIR/canticle/daemon.sock
     python -m canticle doctor  [--json] [--probe|--no-probe]                 # check this host; exit 1 if a check fails
     python -m canticle manifest verify|show [fleet.json]
+    python -m canticle dns-find --domain example.org --manifest fleet.json --where 'streams=ops.*'   # read-only; JSON
     python -m canticle ambient --control ... --stream hymn --fixture hymn.txt --duration 600   # background emitter
     python -m canticle cue add --control ... --id evening-rain --stream hymn --text "rain on the roof" --in 120 --for 600
     python -m canticle tuner   --manifest fleet.json --multicast --http 127.0.0.1:8765         # synthetic-only web view
@@ -744,16 +745,33 @@ def _manifest_show(a, path: str, data, problems: list) -> int:
     return 1 if problems else 0
 
 
+def _dns_manifest(path) -> Manifest:
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    problems = verify_json(data)
+    if problems:
+        raise ValueError("invalid manifest: " + "; ".join(problems[:3]))
+    return Manifest.from_json(data)
+
+
 def cmd_dns_browse(a) -> int:
     from .dns_browse import Browser, DnsPythonResolver
     try:
-        data = json.loads(Path(a.manifest).read_text(encoding="utf-8"))
-        problems = verify_json(data)
-        if problems:
-            raise ValueError("invalid manifest: " + "; ".join(problems[:3]))
-        result = Browser(DnsPythonResolver(), Manifest.from_json(data), a.domain).browse()
+        result = Browser(DnsPythonResolver(), _dns_manifest(a.manifest), a.domain).browse()
     except (OSError, ValueError, RuntimeError) as exc:
         print(f"dns-browse: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def cmd_dns_find(a) -> int:
+    from . import dns_browse
+    try:
+        where = dns_browse.parse_where(a.where)  # a bad predicate is refused before dnspython is needed
+        manifest = _dns_manifest(a.manifest)
+        result = dns_browse.find(a.domain, where, manifest=manifest, query=dns_browse.DnsPythonResolver().resolve)
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"dns-find: {exc}", file=sys.stderr)
         return 1
     print(json.dumps(result, indent=2))
     return 0
@@ -1008,6 +1026,13 @@ def main(argv=None) -> int:
     db.add_argument("--domain", required=True, help="one explicit unicast DNS domain")
     db.add_argument("--manifest", required=True, help="local manifest with explicit public_streams")
     db.set_defaults(fn=cmd_dns_browse)
+
+    df = sub.add_parser("dns-find", help="dns-browse, keeping stations whose manifest grant matches every --where")
+    df.add_argument("--domain", required=True, help="one explicit unicast DNS domain")
+    df.add_argument("--manifest", required=True, help="local manifest with explicit public_streams")
+    df.add_argument("--where", action="append", required=True, metavar="KEY=PATTERN",
+                    help="streams=GLOB (* and ?), sid=KEY_ID or k=ed25519:BASE64; repeat to AND (at most 8)")
+    df.set_defaults(fn=cmd_dns_find)
 
     v = sub.add_parser("vectors", help="regenerate the candidate conformance vectors")
     v.add_argument("--out", default="vectors/frame-v2-candidates.json")
