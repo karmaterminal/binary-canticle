@@ -177,6 +177,7 @@ S2, the BC-2 slice of S3, the host daemon of decision D35 and the join snapshot 
 | Path | What it holds | Status |
 |---|---|---|
 | [`rfc/0001-binary-canticle.md`](rfc/0001-binary-canticle.md) | the specification | current draft |
+| [`rfc/0003-summons.md`](rfc/0003-summons.md) | RFC-0003, summons: the contract for invoking a worker and singing its result back as a programme | draft; contract only, nothing built or authorized |
 | [`rfc/0001-notes/`](rfc/0001-notes/) | the review notes and broker experiments the RFC cites as `review/<note>` | evidence |
 | [`prototype/canticle-station/`](prototype/canticle-station/) | station, listener, host daemon, doctor, tuner and emitter; the candidate vectors | spike, tested in CI |
 | [`prototype/protocol-dynamics/`](prototype/protocol-dynamics/) | UDP carousel versus TCP measurements E1-E5, with results | spike; the privileged runs are attested in its `SUMMARY.md`, CI runs only the harness tests |
