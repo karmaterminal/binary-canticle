@@ -1,0 +1,53 @@
+{
+ "row": "F2b-forged-own-key-2x-max",
+ "offered_per_s": 721584.2,
+ "sung": 30,
+ "at_daemon": 30,
+ "at_daemon_during_flood": 30,
+ "pushed": 30,
+ "send_to_record_ms": {
+  "p50": 19.7,
+  "p90": 21.4,
+  "p99": 36.4,
+  "max": 40.2
+ },
+ "send_to_push_ms": {
+  "p50": 5759.9,
+  "p90": 5977.2,
+  "p99": 6036.0,
+  "max": 6046.3
+ },
+ "kernel_drops": 0,
+ "reported_socket_dropped": 0,
+ "receive": {
+  "read": 216475829,
+  "repeats": 236,
+  "copies": 215875055,
+  "verified": 346,
+  "unverified": 600192,
+  "queued": 0,
+  "refused": {
+   "unlisted": 0,
+   "unverified": 0,
+   "over_rate": 0,
+   "backlog": 0
+  }
+ },
+ "health_reasons_seen": [],
+ "admission": {
+  "verified": 30,
+  "duplicate": 236
+ },
+ "unverified": {
+  "bad_signature": 600192
+ },
+ "ear_live_overflow": null,
+ "daemon_cpu_rss": {
+  "cpu_max": 133.9,
+  "rss_max_kb": 35084,
+  "cpu_mean": 117.3
+ },
+ "load_at_start": 0.37,
+ "duration_s": 300.0,
+ "drain_s": 15.0
+}

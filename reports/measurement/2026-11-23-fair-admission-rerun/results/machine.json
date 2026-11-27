@@ -1,0 +1,42 @@
+{
+ "host": "ronan",
+ "arch": "aarch64",
+ "kernel": "7.0.0-1019-nvidia",
+ "nproc": 20,
+ "cpu_models": [
+  "Cortex-A725",
+  "Cortex-X925"
+ ],
+ "cpu_max_mhz": {
+  "cpu0": 2808,
+  "cpu1": 2808,
+  "cpu10": 2808,
+  "cpu11": 2808,
+  "cpu12": 2808,
+  "cpu13": 2808,
+  "cpu14": 2808,
+  "cpu15": 3900,
+  "cpu16": 3900,
+  "cpu17": 3900,
+  "cpu18": 3900,
+  "cpu19": 3900,
+  "cpu2": 2808,
+  "cpu3": 2808,
+  "cpu4": 2808,
+  "cpu5": 3900,
+  "cpu6": 3900,
+  "cpu7": 3900,
+  "cpu8": 3900,
+  "cpu9": 3900
+ },
+ "mem_total_kb": 127598768,
+ "loadavg_at_start": "2.82 3.11 3.52 2/1780 1588630",
+ "python": "3.12.3",
+ "net.core.rmem_default": 212992,
+ "net.core.rmem_max": 4194304,
+ "nvme_scheduler": "[none] mq-deadline",
+ "niceness": 19,
+ "ionice": "idle",
+ "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/scribe-rez.service",
+ "loopback": "127.0.0.1 (lo, mtu 65536)"
+}
