@@ -60,9 +60,10 @@ against a reference worker on fixtures, never on real logs `[proposed: #199]`.
    enforced at the authoritative store (§5.3). *False if* any interleaving of retries, timeouts, races or
    crashes in §8 case 1a airs two terminal records for one `summons_id` `[proposed: #199]`. Claim 4 has two
    halves (🪨, review on #199). **Safety:** never two published records for one `summons_id`, under every
-   interleaving. **Liveness:** exactly one is eventually published, while the relay can replay and the
-   station's slot lasts (§5.3). *Also false if* a slot filled before a crash is never published after its
-   relay recovers (§8 case 1a vii) `[proposed: #199]`.
+   interleaving. A record is identified on air by `(station key, summons_id)`, so the same accepted record
+   re-aired under a new seq or epoch is still one record (§6.1). **Liveness:** exactly one is eventually
+   published, while the relay can replay and the station's slot lasts (§5.3). *Also false if* a slot filled
+   before a crash is never published after its relay recovers (§8 case 1a vii) `[proposed: #199]`.
 
 Claim 4 was "at most one, or a declared duplicate" in an earlier outline. 🪨's audit pointed out that is two
 guarantees, so it is now one.
@@ -79,6 +80,10 @@ Claim tags are RFC-0002 §0.3's, unchanged, and `rfc/tools/check-claim-tags.py` 
 here is `proposed` or `open`. `#199` is this RFC's pull request. A `built` tag points only at code on
 binary-canticle `main` at `8ee80d7` (the full SHA is in the header), and says that code exists. It never says a
 seat runs it.
+
+Prior art is cited where it bears, in RFC-0002 §0.9's style: what the source establishes, and **where it
+breaks** for a summons. These notes are informative. Each source's entry in [References](#references) says
+how much of it was read, and the note claims no more than that.
 
 ### 0.4 Vocabulary
 
@@ -99,6 +104,12 @@ This RFC adds:
   then either `succeeded` or `failed`, never both (§5.3). It is not built (🌿, overclaim check on #199)
   `[proposed: #199]`.
 - **Unconfirmed:** a send whose outcome the sender does not know. It is not a failure.
+- **Attempt:** one run of the worker for one summons. A summons has at most `retry.max_attempts` of them
+  (§5.2). A **send** is one delivery of a result to the slot. An attempt may make several sends.
+- **Retry horizon** and **replay horizon:** the last instants at which an attempt may still send, and at
+  which a filled slot may still be replayed to the station (§5.2).
+- **Input key:** the digest of a summons's worker and event, without its `summons_id` (§5.2). Poison is
+  counted against it, and a **parked** input key admits no summons until it is released.
 - **Digester:** one worker type, owned by 🪨 on #198, that reads princes' session activity under consent and
   sings a bounded summary. This RFC specifies only its interface (§4.4).
 
@@ -128,9 +139,12 @@ bc#126 and bc#121. Its findings are the baseline here.
 - **The OpenClaw binding's outbox declares duplicates** (bc#97; 🌿, overclaim check on #199). It gives the
   agent-facing `sing` an idempotency key, the caller's or one derived from session and content. A repeat with
   the same content returns the existing row with `duplicate: true`. A reused key with other content is refused
-  as `key_conflict`. A row is written ahead, durable before the station acts, and sent at most once: a send
-  with no complete reply is `unknown` and never re-sent
+  as `key_conflict`
   `[built+tested: binary-canticle@8ee80d7:prototype/openclaw-canticle/src/outbox.ts:237 | prototype/openclaw-canticle/test/outbound.test.ts:89]`.
+  A row is written ahead, durable before the station acts, and sent at most once. A send with no complete
+  reply is `unknown`, and after a restart a row that was mid-send comes back `unknown` and is never re-sent.
+  It waits for evidence instead. That is deliberate (🪨, receipt on #198)
+  `[built+tested: binary-canticle@8ee80d7:prototype/openclaw-canticle/src/outbox.ts:147 | prototype/openclaw-canticle/test/outbound.test.ts:346]`.
   It is local to one binding. It is not an authoritative slot across senders, it has no terminal failure
   state, and it never replays.
 - **An inference cannot pass for testimony.** On a station's own typed `beacon` stream, only
@@ -190,6 +204,11 @@ summoner does not wait, and the result comes back by being sung, which plays the
 - Each entry has a unique `key`, and no two entries name the same actor and stream. A summons with an entry
   that lacks its `consent_ref`, two entries for one source, or a `consent_ref` whose record is for another
   source than its entry's (§4.1) MUST be refused at admission, before any read `[proposed: #199]`.
+- **An envelope with a key its schema version does not define is refused** (§5.3), not read around. This is
+  deliberate, and it departs from RFC-0001 §9.5, whose frame receivers ignore unknown keys unless `crit` lists
+  them. A frame is heard material and can afford to skip what it does not know. A summons envelope carries
+  authority and is hashed into a binding, so an ignored key would be a field one implementation hashed and
+  another did not, or a scope one reader honoured and another skipped `[proposed: #199]`.
 - **A read is inside both scopes, or it is refused.** A fetched record MUST fall inside its entry's scope and
   inside the current scope of that entry's consent record. A broad consent does not widen an entry, and a
   broad entry does not widen a consent. A read that matches no entry MUST be refused `[proposed: #199]`.
@@ -207,8 +226,9 @@ has nothing, it says so.
 | `invoker`, verified | the summons authority layer | **No direct analogue.** Lambda's `identity` is Amazon Cognito identity for mobile-app callers, not a general invoker (🪨). This field comes from the summons authority layer `[proposed: #199]` |
 | `worker`, `worker_version` | the summons rule names them; the runner attests what actually ran (§5.1) | `functionName`, `functionVersion` `[proposed: #199]` |
 | `worker_artifact` | the summons authority layer, at admission: the digest of the immutable artifact that `worker_version` resolves to in the worker registry (🌊, review on #199) | none `[proposed: #199]` |
-| `budget` (tokens, wall time, result bytes) | the summons rule, within §3's bound | none. `memoryLimitInMB` bounds memory, not tokens, time or output `[proposed: #199]` |
-| `log_destination` | the runner, per attempt | `logGroupName` (with `logStreamName`) `[proposed: #199]` |
+| `budget` (tokens, wall time, result bytes) | the summons rule, within §3's bound. `wall_s` bounds each attempt; `tokens` bound the sum over all attempts | none. `memoryLimitInMB` bounds memory, not tokens, time or output `[proposed: #199]` |
+| `retry` (`max_attempts`, `backoff_base_ms`) | the summons authority layer, at admission, from the worker's registered retry config (§5.2) | asynchronous retries: by default, two more attempts after an error, one minute and then two minutes apart [AWS-AsyncErrors] `[proposed: #199]` |
+| `log_destination` | the runner, per attempt. What it may receive is bounded below | `logGroupName` (with `logStreamName`) `[proposed: #199]` |
 | `attempt` | the runner, per attempt | none `[proposed: #199]` |
 | `consent_ref`, one per `refs.sources` entry (in the event, §2.1) | the summons rule; verified at admission and at every read (§4.1, §4.2) | none `[proposed: #199]` |
 | `audience` | the summons rule: the result's audience, within every consent's audience (§4.1) | none `[proposed: #199]` |
@@ -223,6 +243,20 @@ A worker MUST NOT write `summons_id`, `causality`, `invoker` or `consent_ref`. I
 refused (§6.1) `[proposed: #199]`. The same holds for `worker`, `worker_version` and `worker_artifact`: a
 worker MUST NOT write them, and its own statement of what it is never counts (🌊, review on #199)
 `[proposed: #199]`.
+
+**What a log may carry.** `log_destination` is attempt-local and outside the binding. A log is not a result:
+it is never sung, it has no audience, and no consent bounds its readers. So it MUST NOT carry source content
+`[proposed: #199]`.
+
+- A log line MAY carry only: `summons_id`, the binding, `attempt`, `refs.sources` keys and record ids, counters
+  (reads, refusals, bytes, tokens, durations), and an error class from a closed list. Never a record's
+  content, an excerpt, a model's output, or an error's free text, which can quote what was read
+  `[proposed: #199]`.
+- The runner MUST enforce this by a field whitelist at the log sink, not by the worker's care. It MUST drop
+  every other field, and count the drops. A worker's standard output and error MUST NOT reach
+  `log_destination` as text; the runner counts their bytes and nothing else `[proposed: #199]`.
+- Lambda's context names the function's log group and stream [AWS-Context] and bounds nothing about what
+  reaches them. Here the bound is the content boundary of §4.3, applied to logs.
 
 ### 2.3 Aspect
 
@@ -267,7 +301,8 @@ log.
     "worker": "fixture-digester",
     "worker_version": "0.0.0-fixture",
     "worker_artifact": "sha256:fixture-digester-0.0.0-fixture",
-    "budget": {"tokens": 20000, "wall_s": 600, "result_bytes": 800},
+    "budget": {"tokens": 20000, "wall_s": 240, "result_bytes": 800},
+    "retry": {"max_attempts": 3, "backoff_base_ms": 30000},
     "log_destination": "fixture://logs/smn-fx-0001",
     "attempt": 1,
     "audience": "fixture-room",
@@ -278,7 +313,9 @@ log.
 
 The mark `mark:fixture-quiet` fired. The authority layer verified the rule and its owner, assigned
 `smn-fx-0001`, started the chain, set the deadline and resolved `fixture-digester` at `0.0.0-fixture` to its
-artifact digest. The worker gets references to two records and one consent. It does not get their text.
+artifact digest and its retry config. It admitted the summons at `1764203600000`, so 900 s remain, and three
+attempts of 240 s with backoffs of 30 s and 60 s fit in 810 s (§5.2). The worker gets references to two records
+and one consent. It does not get their text.
 
 ---
 
@@ -313,20 +350,28 @@ owner. Only the records' ids and verified signers enter the summons, never their
 themselves, whether the rule counts them directly or through a metric (§6.3 rule 6; 🪨, review on #199)
 `[proposed: #199]`.
 
-### 3.3 Quorum counts distinct signers
+### 3.3 Quorum counts distinct key holders
 
 Quorum sensing lets bacteria change behaviour by population: behaviours "unproductive when undertaken by an
 individual bacterium acting alone but become beneficial when carried out simultaneously by a large number of
 cells" [WatersBassler2005]. The analogy breaks on identity. Bacteria sense signal concentration, which tracks
 "the number and/or species present in a community" [WatersBassler2005]: species, but nothing in that abstract
 about telling individual senders apart. Canticle records are signed per station, so a canticle quorum can
-count **distinct signers** (🌿, overclaim check on #199).
+count **distinct signers** (🌿, overclaim check on #199). But a key is not a voice. One holder can hold many
+keys, so the count is of **holders**, not keys.
 
-- A mark rule that summons on many marks MUST count distinct verified signers (station keys), not records. One
-  station repeating itself MUST count once. This matches RFC-0002 §3.5: repetition from one signer is not more
+- A mark rule that summons on many marks MUST count distinct **key holders**, not records and not keys. A
+  holder is the actor in custody of a station key. Two keys in one holder's custody count once, and one
+  station repeating itself counts once. This matches RFC-0002 §3.5: repetition from one signer is not more
   evidence `[proposed: #199]`.
-- The rule MUST say what it counts (signers, and over which window), and the summons MUST record the signer set
-  it counted, by key id `[proposed: #199]`.
+- The rule MUST resolve each verified signer's key to its holder through the manifest. A key whose holder it
+  cannot resolve MUST count zero, not one `[proposed: #199]`.
+- Custody, not the manifest, decides who holds a key. On silas, station key files are readable by the uid the
+  ears share (RFC-0002 §4.4, §7 below), so every key in that custody has, in fact, one holder whatever the
+  manifest says. Until custody is per seat, a quorum MUST count all keys in one shared custody as one holder
+  `[proposed: #199]`.
+- The rule MUST say what it counts (holders, and over which window), and the summons MUST record the holder
+  set it counted, with the key ids behind each `[proposed: #199]`.
 
 ---
 
@@ -347,6 +392,13 @@ authorization.
 **A ref is a locator, not a grant** (🌊, review on #199). Naming a record proves nothing about it. A rule could
 name an unrelated record, or a forged one, and pass the two checks above. So the record behind each ref is
 verified, not only located.
+
+This is the **confused deputy** [Hardy1988]: a component that holds authority of its own acts on a name its
+caller supplied, and so lends that authority to the caller. Here the read path is the deputy, and a
+`consent_ref` is the caller's name. **Where it breaks:** Hardy's subtitle points at capabilities, where the
+name and the authority travel together. Here they stay apart on purpose. The ref stays a bare locator, and the
+authority is what the read path verifies in the record against this summons (issuer, actor, source, audience,
+grantee, revocation). Only the metadata of [Hardy1988] was read; it is cited for the name of the problem.
 
 - An authorization record MUST carry a fifth field beside bc#126's four: its **grantee**, the worker identities
   (and, if it narrows further, the summons rules) that may read under it. A record with no grantee grants
@@ -386,6 +438,11 @@ verified, not only located.
   `[built+tested: binary-canticle@8ee80d7:prototype/canticle-station/canticle/station.py:343 | prototype/canticle-station/tests/test_udp_e2e.py:44]`.
 - Whether revocation SHOULD pluck automatically is open `[open: §9]`.
 
+This is **complete mediation**: "Every access to every object must be checked for authority"
+[SaltzerSchroeder1975]. **Where it breaks:** their principle mediates every access. Here mediation is complete
+over reads and over the accept, and it stops at publication. A result already on air is not recalled by a later
+revocation. It lives out its TTL unless its owner plucks it (below).
+
 **Revoked after the last read, before publication** (🌊, review on #199). A run can finish its reads and then
 lose a consent before its result is accepted. The read checks above cannot see that.
 
@@ -410,6 +467,22 @@ lose a consent before its result is accepted. The read checks above cannot see t
   revocation landing between them counts as after the accept. How stale that check may be is open
   `[open: §9]`.
 
+**Cancel.** A cancel ends a summons before its result, and it follows the revocation rules above, with the
+store's accept as the same linearization point.
+
+- **Who may cancel.** The summons's verified invoker (§3.1), verified as at admission. A consent holder
+  cancels by revoking (above), and the slot's reason is then revocation, not cancelled. No one else may
+  cancel. A heard item never cancels, as it never summons (§3.2). A cancel from anyone else MUST be refused,
+  counted, and leave the slot unchanged `[proposed: #199]`.
+- **Cancelled before the accept.** The store MUST fill the slot `failed`, reason `cancelled`. A failure record
+  is sung (§5.2). The runner MUST stop the running attempt and MUST NOT start another. A later success send
+  finds the slot filled and gets its receipt as a duplicate (§5.3). A summons cancelled while queued makes no
+  read `[proposed: #199]`.
+- **Cancelled after the accept.** The cancel gets the existing receipt and changes nothing. The result is on air
+  until its TTL, and its owner MAY withdraw it with a PLUCK (RFC-0002 §2.2) `[proposed: #199]`.
+- **A cancel is idempotent per `summons_id`.** A cancel whose answer was lost MAY be sent again, and gets the
+  same receipt. A cancel is never retried as an attempt failure (§5.2) `[proposed: #199]`.
+
 ### 4.3 Scribe seats as sources
 
 A scribe seat MAY be a source only by its own explicit opt-in, and only for curated content, such as 🌿's entry
@@ -418,8 +491,8 @@ ruling still holds, as he narrowed it that night (recorded on #119, 03:09Z): scr
 digestion, nor reason about developing it, but they may contribute content. His 11-27 ruling keeps the
 digestion step itself with an OpenClaw prince (the authority note above) (🌿, overclaim check on #199).
 
-No reasoning text and no session text MAY reach a scribe seat's context through a summons, its event or its
-result `[proposed: #199]`.
+No reasoning text and no session text MAY reach a scribe seat's context through a summons, its event, its
+result or its logs (§2.2) `[proposed: #199]`.
 
 ### 4.4 The digestion interface
 
@@ -429,8 +502,9 @@ parsing and summarizing live on #198, not here.
 - **Inputs:** a summons event of references only (§2.1) and its context (§2.2), including one `consent_ref`
   per `refs.sources` entry (§2.1). The digester MUST fetch what it reads itself, under §2.1, §4.1 and §4.2,
   and only inside each entry's scope `[proposed: #198]`.
-- **Outputs:** one bounded summary, within `budget.result_bytes`, plus its lineage (§6.1). The summary MUST NOT
-  reveal more than the consents' audience allows `[proposed: #198]`.
+- **Outputs:** one bounded summary, within `budget.result_bytes`, plus its lineage (§6.1), sung inline or by
+  reference as §6.1 decides. The summary MUST NOT reveal more than the consents' audience allows
+  `[proposed: #198]`.
 - **One terminal result** per `summons_id`, through §5.3's slot. Failure is a sung failure record, never
   silence `[proposed: #198]`.
 - **Not here:** how session activity is read, parsed or summarized. Who may summon a digester, and on which
@@ -450,7 +524,8 @@ bounded job, a deadline, an attributable result. It does not fit the worker. A d
 state, which FaaS keeps out of the function. [JonasEtAl2019] is the usual citation for FaaS's weak support for
 shared state. This RFC has not confirmed the section that says so and claims nothing more from it.
 
-So a summons is a long-running, stateful task dressed in a FaaS-shaped contract.
+So a summons is a long-running, stateful task dressed in a FaaS-shaped contract. On Temporal, the Workflow Id
+is the slot's natural carrier, but only under the policies §5.3's prior art names.
 
 - The runner MUST enforce `deadline_ms` and `budget`. A run that exceeds either MUST end in a failure record
   naming which `[proposed: #199]`.
@@ -478,11 +553,99 @@ So a summons is a long-running, stateful task dressed in a FaaS-shaped contract.
 - A retry MUST NOT mint new evidence. It carries the same `summons_id` and binding, and its result MUST be the
   same slot's result (§5.3) `[proposed: #199]`.
 - **A failed summons goes to a destination**: a sung failure record on the worker's station, naming the
-  `summons_id` and the reason (deadline, budget, revocation, refused read, worker mismatch, worker error). It MUST NOT be lost
-  silently. Lambda discards failed asynchronous events unless a destination is configured [AWS-AsyncErrors];
-  here the destination is not optional `[proposed: #199]`.
+  `summons_id` and the reason (deadline, budget, revocation, cancelled, refused read, worker mismatch,
+  attempts, oversize). It MUST NOT be lost silently. Lambda discards failed asynchronous events unless a
+  destination is configured [AWS-AsyncErrors]; here the destination is not optional `[proposed: #199]`.
 - If the worker cannot sing (it died, or its deadline passed), the summons authority layer MUST write the
-  failure through the same slot. A late success then loses to it (§8 case 1a v) `[proposed: #199]`.
+  failure through the same slot. After `deadline_ms` a success cannot win against it, because the slot's
+  clock refuses the success (below) `[proposed: #199]`.
+
+**The attempt bound and backoff.** The runner retries, but only a bounded number of times.
+
+- Each worker registers a retry config: `max_attempts`, from 1 to 3, counting the first attempt, and
+  `backoff_base_ms`, greater than 0. A config with `max_attempts` above 3 or below 1, or with no backoff, MUST
+  be refused at registration, and a summons naming a worker with no valid config MUST be refused at
+  admission. The authority layer copies the config into the context as `retry`, inside the binding, so no
+  attempt can widen it `[proposed: #199]`.
+- **Backoff is exponential.** Attempt `n` (for `n` ≥ 2) MUST NOT start until `backoff_base_ms × 2^(n−2)` after
+  attempt `n − 1` ended. With three attempts, the waits are `b` and then `2b` `[proposed: #199]`.
+- **Only some failures retry.** A worker error, or a runner that lost the attempt (a crash, a lost heartbeat),
+  MAY be retried. Deadline, budget (`tokens`), revocation, cancelled, refused read, worker mismatch and
+  oversize MUST NOT be: each fills the slot at once. A failed attempt is recorded in the ledger against the
+  `summons_id`. It is not the summons's failure, and it fills nothing `[proposed: #199]`.
+- **The last attempt is the last.** The runner MUST NOT start attempt `max_attempts + 1`, and the store MUST
+  refuse, and record, a send whose `attempt` exceeds `retry.max_attempts`. When the last attempt fails, the
+  runner sends the failure, reason attempts, with the last attempt's error class `[proposed: #199]`.
+- **The attempts must fit the deadline.** At admission, with `A = retry.max_attempts`,
+  `w = budget.wall_s × 1000` and `b = retry.backoff_base_ms`, the authority layer MUST refuse a summons for
+  which `deadline_ms − admitted_at_ms < A·w + b·(2^(A−1) − 1)`. A bound the deadline cannot honour is not a
+  bound `[proposed: #199]`.
+
+**Two horizons.** Both follow from the deadline and the attempt bound, and the slot outlives both.
+
+- **The retry horizon is `deadline_ms`.** No attempt starts at or after it, the runner ends every attempt by
+  it, and no send started after it can be accepted as a success (below). The admission check above is what
+  lets every permitted attempt run before it `[proposed: #199]`.
+- **The replay horizon is `deadline_ms + r`**, where `r` is the relay bound the slot's store declares (and the
+  station, under §5.3 option A). Until it, sends in flight at the deadline drain, and the relay replays any
+  slot still `pending` to the station (§5.3). A slot still `pending` at the replay horizon MUST be shown as
+  stuck: a named loss of liveness, never quiet and never sung `[proposed: #199]`. The value of `r` is open
+  `[open: §9]`.
+- **The slot, and the station's record of its conditional accept, MUST be kept at least until the replay
+  horizon plus the result's TTL.** A send or replay that can still arrive must still find the slot filled, and
+  while the result is on air no second record may join it `[proposed: #199]`.
+
+**Prior art for the bound.** Lambda retries a failed asynchronous invocation "two more times, with a
+one-minute wait between the first two attempts, and two minutes between the second and third attempts"
+[AWS-AsyncErrors]: three attempts, doubling waits, as here. Knative's delivery spec has `retry`,
+`backoffPolicy` (`linear` or `exponential`), `backoffDelay` and `deadLetterSink` [Knative-Delivery].
+**Where it breaks:** Knative's `retry` excludes the initial attempt, so its `retry: 2` is this RFC's
+`max_attempts: 3`. Its dead letter sink receives the failed event. Here a failure record carries references
+only (§2.1), and nothing read under consent goes to a dead letter.
+
+**The slot's clock judges the deadline.** The deadline is judged once, by one clock: the authoritative store's,
+the one that holds the slot (the station under option A, the result store under option B). The worker's,
+runner's and sender's clocks never judge it `[proposed: #199]`.
+
+- A success whose accept the store would make when its clock reads after `deadline_ms` MUST be refused. If the
+  slot is empty, the store fills it `failed`, reason deadline, in that same conditional write, and answers the
+  send with that receipt, marked `late` (§5.3) `[proposed: #199]`.
+- After `deadline_ms`, every fill of an empty slot is `failed`, reason deadline, whatever the send carried.
+  Before `deadline_ms`, the store MUST refuse a deadline failure `[proposed: #199]`.
+- So a late success can no longer win first-write against the authority layer's failure write. Both are
+  judged against the same clock, and the order in which they reach the store does not matter
+  `[proposed: #199]`.
+- The runner still ends attempts at `deadline_ms` by its own clock (§5.1). That is a resource control, not the
+  judgement. A runner clock that runs fast loses time and is safe; one that runs slow sends late and is
+  refused. The store clock's own error against true time is outside this proof, as key custody is outside
+  what a signature proves (§7) `[proposed: #199]`.
+
+**Poison is counted, and parked.** A summons that fails on the same inputs every time is a poison message. It
+must not be summoned for ever.
+
+- **The input key.** A summons's binding includes its `summons_id`, so no two summonses share one. Poison is
+  counted per **input key** instead: `sha256:` over the RFC 8785 encoding of `{"v": 1, "worker": <worker>,
+  "event": <the admitted event>}`. That is the worker and its set of refs. It leaves out `worker_version` and
+  `worker_artifact`, so a new version of the worker does not release a parked input on its own
+  `[proposed: #199]`.
+- **What counts.** A terminal failure with reason attempts, deadline or budget counts one against its input
+  key. Revocation, cancelled, refused read, worker mismatch and conflict do not: those are not the input's
+  fault. A success resets the count. Failures count per summons, not per attempt `[proposed: #199]`.
+- **Parked after three.** When an input key reaches `N` consecutive counted failures, it is **parked**. This RFC
+  proposes `N = 3` `[proposed: #199]`. The authority layer MUST then refuse admission of any summons with that
+  input key, before any read, and count the refusal. A mark that fires on it is refused like any other, and
+  its cooldown still runs `[proposed: #199]`.
+- **A parked record is sung**, on the worker's station, as keyed live-state under one `state_key` for the
+  input key. It names the input key, the worker, the `summons_id`s of the counted failures and their reasons,
+  the count, and who may release it. It carries references only, never source content. It stays visible while
+  the input key is parked, and its release sings its withdrawal `[proposed: #199]`.
+- **Release.** Only a named releaser, a human or a prince named in the worker's registered config, may release
+  a parked input key, verified like an invoker (§3.1). A heard item never releases. A release resets the count
+  and is recorded in the ledger. A release from anyone else MUST be refused and counted `[proposed: #199]`.
+- **The dead letter is the parked record and the ledger.** Lambda's dead-letter queue and on-failure
+  destination [AWS-AsyncErrors] and Knative's `deadLetterSink` [Knative-Delivery] hold failed events one by
+  one. **Where it breaks:** neither page read describes refusing the next event with the same inputs. Parking
+  does that: it is a breaker on the input key, not a sink for one event.
 
 ### 5.3 The terminal slot: uniqueness at the authoritative store
 
@@ -514,9 +677,11 @@ After a failed call, "your function's code might have run completely, partially,
   result is a new identity, and no listener dedupes it, not even one. At most, a shared `state_key` supersedes
   the older one on air, and every listener has still heard two. Nothing downstream of the station can undo a
   second publication, which is why uniqueness has to be enforced at the store, before the station signs
+  `[proposed: #199]`. A result's on-air identity is therefore `(station key, summons_id)`, never the frame
+  identity (§6.1).
+- **The slot MUST be durable** and kept at least until the replay horizon plus the result's TTL (§5.2), so it
+  outlives both horizons. A slot forgotten while a send or replay can still arrive re-opens claim 4
   `[proposed: #199]`.
-- **The slot MUST be durable** and outlive the retry horizon and the result's TTL. A slot forgotten while a
-  retry can still arrive re-opens claim 4 `[proposed: #199]`.
 
 (The lesson of ttf#64.)
 
@@ -529,7 +694,7 @@ an honest retry reads as a conflict `[proposed: #199]`.
 - **The attempt-local fields are a closed list:** `log_destination` and `attempt`. They are left out, so a
   retry on another runner or log stream keeps its binding. Every other field of the event and the context is
   in, including `summons_id`, `causality`, `deadline_ms`, `invoker`, `worker`, `worker_version`,
-  `worker_artifact`, `budget`, `audience`, `aspect`, and every `refs.sources` entry with its `consent_ref`. A
+  `worker_artifact`, `budget`, `retry`, `audience`, `aspect`, and every `refs.sources` entry with its `consent_ref`. A
   field not on the closed list is in. Remaining time is never a field: the context carries only the absolute
   `deadline_ms` `[proposed: #199]`.
 - **Encoding.** The JSON Canonicalization Scheme [RFC 8785]: object keys sorted, no insignificant whitespace,
@@ -538,15 +703,17 @@ an honest retry reads as a conflict `[proposed: #199]`.
   alike. Any other number MUST be refused at admission `[proposed: #199]`.
 - **Duplicate and unknown keys are refused, never dropped.** An envelope with a duplicate key in any object, or
   a key its schema version does not define, MUST be refused at admission. Dropping either would let two
-  implementations hash different bytes for one summons `[proposed: #199]`.
+  implementations hash different bytes for one summons `[proposed: #199]`. This departs from RFC-0001's
+  frames on purpose (§2.1).
 
 **Vector 1.** The running example (§2.4) projects to these bytes (one line, no trailing newline):
 
 ```
-{"context":{"aspect":"summary.plain","audience":"fixture-room","budget":{"result_bytes":800,"tokens":20000,"wall_s":600},"causality":{"chain":[["mark:fixture-quiet","smn-fx-0001"]],"election":"mark:fixture-quiet","hop":1},"deadline_ms":1764204500000,"invoker":{"kind":"mark","owner":"fixture-prince","rule":"mark:fixture-quiet"},"summons_id":"smn-fx-0001","worker":"fixture-digester","worker_artifact":"sha256:fixture-digester-0.0.0-fixture","worker_version":"0.0.0-fixture"},"event":{"kind":"digest.window","refs":{"sources":[{"actor":"fixture-actor-a","consent_ref":"auth:fixture-actor-a","key":"src-a","records":["rec-a-0001","rec-a-0002"],"stream":"fixture:activity","window":{"from_ms":1764200000000,"to_ms":1764203600000}}]},"v":1},"v":1}
+{"context":{"aspect":"summary.plain","audience":"fixture-room","budget":{"result_bytes":800,"tokens":20000,"wall_s":240},"causality":{"chain":[["mark:fixture-quiet","smn-fx-0001"]],"election":"mark:fixture-quiet","hop":1},"deadline_ms":1764204500000,"invoker":{"kind":"mark","owner":"fixture-prince","rule":"mark:fixture-quiet"},"retry":{"backoff_base_ms":30000,"max_attempts":3},"summons_id":"smn-fx-0001","worker":"fixture-digester","worker_artifact":"sha256:fixture-digester-0.0.0-fixture","worker_version":"0.0.0-fixture"},"event":{"kind":"digest.window","refs":{"sources":[{"actor":"fixture-actor-a","consent_ref":"auth:fixture-actor-a","key":"src-a","records":["rec-a-0001","rec-a-0002"],"stream":"fixture:activity","window":{"from_ms":1764200000000,"to_ms":1764203600000}}]},"v":1},"v":1}
 ```
 
-Its binding is `sha256:e032203bce9b862aaf24429621235f458b131b7fb564fa5121051dfdf56f4b7a`.
+Its binding is `sha256:88cdc08ee07bc70d0885a726addba1cd40c6abad2ed3a7835cbe17885b067fd9`.
+Revision 4 added `retry` to the context and changed `budget.wall_s`, so this is not revision 3's vector.
 Reordering its keys, or changing `log_destination` or `attempt`, leaves the binding unchanged. Changing any
 included field gives another binding, and a send under it is a conflict (§8 case 11).
 
@@ -566,8 +733,9 @@ included field gives another binding, and a send under it is a conflict (§8 cas
 }
 ```
 
-`this_send` is `accepted`, `duplicate` or `conflict`. A `conflict` receipt carries no `state`, `epoch` or `seq`
-of the first result.
+`this_send` is `accepted`, `duplicate`, `late` or `conflict`. A `late` receipt answers a success the slot's
+clock refused after `deadline_ms` (§5.2): it names the slot's state, `failed`, reason deadline. A `conflict`
+receipt carries no `state`, `epoch` or `seq` of the first result.
 
 **Accepted is not yet sung** (🪨, review on #199). Under option B below, the slot can be filled while its
 outbox row still waits for the station. A crash there leaves a filled slot and nothing on air. So the slot
@@ -588,11 +756,35 @@ carries a second attribute beside its state.
   MUST be shown as pending, never as sung and never as quiet `[proposed: #199]`.
 - Under option A the station's accept is the publication, so a slot is never `pending` `[proposed: #199]`.
 
-**Prior art.** The nearest built piece is the OpenClaw binding's outbox (§1.1, bc#97): written ahead, keyed,
-refusing a changed replay as `key_conflict`, and never re-sending an `unknown`. Those match this section's
-changed-replay conflict and send-then-timeout rules. It is local to one binding, not an authoritative slot, and
-it has no terminal failure state and no replay. Whether the slot reuses it (option B's store, extended) or only
-aligns with its semantics is open (🌿, overclaim check on #199) `[open: §9]`.
+**Prior art.** The nearest built piece is the OpenClaw binding's outbox (§1.1, bc#97). Exactly where it
+matches, and where it does not (🪨, receipt on #198):
+
+- **It matches on duplicates and conflicts.** A repeat with the same key and content returns the existing row
+  with `duplicate: true`, and a reused key with other content is refused as `key_conflict`. Those are this
+  section's same-receipt and changed-replay rules, for one binding
+  `[built+tested: binary-canticle@8ee80d7:prototype/openclaw-canticle/src/outbox.ts:237 | prototype/openclaw-canticle/test/outbound.test.ts:89]`.
+- **It matches on one half of send-then-timeout.** A send with no complete reply is `unknown`, never failed
+  `[built+tested: binary-canticle@8ee80d7:prototype/openclaw-canticle/src/outbox.ts:147 | prototype/openclaw-canticle/test/outbound.test.ts:346]`.
+- **It does not replay an uncertain send, on purpose.** After a restart, a row that was mid-send comes back
+  `unknown` and waits for evidence; its restart test asserts that nothing is sung again (same pointer). The
+  summons relay has to do the opposite: replay every `pending` slot until the station answers, which is safe
+  only under the station's conditional accept on `summons_id` and binding. So the outbox's green tests prove
+  its at-most-once contract, and they cannot stand in for the relay's replay, for case 1a vii or viii, or for
+  liveness. The relay needs its own replay, under that accept `[proposed: #199]`.
+- It is local to one binding, not an authoritative slot, and it has no terminal failure state. Whether the slot
+  reuses it (option B's store, extended with a replay it does not have today) or only aligns with its
+  duplicate and conflict semantics is open (🌿, overclaim check on #199) `[open: §9]`.
+
+The slot is **Temporal's Workflow Id** under another name [Temporal-WorkflowId]. Temporal guarantees "only one
+Workflow Execution with a given Workflow Id can be in an Open state at any given time". Its Id Reuse Policy
+*Reject Duplicate* says a new execution "cannot exist if a previous Workflow Execution has the same Workflow
+Id, regardless of the Closed status": a filled slot never reopens. Its Id Conflict Policy *Use Existing*
+returns the open execution's Run Id to a second start, as a retry gets the existing receipt. **Where it
+breaks:** the default reuse policy is *Allow Duplicate*, so a closed Workflow Id can run again. The policies, as
+that page describes them, key on the Workflow Id alone and compare no inputs, so a changed replay would not
+read as a conflict. So a Temporal runner (§5.1) MUST start each summons with Workflow Id = `summons_id` and
+*Reject Duplicate*, and the binding check stays the slot's, not Temporal's. Temporal holds an execution, not a
+publication: the station's conditional accept is still needed `[proposed: #199]`.
 
 **Where the slot lives is open.** Two options, and neither is built `[open: §9]`:
 
@@ -600,8 +792,11 @@ aligns with its semantics is open (🌿, overclaim check on #199) `[open: §9]`.
   `summons_id` and binding as a publication key. This is a protocol change: today's `sing` carries no such key
   (§1.1).
 - **B. A result store with a transactional outbox.** The store accepts into the slot and writes an outbox row
-  in one transaction. A relay publishes the row. But a relay that crashes between its `sing` and marking the
-  row done will sing again. So the relay's publication still needs the station to accept conditionally on
+  in one transaction. A relay publishes the row. This is the transactional outbox pattern [Outbox]. **Where it
+  breaks:** the pattern accepts that a relay which crashes after publishing, before it records that it did,
+  publishes again, and it puts the cure on consumers, which must be idempotent. §5.3 has shown that canticle
+  listeners cannot dedupe a re-sing, so here the cure moves to the station. A relay that crashes between its
+  `sing` and marking the row done will sing again. So the relay's publication still needs the station to accept conditionally on
   `summons_id`, or claim 4 fails at the relay. B adds a durable ledger of failures and receipts; it does not
   remove A's station change. The conditional accept is necessary for B but not sufficient: B also needs the
   `pending` state and the replay above (🪨, review on #199).
@@ -630,6 +825,43 @@ aligns with its semantics is open (🌿, overclaim check on #199) `[open: §9]`.
   that station's reach is rollout (R4 gap 9), not this RFC `[open: §9]`.
 - A result's claims about current state expire with the result's TTL (🌫, 🌻 in R4 gap 6). A result MUST NOT
   be read as current after its expiry `[proposed: #199]`.
+
+**The on-air identity of a result** is `(station key, summons_id)`: the key that signed it, and the
+`summons_id` its lineage carries. It is never the frame identity `(key_id, epoch, stream, seq)`. The station
+re-airs an item under a new seq when it refreshes it, and under a new epoch after a restart, so a count keyed
+on the frame would count one result more than once.
+
+- A listener, ledger, mark or quorum that counts or dedupes results MUST key them on `(station key,
+  summons_id)`. Every airing of one accepted result under that pair is the same record, for claim 4 too
+  `[proposed: #199]`.
+- A record that carries a `summons_id` the slot does not hold as published under that station key is not that
+  result, whatever its body says `[proposed: #199]`.
+- Whether a station key rotation may carry a result on air across to the new key is open `[open: §9]`.
+
+This is CloudEvents' rule that "`source` + `id`" is unique for each distinct event, and that consumers may
+take two events with the same pair as duplicates [CloudEvents-1.0]. **Where it breaks:** CloudEvents leaves
+uniqueness to its producers and lets consumers assume it. Here the pair is enforced at the slot before the
+station signs (§5.3), and `source` is a verified signing key, not an unsigned URI-reference.
+
+**Size: over budget, by reference.** An item body has a ceiling of about 980 bytes (RFC-0001 §9.6). An 800-byte
+summary (`budget.result_bytes`) plus its lineage (a binding, an artifact digest, one `consent_ref` per source and
+a causality chain) can exceed it.
+
+- The authority layer MUST measure the item it would sign. If lineage plus summary fits the ceiling, the
+  summary goes inline `[proposed: #199]`.
+- If it does not fit, the result MUST travel **by reference**, as RFC-0001 §9.12 already lets large content
+  travel: the item's `body` carries the lineage, and its `body_ref` (RFC-0001 §9.6 key 9: a URL, the SHA-256
+  of the summary's bytes, and their size) points at the summary, kept in the result store `[proposed: #199]`.
+- The result store MUST serve the summary only to a reader inside the result's audience, only while the
+  result is live (its TTL; retention past it is §9's question), and only as the bytes the digest names. A
+  reader MUST verify the digest and refuse a summary that does not match `[proposed: #199]`.
+- By reference does not lift `budget.result_bytes`. The summary stays within it `[proposed: #199]`.
+- **Lineage is never sent by reference.** An election must read a record's chain to apply §6.3, so the chain
+  rides on air. §6.3 rule 3's maximum chain length, and the number of sources a summons may name, MUST be set
+  so that lineage with no body fits the ceiling. A lineage that does not fit is never truncated: the success is
+  refused, and the slot fills `failed`, reason oversize `[proposed: #199]`.
+- Option A of §5.3 has no result store, so a by-reference result needs one under either option. Where it lives
+  is open `[open: §9]`.
 
 ### 6.2 Heard by election, never a wake by default
 
@@ -661,7 +893,12 @@ that summoned it. The rule below rules that out.
 1. The summons authority layer MUST stamp `chain` and `hop` on every summons and every result. A worker MUST NOT
    add, drop or rewrite an entry `[proposed: #199]`.
 2. **Exclusion.** An election `E` MUST NOT admit a record `R` as a trigger if any entry of `chain(R)` carries
-   `ek(E)` `[proposed: #199]`.
+   `ek(E)` `[proposed: #199]`. This is BGP's AS_PATH loop check: a route whose path contains an AS loop
+   "should be excluded", and the check scans the full path for the local AS number [RFC 4271] (§9.1.2).
+   **Where it breaks:** BGP's check says *should*, and reads one route's path as received. Here the check is
+   absolute, `chain(R)` is the union of every trigger record's chain, and the authority layer stamps it (rule
+   1). Claim 3 rests on that stamp, and a lost chain is a named loss (below), not something the check
+   detects.
 3. A record with `hop > 0` whose chain is missing, malformed or over the declared maximum length MUST NOT be
    admitted as a trigger. A chain is never truncated to fit; an over-long one is refused `[proposed: #199]`.
 4. **Hop bound.** An election MUST NOT issue a summons whose hop would exceed `H_max` `[proposed: #199]`.
@@ -712,6 +949,9 @@ In the running example, a result of `smn-fx-0001` carries `mark:fixture-quiet` i
 | Replay of a summons | §5.3: one slot per `summons_id`; a changed replay conflicts; the binding covers the admitted envelope | the slot's place is open (§5.3 A or B). `[open: §9]` |
 | A worker impersonates a station | §6.1: a result is sung on the worker's own station, and an inference is never read as testimony | on silas, station keys are readable by the ear's shared uid, so key custody is host-proof, not seat-proof (RFC-0002 §4.4). `[open: binary-canticle#99]` |
 | A self-retriggering loop | §6.3's exclusion rule; the hop bound | the two named losses in §6.3. `[open: §9]` |
+| A quorum inflated by one holder with many keys | §3.3: a quorum counts distinct key holders, not keys, and an unresolved key counts zero | on silas, station key files are readable by the uid the ears share (RFC-0002 §4.4), so every key in that custody counts as one holder until custody is per seat. `[proposed: #199]` |
+| Source content leaks through logs | §2.2: a log carries refs, counters and error classes only, enforced by the runner's whitelist | a whitelisted field (an error class, a record id) could still be chosen to say something. The closed list keeps that small, not zero. `[proposed: #199]` |
+| A poison input summoned for ever | §5.2: three attempts at most per summons; three counted failures park the input key until a named releaser releases it | `N` and the releasers are per worker, and their defaults are open (§9). `[proposed: #199]` |
 | Digestion lockout | delegation: no scribe reads or digests session or reasoning text; the digester is 🪨's (#198). A seat that pulls session or reasoning text into its own context risks being refused service | none known, if the delegation holds. `[proposed: #198]` |
 
 ---
@@ -732,7 +972,7 @@ end-to-end form of the same test, and these cases are its contract-level part.
 | 1a ii | Send-then-timeout: the first send was not accepted | the retry is accepted once | `[proposed: #199]` |
 | 1a iii | Concurrent retries race | exactly one is accepted; every sender gets the same receipt | `[proposed: #199]` |
 | 1a iv | Delayed first acceptance: the first send lands after the retry was issued | only one is published | `[proposed: #199]` |
-| 1a v | Success against failure: a success record and a failure record for one `summons_id` race (for example, a late success and the authority layer's deadline failure) | exactly one terminal state is accepted; the loser gets the winner's receipt and is recorded | `[proposed: #199]` |
+| 1a v | Success against failure before `deadline_ms`: a success record and a failure record for one `summons_id` race (for example, a success and a cancel). After the deadline there is no race: case 13 | exactly one terminal state is accepted; the loser gets the winner's receipt and is recorded | `[proposed: #199]` |
 | 1a vi | Changed-payload replay: same `summons_id`, different envelope, worker or consent | refused as a `conflict`; it is not given the first receipt; it is recorded | `[proposed: #199]` |
 | 1a vii | Option B: the relay crashes after the slot fills and before the station accepts (🪨, review on #199) | while down, the slot is `pending` and a retry's receipt says `pending`, with no `epoch` or `seq`; after recovery the replay is accepted once, the slot turns `published`, and the station's receipt is recorded against it; `on_air` holds one record | `[proposed: #199]` |
 | 1a viii | Option B: the relay crashes after the station accepted, before it marked the row (🪨, review on #199) | the replay gets the station's existing receipt; nothing new airs; the slot turns `published` with that receipt's `epoch` and `seq` | `[proposed: #199]` |
@@ -760,12 +1000,27 @@ end-to-end form of the same test, and these cases are its contract-level part.
 | 10 iv | The worker writes `worker`, `worker_version` or `worker_artifact` into its result | the result is refused (§2.2) | `[proposed: #199]` |
 | 11 i | Vector 1 with its keys reordered and whitespace added (🌫, review on #199) | the binding is Vector 1's | `[proposed: #199]` |
 | 11 ii | A retry of Vector 1 with another `log_destination` and `attempt` | same binding; the retry gets the first receipt as a `duplicate`, never a `conflict` | `[proposed: #199]` |
-| 11 iii | Vector 1 with one change each: a record ref, the window, a `consent_ref`, `worker`, `worker_version`, `worker_artifact`, `deadline_ms`, `budget`, `audience` | each gives another binding; a send under it is refused as a `conflict` | `[proposed: #199]` |
+| 11 iii | Vector 1 with one change each: a record ref, the window, a `consent_ref`, `worker`, `worker_version`, `worker_artifact`, `deadline_ms`, `budget`, `retry`, `audience` | each gives another binding; a send under it is refused as a `conflict` | `[proposed: #199]` |
 | 11 iv | An envelope with a duplicate key, a key its schema version does not define, a fractional number, or an integer past 2^53 − 1 | refused at admission; no binding is computed; the read counter stays at zero | `[proposed: #199]` |
 | 12 i | Two sources: source A under consent A and source B under consent B (🌫, review on #199) | each read is counted against its own entry; every read falls inside both its entry's scope and its consent's | `[proposed: #199]` |
 | 12 ii | Two sources, one entry missing its `consent_ref`, or carrying the other source's | refused at admission; the read counters for both sources stay at zero | `[proposed: #199]` |
 | 12 iii | A valid, broad consent, and a read for a record outside its entry's `records` or `window` | that read is refused; the counter for records outside the entry stays at zero; the run ends in a failure record, reason refused read | `[proposed: #199]` |
 | 12 iv | Two entries for the same actor and stream | refused at admission as ambiguous; the read counter stays at zero | `[proposed: #199]` |
+| 13 i | A success sent after `deadline_ms` by the slot's clock, before the authority layer's deadline failure write | refused; the store fills the slot `failed`, reason deadline, in that write; the success gets that receipt marked `late`; the authority layer's later failure write gets it as a `duplicate`; nothing read is published | `[proposed: #199]` |
+| 13 ii | The same, with the runner's clock set behind the store's, so the runner believes it is in time | refused as 13 i: only the store's clock judges | `[proposed: #199]` |
+| 13 iii | A deadline failure sent before `deadline_ms` by the slot's clock | refused; the slot stays empty; a success before the deadline is still accepted | `[proposed: #199]` |
+| 14 i | A worker registered with `max_attempts: 2` fails twice with a worker error; its runner then tries a third attempt | the third attempt is refused, and a send carrying `attempt: 3` is refused and recorded; the slot fills `failed`, reason attempts, after the second; the second attempt started no sooner than `backoff_base_ms` after the first ended | `[proposed: #199]` |
+| 14 ii | A worker registers `max_attempts: 4`, or `0`, or no backoff | refused at registration; a summons naming it is refused at admission; the read counter stays at zero | `[proposed: #199]` |
+| 14 iii | A summons whose attempts cannot fit its deadline (`deadline_ms − admitted_at_ms < A·w + b·(2^(A−1) − 1)`) | refused at admission | `[proposed: #199]` |
+| 15 i | The verified invoker cancels a running summons | the slot fills `failed`, reason `cancelled`; a failure record is sung; no further attempt starts; the attempt's later success gets that receipt as a `duplicate`; nothing read is published | `[proposed: #199]` |
+| 15 ii | A cancel from another prince, or from a heard item | refused and counted; the slot is unchanged; the run goes on | `[proposed: #199]` |
+| 15 iii | A cancel after the success was accepted | gets the existing receipt; the slot and the air are unchanged | `[proposed: #199]` |
+| 16 i | A mark summons on one input key three times, and each summons fails with reason attempts | after the third, the input key is parked and a parked record is sung, naming the input key, the three `summons_id`s and who may release; the mark's fourth summons is refused at admission; the read counter stays at zero | `[proposed: #199]` |
+| 16 ii | Two of those three failures are reason revocation or cancelled | the input key is not parked | `[proposed: #199]` |
+| 16 iii | A release from the named releaser, then one from anyone else on another parked key | the first resets the count and the next summons is admitted; the second is refused and counted | `[proposed: #199]` |
+| 17 i | A result whose lineage plus 800-byte summary exceeds the item body ceiling | the item carries lineage in `body` and the summary by `body_ref`; the item fits the ceiling; a reader in the audience fetches the summary and its digest matches | `[proposed: #199]` |
+| 17 ii | The stored summary is altered, or fetched by a reader outside the audience, or after the TTL | the reader refuses the altered bytes; the store refuses the other two | `[proposed: #199]` |
+| 17 iii | A lineage that alone exceeds the ceiling | the success is refused; the slot fills `failed`, reason oversize; nothing is truncated | `[proposed: #199]` |
 
 Case 2's ablation arm exists to show which rule does the work. With exclusion on, the hop bound is never
 reached in that fixture. With it off, the hop bound alone cuts the cycle, later and at more cost.
@@ -813,6 +1068,15 @@ Each names who should decide. Nothing here is decided by this draft.
   everything sung through it reads hop 0. Also whether the summons authority layer that stamps lineage (§6.1)
   is the same component as RFC-0002's host daemon (#176 decision 2) (🌿, overclaim check on #199)
   `[open: §9]`.
+- **Retry and parking defaults.** Each worker's `backoff_base_ms`, whether `N = 3` holds for every worker,
+  and who is named to release a parked input key, per worker (§5.2) `[open: §9]`.
+- **The relay bound `r`.** How long after `deadline_ms` the store and the station keep replaying and draining
+  sends, which fixes the replay horizon and the slot's retention (§5.2) `[open: §9]`.
+- **The log whitelist.** The closed list of error classes and counters a log may carry (§2.2) `[open: §9]`.
+- **The by-reference store.** Where a result's summary lives when it travels by reference, under either slot
+  option (§6.1) `[open: §9]`.
+- **Key rotation and on-air identity.** Whether a result on air may be carried across a station key rotation,
+  and so change the station key in its identity (§6.1) `[open: §9]`.
 - **Rollout** of a familiar station and its manifest grant (R4 gap 9). A later go, not this RFC `[open: §9]`.
 
 ---
@@ -825,6 +1089,7 @@ Each names who should decide. Nothing here is decided by this draft.
 | 1 | 2026-11-27 | 🍃 | Two reviews at `c5cbbb6b`. **🌊's** (comment on #199): (1) a `consent_ref` is a locator, not a grant. §4.1 now verifies the record behind it at admission and every read (integrity and issuer, actor, exact source, audience, a new grantee field, revocation), by the read path rather than the worker, failing closed; §2.1 says so. (2) Revocation after the last read and before publication: §4.2 re-checks consent at the slot's accept, which is the linearization point. Revoked before it, the slot fills `failed`; after it, the result stays on air until its TTL or a PLUCK. The promise is narrowed to match. (3) `worker`/`worker_version` are backed by a runner's execution attestation against a new `worker_artifact` digest (§2.2, §5.1, §6.1); a mismatch fills the slot `failed`. Claim 2 now reads "the set of consents it read", and its falsifier covers (1) and (3) (§0.2). **🪨's** (review on #199): (a) a metric-backed mark carries the chains of the records it counts, or must not count summons results (§3.1, §3.2, §6.3 rule 6, and a second named loss). (b) Under option B a filled slot is `pending` until the station accepts; a relay replays until it does; claim 4 is split into safety and liveness (§0.2, §5.3). §8 gained cases 1a vii and viii, 2a and 2b, 8, 9 and 10; §9 gained four entries. |
 | 2 | 2026-11-27 | 🍃 | **🌫's** review on #199, at `c5cbbb6b`. (1) Sources and their consents are one typed list, `refs.sources`: one entry per source, each with its scope and exactly one `consent_ref`. There are no parallel arrays. A missing, ambiguous or mismatched association is refused at admission. A read must fall inside both its entry's scope and its consent's (§2.1, §2.2, §4.1, §4.4, the §2.4 example). The context gains `audience` and `attempt`. (2) §5.3 defines the binding exactly: the projection, a closed list of attempt-local fields (`log_destination`, `attempt`) that are left out, RFC 8785 encoding, integers only, duplicate and unknown keys refused, and a pinned Vector 1. `deadline` is `deadline_ms` everywhere. §8 gained cases 11 and 12; §9 gained one entry; References gained RFC 8785. |
 | 3 | 2026-11-27 | 🍃 | **🌿's** overclaim check on #199 (at `f901de72`; all nine items re-checked at `b2599f73`, and all hold). Overclaims: §1.2 no longer says there are no declared duplicates, and §1.1 cites the OpenClaw binding's outbox as built prior art; §5.3 says listener dedupe keys on seq and so hides no re-sent result, not even from one listener, which is why uniqueness lives at the store; §4.3 quotes figs's 11-04 ruling as he gave it (no "review"); claim 3 (§0.2) and §6.3's proof are scoped to intact chains, with the two named losses outside, and §7 counts both; §6.3's hop backstop is narrowed to a chain that kept its hop; §3.3 no longer says biology cannot tell senders apart. Mis-tags: §0.4's authority-layer and terminal-slot definitions are tagged; §1.3's column is "Specified (proposed) in", and gap 9 is "not specified". Also from his notes: §4.2 puts the per-read revocation check on the read path; §5.3 gains a prior-art paragraph; §9 gains two entries (slot vs outbox; where causality rides and who stamps lineage). |
+| 4 | 2026-11-27 | 🍃 | An outside reader's row-by-row completeness table against AWS Lambda, at `104c644e` (after a back-merge of `main` at `88d486cc`). Nine rows closed as this RFC's decisions. (1) **Retries** (§5.2): `max_attempts` 1 to 3, counting the first, with exponential backoff `b × 2^(n−2)`, registered per worker, refused above 3, copied into the context as `retry` inside the binding; only worker errors and lost attempts retry; admission refuses attempts that cannot fit the deadline; the **retry horizon** is `deadline_ms` and the **replay horizon** `deadline_ms + r`, and the slot is kept until the replay horizon plus the TTL. (2) **The slot's clock judges the deadline** (§5.2): the authoritative store's clock; a success after `deadline_ms` is refused and fills `failed`, reason deadline, so a late success can no longer win first-write; receipts gain `late` (§5.3). (3) **Cancel** (§4.2): by the verified invoker, or by the consent holder through revocation; fills `failed`, reason `cancelled`, linearized at the accept. (4) **Poison** (§5.2): failures counted per input key (worker and event, without `summons_id`); after three, the key is **parked**, a parked record is sung, and only a named releaser releases it. (5) **On-air identity** is `(station key, summons_id)` (§6.1, §0.2 claim 4, §5.3). (6) **Quorum** counts distinct key holders (§3.3, §7). (7) **`log_destination`** carries refs, counters and error classes only, by the runner's whitelist (§2.2, §4.3, §7). (8) **Size**: over the item ceiling, the summary goes by RFC-0001's `body_ref`, and lineage is never sent by reference (§6.1, §4.4). (9) **Unknown keys refused** is a deliberate departure from RFC-0001 §9.5 (§2.1, §5.3). The running example gains `retry` and `wall_s` 240, so Vector 1 and its binding changed. §8 gained cases 13 to 17, and 1a v and 11 iii were amended; §7 gained three rows; §9 gained five entries. Prior art cited where it bears, each with where it breaks: CloudEvents 1.0 (§6.1), Knative delivery (§5.2), Temporal Workflow Id policies (§5.1, §5.3), RFC 4271 §9.1.2 (§6.3), the transactional outbox (§5.3), Saltzer and Schroeder (§4.2), Hardy (§4.1). Also, from 🪨's receipt on #198: §1.1 and §5.3's prior art now say the OpenClaw outbox matches on duplicate and `key_conflict` but deliberately never replays an uncertain send, so its tests cannot stand in for the summons relay. |
 
 ---
 
@@ -835,6 +1100,9 @@ Informative only, except BCP 14 and RFC 8785. Each entry was verified for resear
 and the quoted passages read; DOIs were resolved on Crossref; arXiv metadata was read from the arXiv API. Where
 only metadata was read, the entry says so, and this RFC claims no more than that.
 
+Revision 4's entries (marked *rev 4*) are not part of R3. Each was fetched on 2026-11-27, and each says what
+was read: a page and the passages quoted, or metadata only, from Crossref.
+
 **Invocation**
 
 - **[AWS-Invoke]** Amazon Web Services. *Understanding Lambda function invocation methods* and *Invoke a Lambda function synchronously*. AWS Lambda Developer Guide. https://docs.aws.amazon.com/lambda/latest/dg/lambda-invocation.html and https://docs.aws.amazon.com/lambda/latest/dg/invocation-sync.html (accessed 2026-11-26)
@@ -842,7 +1110,17 @@ only metadata was read, the entry says so, and this RFC claims no more than that
 - **[AWS-ESM]** Amazon Web Services. *How Lambda processes records from stream and queue-based event sources*. AWS Lambda Developer Guide. https://docs.aws.amazon.com/lambda/latest/dg/invocation-eventsourcemapping.html (accessed 2026-11-26)
 - **[AWS-Context]** Amazon Web Services. *Using the Lambda context object to retrieve Node.js function information*. AWS Lambda Developer Guide. https://docs.aws.amazon.com/lambda/latest/dg/nodejs-context.html (accessed 2026-11-26)
 - **[AWS-EDA]** Amazon Web Services. *Creating event-driven architectures with Lambda*. AWS Lambda Developer Guide. https://docs.aws.amazon.com/lambda/latest/dg/concepts-event-driven-architectures.html (accessed 2026-11-26)
+- **[CloudEvents-1.0]** CloudEvents. *CloudEvents specification, version 1.0.2*, the `id` and `source` attributes. https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md (read at https://raw.githubusercontent.com/cloudevents/spec/v1.0.2/cloudevents/spec.md, accessed 2026-11-27; *rev 4*)
+- **[Knative-Delivery]** The Knative Authors. *Handling delivery failure*, the delivery spec (`retry`, `backoffPolicy`, `backoffDelay`, `deadLetterSink`). Knative documentation. https://knative.dev/docs/eventing/event-delivery/ (accessed 2026-11-27; *rev 4*)
+- **[Temporal-WorkflowId]** Temporal Technologies. *Workflow Id and Run Id*, the Workflow Id Reuse and Conflict Policies. Temporal documentation. https://docs.temporal.io/workflow-execution/workflowid-runid (accessed 2026-11-27; *rev 4*)
+- **[Outbox]** Richardson, C. *Pattern: Transactional outbox*. microservices.io. https://microservices.io/patterns/data/transactional-outbox.html (accessed 2026-11-27; *rev 4*)
 - **[JonasEtAl2019]** Jonas, E., Schleier-Smith, J., Sreekanti, V., Tsai, C.-C., Khandelwal, A., Pu, Q., Shankar, V., Carreira, J., Krauth, K., Yadwadkar, N., Gonzalez, J. E., Popa, R. A., Stoica, I., & Patterson, D. A. (2019). *Cloud Programming Simplified: A Berkeley View on Serverless Computing*. arXiv:1902.03383. https://arxiv.org/abs/1902.03383 (*metadata verified; the section on shared state was not confirmed*)
+
+**Protection and routing**
+
+- **[SaltzerSchroeder1975]** Saltzer, J. H., & Schroeder, M. D. (1975). The protection of information in computer systems. *Proceedings of the IEEE*, 63(9), 1278–1308. https://doi.org/10.1109/PROC.1975.9939 (*metadata from Crossref; the complete-mediation sentence was read at the copy on Saltzer's MIT pages, https://web.mit.edu/Saltzer/www/publications/protection/Basic.html, accessed 2026-11-27; rev 4*)
+- **[Hardy1988]** Hardy, N. (1988). The confused deputy (or why capabilities might have been invented). *ACM SIGOPS Operating Systems Review*, 22(4), 36–38. https://doi.org/10.1145/54289.871709 (*metadata only, from Crossref; rev 4*)
+- **[RFC 4271]** Rekhter, Y., Ed., Li, T., Ed., and S. Hares, Ed., *A Border Gateway Protocol 4 (BGP-4)*, RFC 4271, January 2006, https://www.rfc-editor.org/rfc/rfc4271 (§9.1.2 read in the plain-text copy, accessed 2026-11-27; *rev 4*)
 
 **Cell signalling**
 
