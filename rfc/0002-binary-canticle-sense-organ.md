@@ -889,7 +889,8 @@ those frond-ear routes rather than refusing them (§4.4)
 The ear runs beside other host processes under a shared uid. Both signing keys matter: if that uid can
 read either the **issuer** key or the **station** key, a reader-side process can bypass the intended
 election and sign an effect itself. An issuer that signs arbitrary caller-supplied bytes has the same
-defect `[open: binary-canticle#99]`.
+defect `[open: binary-canticle#185]`. (#185 is issuer-key custody. #99 is the separate second-uid
+daemon-socket defect, a prerequisite for any split-uid deployment of it.)
 
 The publish path is #176 decision 2 (§0.7): RFC-0001's D35, with the host daemon as the target. The
 harness-facing publish tool MUST be a peer client of the one host daemon. The agent supplies text and an
@@ -916,7 +917,7 @@ evidence at its tested boundary, not an installed producer `[proposed: #159]`.
   `[built: binary-canticle@452c5433:prototype/canticle-station/canticle/derived_reply_proposal.py:542]`.
 - The station's own signing key MUST also be unreadable by the ear's uid, with a separate
   policy-enforcing station service/control path rather than an arbitrary signing oracle
-  `[open: binary-canticle#99]`.
+  `[open: binary-canticle#185]` (a split uid also needs `[open: binary-canticle#99]`).
 - The request MUST NOT supply its own lineage or widen the audience beyond the narrowest exposed source
   `[proposed: #162]`. (#162 at `452c5433` never records a source's scope, so this is not enforced:
   `[built: binary-canticle@452c5433:prototype/canticle-station/canticle/derived_reply_proposal.py:94]`.)
@@ -957,7 +958,7 @@ inspection without leaking a private transcript into the frame `[proposed: #162]
 - On silas today, the Claude-ear processes and station key files share the `figs` uid; the reader uid
   can read those station keys (🍃's read on PR #168, names and modes only). Thus station-key custody is
   still **host-proof, not seat-proof** (binary-canticle#99), and an issuer alone would not close the
-  derived-publication boundary `[open: binary-canticle#99]`.
+  derived-publication boundary `[open: binary-canticle#185]`.
 - #166's ledger provisioning and installation are proposed, not done `[proposed: #166]`.
 - No source test, capsule probe or station acceptance proves that this continuing prince heard, chose,
   sent and reached another. The bounded disposable proof in #167, with exact installed hashes and a
@@ -1052,7 +1053,7 @@ an installed receipt.
 | Live-set fair shares and the coverage note's local omissions (frond-ear#119) | merged in source at `a8e2e5b`; no installed receipt here | none | `[built+tested: frond-ear@a8e2e5b:src/canticle/delivery.ts:31 \| test/canticle-live-fairness.test.ts:202]` |
 | Fair admission at the host daemon's first hop | open PR, not merged | #173 | `[proposed: #173]` |
 | §2.7 flood acceptance test | FAILS on the built path | #171's report | `[built+tested: binary-canticle@d4c3066:reports/measurement/2026-11-23-step-one/README.md:9 \| step-one flood cells F1-F11]` |
-| Derived publication (answering back) | closed: no owner issuer; on silas the station keys remain readable by the ear uid | frond-ear#113; #162 draft; binary-canticle#99 | `[open: binary-canticle#99]` |
+| Derived publication (answering back) | closed: no owner issuer; on silas the station keys remain readable by the ear uid | frond-ear#113; #162 draft; binary-canticle#185 (key custody), #99 (second-uid socket) | `[open: binary-canticle#185]` |
 | OpenClaw continuing-reader ingress | conditional OC-0 source slice; live continuing-session drain/custody unproved | #161 and the pinned prototype README | `[open: #161]` |
 | Ring-backed ear | design only | frond-ear#116, frond-ear#118 | `[proposed: frond-ear#116]` |
 | Durable per-prince ledger and return view | design only | this RFC §3.1 | `[proposed: #168]` |
