@@ -169,6 +169,16 @@ summoner does not wait, and the result comes back by being sung, which plays the
 - A reference names where to look. It never grants the right to look. That right comes from the consent
   record a `consent_ref` locates, once that record is verified at the read (§4.1). The ref itself is only a
   locator (🌊, review on #199) `[proposed: #199]`.
+- **Sources are one typed list** (🌫, review on #199). `refs.sources` holds one entry per source. Each entry
+  pairs one source (its `actor` and `stream`) with the scope the summons may read there (`records`, a
+  `window`, and optionally `fields`) and exactly one `consent_ref`. There are no parallel arrays, and no
+  scope is ever formed by combining parts of different entries `[proposed: #199]`.
+- Each entry has a unique `key`, and no two entries name the same actor and stream. A summons with an entry
+  that lacks its `consent_ref`, two entries for one source, or a `consent_ref` whose record is for another
+  source than its entry's (§4.1) MUST be refused at admission, before any read `[proposed: #199]`.
+- **A read is inside both scopes, or it is refused.** A fetched record MUST fall inside its entry's scope and
+  inside the current scope of that entry's consent record. A broad consent does not widen an entry, and a
+  broad entry does not widen a consent. A read that matches no entry MUST be refused `[proposed: #199]`.
 
 ### 2.2 Context
 
@@ -179,18 +189,21 @@ has nothing, it says so.
 |---|---|---|
 | `summons_id` | the summons authority layer, once, at admission | **No direct analogue.** `awsRequestId` identifies one invocation request. It is not a caller-chosen key that stays the same across every retry and re-send (🪨). This key comes from the summons authority layer `[proposed: #199]` |
 | `causality` (`election`, `chain`, `hop`) | the summons authority layer (§6.3) | none. AWS detects some recursive loops itself [AWS-EDA], but exposes no chain to the function `[proposed: #199]` |
-| `deadline` (absolute, ms) | the authority layer, at admission | `getRemainingTimeInMillis()`, which gives remaining time rather than an absolute deadline `[proposed: #199]` |
+| `deadline_ms` (absolute) | the authority layer, at admission | `getRemainingTimeInMillis()`, which gives remaining time rather than an absolute deadline `[proposed: #199]` |
 | `invoker`, verified | the summons authority layer | **No direct analogue.** Lambda's `identity` is Amazon Cognito identity for mobile-app callers, not a general invoker (🪨). This field comes from the summons authority layer `[proposed: #199]` |
 | `worker`, `worker_version` | the summons rule names them; the runner attests what actually ran (§5.1) | `functionName`, `functionVersion` `[proposed: #199]` |
 | `worker_artifact` | the summons authority layer, at admission: the digest of the immutable artifact that `worker_version` resolves to in the worker registry (🌊, review on #199) | none `[proposed: #199]` |
 | `budget` (tokens, wall time, result bytes) | the summons rule, within §3's bound | none. `memoryLimitInMB` bounds memory, not tokens, time or output `[proposed: #199]` |
-| `log_destination` | the runner | `logGroupName` (with `logStreamName`) `[proposed: #199]` |
-| `consent_ref` | the summons rule; checked at every read (§4.2) | none `[proposed: #199]` |
+| `log_destination` | the runner, per attempt | `logGroupName` (with `logStreamName`) `[proposed: #199]` |
+| `attempt` | the runner, per attempt | none `[proposed: #199]` |
+| `consent_ref`, one per `refs.sources` entry (in the event, §2.1) | the summons rule; verified at admission and at every read (§4.1, §4.2) | none `[proposed: #199]` |
+| `audience` | the summons rule: the result's audience, within every consent's audience (§4.1) | none `[proposed: #199]` |
 | `aspect` | the summons rule | none (§2.3) `[proposed: #199]` |
 
-Every context field except `log_destination` MUST be fixed at admission and covered by the summons
-**binding**: a digest of the canonical event and context as admitted. A retry carries the same binding. An
-attempt counter, if any, lies outside it `[proposed: #199]`.
+Every context field except the attempt-local ones (`log_destination` and `attempt`) MUST be fixed at
+admission and covered by the summons **binding**, a digest of the admitted event and context whose exact
+projection and encoding §5.3 defines. A retry carries the same binding (🌫, review on #199)
+`[proposed: #199]`.
 
 A worker MUST NOT write `summons_id`, `causality`, `invoker` or `consent_ref`. If it supplies them, the result is
 refused (§6.1) `[proposed: #199]`. The same holds for `worker`, `worker_version` and `worker_artifact`: a
@@ -216,10 +229,16 @@ log.
     "v": 1,
     "kind": "digest.window",
     "refs": {
-      "actors": ["fixture-actor-a"],
-      "streams": ["fixture:activity"],
-      "records": ["rec-a-0001", "rec-a-0002"],
-      "window": {"from_ms": 1764200000000, "to_ms": 1764203600000}
+      "sources": [
+        {
+          "key": "src-a",
+          "actor": "fixture-actor-a",
+          "stream": "fixture:activity",
+          "records": ["rec-a-0001", "rec-a-0002"],
+          "window": {"from_ms": 1764200000000, "to_ms": 1764203600000},
+          "consent_ref": "auth:fixture-actor-a"
+        }
+      ]
     }
   },
   "context": {
@@ -233,10 +252,11 @@ log.
     "invoker": {"kind": "mark", "rule": "mark:fixture-quiet", "owner": "fixture-prince"},
     "worker": "fixture-digester",
     "worker_version": "0.0.0-fixture",
-    "worker_artifact": "sha256:<digest of the fixture-digester 0.0.0-fixture artifact>",
+    "worker_artifact": "sha256:fixture-digester-0.0.0-fixture",
     "budget": {"tokens": 20000, "wall_s": 600, "result_bytes": 800},
     "log_destination": "fixture://logs/smn-fx-0001",
-    "consent_ref": "auth:fixture-actor-a",
+    "attempt": 1,
+    "audience": "fixture-room",
     "aspect": "summary.plain"
   }
 }
@@ -303,8 +323,9 @@ Consent is per actor and sovereign to each seat. An authorization record follows
 **actor, source, audience, revocation**. #119 already requires each of those four for every source
 authorization.
 
-- A summons MUST name one `consent_ref` per source it may read. A worker MUST NOT read a source that no
-  `consent_ref` in its summons names `[proposed: #199]`.
+- A summons MUST name one `consent_ref` per source it may read, in that source's `refs.sources` entry (§2.1;
+  🌫, review on #199). A worker MUST NOT read a source that no `consent_ref` in its summons names
+  `[proposed: #199]`.
 - A consent record's audience bounds the result: the result's audience MUST NOT be wider than the narrowest
   audience among the consents it read under `[proposed: #199]`.
 
@@ -323,7 +344,7 @@ verified, not only located.
   2. **Actor.** The record's actor is the actor whose data this read fetches.
   3. **Source.** The record's source covers exactly the stream or record being read. A record for another
      source, or one the read would widen, fails.
-  4. **Audience.** The result audience the summons was admitted with is within the record's audience.
+  4. **Audience.** The summons's `audience` (§2.2) is within the record's audience.
   5. **Grantee.** This summons's `worker` (and its rule, if the record names rules) is among the record's
      grantees.
   6. **Revocation**, as §4.2.
@@ -388,7 +409,8 @@ The digester is owned by 🪨 Rune (#198). This section is the contract it must 
 parsing and summarizing live on #198, not here.
 
 - **Inputs:** a summons event of references only (§2.1) and its context (§2.2), including one `consent_ref`
-  per source. The digester MUST fetch what it reads itself, under §4.1 and §4.2 `[proposed: #198]`.
+  per `refs.sources` entry (§2.1). The digester MUST fetch what it reads itself, under §2.1, §4.1 and §4.2,
+  and only inside each entry's scope `[proposed: #198]`.
 - **Outputs:** one bounded summary, within `budget.result_bytes`, plus its lineage (§6.1). The summary MUST NOT
   reveal more than the consents' audience allows `[proposed: #198]`.
 - **One terminal result** per `summons_id`, through §5.3's slot. Failure is a sung failure record, never
@@ -412,7 +434,7 @@ shared state. This RFC has not confirmed the section that says so and claims not
 
 So a summons is a long-running, stateful task dressed in a FaaS-shaped contract.
 
-- The runner MUST enforce `deadline` and `budget`. A run that exceeds either MUST end in a failure record
+- The runner MUST enforce `deadline_ms` and `budget`. A run that exceeds either MUST end in a failure record
   naming which `[proposed: #199]`.
 - The runner SHOULD heartbeat a long run so that "still running" and "the runner died" read differently.
   Unknown MUST NOT be shown as quiet `[proposed: #199]`.
@@ -474,6 +496,36 @@ After a failed call, "your function's code might have run completely, partially,
   retry can still arrive re-opens claim 4 `[proposed: #199]`.
 
 (The lesson of ttf#64.)
+
+**The binding, exactly** (🌫, review on #199). Two implementations MUST hash the same bytes for one summons, or
+an honest retry reads as a conflict `[proposed: #199]`.
+
+- **Projection.** The binding MUST be `sha256:` followed by the lowercase hex SHA-256 of the canonical encoding
+  of `{"v": 1, "event": <the admitted event>, "context": <the admitted context without its attempt-local
+  fields>}` `[proposed: #199]`.
+- **The attempt-local fields are a closed list:** `log_destination` and `attempt`. They are left out, so a
+  retry on another runner or log stream keeps its binding. Every other field of the event and the context is
+  in, including `summons_id`, `causality`, `deadline_ms`, `invoker`, `worker`, `worker_version`,
+  `worker_artifact`, `budget`, `audience`, `aspect`, and every `refs.sources` entry with its `consent_ref`. A
+  field not on the closed list is in. Remaining time is never a field: the context carries only the absolute
+  `deadline_ms` `[proposed: #199]`.
+- **Encoding.** The JSON Canonicalization Scheme [RFC 8785]: object keys sorted, no insignificant whitespace,
+  strings serialized as it serializes them, with no Unicode normalization `[proposed: #199]`.
+- **Numbers.** Every number MUST be an integer from −(2^53 − 1) to 2^53 − 1, so every implementation encodes it
+  alike. Any other number MUST be refused at admission `[proposed: #199]`.
+- **Duplicate and unknown keys are refused, never dropped.** An envelope with a duplicate key in any object, or
+  a key its schema version does not define, MUST be refused at admission. Dropping either would let two
+  implementations hash different bytes for one summons `[proposed: #199]`.
+
+**Vector 1.** The running example (§2.4) projects to these bytes (one line, no trailing newline):
+
+```
+{"context":{"aspect":"summary.plain","audience":"fixture-room","budget":{"result_bytes":800,"tokens":20000,"wall_s":600},"causality":{"chain":[["mark:fixture-quiet","smn-fx-0001"]],"election":"mark:fixture-quiet","hop":1},"deadline_ms":1764204500000,"invoker":{"kind":"mark","owner":"fixture-prince","rule":"mark:fixture-quiet"},"summons_id":"smn-fx-0001","worker":"fixture-digester","worker_artifact":"sha256:fixture-digester-0.0.0-fixture","worker_version":"0.0.0-fixture"},"event":{"kind":"digest.window","refs":{"sources":[{"actor":"fixture-actor-a","consent_ref":"auth:fixture-actor-a","key":"src-a","records":["rec-a-0001","rec-a-0002"],"stream":"fixture:activity","window":{"from_ms":1764200000000,"to_ms":1764203600000}}]},"v":1},"v":1}
+```
+
+Its binding is `sha256:e032203bce9b862aaf24429621235f458b131b7fb564fa5121051dfdf56f4b7a`.
+Reordering its keys, or changing `log_destination` or `attempt`, leaves the binding unchanged. Changing any
+included field gives another binding, and a send under it is a conflict (§8 case 11).
 
 **The receipt.** One shape for every send to the slot:
 
@@ -674,6 +726,14 @@ end-to-end form of the same test, and these cases are its contract-level part.
 | 10 ii | No runner attestation; only the worker reports its version | refused as 10 i | `[proposed: #199]` |
 | 10 iii | An attestation from another summons or binding is replayed | refused as 10 i | `[proposed: #199]` |
 | 10 iv | The worker writes `worker`, `worker_version` or `worker_artifact` into its result | the result is refused (§2.2) | `[proposed: #199]` |
+| 11 i | Vector 1 with its keys reordered and whitespace added (🌫, review on #199) | the binding is Vector 1's | `[proposed: #199]` |
+| 11 ii | A retry of Vector 1 with another `log_destination` and `attempt` | same binding; the retry gets the first receipt as a `duplicate`, never a `conflict` | `[proposed: #199]` |
+| 11 iii | Vector 1 with one change each: a record ref, the window, a `consent_ref`, `worker`, `worker_version`, `worker_artifact`, `deadline_ms`, `budget`, `audience` | each gives another binding; a send under it is refused as a `conflict` | `[proposed: #199]` |
+| 11 iv | An envelope with a duplicate key, a key its schema version does not define, a fractional number, or an integer past 2^53 − 1 | refused at admission; no binding is computed; the read counter stays at zero | `[proposed: #199]` |
+| 12 i | Two sources: source A under consent A and source B under consent B (🌫, review on #199) | each read is counted against its own entry; every read falls inside both its entry's scope and its consent's | `[proposed: #199]` |
+| 12 ii | Two sources, one entry missing its `consent_ref`, or carrying the other source's | refused at admission; the read counters for both sources stay at zero | `[proposed: #199]` |
+| 12 iii | A valid, broad consent, and a read for a record outside its entry's `records` or `window` | that read is refused; the counter for records outside the entry stays at zero; the run ends in a failure record, reason refused read | `[proposed: #199]` |
+| 12 iv | Two entries for the same actor and stream | refused at admission as ambiguous; the read counter stays at zero | `[proposed: #199]` |
 
 Case 2's ablation arm exists to show which rule does the work. With exclusion on, the hop bound is never
 reached in that fixture. With it off, the hop bound alone cuts the cycle, later and at more cost.
@@ -712,6 +772,8 @@ Each names who should decide. Nothing here is decided by this draft.
   slot are different stores (§4.2) `[open: §9]`.
 - **Execution attestation.** Its format and signing key per runner (ARC or Temporal), and the worker registry
   that maps a `worker_version` to its artifact digest (§5.1, §2.2; 🌊, review on #199) `[open: §9]`.
+- **Read scope fields.** What a `refs.sources` entry's `fields` may name, per source schema, and how a consent
+  record states a narrower scope than its whole source (§2.1; 🌫, review on #199) `[open: §9]`.
 - **Rollout** of a familiar station and its manifest grant (R4 gap 9). A later go, not this RFC `[open: §9]`.
 
 ---
@@ -722,12 +784,13 @@ Each names who should decide. Nothing here is decided by this draft.
 |---|---|---|---|
 | 0 | 2026-11-27 | 🍃 | The draft, from the outline at frond-gloss `24c311a`. 🪨's claims audit (room, 2026-11-27, 03:41Z to 03:44Z) made five fixes, all carried here. (1) `summons_id` and `invoker` have no direct Lambda analogue (§2.2): `awsRequestId` is one request, and `identity` is Cognito mobile identity; both fields come from the summons authority layer. (2) Claim 4 is exactly one sung result per `summons_id`, not "at most one, or a declared duplicate" (§0.2). Send-then-timeout is unconfirmed, not failure (§5.3). (3) Revocation is checked at every read, not only at admission (§4.2). (4) The exclusion rule by causality chain proves no self-retrigger; the hop count only bounds (§6.3). Uniqueness lives at the authoritative store, with a conditional accept or a transactional outbox, every retry gets the same receipt, and a pre-read is only an optimisation (§5.3). §8 gained cases 1a i to iv. (5) `summons_id` is the one terminal slot, not `(summons_id, result_kind)`: success and failure are mutually exclusive states of it, and a changed replay conflicts (§5.3). §8 gained cases 1a v and vi. The digester's owner is 🪨 (#198). |
 | 1 | 2026-11-27 | 🍃 | Two reviews at `c5cbbb6b`. **🌊's** (comment on #199): (1) a `consent_ref` is a locator, not a grant. §4.1 now verifies the record behind it at admission and every read (integrity and issuer, actor, exact source, audience, a new grantee field, revocation), by the read path rather than the worker, failing closed; §2.1 says so. (2) Revocation after the last read and before publication: §4.2 re-checks consent at the slot's accept, which is the linearization point. Revoked before it, the slot fills `failed`; after it, the result stays on air until its TTL or a PLUCK. The promise is narrowed to match. (3) `worker`/`worker_version` are backed by a runner's execution attestation against a new `worker_artifact` digest (§2.2, §5.1, §6.1); a mismatch fills the slot `failed`. Claim 2 now reads "the set of consents it read", and its falsifier covers (1) and (3) (§0.2). **🪨's** (review on #199): (a) a metric-backed mark carries the chains of the records it counts, or must not count summons results (§3.1, §3.2, §6.3 rule 6, and a second named loss). (b) Under option B a filled slot is `pending` until the station accepts; a relay replays until it does; claim 4 is split into safety and liveness (§0.2, §5.3). §8 gained cases 1a vii and viii, 2a and 2b, 8, 9 and 10; §9 gained four entries. |
+| 2 | 2026-11-27 | 🍃 | **🌫's** review on #199, at `c5cbbb6b`. (1) Sources and their consents are one typed list, `refs.sources`: one entry per source, each with its scope and exactly one `consent_ref`. There are no parallel arrays. A missing, ambiguous or mismatched association is refused at admission. A read must fall inside both its entry's scope and its consent's (§2.1, §2.2, §4.1, §4.4, the §2.4 example). The context gains `audience` and `attempt`. (2) §5.3 defines the binding exactly: the projection, a closed list of attempt-local fields (`log_destination`, `attempt`) that are left out, RFC 8785 encoding, integers only, duplicate and unknown keys refused, and a pinned Vector 1. `deadline` is `deadline_ms` everywhere. §8 gained cases 11 and 12; §9 gained one entry; References gained RFC 8785. |
 
 ---
 
 ## References
 
-Informative only, except BCP 14. Each entry was verified for research note R3
+Informative only, except BCP 14 and RFC 8785. Each entry was verified for research note R3
 (`karmaterminal/frond-gloss:crusade/research/R3-bibliography.md` §1 and §4) on 2026-11-26: AWS pages were fetched
 and the quoted passages read; DOIs were resolved on Crossref; arXiv metadata was read from the arXiv API. Where
 only metadata was read, the entry says so, and this RFC claims no more than that.
@@ -745,4 +808,6 @@ only metadata was read, the entry says so, and this RFC claims no more than that
 
 - **[WatersBassler2005]** Waters, C. M., & Bassler, B. L. (2005). Quorum sensing: cell-to-cell communication in bacteria. *Annual Review of Cell and Developmental Biology*, 21, 319–346. https://doi.org/10.1146/annurev.cellbio.21.012704.131001 (*abstract read*)
 
-**Normative**: BCP 14 [RFC 2119] [RFC 8174], as in §0.3.
+**Normative**: BCP 14 [RFC 2119] [RFC 8174], as in §0.3. And [RFC 8785]: Rundgren, A., Jordan, B., and S.
+Erdtman, *JSON Canonicalization Scheme (JCS)*, RFC 8785, June 2020, https://www.rfc-editor.org/rfc/rfc8785,
+for §5.3's binding. It was added in revision 2, cited by number, and is not part of R3's check.
