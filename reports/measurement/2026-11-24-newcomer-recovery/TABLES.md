@@ -42,15 +42,15 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 
 | row (sources-ports-rate-offset) | fix | new | base | slice |
 |---|---|---|---|---|
-| xfixed-40-20000-0 | PASS: worst first 0.02 s; first 0/1, items 0/20 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.14 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
-| xfixed-40-20000-5 | PASS: worst first 0.04 s; first 0/1, items 0/20 | PASS: worst first 0.04 s; first 0/6, items 0/120 | PASS: worst first 0.05 s; first 0/3, items 0/60 | PASS: worst first 0.06 s; first 0/5, items 0/100 |
-| xfixed-40-20000-30 | PASS: worst first 0.02 s; first 0/1, items 0/20 | PASS: worst first 0.05 s; first 0/7, items 0/140 | PASS: worst first 0.13 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
-| xfixed-40-20000-120 | PASS: worst first 0.02 s; first 0/1, items 0/20 | PASS: worst first 0.05 s; first 0/7, items 0/140 | PASS: worst first 0.04 s; first 0/3, items 0/60 | PASS: worst first 0.03 s; first 0/5, items 0/100 |
-| xfixed-40-100000-0 | PASS: worst first 0.08 s; first 0/1, items 0/20 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.04 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
-| xfixed-40-100000-5 | – | PASS: worst first 0.05 s; first 0/7, items 0/140 | PASS: worst first 0.04 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
-| xfixed-40-100000-30 | – | PASS: worst first 0.04 s; first 0/6, items 0/120 | PASS: worst first 0.07 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
-| xfixed-40-100000-120 | – | PASS: worst first 0.05 s; first 0/7, items 0/140 | PASS: worst first 0.03 s; first 0/4, items 0/80 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
-| **cells passed** | **5 of 5** | **8 of 8** | **8 of 8** | **8 of 8** |
+| xfixed-40-20000-0 | PASS: worst first 0.05 s; first 0/5, items 0/100 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.14 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
+| xfixed-40-20000-5 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.04 s; first 0/6, items 0/120 | PASS: worst first 0.05 s; first 0/3, items 0/60 | PASS: worst first 0.06 s; first 0/5, items 0/100 |
+| xfixed-40-20000-30 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.05 s; first 0/7, items 0/140 | PASS: worst first 0.13 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
+| xfixed-40-20000-120 | PASS: worst first 0.12 s; first 0/5, items 0/100 | PASS: worst first 0.05 s; first 0/7, items 0/140 | PASS: worst first 0.04 s; first 0/3, items 0/60 | PASS: worst first 0.03 s; first 0/5, items 0/100 |
+| xfixed-40-100000-0 | PASS: worst first 0.08 s; first 0/5, items 0/100 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.04 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
+| xfixed-40-100000-5 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.05 s; first 0/7, items 0/140 | PASS: worst first 0.04 s; first 0/3, items 0/60 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
+| xfixed-40-100000-30 | PASS: worst first 0.05 s; first 0/5, items 0/100 | PASS: worst first 0.04 s; first 0/6, items 0/120 | PASS: worst first 0.07 s; first 0/3, items 0/60 | PASS: worst first 0.04 s; first 0/5, items 0/100 |
+| xfixed-40-100000-120 | PASS: worst first 0.05 s; first 0/5, items 0/100 | PASS: worst first 0.05 s; first 0/7, items 0/140 | PASS: worst first 0.03 s; first 0/4, items 0/80 | PASS: worst first 0.05 s; first 0/5, items 0/100 |
+| **cells passed** | **8 of 8** | **8 of 8** | **8 of 8** | **8 of 8** |
 
 | row (sources-ports-rate-offset) | fix | new | base | slice |
 |---|---|---|---|---|
@@ -171,35 +171,38 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 | row | tree | runs judged | first frame: on time / late / missing | items: on time / late / missing, of 20 a run | verdict | the harness's own verdict |
 |---|---|---|---|---|---|---|
 | xfixed-40-20000-0 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xfixed-40-20000-0 | fix | 0 of 1 | 0 / 0 / 0 | 0 / 0 / 0 | **INVALID**, 0 of 5 declared (run 0: underdriven: 14500 of 20000 in its lowest second) | PASS **(they differ)** |
+| xfixed-40-20000-0 | fix | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 0: underdriven: 14500 of 20000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-20000-0 | new | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xfixed-40-20000-0 | slice | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 0: underdriven: 18320 of 20000 in its lowest second; run 2: underdriven: 18340 of 20000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-20000-5 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xfixed-40-20000-5 | fix | 0 of 1 | 0 / 0 / 0 | 0 / 0 / 0 | **INVALID**, 0 of 5 declared (run 0: underdriven: 18070 of 20000 in its lowest second) | PASS **(they differ)** |
+| xfixed-40-20000-5 | fix | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 0: underdriven: 18070 of 20000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-20000-5 | new | 5 of 6 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 2: underdriven: 18530 of 20000 in its lowest second) | PASS |
 | xfixed-40-20000-5 | slice | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 4: underdriven: 18780 of 20000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-20000-30 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xfixed-40-20000-30 | fix | 0 of 1 | 0 / 0 / 0 | 0 / 0 / 0 | **INVALID**, 0 of 5 declared (run 0: underdriven: 17300 of 20000 in its lowest second) | PASS **(they differ)** |
+| xfixed-40-20000-30 | fix | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 0: underdriven: 17300 of 20000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-20000-30 | new | 5 of 7 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 1: underdriven: 3690 of 20000 in its lowest second; run 4: underdriven: 18850 of 20000 in its lowest second) | PASS |
 | xfixed-40-20000-30 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xfixed-40-20000-120 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xfixed-40-20000-120 | fix | 0 of 1 | 0 / 0 / 0 | 0 / 0 / 0 | **INVALID**, 0 of 5 declared (run 0: underdriven: 17500 of 20000 in its lowest second) | PASS **(they differ)** |
+| xfixed-40-20000-120 | fix | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 0: underdriven: 17500 of 20000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-20000-120 | new | 5 of 7 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 1: underdriven: 2280 of 20000 in its lowest second; run 4: underdriven: 18290 of 20000 in its lowest second) | PASS |
 | xfixed-40-20000-120 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xfixed-40-100000-0 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
-| xfixed-40-100000-0 | fix | 0 of 1 | 0 / 0 / 0 | 0 / 0 / 0 | **INVALID**, 0 of 5 declared (run 0: underdriven: 65200 of 100000 in its lowest second) | PASS **(they differ)** |
+| xfixed-40-100000-0 | fix | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 0: underdriven: 65200 of 100000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-100000-0 | new | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xfixed-40-100000-0 | slice | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 3: underdriven: 94300 of 100000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-100000-5 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
+| xfixed-40-100000-5 | fix | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 1: underdriven: 80100 of 100000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-100000-5 | new | 5 of 7 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 2: underdriven: 87150 of 100000 in its lowest second; run 4: underdriven: 89200 of 100000 in its lowest second) | PASS |
 | xfixed-40-100000-5 | slice | 4 of 5 | 4 / 0 / 0 | 80 / 0 / 0 | **INVALID**, 4 of 5 declared (run 1: underdriven: 94900 of 100000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-100000-30 | base | 3 of 3 | 3 / 0 / 0 | 60 / 0 / 0 | PASS | PASS |
+| xfixed-40-100000-30 | fix | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xfixed-40-100000-30 | new | 5 of 6 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 3: underdriven: 87550 of 100000 in its lowest second) | PASS |
 | xfixed-40-100000-30 | slice | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 0: underdriven: 79850 of 100000 in its lowest second; run 1: underdriven: 67050 of 100000 in its lowest second) | PASS **(they differ)** |
 | xfixed-40-100000-120 | base | 3 of 4 | 3 / 0 / 0 | 60 / 0 / 0 | PASS (run 1: underdriven: 86850 of 100000 in its lowest second) | PASS |
+| xfixed-40-100000-120 | fix | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | xfixed-40-100000-120 | new | 5 of 7 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 3: underdriven: 90350 of 100000 in its lowest second; run 4: underdriven: 93900 of 100000 in its lowest second) | PASS |
 | xfixed-40-100000-120 | slice | 3 of 5 | 3 / 0 / 0 | 60 / 0 / 0 | **INVALID**, 3 of 5 declared (run 1: underdriven: 92450 of 100000 in its lowest second; run 4: underdriven: 52200 of 100000 in its lowest second) | PASS **(they differ)** |
-11 cells where the two verdicts differ, or with too few valid runs
+12 cells where the two verdicts differ, or with too few valid runs
 
 | row | tree | runs judged | first frame: on time / late / missing | items: on time / late / missing, of 20 a run | verdict | the harness's own verdict |
 |---|---|---|---|---|---|---|
@@ -232,14 +235,14 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 | xchurn-40-100000-5 | 0.22 | 0.125; 5 of 5 | 0.050; 6 of 6 | 0.035; 3 of 3 | 0.047; 5 of 5 |
 | xchurn-40-100000-30 | 0.22 | 0.105; 5 of 5 | 0.061; 7 of 7 | 0.049; 3 of 3 | 0.044; 5 of 5 |
 | xchurn-40-100000-120 | 0.22 | 0.244; 4 of 5 **OUTSIDE** | 0.043; 9 of 9 | 0.035; 3 of 3 | 0.058; 5 of 5 |
-| xfixed-40-20000-0 | 0.22 | 0.022; 1 of 1 | 0.040; 5 of 5 | 0.135; 3 of 3 | 0.039; 5 of 5 |
-| xfixed-40-20000-5 | 0.22 | 0.039; 1 of 1 | 0.043; 6 of 6 | 0.050; 3 of 3 | 0.057; 5 of 5 |
-| xfixed-40-20000-30 | 0.22 | 0.020; 1 of 1 | 0.045; 7 of 7 | 0.133; 3 of 3 | 0.045; 5 of 5 |
-| xfixed-40-20000-120 | 0.22 | 0.017; 1 of 1 | 0.050; 7 of 7 | 0.038; 3 of 3 | 0.031; 5 of 5 |
-| xfixed-40-100000-0 | 0.22 | 0.076; 1 of 1 | 0.045; 5 of 5 | 0.036; 3 of 3 | 0.040; 5 of 5 |
-| xfixed-40-100000-5 | 0.22 | – | 0.054; 7 of 7 | 0.045; 3 of 3 | 0.047; 5 of 5 |
-| xfixed-40-100000-30 | 0.22 | – | 0.043; 6 of 6 | 0.068; 3 of 3 | 0.044; 5 of 5 |
-| xfixed-40-100000-120 | 0.22 | – | 0.045; 7 of 7 | 0.031; 4 of 4 | 0.053; 5 of 5 |
+| xfixed-40-20000-0 | 0.22 | 0.047; 5 of 5 | 0.040; 5 of 5 | 0.135; 3 of 3 | 0.039; 5 of 5 |
+| xfixed-40-20000-5 | 0.22 | 0.039; 5 of 5 | 0.043; 6 of 6 | 0.050; 3 of 3 | 0.057; 5 of 5 |
+| xfixed-40-20000-30 | 0.22 | 0.044; 5 of 5 | 0.045; 7 of 7 | 0.133; 3 of 3 | 0.045; 5 of 5 |
+| xfixed-40-20000-120 | 0.22 | 0.119; 5 of 5 | 0.050; 7 of 7 | 0.038; 3 of 3 | 0.031; 5 of 5 |
+| xfixed-40-100000-0 | 0.22 | 0.076; 5 of 5 | 0.045; 5 of 5 | 0.036; 3 of 3 | 0.040; 5 of 5 |
+| xfixed-40-100000-5 | 0.22 | 0.039; 5 of 5 | 0.054; 7 of 7 | 0.045; 3 of 3 | 0.047; 5 of 5 |
+| xfixed-40-100000-30 | 0.22 | 0.049; 5 of 5 | 0.043; 6 of 6 | 0.068; 3 of 3 | 0.044; 5 of 5 |
+| xfixed-40-100000-120 | 0.22 | 0.048; 5 of 5 | 0.045; 7 of 7 | 0.031; 4 of 4 | 0.053; 5 of 5 |
 
 ## N0: copies sent until one was heard, against the lottery
 
