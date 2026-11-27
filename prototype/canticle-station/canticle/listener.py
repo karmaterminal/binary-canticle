@@ -6,7 +6,10 @@ Landing into agent sessions (§14) is out of scope here.
 
 With ``state_path`` set, the safety state that must survive a restart (epoch
 maxima, dedup digests, sticky PLUCKs, supersession high-water marks; §5.2, §7.4,
-§7.7, §7.8) is written atomically after every change and loaded at start.
+§7.7, §7.8) is written atomically after every change and loaded at start. Each
+key's beacon mark and δ̂ samples (#175) are kept too, with one exception to "every
+change": a lowered δ̂ is saved at once, but a moved mark only within MARK_SAVE_MS
+(plus one tick), so a crash can let the last window's beacons be heard again.
 
 ``receptor_mode=True`` is the BC-2 behaviour the record v1 emitter needs
 (``records.py``, RFC §14.18.3): it reports the outcomes this listener is otherwise
@@ -35,7 +38,9 @@ SKEW_MS = 5_000
 OFFSET_SAMPLES = 16
 SCOPE_NAMES = {v: k for k, v in SCOPES.items()}
 LIVE_STATE = CLASS_BY_NAME["live-state"].code
-STATE_VERSION = 3  # 2: dedup rows carry (expires_at, scope) for the §9.7 PLUCK check (#60); 3: marks carry their class (§23.2 q21)
+STATE_VERSION = 4  # 2: dedup rows carry (expires_at, scope) for the §9.7 PLUCK check (#60); 3: marks carry their class
+# (§23.2 q21); 4: each key's beacon mark and δ̂ samples (#175)
+MARK_SAVE_MS = 10_000  # how long a beacon mark may go unsaved: after a crash, beacons this recent can be heard again (#175)
 
 
 def _mark_factor(c) -> int:
@@ -155,7 +160,7 @@ class Listener:
     def __init__(self, manifest: Manifest, tuned: Optional[set] = None, dedup_capacity: int = 100_000,
                  binding: str = "lan", state_path=None, warmup: bool = True, ephemeral: bool = False,
                  per_key_quota: Optional[int] = None, per_key_mark_quota: Optional[int] = None,
-                 receptor_mode: bool = False):
+                 receptor_mode: bool = False, max_skew_ms: Optional[int] = None):
         # Restart safety is the default: without state_path a restarted listener could surface a
         # stale or withdrawn item (§7.4-§7.8). Tests and experiments must opt out explicitly.
         if state_path is None and not ephemeral:
@@ -195,6 +200,19 @@ class Listener:
         # "first", "duplicate" (a benign repeat, or an older/repeated beacon) or "resurfaced" (§14.18.3).
         self.last_frame: Optional[wire.Frame] = None
         self.last_dedup: Optional[str] = None
+        # Opt-in (#175): refuse a beacon whose clock is further off than this, before it moves any state. Off by
+        # default, so a station clock an hour wrong still delivers (§12.2 step 3, F-CARRIER). For receivers that
+        # know their stations keep time (an NTP-synced LAN): it bounds how old a captured stream can be and still
+        # land on a first join, or after 16 replayed beacons of an epoch never heard.
+        if max_skew_ms is not None and max_skew_ms < 0:
+            raise ValueError("max_skew_ms must be at least 0")
+        self.max_skew_ms = max_skew_ms
+        # Beacon marks as last saved, and when (#175): tick() saves a mark that has moved after MARK_SAVE_MS.
+        self._marks_saved: dict[bytes, int] = {}
+        self._now_seen = self._marks_saved_at = 0
+        # True when the state file predates version 4: no beacon marks or δ̂ were kept, so until this
+        # listener hears its stations again it is as exposed to an old beacon as a first join (#175).
+        self.loaded_without_marks = False
         if state_path is not None and os.path.exists(state_path):
             self._load(state_path)
 
@@ -254,14 +272,24 @@ class Listener:
     def _beacon(self, f: wire.Frame, now_ms: int) -> list[Event]:
         b: wire.Beacon = f.body
         events: list[Event] = []
+        if self.max_skew_ms is not None and abs(now_ms - b.wallclock) > self.max_skew_ms:
+            # Before the epoch, the mark or the samples move: a refusal is state-neutral (§10.9).
+            events.append(self._evidence("clock-skew", f.key_id, f"beacon clock {now_ms - b.wallclock} ms off, "
+                                         f"bound {self.max_skew_ms} ms"))
+            return events
         if not self._epoch_ok(f.key_id, b.epoch, now_ms, events):
             return events
         st = self._st(f.key_id)
-        if b.epoch == st.epoch_hwm and b.bseq <= st.bseq and st.last_beacon is not None:
+        # A mark kept across a restart counts, as of its last save (#175): bseq > 0 is a mark this listener
+        # kept, not one it heard.
+        if b.epoch == st.epoch_hwm and b.bseq <= st.bseq and (st.last_beacon is not None or st.bseq > 0):
             self.last_dedup = "duplicate"
             return events  # older or repeated beacon
         st.bseq = b.bseq
+        floor = st.offset_ms if st.offsets else None
         st.offsets.append(now_ms - b.wallclock)
+        if st.offset_ms != floor:
+            self._dirty = True  # δ̂ moved: a restart must not lose it (#175)
         st.last_beacon = now_ms
         st.signed_off = b.next_beacon_ms == 0
         st.period_ms = b.next_beacon_ms or st.period_ms
@@ -344,7 +372,9 @@ class Listener:
             self._restored.discard(ident)
             self.last_dedup = "resurfaced"
             resurface = True
-            retain = seen[1]
+            # The entry may be kept past the item's local expiry (#175), so the expiry is worked out again,
+            # with the δ̂ kept across the restart, and never later than what was kept.
+            retain = min(seen[1], wire.local_expiry_ms(body, st.offset_ms, first_heard_ms=now_ms) + SKEW_MS)
         else:
             target = None
             if f.kind == wire.KIND_PLUCK:
@@ -366,7 +396,7 @@ class Listener:
                 return events
             self._epoch_ok(kid, body.epoch, now_ms, events)
             retain = wire.local_expiry_ms(body, st.offset_ms, first_heard_ms=now_ms) + SKEW_MS
-            self._remember(ident, digest, retain,
+            self._remember(ident, digest, self._keep(f, body, retain, now_ms),
                            (body.expires_at, body.scope) if f.kind == wire.KIND_ITEM else None)
             self._heard_on(st, body.stream, now_ms)
         name = self._stream_name(kid, body.stream)
@@ -578,7 +608,7 @@ class Listener:
                                              stream=self._stream_name(kid, body.stream), seq=body.seq))
                 return events
             retain = wire.local_expiry_ms(body, st.offset_ms, first_heard_ms=now_ms) + SKEW_MS
-            self._remember(ident, digest, retain,
+            self._remember(ident, digest, self._keep(f, body, retain, now_ms),
                            (body.expires_at, body.scope) if f.kind == wire.KIND_ITEM else None)
         self.evidence_counts["epoch-regression"] = self.evidence_counts.get("epoch-regression", 0) + 1
         events.append(Event("held", self._name(kid), kid.hex(), self._stream_name(kid, body.stream), body.seq,
@@ -606,6 +636,16 @@ class Listener:
             events.append(Event("item", self._name(kid), kid.hex(), self._stream_name(kid, it.stream), it.seq,
                                 self._item_data(it, now_ms, st), ident=ident))
         return events
+
+    @staticmethod
+    def _keep(f: wire.Frame, body, retain: int, now_ms: int) -> int:
+        """How long an ITEM's dedup entry is kept: until its local expiry cap, not its local expiry (#175).
+        Local expiry moves with δ̂; an entry kept only that long could lapse before a later, higher δ̂
+        let the same item's loop count as new. The cap is the latest any δ̂ allows. A PLUCK keeps its
+        own local expiry (§7.7), as before."""
+        if f.kind != wire.KIND_ITEM:
+            return retain
+        return max(retain, wire.local_expiry_cap_ms(body, now_ms) + SKEW_MS)
 
     def _remember(self, ident: tuple, digest: bytes, retain: int, meta: Optional[tuple] = None) -> None:
         # Live entries are never evicted: they hold the equivocation evidence (§10.8) and stop a
@@ -655,6 +695,10 @@ class Listener:
         self._purge_dedup(now_ms)
         self._purge_hwm(now_ms)
         events.extend(self._release_held(now_ms))
+        self._now_seen = now_ms
+        if now_ms - self._marks_saved_at >= MARK_SAVE_MS and any(
+                s.bseq != self._marks_saved.get(k) for k, s in self.stations.items()):
+            self._dirty = True
         if self.autosave:
             self._save_if_dirty()
         for kid in list(self.stations):
@@ -673,22 +717,36 @@ class Listener:
                       for i, (d, r, m) in self.dedup.items()],
             "sticky_pluck": [[i[0].hex(), i[1], i[2], i[3], r] for i, r in self.sticky_pluck.items()],
             "hwm": [[k[0].hex(), k[1], k[2], *v] for k, v in self.hwm.items()],
+            # #175: a restarted listener keeps each key's beacon mark (as of its last save, ≤ MARK_SAVE_MS old)
+            # and δ̂ samples, so a captured beacon at or below the mark is a duplicate, and one above it can
+            # only add a larger sample (δ̂ is their minimum).
+            "beacons": {k.hex(): [s.epoch_hwm, s.bseq, list(s.offsets)] for k, s in self.stations.items()
+                        if s.epoch_hwm and (s.bseq or s.offsets)},
         }
         if self.extra_state is not None:
             state["receptor"] = self.extra_state()
         atomic_write_json(self.state_path, state)
         self._dirty = False
+        self._marks_saved = {k: s.bseq for k, s in self.stations.items()}
+        self._marks_saved_at = self._now_seen
 
     def _load(self, path) -> None:
         with open(path) as f:
             state = json.load(f)
         version = state.get("version")
-        if version not in (1, 2, STATE_VERSION):
+        if version not in (1, 2, 3, STATE_VERSION):
             raise ValueError(f"listener state {path}: unsupported version {version!r}")
         self.loaded_extra = state.get("receptor")
+        self.loaded_without_marks = version < 4 and bool(state["epochs"])
         for kid_hex, (epoch, seen_at) in state["epochs"].items():
             st = self._st(bytes.fromhex(kid_hex))
             st.epoch_hwm, st.epoch_seen_at = epoch, seen_at
+        for kid_hex, (epoch, bseq, offsets) in state.get("beacons", {}).items():
+            st = self._st(bytes.fromhex(kid_hex))
+            if epoch == st.epoch_hwm:  # a mark of an older epoch says nothing about this one
+                st.bseq = bseq
+                st.offsets.extend(offsets[-OFFSET_SAMPLES:])
+        self._marks_saved = {k: s.bseq for k, s in self.stations.items()}
         for row in state["dedup"]:
             # version 1 rows have no (expires_at, scope): those targets skip the §9.7 PLUCK check
             kid_hex, epoch, stream, seq, digest, retain = row[:6]

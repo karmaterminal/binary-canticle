@@ -639,6 +639,14 @@ class PerKeyBoundsTest(unittest.TestCase):
         lst.hear(self.pluck(2, 1, T0 + 2_000, T0 + 120_000), T0 + 2_000 + d)
         lst.tick(T0 + 160_000)
         evs = lst.hear(target, T0 + 160_000)
+        self.assertNotIn("item", [e.kind for e in evs])
+        # #175: the target's own dedup entry is now kept to its local expiry cap, so here it is a repeat;
+        # the sticky mark, which follows the PLUCK's current δ̂, must last as long as well.
+        self.assertEqual(lst.last_dedup, "duplicate")
+        (mark,) = [r for (k, _, _, seq), r in lst.sticky_pluck.items() if seq == 1]
+        self.assertGreater(mark, T0 + 160_000)
+        lst.dedup.clear()                                  # without the entry, the sticky mark alone refuses it
+        evs = lst.hear(target, T0 + 160_000)
         self.assertEqual([e.data["reason"] for e in evs if e.kind == "evidence"], ["plucked"])
 
     def test_refusals_do_not_advance_the_epoch(self):
