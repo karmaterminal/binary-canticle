@@ -38,23 +38,44 @@ def _key_hint(grant) -> str:
     return "ed25519:" + base64.b64encode(grant.public_key).decode()
 
 
+def _glob(pattern: str, name: str) -> bool:
+    """`*` any run, `?` one character, anything else itself. Never backtracks: a regex would, and
+    a 30-star glob that cannot match would then run for hours, before any DNS timeout applies."""
+    p = n = 0
+    star, resume = -1, 0
+    while n < len(name):
+        if p < len(pattern) and pattern[p] == "*":
+            star, resume = p, n
+            p += 1
+        elif p < len(pattern) and pattern[p] in ("?", name[n]):
+            p += 1
+            n += 1
+        elif star >= 0:
+            # Let the last star take one more character, and retry what follows it.
+            resume += 1
+            p, n = star + 1, resume
+        else:
+            return False
+    return pattern[p:].strip("*") == ""
+
+
 @dataclass(frozen=True)
 class Where:
     """One `KEY=PATTERN` predicate on a §13.2 TXT key the browse checks against the manifest.
 
     `streams` takes a glob (`*` any run, `?` one character) over the grant's public stream names;
-    `sid` and `k` take one exact value. The key is case-insensitive (RFC 6763 §6.4); values are
-    exact, except that a key id is hex. Other §13.2 keys are not cross-checked, so they cannot be
-    searched: matching them would let an unverified TXT decide a hit.
+    `sid` and `k` take one exact value. Both parts are US-ASCII. The key is case-insensitive
+    (RFC 6763 §6.4); values are exact, except that a key id is hex. Other §13.2 keys are not
+    cross-checked, so they cannot be searched: matching them would let an unverified TXT decide a
+    hit. Every Where is checked when it is made, by `parse` or directly.
     """
     key: str
     pattern: str
 
-    @classmethod
-    def parse(cls, text) -> "Where":
-        if not isinstance(text, str) or "=" not in text:
-            raise ValueError(f"a predicate is KEY=PATTERN, not {text!r}")
-        key, pattern = text.split("=", 1)
+    def __post_init__(self):
+        key, pattern = self.key, self.pattern
+        if not (isinstance(key, str) and isinstance(pattern, str) and key.isascii() and pattern.isascii()):
+            raise ValueError(f"a predicate is US-ASCII KEY=PATTERN, not {key!r}={pattern!r}")
         key = key.lower()
         if key == "streams":
             if not _GLOB.fullmatch(pattern):
@@ -64,21 +85,30 @@ class Where:
             if not _SID.fullmatch(pattern):
                 raise ValueError(f"sid={pattern!r}: a key id is 16 hex characters")
         elif key == "k":
-            try:
-                raw = base64.b64decode(pattern.removeprefix("ed25519:"), validate=True)
-            except ValueError:
-                raw = b""
-            if not pattern.startswith("ed25519:") or len(raw) != 32:
-                raise ValueError(f"k={pattern!r}: ed25519:<base64 of a 32-byte public key>")
+            raw = b""
+            if pattern.startswith("ed25519:"):
+                try:
+                    raw = base64.b64decode(pattern[8:], validate=True)
+                except ValueError:
+                    pass
+            # Canonical only: the comparison is of strings, so another spelling of the key never matches.
+            if len(raw) != 32 or base64.b64encode(raw).decode() != pattern[8:]:
+                raise ValueError(f"k={pattern!r}: ed25519:<canonical base64 of a 32-byte public key>")
         else:
             raise ValueError(f"cannot search on {key!r}: the keys are streams, sid and k")
-        return cls(key, pattern)
+        object.__setattr__(self, "key", key)
+        object.__setattr__(self, "pattern", pattern)
+
+    @classmethod
+    def parse(cls, text) -> "Where":
+        if not isinstance(text, str) or "=" not in text:
+            raise ValueError(f"a predicate is KEY=PATTERN, not {text!r}")
+        return cls(*text.split("=", 1))
 
     def values(self, grant) -> list:
         """The grant's values that satisfy this predicate, in manifest order; empty if none."""
         if self.key == "streams":
-            glob = "".join(".*" if c == "*" else "." if c == "?" else re.escape(c) for c in self.pattern)
-            return [name for name in grant.public_streams if re.fullmatch(glob, name)]
+            return [name for name in grant.public_streams if _glob(self.pattern, name)]
         value = grant.key_id.hex() if self.key == "sid" else _key_hint(grant)
         return [value] if value == self.pattern else []
 
