@@ -253,8 +253,8 @@ test("11 iii: every listed binding field conflicts instead of inheriting the fir
   const slot = new FixtureTerminalSlot();
   const original = vector1();
   const firstBinding = bindingOf(original);
-  assert.equal(slot.accept(summons.summonsId, firstBinding, "succeeded").thisSend, "accepted");
-  assert.equal(slot.accept(summons.summonsId, firstBinding, "succeeded").thisSend, "duplicate");
+  assert.equal(slot.accept(summons.summonsId, firstBinding, { status: "succeeded", summary: "first" }).thisSend, "accepted");
+  assert.equal(slot.accept(summons.summonsId, firstBinding, { status: "succeeded", summary: "retry" }).thisSend, "duplicate");
 
   const changes: Array<[string, (changed: ReturnType<typeof vector1>) => void]> = [
     ["record ref", (changed) => { changed.event.refs.sources[0]!.records[0] = "rec-a-other"; }],
@@ -272,7 +272,7 @@ test("11 iii: every listed binding field conflicts instead of inheriting the fir
     const changed = vector1();
     change(changed);
     assert.deepEqual(
-      slot.accept(summons.summonsId, bindingOf(changed), "succeeded"),
+      slot.accept(summons.summonsId, bindingOf(changed), { status: "succeeded", summary: "changed" }),
       { summonsId: summons.summonsId, thisSend: "conflict" },
       field,
     );

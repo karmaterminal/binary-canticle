@@ -60,17 +60,32 @@ export type FixtureWorkerResult = {
   workerArtifact?: string;
 };
 
+export type FixtureFailureReason =
+  | "refused_admission"
+  | "refused_read"
+  | "revocation"
+  | "worker_mismatch"
+  | "refused_result";
+
+type FixtureSlotCandidate =
+  | { status: "failed"; reason: Exclude<FixtureFailureReason, "refused_admission"> }
+  | { status: "succeeded"; summary: string };
+
+type FixturePublishedOutcome =
+  | { status: "failed"; reason: Exclude<FixtureFailureReason, "refused_admission">; publication: "published" }
+  | { status: "succeeded"; summary: string; binding: string; publication: "published" };
+
 export type FixtureSlotReceipt =
-  | { summonsId: string; binding: string; state: "succeeded" | "failed"; thisSend: "accepted" | "duplicate" }
+  | {
+      summonsId: string;
+      binding: string;
+      state: "succeeded" | "failed";
+      outcome: FixturePublishedOutcome;
+      thisSend: "accepted" | "duplicate";
+    }
   | { summonsId: string; thisSend: "conflict" };
 
-export type FixtureDigesterResult =
-  | {
-      status: "failed";
-      reason: "refused_admission" | "refused_read" | "revocation" | "worker_mismatch" | "refused_result";
-      publication?: "published";
-    }
-  | { status: "succeeded"; summary: string; binding: string; publication: "published" };
+export type FixtureDigesterResult = FixturePublishedOutcome | { status: "failed"; reason: FixtureFailureReason };
 
 export type FixtureDigesterInput = {
   summons: FixtureSummons;
@@ -103,18 +118,27 @@ export class FixtureConsentStore {
 }
 
 export class FixtureTerminalSlot {
-  readonly #slots = new Map<string, { binding: string; state: "succeeded" | "failed" }>();
+  readonly #slots = new Map<string, { binding: string; outcome: FixturePublishedOutcome }>();
 
-  accept(summonsId: string, binding: string, state: "succeeded" | "failed"): FixtureSlotReceipt {
+  accept(summonsId: string, binding: string, candidate: FixtureSlotCandidate): FixtureSlotReceipt {
     const existing = this.#slots.get(summonsId);
     if (existing) {
       if (existing.binding !== binding) {
         return { summonsId, thisSend: "conflict" };
       }
-      return { summonsId, binding, state: existing.state, thisSend: "duplicate" };
+      return {
+        summonsId,
+        binding,
+        state: existing.outcome.status,
+        outcome: structuredClone(existing.outcome),
+        thisSend: "duplicate",
+      };
     }
-    this.#slots.set(summonsId, { binding, state });
-    return { summonsId, binding, state, thisSend: "accepted" };
+    const outcome: FixturePublishedOutcome = candidate.status === "succeeded"
+      ? { status: "succeeded", summary: candidate.summary, binding, publication: "published" }
+      : { status: "failed", reason: candidate.reason, publication: "published" };
+    this.#slots.set(summonsId, { binding, outcome: structuredClone(outcome) });
+    return { summonsId, binding, state: outcome.status, outcome, thisSend: "accepted" };
   }
 }
 
@@ -214,8 +238,11 @@ function publishFailure(
   binding: string,
   reason: "refused_read" | "revocation" | "worker_mismatch" | "refused_result",
 ): FixtureDigesterResult {
-  input.slot.accept(input.summons.summonsId, binding, "failed");
-  return { status: "failed", reason, publication: "published" };
+  const receipt = input.slot.accept(input.summons.summonsId, binding, { status: "failed", reason });
+  if (receipt.thisSend === "conflict") {
+    return { status: "failed", reason: "refused_result" };
+  }
+  return receipt.outcome;
 }
 
 export async function runFixtureDigester(input: FixtureDigesterInput): Promise<FixtureDigesterResult> {
@@ -268,9 +295,12 @@ export async function runFixtureDigester(input: FixtureDigesterInput): Promise<F
     return publishFailure(input, binding, "worker_mismatch");
   }
 
-  const receipt = input.slot.accept(input.summons.summonsId, binding, "succeeded");
+  const receipt = input.slot.accept(input.summons.summonsId, binding, {
+    status: "succeeded",
+    summary: workerResult.summary,
+  });
   if (receipt.thisSend === "conflict") {
     return { status: "failed", reason: "refused_result" };
   }
-  return { status: "succeeded", summary: workerResult.summary, binding, publication: "published" };
+  return receipt.outcome;
 }
