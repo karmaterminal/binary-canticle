@@ -1,0 +1,74 @@
+{
+ "max_streams_per_station": 32,
+ "why": "stream budgets cannot fit B_station",
+ "b_station_bps": 16000,
+ "b_stream_bps": 4000,
+ "stream_budget_floor_bps": 500,
+ "beacon_max_pages": 8,
+ "ring_depth_per_stream": 256,
+ "dedup_capacity": 100000,
+ "manifest_stations": 8,
+ "dedup_quota_per_key": 12500,
+ "daemon_max_peers": 16,
+ "daemon_queue_per_peer": 1024,
+ "snapshot_entries_max": 511,
+ "health_interval_ms": 10000,
+ "max_frame": 1100,
+ "max_datagram": 1200,
+ "classes": {
+  "chatter": {
+   "default_ttl_s": 60,
+   "max_ttl_s": 300,
+   "loop_floor_ms": 5000,
+   "wake_eligible": false
+  },
+  "ambient": {
+   "default_ttl_s": 300,
+   "max_ttl_s": 3600,
+   "loop_floor_ms": 10000,
+   "wake_eligible": false
+  },
+  "live-state": {
+   "default_ttl_s": 180,
+   "max_ttl_s": 900,
+   "loop_floor_ms": 5000,
+   "wake_eligible": false
+  },
+  "advisory": {
+   "default_ttl_s": 900,
+   "max_ttl_s": 3600,
+   "loop_floor_ms": 5000,
+   "wake_eligible": false
+  },
+  "finding-ref": {
+   "default_ttl_s": 900,
+   "max_ttl_s": 86400,
+   "loop_floor_ms": 10000,
+   "wake_eligible": false
+  },
+  "regulatory": {
+   "default_ttl_s": 600,
+   "max_ttl_s": 3600,
+   "loop_floor_ms": 5000,
+   "wake_eligible": false
+  },
+  "alarm": {
+   "default_ttl_s": 900,
+   "max_ttl_s": 3600,
+   "loop_floor_ms": 2000,
+   "wake_eligible": true
+  },
+  "control": {
+   "default_ttl_s": 600,
+   "max_ttl_s": 3600,
+   "loop_floor_ms": 1000,
+   "wake_eligible": false
+  },
+  "root": {
+   "default_ttl_s": 3600,
+   "max_ttl_s": 3600,
+   "loop_floor_ms": 30000,
+   "wake_eligible": false
+  }
+ }
+}
