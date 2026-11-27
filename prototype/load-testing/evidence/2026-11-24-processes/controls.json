@@ -1,0 +1,14 @@
+[
+  {
+    "case": "positive",
+    "actual_exit": 0
+  },
+  {
+    "case": "negative",
+    "actual_exit": 99
+  },
+  {
+    "case": "repeat",
+    "actual_exit": 0
+  }
+]

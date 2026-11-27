@@ -1,0 +1,10 @@
+{
+  "prototype/canticle-station/canticle/runner.py": "4fb214ce571923eab8b0e638b9d2b4fcc99a4f94ffa956697aa51fb9db397946",
+  "prototype/load-testing/fixtures/__init__.py": "207db6894bd54f493a1f65dfa11de9111ed844ea9e2eac34905809cc8b42f3f4",
+  "prototype/load-testing/fixtures/loopback.py": "93f0bf5b78a8e305566b2a4fd52b710ef7258ddb3acfddb990a2c2870d4a214c",
+  "prototype/load-testing/run.py": "dc031c88fd414c24e8dfc2a5d99d05a5e3ef7f0426a759a57dcf0afe9cc5bb13",
+  "prototype/load-testing/scenarios/smoke.js": "73061081bdb0f39806bdb636b9d3e8f4c8122e3118a925afc3f87141e7ebdf17",
+  "prototype/load-testing/tests/test_loopback.py": "339a8eda7bf989a4640112b8fec18f98fb9128bc4ba71010c4a0cbe65f410337",
+  "prototype/load-testing/tests/test_verify.py": "19c01a211c2f58b8e35b10e4e28cae08f62631d778f9ca377308bedc3aa63a15",
+  "prototype/load-testing/verify.py": "11b39c9063a38759b4c71b4bd2d9d48da7c265fca360961dc2b9cc705dbd8fef"
+}

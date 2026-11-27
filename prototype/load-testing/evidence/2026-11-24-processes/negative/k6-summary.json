@@ -1,0 +1,331 @@
+{
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [
+      {
+        "name": "teardown",
+        "path": "::teardown",
+        "id": "a8a9942382e8ffe2e56ef29e664b8229",
+        "groups": [],
+        "checks": [
+            {
+              "name": "all planned offers accounted",
+              "path": "::teardown::all planned offers accounted",
+              "id": "e6479f2c0d6f0b5aedb81616085798a4",
+              "passes": 1,
+              "fails": 0
+            },
+            {
+              "name": "conservation holds",
+              "path": "::teardown::conservation holds",
+              "id": "f7ec0b0f172868535107db7d43f7a1f9",
+              "passes": 1,
+              "fails": 0
+            },
+            {
+              "path": "::teardown::no duplicate surface records",
+              "id": "469c0ad034488b1d9760cbac0d6f1df1",
+              "passes": 1,
+              "fails": 0,
+              "name": "no duplicate surface records"
+            },
+            {
+              "name": "no fixture errors",
+              "path": "::teardown::no fixture errors",
+              "id": "83f8b890c088241ba9f91454101417b7",
+              "passes": 1,
+              "fails": 0
+            }
+          ]
+      }
+    ],
+    "checks": [
+      {
+        "name": "fixture returned a settled offer",
+        "path": "::fixture returned a settled offer",
+        "id": "034bae7befbfd9329f3fa27e4b0a7977",
+        "passes": 6,
+        "fails": 0
+      },
+      {
+        "passes": 6,
+        "fails": 0,
+        "name": "station accepted",
+        "path": "::station accepted",
+        "id": "db136fca314f14f9c1e26863879ffa0e"
+      },
+      {
+        "name": "complete surface record by deadline",
+        "path": "::complete surface record by deadline",
+        "id": "9b49ccfa9b1a61f85c521e8af69a29b7",
+        "passes": 5,
+        "fails": 1
+      }
+    ]
+  },
+  "options": {
+    "summaryTrendStats": [
+      "min",
+      "med",
+      "p(95)",
+      "max",
+      "count"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  },
+  "state": {
+    "testRunDurationMs": 2520.435547,
+    "isStdOutTTY": false,
+    "isStdErrTTY": false
+  },
+  "metrics": {
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 2.05572,
+        "p(95)": 701.6549924999994,
+        "max": 1001.376963,
+        "count": 7,
+        "min": 0.583108
+      }
+    },
+    "http_reqs": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 7,
+        "rate": 2.7772977604334668
+      }
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 0,
+        "count": 7,
+        "min": 0,
+        "med": 0,
+        "p(95)": 0
+      }
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 9170,
+        "rate": 3638.2600661678416
+      }
+    },
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 6,
+        "rate": 2.3805409375144
+      }
+    },
+    "vus": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 1,
+        "min": 1,
+        "max": 1
+      }
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 701.6549924999994,
+        "max": 1001.376963,
+        "count": 7,
+        "min": 0.583108,
+        "med": 2.05572
+      }
+    },
+    "canticle_arrival_to_record_success_ms": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "count": 5,
+        "min": 0.847948,
+        "med": 0.936577,
+        "p(95)": 0.9830072000000001,
+        "max": 0.983091
+      }
+    },
+    "canticle_deadline_miss": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0.16666666666666666,
+        "passes": 1,
+        "fails": 5
+      },
+      "thresholds": {
+        "rate==0": {
+          "ok": false
+        }
+      }
+    },
+    "http_req_sending": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0.049657,
+        "med": 0.062439,
+        "p(95)": 0.10120049999999998,
+        "max": 0.104553,
+        "count": 7
+      }
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 1001.137895,
+        "count": 7,
+        "min": 0.45872,
+        "med": 1.906468,
+        "p(95)": 701.4425758999993
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0.045677,
+        "med": 0.068794,
+        "p(95)": 0.12903279999999995,
+        "max": 0.14569,
+        "count": 7
+      }
+    },
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 1252.9724,
+        "count": 6,
+        "min": 252.476559,
+        "med": 253.2839285,
+        "p(95)": 1003.1328525000001
+      }
+    },
+    "canticle_offered": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 6,
+        "rate": 2.3805409375144
+      },
+      "thresholds": {
+        "count==6": {
+          "ok": true
+        }
+      }
+    },
+    "vus_max": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "min": 1,
+        "max": 1,
+        "value": 1
+      }
+    },
+    "http_req_connecting": {
+      "values": {
+        "med": 0.173836,
+        "p(95)": 0.21738929999999998,
+        "max": 0.222795,
+        "count": 7,
+        "min": 0.126204
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "canticle_arrival_to_record_or_deadline_ms": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 999.225526,
+        "count": 6,
+        "min": 0.847948,
+        "med": 0.9596245,
+        "p(95)": 749.6649172499999
+      }
+    },
+    "data_sent": {
+      "contains": "data",
+      "values": {
+        "count": 1561,
+        "rate": 619.3374005766631
+      },
+      "type": "counter"
+    },
+    "checks": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0.9545454545454546,
+        "passes": 21,
+        "fails": 1
+      },
+      "thresholds": {
+        "rate==1": {
+          "ok": false
+        }
+      }
+    },
+    "http_req_failed": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 7
+      }
+    },
+    "canticle_delivered": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 5,
+        "rate": 1.9837841145953334
+      },
+      "thresholds": {
+        "count==6": {
+          "ok": false
+        }
+      }
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0.207569,
+        "med": 0.253804,
+        "p(95)": 0.3022533,
+        "max": 0.304998,
+        "count": 7
+      }
+    },
+    "canticle_offer_to_record_or_deadline_ms": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 1000,
+        "count": 6,
+        "min": 1.423792,
+        "med": 1.6385905,
+        "p(95)": 750.45662475
+      }
+    }
+  }
+}

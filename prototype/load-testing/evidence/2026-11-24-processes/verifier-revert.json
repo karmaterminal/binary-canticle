@@ -1,0 +1,14 @@
+[
+  {
+    "case": "base-red",
+    "actual_exit": 1
+  },
+  {
+    "case": "current-green",
+    "actual_exit": 0
+  },
+  {
+    "case": "revert-red",
+    "actual_exit": 1
+  }
+]

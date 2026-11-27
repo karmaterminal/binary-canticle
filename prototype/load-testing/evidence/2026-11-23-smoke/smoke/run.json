@@ -1,0 +1,25 @@
+{
+  "bounds": {
+    "items": 6,
+    "vus": 1,
+    "deadline_ms": 1000,
+    "pace_ms": 250,
+    "drop_first": false
+  },
+  "command": [
+    "/home/figs/.local/bin/k6",
+    "run",
+    "--address",
+    "127.0.0.1:0",
+    "--no-usage-report",
+    "/var/tmp/elliott-bc-k6-20261123/prototype/load-testing/scenarios/smoke.js"
+  ],
+  "latency_boundary": "first relay UDP arrival to complete record-v1 newline; not model heard",
+  "shared_process": true,
+  "hard_caps": {
+    "child_cpu_seconds": 30,
+    "child_fds": 128,
+    "child_file_bytes": 8388608,
+    "child_wall_seconds": 55
+  }
+}

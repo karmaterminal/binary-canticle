@@ -1,0 +1,49 @@
+{
+  "tasks_done": true,
+  "unix_sockets_removed": true,
+  "temporary_state_removed": true,
+  "ports_rebindable": {
+    "daemon_udp": true,
+    "relay_udp": true,
+    "http_tcp": true,
+    "station_udp": true
+  },
+  "errors": [],
+  "ok": true,
+  "processes": {
+    "daemon": {
+      "pid": 1626639,
+      "started": true,
+      "started_ns": 2632861301614863,
+      "ready": true,
+      "ready_ns": 2632861425799623,
+      "child_started_ns": 2632861419668014,
+      "exit_code": 0,
+      "alive": false,
+      "term_sent": true,
+      "kill_sent": false,
+      "reaped": true,
+      "exit_observed_ns": 2632863377036594,
+      "handle_closed": true,
+      "reaped_ns": 2632863377030797
+    },
+    "station": {
+      "pid": 1626640,
+      "started": true,
+      "started_ns": 2632861426667057,
+      "ready": true,
+      "ready_ns": 2632861549844351,
+      "child_started_ns": 2632861543211349,
+      "exit_code": 0,
+      "alive": false,
+      "term_sent": true,
+      "kill_sent": false,
+      "reaped": true,
+      "exit_observed_ns": 2632863345926184,
+      "handle_closed": true,
+      "reaped_ns": 2632863345918572
+    }
+  },
+  "processes_reaped": true,
+  "k6_child_reaped": true
+}

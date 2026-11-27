@@ -1,0 +1,20 @@
+test_changed_startup_receipt_cannot_pass (test_process_receipts.ProcessReceiptTest.test_changed_startup_receipt_cannot_pass) ... ok
+test_cleanup_alive_cannot_pass (test_process_receipts.ProcessReceiptTest.test_cleanup_alive_cannot_pass) ... ok
+test_daemon_first_shutdown_cannot_pass (test_process_receipts.ProcessReceiptTest.test_daemon_first_shutdown_cannot_pass) ... ok
+test_dead_child_cannot_pass (test_process_receipts.ProcessReceiptTest.test_dead_child_cannot_pass) ... ok
+test_failed_exit_cannot_pass (test_process_receipts.ProcessReceiptTest.test_failed_exit_cannot_pass) ... ok
+test_forced_kill_cannot_pass (test_process_receipts.ProcessReceiptTest.test_forced_kill_cannot_pass) ... ok
+test_impossible_start_order_cannot_pass (test_process_receipts.ProcessReceiptTest.test_impossible_start_order_cannot_pass) ... ok
+test_missing_readiness_cannot_pass (test_process_receipts.ProcessReceiptTest.test_missing_readiness_cannot_pass) ... ok
+test_missing_reap_cannot_pass (test_process_receipts.ProcessReceiptTest.test_missing_reap_cannot_pass) ... ok
+test_open_handle_cannot_pass (test_process_receipts.ProcessReceiptTest.test_open_handle_cannot_pass) ... ok
+test_parent_cannot_masquerade_as_child (test_process_receipts.ProcessReceiptTest.test_parent_cannot_masquerade_as_child) ... ok
+test_same_process_cannot_masquerade_as_two_children (test_process_receipts.ProcessReceiptTest.test_same_process_cannot_masquerade_as_two_children) ... ok
+test_structural_control_only_not_process_evidence (test_process_receipts.ProcessReceiptTest.test_structural_control_only_not_process_evidence) ... ok
+test_unready_child_cannot_pass (test_process_receipts.ProcessReceiptTest.test_unready_child_cannot_pass) ... ok
+test_wrong_reaped_pid_cannot_pass (test_process_receipts.ProcessReceiptTest.test_wrong_reaped_pid_cannot_pass) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.019s
+
+OK

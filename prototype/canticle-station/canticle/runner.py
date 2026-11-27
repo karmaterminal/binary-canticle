@@ -179,6 +179,11 @@ async def run_station(station: Station, dests: list[tuple[str, int]], control_pa
         old = os.umask(0o177)
         try:
             server = await asyncio.start_unix_server(handle, path=control_path, limit=CONTROL_LINE_LIMIT)
+        except BaseException:
+            # The normal send-loop finally is not active during control startup.
+            # Close on failure AND cancellation before propagating either.
+            sock.close()
+            raise
         finally:
             os.umask(old)
         log(f"control socket {control_path}")

@@ -1,0 +1,19 @@
+{
+  "base": "665c0f6d4c9cc5630a2c2a913d1539cd4d48a1da",
+  "python": "3.14.8",
+  "k6": "k6 v2.0.0 (commit/8c3be52cc1, go1.26.3, linux/amd64)",
+  "source_sha256": {
+    "fixtures/loopback.py": "93f0bf5b78a8e305566b2a4fd52b710ef7258ddb3acfddb990a2c2870d4a214c",
+    "fixtures/processes.py": "8ac82940f7fe3ce38b3f4822e056897c41cac4b02be8f4fc2fb17116b106fece",
+    "run.py": "4a13ff0b7ecba5c28e3166ba119da38a5db311b040e45c5c94685416a5cf779d",
+    "verify.py": "d35511f0a32802ab8cba356e45e7f0518067ffadb50ed8b92cf19dc3a2bc7807",
+    "scenarios/smoke.js": "73061081bdb0f39806bdb636b9d3e8f4c8122e3118a925afc3f87141e7ebdf17",
+    "tests/test_processes.py": "71244bb28092ddc0bf2a3773bd20ba0468e93ce9f56e5b36b97c561e86b3b6f7",
+    "tests/test_process_receipts.py": "7d94fa6145c7e83a967acaa116aafb1c1e22fb43e32be389922d2dbb17d88cac",
+    "tests/test_process_reconnect.py": "e60b9295587c039edaff1208441dc7c8627e72aa4f8549bb35351c49b59aca17",
+    "tests/test_process_supervisor.py": "b7de8a6b36380100a01e9ebebfe02254b075ef5e8a7ea753bae9ff8c2c8cc25d",
+    "../canticle-station/canticle/runner.py": "4fb214ce571923eab8b0e638b9d2b4fcc99a4f94ffa956697aa51fb9db397946",
+    "../canticle-station/canticle/daemon.py": "fa1a0652b06c3dd6c43eb037aa4e8b39a60075a503f923416a38822d385b406b"
+  },
+  "boundary": "six-item real loopback correctness; separate station/daemon OS children; parent relay/record client; no capacity or model-hearing claim"
+}
