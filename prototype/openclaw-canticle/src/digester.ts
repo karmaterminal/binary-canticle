@@ -34,5 +34,9 @@ export async function runFixtureDigester(_input: {
   consent: FixtureConsent;
   source: FixtureSource;
 }): Promise<FixtureDigesterResult> {
+  const { summons, consent } = _input;
+  if (consent.ref !== summons.source.consentRef || consent.actor !== summons.source.actor) {
+    return { status: "failed", reason: "refused_admission" };
+  }
   return { status: "failed", reason: "not_implemented" };
 }
