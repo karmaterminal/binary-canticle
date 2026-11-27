@@ -42,9 +42,13 @@ against a reference worker on fixtures, never on real logs `[proposed: #199]`.
    has a verified invoker (§3), and the event carries references, never instructions (§2). *False if* any
    fixture item heard on air, or quoted inside a referenced record, causes a summons or changes a worker's
    inputs, budget or consent `[proposed: #199]`.
-2. **Every result is attributable** to one summons, one worker identity and one consent. *False if* a sung
-   result lacks any of `summons_id`, `worker` and `worker_version`, `consent_ref` or its causality chain, or
-   if any of them can be supplied by the worker rather than stamped by the summons authority layer
+2. **Every result is attributable** to one summons, one worker identity and the set of consents it read
+   (🌊, review on #199). The worker identity is the one its runner attests it ran (§5.1), not only the one
+   the rule configured `[proposed: #199]`. *False if* a sung result lacks any of `summons_id`, `worker`,
+   `worker_version` and `worker_artifact`, a `consent_ref` for each source read, or its causality chain, or
+   if any of them can be supplied by the worker rather than stamped by the summons authority layer. *Also
+   false if* a success is accepted whose runner attestation is missing or names another artifact (§8 case
+   10), or that read under a `consent_ref` whose record does not grant that read (§4.1, §8 case 8)
    `[proposed: #199]`.
 3. **A sung result can never re-trigger the election that summoned it** (§6.3). *False if* any descendant of
    a summons issued under election `E` is admitted by `E`, at any depth, while chains are intact
@@ -52,7 +56,11 @@ against a reference worker on fixtures, never on real logs `[proposed: #199]`.
 4. **A duplicate delivery of one summons produces exactly one sung result** per `summons_id`. The duplicate is
    detected and recorded against the first result in a durable ledger, never sung twice. Uniqueness is
    enforced at the authoritative store (§5.3). *False if* any interleaving of retries, timeouts, races or
-   crashes in §8 case 1a airs two terminal records for one `summons_id` `[proposed: #199]`.
+   crashes in §8 case 1a airs two terminal records for one `summons_id` `[proposed: #199]`. Claim 4 has two
+   halves (🪨, review on #199). **Safety:** never two published records for one `summons_id`, under every
+   interleaving. **Liveness:** exactly one is eventually published, while the relay can replay and the
+   station's slot lasts (§5.3). *Also false if* a slot filled before a crash is never published after its
+   relay recovers (§8 case 1a vii) `[proposed: #199]`.
 
 Claim 4 was "at most one, or a declared duplicate" in an earlier outline. 🪨's audit pointed out that is two
 guarantees, so it is now one.
@@ -158,8 +166,9 @@ summoner does not wait, and the result comes back by being sung, which plays the
 - The event MUST carry **references only**: record ids, stream names, actors and time windows. It MUST NOT
   carry raw session text, reasoning text or any heard payload. The worker fetches what it reads itself, under
   consent (§4) `[proposed: #199]`.
-- A reference names where to look. It never grants the right to look. That right comes from `consent_ref`
-  alone `[proposed: #199]`.
+- A reference names where to look. It never grants the right to look. That right comes from the consent
+  record a `consent_ref` locates, once that record is verified at the read (§4.1). The ref itself is only a
+  locator (🌊, review on #199) `[proposed: #199]`.
 
 ### 2.2 Context
 
@@ -172,7 +181,8 @@ has nothing, it says so.
 | `causality` (`election`, `chain`, `hop`) | the summons authority layer (§6.3) | none. AWS detects some recursive loops itself [AWS-EDA], but exposes no chain to the function `[proposed: #199]` |
 | `deadline` (absolute, ms) | the authority layer, at admission | `getRemainingTimeInMillis()`, which gives remaining time rather than an absolute deadline `[proposed: #199]` |
 | `invoker`, verified | the summons authority layer | **No direct analogue.** Lambda's `identity` is Amazon Cognito identity for mobile-app callers, not a general invoker (🪨). This field comes from the summons authority layer `[proposed: #199]` |
-| `worker`, `worker_version` | the summons rule | `functionName`, `functionVersion` `[proposed: #199]` |
+| `worker`, `worker_version` | the summons rule names them; the runner attests what actually ran (§5.1) | `functionName`, `functionVersion` `[proposed: #199]` |
+| `worker_artifact` | the summons authority layer, at admission: the digest of the immutable artifact that `worker_version` resolves to in the worker registry (🌊, review on #199) | none `[proposed: #199]` |
 | `budget` (tokens, wall time, result bytes) | the summons rule, within §3's bound | none. `memoryLimitInMB` bounds memory, not tokens, time or output `[proposed: #199]` |
 | `log_destination` | the runner | `logGroupName` (with `logStreamName`) `[proposed: #199]` |
 | `consent_ref` | the summons rule; checked at every read (§4.2) | none `[proposed: #199]` |
@@ -183,7 +193,9 @@ Every context field except `log_destination` MUST be fixed at admission and cove
 attempt counter, if any, lies outside it `[proposed: #199]`.
 
 A worker MUST NOT write `summons_id`, `causality`, `invoker` or `consent_ref`. If it supplies them, the result is
-refused (§6.1) `[proposed: #199]`.
+refused (§6.1) `[proposed: #199]`. The same holds for `worker`, `worker_version` and `worker_artifact`: a
+worker MUST NOT write them, and its own statement of what it is never counts (🌊, review on #199)
+`[proposed: #199]`.
 
 ### 2.3 Aspect
 
@@ -221,6 +233,7 @@ log.
     "invoker": {"kind": "mark", "rule": "mark:fixture-quiet", "owner": "fixture-prince"},
     "worker": "fixture-digester",
     "worker_version": "0.0.0-fixture",
+    "worker_artifact": "sha256:<digest of the fixture-digester 0.0.0-fixture artifact>",
     "budget": {"tokens": 20000, "wall_s": 600, "result_bytes": 800},
     "log_destination": "fixture://logs/smn-fx-0001",
     "consent_ref": "auth:fixture-actor-a",
@@ -230,8 +243,8 @@ log.
 ```
 
 The mark `mark:fixture-quiet` fired. The authority layer verified the rule and its owner, assigned
-`smn-fx-0001`, started the chain and set the deadline. The worker gets references to two records and one
-consent. It does not get their text.
+`smn-fx-0001`, started the chain, set the deadline and resolved `fixture-digester` at `0.0.0-fixture` to its
+artifact digest. The worker gets references to two records and one consent. It does not get their text.
 
 ---
 
@@ -241,7 +254,10 @@ consent. It does not get their text.
 
 - **Marks.** A threshold on a metric the house already gathers, from Grafana or Loki as the familiar sweep does
   today (ttf#36). A mark rule MUST declare its debounce and its cooldown, and MUST NOT fire again inside its
-  cooldown. The rule's owner is the invoker, not the metric `[proposed: #199]`.
+  cooldown. The rule's owner is the invoker, not the metric `[proposed: #199]`. A mark on a metric derived
+  from canticle records (a Grafana or Loki series that counts or reads sung records) counts those records as
+  its trigger records, even though it reads them through a metric. It MUST carry their chains into admission,
+  or else it MUST NOT count summons results at all (§6.3 rule 6; 🪨, review on #199) `[proposed: #199]`.
 - **Elected princes.** A prince may summon for itself. The invoker is that prince, verified by the authority
   layer, not named in a message `[proposed: #199]`.
 - **Schedules.** A schedule's owner is its invoker `[proposed: #199]`.
@@ -259,6 +275,8 @@ authority. A signature proves who sang and that the bytes are intact, nothing mo
 
 A mark rule MAY count heard records as evidence, if its owner configured that. The invoker is still the rule's
 owner. Only the records' ids and verified signers enter the summons, never their payloads (§2.1)
+`[proposed: #199]`. Their stamped causality chains enter it too, read by the authority layer from the records
+themselves, whether the rule counts them directly or through a metric (§6.3 rule 6; 🪨, review on #199)
 `[proposed: #199]`.
 
 ### 3.3 Quorum counts distinct signers
@@ -290,6 +308,35 @@ authorization.
 - A consent record's audience bounds the result: the result's audience MUST NOT be wider than the narrowest
   audience among the consents it read under `[proposed: #199]`.
 
+**A ref is a locator, not a grant** (🌊, review on #199). Naming a record proves nothing about it. A rule could
+name an unrelated record, or a forged one, and pass the two checks above. So the record behind each ref is
+verified, not only located.
+
+- An authorization record MUST carry a fifth field beside bc#126's four: its **grantee**, the worker identities
+  (and, if it narrows further, the summons rules) that may read under it. A record with no grantee grants
+  nothing to a summons `[proposed: #199]`.
+- At admission, and again at every read, the verifier MUST resolve the ref to the current record and check all
+  of the following. Any one failing refuses the read `[proposed: #199]`.
+  1. **Integrity and issuer.** The record is intact and signed by its issuer, and the issuer is the actor with
+     authority over the source being read: for a prince's own session activity, that prince; for a scribe
+     seat, that seat, by its own opt-in (§4.3). A record issued by anyone else grants nothing.
+  2. **Actor.** The record's actor is the actor whose data this read fetches.
+  3. **Source.** The record's source covers exactly the stream or record being read. A record for another
+     source, or one the read would widen, fails.
+  4. **Audience.** The result audience the summons was admitted with is within the record's audience.
+  5. **Grantee.** This summons's `worker` (and its rule, if the record names rules) is among the record's
+     grantees.
+  6. **Revocation**, as §4.2.
+- **The verifier is the read path, not the worker.** At admission it is the summons authority layer. At a read
+  it is the component that serves the source to the worker, which checks the summons binding and the
+  `consent_ref` presented with each read. A worker's own check is never the guarantee, for the same reason a
+  worker's own report is never a receipt (§8) `[proposed: #199]`.
+- **Fail closed.** A check that cannot complete (the record cannot be fetched, the signature cannot be verified,
+  a field is missing) MUST refuse the read. At admission, the summons is then refused before any read. Mid-run,
+  the run ends in a failure record, reason refused read (§5.2) `[proposed: #199]`.
+- How issuers sign their records, and where the map from a source to the actor with authority over it lives,
+  are open `[open: §9]`.
+
 ### 4.2 Revocation is checked at every read
 
 - The worker MUST check the consent record's revocation **at every read** of a source, not only at summons
@@ -301,6 +348,30 @@ authorization.
   it with a PLUCK (RFC-0002 §2.2). The station can pluck today, but nothing wires revocation to a pluck yet
   `[built+tested: binary-canticle@8ee80d7:prototype/canticle-station/canticle/station.py:343 | prototype/canticle-station/tests/test_udp_e2e.py:44]`.
 - Whether revocation SHOULD pluck automatically is open `[open: §9]`.
+
+**Revoked after the last read, before publication** (🌊, review on #199). A run can finish its reads and then
+lose a consent before its result is accepted. The read checks above cannot see that.
+
+- The authoritative store's accept of a success (§5.3) MUST check again every consent the result read under.
+  The accept is the **linearization point**: a revocation counts as before publication if the consent store
+  recorded it before the accept's check read it, and as after publication if not `[proposed: #199]`.
+- **Revoked before the accept: withheld, and sung as a failure.** The store MUST fill the slot `failed`, reason
+  revocation, in place of the success. The success send then finds the slot filled and is answered as §5.3
+  answers any such send: the existing receipt, recorded as a duplicate. Nothing read under the revoked consent
+  is published. A failure record carries no content read under consent, so it needs no consent check
+  `[proposed: #199]`.
+- **Revoked after the accept: on air until its TTL**, like any result already on air (above). Its owner MAY
+  withdraw it with a PLUCK (RFC-0002 §2.2). Under §5.3 option B this includes a result accepted into the slot
+  but still `pending` publication: the relay MUST still publish it, so that claim 4 holds, and the PLUCK is
+  how it is withdrawn `[proposed: #199]`.
+- **Unknown is not unrevoked.** If the accept cannot read a consent's state, it MUST NOT fill the slot. The
+  send is not accepted and may be retried under the same binding. The authority layer's deadline failure
+  (§5.2) still bounds the run `[proposed: #199]`.
+- So the revocation promise is narrow: no result is published under a consent revoked before its accept. It is
+  not a promise that nothing is on air after a revocation `[proposed: #199]`.
+- If the consent store and the slot are different stores, the check and the fill are two steps, and a
+  revocation landing between them counts as after the accept. How stale that check may be is open
+  `[open: §9]`.
 
 ### 4.3 Scribe seats as sources
 
@@ -345,6 +416,18 @@ So a summons is a long-running, stateful task dressed in a FaaS-shaped contract.
   naming which `[proposed: #199]`.
 - The runner SHOULD heartbeat a long run so that "still running" and "the runner died" read differently.
   Unknown MUST NOT be shown as quiet `[proposed: #199]`.
+- **The runner attests what ran** (🌊, review on #199). For each run, the runner MUST produce an execution
+  attestation, signed by the runner and never by the worker, naming the `summons_id`, the binding and the
+  digest of the artifact it actually started. A version the worker reports about itself is never that proof
+  `[proposed: #199]`.
+- Before it stamps a success's lineage (§6.1), the summons authority layer MUST check that the attestation is
+  present and verifies, names this summons and this binding, and names the same digest as `worker_artifact`.
+  If any check fails, the success MUST be refused, and the authority layer fills the slot `failed`, reason
+  worker mismatch (§5.2, §5.3) `[proposed: #199]`.
+- **The proof boundary.** This proves that the artifact the runner started is the one the stamp names. It
+  trusts the runner: a runner that lies in its attestation is outside this proof, just as station key custody
+  is outside what a signature proves (§7). The attestation's format depends on where workers run
+  `[open: §9]`.
 
 ### 5.2 Retries and failure
 
@@ -355,7 +438,7 @@ So a summons is a long-running, stateful task dressed in a FaaS-shaped contract.
 - A retry MUST NOT mint new evidence. It carries the same `summons_id` and binding, and its result MUST be the
   same slot's result (§5.3) `[proposed: #199]`.
 - **A failed summons goes to a destination**: a sung failure record on the worker's station, naming the
-  `summons_id` and the reason (deadline, budget, revocation, refused read, worker error). It MUST NOT be lost
+  `summons_id` and the reason (deadline, budget, revocation, refused read, worker mismatch, worker error). It MUST NOT be lost
   silently. Lambda discards failed asynchronous events unless a destination is configured [AWS-AsyncErrors];
   here the destination is not optional `[proposed: #199]`.
 - If the worker cannot sing (it died, or its deadline passed), the summons authority layer MUST write the
@@ -399,6 +482,7 @@ After a failed call, "your function's code might have run completely, partially,
   "summons_id": "smn-fx-0001",
   "binding": "sha256:<digest of the admitted event and context>",
   "state": "succeeded",
+  "publication": "published",
   "station": "fixture-familiar",
   "epoch": 3,
   "seq": 41,
@@ -410,6 +494,25 @@ After a failed call, "your function's code might have run completely, partially,
 `this_send` is `accepted`, `duplicate` or `conflict`. A `conflict` receipt carries no `state`, `epoch` or `seq`
 of the first result.
 
+**Accepted is not yet sung** (🪨, review on #199). Under option B below, the slot can be filled while its
+outbox row still waits for the station. A crash there leaves a filled slot and nothing on air. So the slot
+carries a second attribute beside its state.
+
+- `publication` is `pending` from the fill until the station accepts the result, then `published`. The
+  terminal state (`succeeded` or `failed`) is fixed at the fill and never changes. Only `publication` moves,
+  once, from `pending` to `published` `[proposed: #199]`.
+- A receipt given while the slot is `pending` MUST say so. It carries the state, but no `station`, `epoch` or
+  `seq`. A sender MUST NOT read a `pending` receipt as sung `[proposed: #199]`.
+- **The relay replays until the station answers.** It sends the row, keyed on `summons_id` and binding, to the
+  station's conditional accept. The station accepts it once. A replay after that gets the station's existing
+  receipt, and the relay records that receipt's `station`, `epoch` and `seq` against the slot and marks it
+  `published`. A crash at any step repeats the replay, never the fill `[proposed: #199]`.
+- **Safety and liveness are separate.** Safety (never two published records for one `summons_id`) rests on the
+  station's conditional accept, under every interleaving. Liveness (one is eventually published) needs more: a
+  relay that recovers and replays, and a station slot that outlives the replay horizon. A slot left `pending`
+  MUST be shown as pending, never as sung and never as quiet `[proposed: #199]`.
+- Under option A the station's accept is the publication, so a slot is never `pending` `[proposed: #199]`.
+
 **Where the slot lives is open.** Two options, and neither is built `[open: §9]`:
 
 - **A. Station-side conditional accept.** The station keeps a durable slot table and its `sing` takes
@@ -419,7 +522,8 @@ of the first result.
   in one transaction. A relay publishes the row. But a relay that crashes between its `sing` and marking the
   row done will sing again. So the relay's publication still needs the station to accept conditionally on
   `summons_id`, or claim 4 fails at the relay. B adds a durable ledger of failures and receipts; it does not
-  remove A's station change.
+  remove A's station change. The conditional accept is necessary for B but not sufficient: B also needs the
+  `pending` state and the replay above (🪨, review on #199).
 
 ---
 
@@ -432,6 +536,9 @@ of the first result.
 - **Lineage** MUST include `summons_id`, `worker`, `worker_version`, `consent_ref` (each one read), `aspect`, the
   binding and the causality chain (§6.3). The sources read appear by reference, never by content
   `[proposed: #199]`.
+- Lineage MUST also include `worker_artifact` and a reference to the runner's execution attestation (§5.1).
+  The `worker` and `worker_version` it carries are the ones the attestation backs, not the worker's word
+  (🌊, review on #199) `[proposed: #199]`.
 - Lineage MUST be stamped by the summons authority layer, never supplied by the worker. This applies decision 2 of
   RFC-0002 (#176) to summons: the agent supplies content and an election, never its own lineage
   `[proposed: #199]`.
@@ -462,8 +569,8 @@ that summoned it. The rule below rules that out.
 
 - Each election `E` has a stable election key `ek(E)`, assigned by the summons authority layer.
 - Each summons `S` issued under `E` has the causality entry `(ek(E), summons_id(S))`.
-- The **trigger records** of `S` are the records `E` counted when it issued `S`. A mark on a metric or a
-  schedule has none.
+- The **trigger records** of `S` are the records `E` counted when it issued `S`, including records it counted
+  through a metric (rule 6). A schedule, or a mark on a metric derived from no records, has none.
 - `chain(S)` is the union of the chains of its trigger records, plus `S`'s own entry.
 - `hop(S)` is one more than the largest hop among its trigger records, or 1 if it has none.
 - A result `R` of `S` carries `chain(R) = chain(S)` and `hop(R) = hop(S)`.
@@ -479,6 +586,11 @@ that summoned it. The rule below rules that out.
 4. **Hop bound.** An election MUST NOT issue a summons whose hop would exceed `H_max` `[proposed: #199]`.
 5. A result MUST NOT cause anything downstream except through an election that admits it under rules 2 to 4
    `[proposed: #199]`.
+6. **Metric-backed marks** (🪨, review on #199). A mark whose metric is derived from records MUST name, at
+   admission, the records it counted, and the authority layer MUST read their stamped chains from the records
+   themselves, never from the metric. If the metric cannot name them, the mark MUST NOT count any record that
+   carries a causality chain (any summons result), and its rule MUST declare the metric's inputs, so that the
+   authority layer can refuse a rule whose inputs include a result stream `[proposed: #199]`.
 
 **What each rule proves.** Rule 2 is the proof of claim 3. Every descendant of a summons `S` issued under `E`
 inherits `chain(S)` whole (rule 1), and `chain(S)` holds `(ek(E), summons_id(S))`. So `E` refuses every
@@ -486,10 +598,20 @@ descendant, at any depth. That includes a cycle through other elections: when th
 `E`'s key is in the chain. The hop count does not prove anything (🪨). It *bounds* cascades through distinct
 elections, which rule 2 does not stop, and it is the backstop if a chain is lost.
 
+On a metric-backed mark, rule 6 is what keeps the chain whole. Without it, take `E1` issuing `S1` with result
+`R1`, and `E2` firing on a metric that counts `R1`. `E2`'s summons would have no trigger records, its chain
+would hold only `E2`'s entry, and `E1` could admit `E2`'s result. With rule 6, `E2`'s summons inherits
+`chain(R1)`, which holds `ek(E1)`, so `E1` refuses it (🪨).
+
 **Named loss.** A loop that passes through a prince's own judgement is outside this guard. If a prince reads a
 result and then summons for itself, the new summons inherits the result's chain only where the host's exposure
 ledger can show the prince was exposed to it (RFC-0002 §4.1). Where it cannot, the chain starts fresh. Then only
 §3.1's per-kind budget bounds that loop `[open: §9]`.
+
+**Named loss, second path** (🪨, review on #199). A metric whose declared inputs are not its real inputs, for
+example a series fed from a result by a component the rule does not name, carries no chain, and rule 6 cannot
+see it. Its summons starts a fresh chain at hop 1, so neither exclusion nor the hop bound holds on that path.
+As with the judgement loop, only §3.1's per-kind budget bounds it `[open: §9]`.
 
 In the running example, a result of `smn-fx-0001` carries `mark:fixture-quiet` in its chain. If
 `mark:fixture-quiet` counts sung records, it refuses that one.
@@ -528,12 +650,30 @@ end-to-end form of the same test, and these cases are its contract-level part.
 | 1a iv | Delayed first acceptance: the first send lands after the retry was issued | only one is published | `[proposed: #199]` |
 | 1a v | Success against failure: a success record and a failure record for one `summons_id` race (for example, a late success and the authority layer's deadline failure) | exactly one terminal state is accepted; the loser gets the winner's receipt and is recorded | `[proposed: #199]` |
 | 1a vi | Changed-payload replay: same `summons_id`, different envelope, worker or consent | refused as a `conflict`; it is not given the first receipt; it is recorded | `[proposed: #199]` |
+| 1a vii | Option B: the relay crashes after the slot fills and before the station accepts (🪨, review on #199) | while down, the slot is `pending` and a retry's receipt says `pending`, with no `epoch` or `seq`; after recovery the replay is accepted once, the slot turns `published`, and the station's receipt is recorded against it; `on_air` holds one record | `[proposed: #199]` |
+| 1a viii | Option B: the relay crashes after the station accepted, before it marked the row (🪨, review on #199) | the replay gets the station's existing receipt; nothing new airs; the slot turns `published` with that receipt's `epoch` and `seq` | `[proposed: #199]` |
 | 2 | A sung result reaches the election that summoned it, directly and through a second election | refused by the exclusion rule at first return. Ablation arm, exclusion off: the two-election cycle stops at `H_max` | `[proposed: #199]` |
+| 2a | Metric-backed two-election path: `E1`'s result `R1` is counted by a metric behind `E2`, and `E2`'s result returns to `E1` (🪨, review on #199) | `E2`'s summons carries `chain(R1)`; `E1` refuses `E2`'s result at first return | `[proposed: #199]` |
+| 2b | A mark rule whose metric cannot name its records declares a result stream among its inputs (🪨, review on #199) | the rule is refused at admission; no summons issues from it | `[proposed: #199]` |
 | 3 | An unauthorized invoker (unverified, over budget, or a heard item) | refused before any read; the read counter stays at zero | `[proposed: #199]` |
 | 4 | A revocation lands while the worker is queued; another lands mid-run | the queued worker makes no read; the running worker's next read is refused, and the run ends in a failure record | `[proposed: #199]` |
 | 5 | A run fails (worker error, deadline, budget) | a sung failure record through the slot, naming the reason | `[proposed: #199]` |
 | 6 | A result's lineage | it carries every §6.1 field, and none was written by the worker | `[proposed: #199]` |
 | 7 | An ambient item, heard on air or quoted inside a referenced record, asks for a summons | no summons; no change to inputs, budget or consent | `[proposed: #199]` |
+| 8 i | The `consent_ref` names a valid record for another actor (🌊, review on #199) | refused at admission, before any read; the read counter stays at zero | `[proposed: #199]` |
+| 8 ii | The record's actor matches, but its source is another stream, or narrower than the read | refused before that read; the counter for that source stays at zero | `[proposed: #199]` |
+| 8 iii | The record's audience is narrower than the summons's result audience | refused at admission | `[proposed: #199]` |
+| 8 iv | The record's grantee names a different worker | refused at admission | `[proposed: #199]` |
+| 8 v | The record is forged, altered, or issued by someone without authority over the source | refused at admission | `[proposed: #199]` |
+| 8 vi | The record is valid at admission, then replaced mid-run by one that fails a check, or cannot be fetched | the next read is refused; the run ends in a failure record, reason refused read | `[proposed: #199]` |
+| 9 i | A revocation lands after the last read, before the success is sent (🌊, review on #199) | the slot fills `failed`, reason revocation; a failure record is sung; nothing read under the consent is published; the success send gets that receipt and is recorded as a duplicate | `[proposed: #199]` |
+| 9 ii | A revocation lands after the accept (under option B, while the slot is still `pending`) | one result is published; the revocation is recorded as after publication; the result stays on air until its TTL or a PLUCK | `[proposed: #199]` |
+| 9 iii | A revocation races the accept | exactly one of 9 i or 9 ii, as ordered by the consent store; the slot holds one state | `[proposed: #199]` |
+| 9 iv | The consent store cannot answer at the accept | the slot is not filled; a retry under the same binding can still be accepted; past the deadline, the authority layer's failure fills it | `[proposed: #199]` |
+| 10 i | The runner's attestation names a different artifact digest from `worker_artifact` (🌊, review on #199) | the success is refused; the slot fills `failed`, reason worker mismatch | `[proposed: #199]` |
+| 10 ii | No runner attestation; only the worker reports its version | refused as 10 i | `[proposed: #199]` |
+| 10 iii | An attestation from another summons or binding is replayed | refused as 10 i | `[proposed: #199]` |
+| 10 iv | The worker writes `worker`, `worker_version` or `worker_artifact` into its result | the result is refused (§2.2) | `[proposed: #199]` |
 
 Case 2's ablation arm exists to show which rule does the work. With exclusion on, the hop bound is never
 reached in that fixture. With it off, the hop bound alone cuts the cycle, later and at more cost.
@@ -562,6 +702,16 @@ Each names who should decide. Nothing here is decided by this draft.
 - **Pluck on revoke.** Whether a revocation plucks results already on air (§4.2) `[open: §9]`.
 - **Chains through a prince.** How much of §6.3's named loss the exposure ledger can close (RFC-0002 §4.1)
   `[open: §9]`.
+- **Metric inputs.** How a mark rule declares its metric's inputs, whether a Grafana or Loki series can name
+  the records it counted, and how much of §6.3's second named loss that closes (🪨, review on #199). Owner:
+  the familiar sweep's owner, with 🪨 `[open: §9]`.
+- **Consent records.** How an issuer signs its record, where the map from a source to the actor with
+  authority over it lives, and the grantee field's exact shape (§4.1; 🌊, review on #199). Owner: not yet
+  named; 🌊 reviews `[open: §9]`.
+- **Consent check staleness.** How old a consent read at the accept may be when the consent store and the
+  slot are different stores (§4.2) `[open: §9]`.
+- **Execution attestation.** Its format and signing key per runner (ARC or Temporal), and the worker registry
+  that maps a `worker_version` to its artifact digest (§5.1, §2.2; 🌊, review on #199) `[open: §9]`.
 - **Rollout** of a familiar station and its manifest grant (R4 gap 9). A later go, not this RFC `[open: §9]`.
 
 ---
@@ -571,6 +721,7 @@ Each names who should decide. Nothing here is decided by this draft.
 | Rev | Date | By | Changed |
 |---|---|---|---|
 | 0 | 2026-11-27 | 🍃 | The draft, from the outline at frond-gloss `24c311a`. 🪨's claims audit (room, 2026-11-27, 03:41Z to 03:44Z) made five fixes, all carried here. (1) `summons_id` and `invoker` have no direct Lambda analogue (§2.2): `awsRequestId` is one request, and `identity` is Cognito mobile identity; both fields come from the summons authority layer. (2) Claim 4 is exactly one sung result per `summons_id`, not "at most one, or a declared duplicate" (§0.2). Send-then-timeout is unconfirmed, not failure (§5.3). (3) Revocation is checked at every read, not only at admission (§4.2). (4) The exclusion rule by causality chain proves no self-retrigger; the hop count only bounds (§6.3). Uniqueness lives at the authoritative store, with a conditional accept or a transactional outbox, every retry gets the same receipt, and a pre-read is only an optimisation (§5.3). §8 gained cases 1a i to iv. (5) `summons_id` is the one terminal slot, not `(summons_id, result_kind)`: success and failure are mutually exclusive states of it, and a changed replay conflicts (§5.3). §8 gained cases 1a v and vi. The digester's owner is 🪨 (#198). |
+| 1 | 2026-11-27 | 🍃 | Two reviews at `c5cbbb6b`. **🌊's** (comment on #199): (1) a `consent_ref` is a locator, not a grant. §4.1 now verifies the record behind it at admission and every read (integrity and issuer, actor, exact source, audience, a new grantee field, revocation), by the read path rather than the worker, failing closed; §2.1 says so. (2) Revocation after the last read and before publication: §4.2 re-checks consent at the slot's accept, which is the linearization point. Revoked before it, the slot fills `failed`; after it, the result stays on air until its TTL or a PLUCK. The promise is narrowed to match. (3) `worker`/`worker_version` are backed by a runner's execution attestation against a new `worker_artifact` digest (§2.2, §5.1, §6.1); a mismatch fills the slot `failed`. Claim 2 now reads "the set of consents it read", and its falsifier covers (1) and (3) (§0.2). **🪨's** (review on #199): (a) a metric-backed mark carries the chains of the records it counts, or must not count summons results (§3.1, §3.2, §6.3 rule 6, and a second named loss). (b) Under option B a filled slot is `pending` until the station accepts; a relay replays until it does; claim 4 is split into safety and liveness (§0.2, §5.3). §8 gained cases 1a vii and viii, 2a and 2b, 8, 9 and 10; §9 gained four entries. |
 
 ---
 
