@@ -54,9 +54,9 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 
 | row (sources-ports-rate-offset) | fix | new | base | slice |
 |---|---|---|---|---|
-| afixed-40-20000-5 | – | PASS: worst first 0.04 s; first 0/6, items 0/120 | PASS: worst first 0.64 s; first 0/4, items 0/80 | PASS: worst first 0.08 s; first 0/5, items 0/100 |
-| afixed-40-100000-5 | – | PASS: worst first 0.03 s; first 0/8, items 0/160 | **FAIL**: worst first 5.18 s; first 1/3, items 20/60 (lost 0, > 10 s 6) | PASS: worst first 0.06 s; first 0/5, items 0/100 |
-| **cells passed** | **0 of 0** | **2 of 2** | **1 of 2** | **2 of 2** |
+| afixed-40-20000-5 | PASS: worst first 0.03 s; first 0/5, items 0/100 | PASS: worst first 0.04 s; first 0/6, items 0/120 | PASS: worst first 0.64 s; first 0/4, items 0/80 | PASS: worst first 0.08 s; first 0/5, items 0/100 |
+| afixed-40-100000-5 | PASS: worst first 0.04 s; first 0/5, items 0/100 | PASS: worst first 0.03 s; first 0/8, items 0/160 | **FAIL**: worst first 5.18 s; first 1/3, items 20/60 (lost 0, > 10 s 6) | PASS: worst first 0.06 s; first 0/5, items 0/100 |
+| **cells passed** | **2 of 2** | **2 of 2** | **1 of 2** | **2 of 2** |
 
 ## N0-N2 by 🌫's comparator (hardened): INVALID runs named, cells complete or not
 
@@ -207,9 +207,11 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 | row | tree | runs judged | first frame: on time / late / missing | items: on time / late / missing, of 20 a run | verdict | the harness's own verdict |
 |---|---|---|---|---|---|---|
 | afixed-40-20000-5 | base | 3 of 4 | 3 / 0 / 0 | 60 / 0 / 0 | PASS (run 0: underdriven: 17510 of 20000 in its lowest second) | PASS |
+| afixed-40-20000-5 | fix | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | afixed-40-20000-5 | new | 5 of 6 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 0: underdriven: 18960 of 20000 in its lowest second) | PASS |
 | afixed-40-20000-5 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | afixed-40-100000-5 | base | 3 of 3 | 2 / 1 / 0 | 40 / 20 / 0 | **FAIL** | FAIL |
+| afixed-40-100000-5 | fix | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 | afixed-40-100000-5 | new | 5 of 8 | 5 / 0 / 0 | 100 / 0 / 0 | PASS (run 1: underdriven: 94850 of 100000 in its lowest second; run 2: underdriven: 87300 of 100000 in its lowest second; run 4: underdriven: 93100 of 100000 in its lowest second) | PASS |
 | afixed-40-100000-5 | slice | 5 of 5 | 5 / 0 / 0 | 100 / 0 / 0 | PASS | PASS |
 
@@ -217,8 +219,8 @@ Trees: `fix` is `91d36c608bda8c6efa9f0c602366fdf3491a40ce` (results-3/; its inta
 
 | row | bound, s | fix: worst first frame, s; runs inside | new: worst first frame, s; runs inside | base: worst first frame, s; runs inside | slice: worst first frame, s; runs inside |
 |---|---|---|---|---|---|
-| afixed-40-20000-5 | 0.23 | – | 0.036; 6 of 6 | 0.643; 0 of 4 **OUTSIDE** | 0.075; 5 of 5 |
-| afixed-40-100000-5 | 0.23 | – | 0.030; 8 of 8 | 5.175; 0 of 3 **OUTSIDE** | 0.061; 5 of 5 |
+| afixed-40-20000-5 | 0.23 | 0.028; 5 of 5 | 0.036; 6 of 6 | 0.643; 0 of 4 **OUTSIDE** | 0.075; 5 of 5 |
+| afixed-40-100000-5 | 0.23 | 0.036; 5 of 5 | 0.030; 8 of 8 | 5.175; 0 of 3 **OUTSIDE** | 0.061; 5 of 5 |
 | fixed-40-20000-0 | 0.33 | 0.037; 5 of 5 | 0.036; 5 of 5 | 0.022; 3 of 3 | 0.028; 5 of 5 |
 | fixed-40-20000-5 | 0.17 | 0.025; 5 of 5 | 0.042; 7 of 7 | 0.095; 3 of 3 | 0.023; 5 of 5 |
 | fixed-40-20000-30 | 0.17 | 0.061; 5 of 5 | 0.038; 6 of 6 | 0.093; 3 of 3 | 0.031; 5 of 5 |

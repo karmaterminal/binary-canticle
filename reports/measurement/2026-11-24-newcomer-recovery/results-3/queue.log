@@ -401,3 +401,23 @@ cold-start-churn-60000-hosts-20000 4 {'sung': 20, 'during_the_flood': 20, 'ever'
 01:37:22Z fix xfixed-40-100000-120 4 first 0.0438 items min/med/max 0.0075 0.0124 0.0437 | misses: first 0 items 0 lost 0 | offered 100001 low 98900 | drops 6728 6728 | cpu 133.5
 === 01:37:22Z gate: load 7.21 6.29 6.31, waited 0 s for others and 0 s for load
 === 01:37:22Z N2 round 1
+01:38:32Z fix afixed-40-20000-5 0 first 0.0105 items min/med/max 0.0077 0.0114 0.8845 | misses: first 0 items 0 lost 0 | offered 20000 low 20000 | drops 0 0 | cpu 27.77
+01:39:42Z fix afixed-40-100000-5 0 first 0.0219 items min/med/max 0.0082 0.0205 0.8473 | misses: first 0 items 0 lost 0 | offered 100002 low 99950 | drops 0 0 | cpu 43.5
+=== 01:39:42Z gate: load 5.69 5.89 6.15, waited 0 s for others and 0 s for load
+=== 01:39:42Z N2 round 2
+01:40:52Z fix afixed-40-20000-5 1 first 0.0224 items min/med/max 0.0088 0.0179 0.8682 | misses: first 0 items 0 lost 0 | offered 20000 low 20000 | drops 0 0 | cpu 30.15
+01:42:02Z fix afixed-40-100000-5 1 first 0.0206 items min/med/max 0.0099 0.0196 0.0356 | misses: first 0 items 0 lost 0 | offered 100001 low 97350 | drops 7869 7869 | cpu 47.69
+=== 01:43:17Z gate: load 7.89 6.82 6.43, waited 0 s for others and 75 s for load
+=== 01:43:17Z N2 round 3
+01:44:27Z fix afixed-40-20000-5 2 first 0.0264 items min/med/max 0.0082 0.0113 0.0263 | misses: first 0 items 0 lost 0 | offered 20000 low 20000 | drops 0 0 | cpu 29.17
+01:45:37Z fix afixed-40-100000-5 2 first 0.0202 items min/med/max 0.0092 0.0178 0.9174 | misses: first 0 items 0 lost 0 | offered 100002 low 100000 | drops 0 0 | cpu 48.57
+=== 01:45:37Z gate: load 6.20 6.62 6.42, waited 0 s for others and 0 s for load
+=== 01:45:37Z N2 round 4
+01:46:47Z fix afixed-40-20000-5 3 first 0.0276 items min/med/max 0.0077 0.0184 1.011 | misses: first 0 items 0 lost 0 | offered 20000 low 20000 | drops 0 0 | cpu 28.66
+01:47:57Z fix afixed-40-100000-5 3 first 0.0236 items min/med/max 0.0078 0.0186 0.9223 | misses: first 0 items 0 lost 0 | offered 100002 low 99950 | drops 0 0 | cpu 49.27
+=== 01:47:57Z gate: load 5.57 6.27 6.32, waited 0 s for others and 0 s for load
+=== 01:47:57Z N2 round 5
+01:49:08Z fix afixed-40-20000-5 4 first 0.013 items min/med/max 0.0084 0.0215 0.9013 | misses: first 0 items 0 lost 0 | offered 20000 low 19960 | drops 0 0 | cpu 28.06
+01:50:18Z fix afixed-40-100000-5 4 first 0.0359 items min/med/max 0.0088 0.0196 1.0196 | misses: first 0 items 0 lost 0 | offered 100002 low 99950 | drops 0 0 | cpu 43.87
+=== 01:50:18Z gate: load 7.35 7.06 6.65, waited 0 s for others and 0 s for load
+=== 01:50:18Z complete n0-churn-own churn-40-100000-0 run 5
