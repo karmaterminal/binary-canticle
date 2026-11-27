@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Status** | Draft (2026-11-23). Not wire-stable, not installed. Shaped from `docs/design/sense-organ.md` at `2c3f5ab6` (draft PR #168), at figs's ask that the canticle work be anchored to an RFC. |
+| **Status** | Draft (2026-11-27; first drafted 2026-11-23). Not wire-stable, not installed. Shaped from `docs/design/sense-organ.md` at `2c3f5ab6` (draft PR #168), at figs's ask that the canticle work be anchored to an RFC. |
 | **Location** | `rfc/0002-binary-canticle-sense-organ.md` |
 | **Updates** | RFC-0001 (`rfc/0001-binary-canticle.md`). Section-level relations are in §0.6. Everything not listed there is **to be settled by the claims audit** (🌿's lane, Appendix B). |
-| **Pointers checked at** | binary-canticle `d4c306618f7f77658fe73705d58b2744f2486701` (`main`, the merge of #171); frond-ear `a8e2e5ba1b16adf5ce700265f25a0d210c569608` (`main`, the merge of frond-ear#119). Other SHAs are named where they are used. |
+| **Pointers checked at** | binary-canticle `8ee80d72984de29b4aca96eb4c46d8df1fcd50ed` (`main`, the merge of #195), on 2026-11-27. The pointers themselves name binary-canticle `d4c306618f7f77658fe73705d58b2744f2486701` (`main`, the merge of #171) and frond-ear `a8e2e5ba1b16adf5ce700265f25a0d210c569608` (`main`, the merge of frond-ear#119). Other SHAs are named where they are used. |
 | **Revisions** | Appendix D lists each revision and what it changed. Nothing decided in an earlier revision is reopened except by an explicit row there. |
 | **Owners** | §1 🕯 Emeric. §2 and §3 🍃 frond-gloss and 🌿 frond-scribe (the tower and ear). §5 🌊 Ronan (the seam), and §3.5. §4 🪨 Rune (answering). §0, §6 and §7 all of us. |
 
@@ -597,8 +597,8 @@ tuned stream `[proposed: #168]`:
 - **The banner for an admitted batch carries its coverage note with the material (🌊):** the source and
   range; what was admitted vs coalesced, expired or muted; known gaps; and `unknown` where coverage
   can't be established. There MUST NOT be a second status wake `[proposed: #168]`. The note gives the
-  shape of the window; custody says which bytes this turn actually saw. (frond-ear at `a8e2e5b` can push
-  a coverage note on its own when every held record went off air: §7.5.)
+  shape of the window; custody says which bytes this turn actually saw. (frond-ear can push a coverage
+  note on its own when every held record went off air. §7.5 decides that it is not a status wake.)
 
 ### 3.2 The controls a prince uses
 
@@ -760,7 +760,7 @@ A second run returns **across a station restart** (🌫).
 | find | the guide lists the programme with its station, stream, class, retention and provenance (§3.3). Finding it MUST NOT by itself arm a wake `[proposed: #195]` (#176 decision 1 is the wake rule) | none: discovery |
 | listen without waking | the ear records the item for this reader and offers no wake. That is **buffer intake** (🪨) | durable-queued (or volatile-queued), with `wake_withheld:<class>` counted |
 | catch up | the return view (§3.1) with its coverage note | host-returned |
-| read it | a later turn echoes an exact item token. That proves **that token was echoed**: not that the payload was read, and not model-input custody (#176 decision 3, 🌫, 🪨). An echoed *batch id* shows the batch was named, not that each item in it was read (🪨). Neither is evidence for the programme (#176 decision 3, 🌫) | prince-encountered (and model-seen, which stays `[open: #176]` on Claude seats) |
+| read it | a later turn echoes an exact item token. That proves **that token was echoed**: not that the payload was read, and not model-input custody (#176 decision 3, 🌫, 🪨). An echoed *batch id* shows the batch was named, not that each item in it was read (🪨). Neither is evidence for the programme (#176 decision 3, 🌫) | token encounter; exact-item model-seen unproved `[open: #176]` |
 | use | the prince's own later act, if any. A host never observes use, and there is no layer for it (🌿). Where it is an answer, §4.3's receipt carries it | none |
 
 **Loss is reported as §3.1's three kinds of gap, never one number:**
@@ -1077,8 +1077,9 @@ the layer names are §0.5's):
 
 ## 7. Open decisions
 
-Each item names who decides. Where #176 decided an item, the item says so and points to §0.7. Nothing
-else here is decided by this draft.
+Each item names who decides. Where #176 decided an item, the item says so and points to §0.7. §7.5 was
+decided by its owners after revision 1 (Appendix D, revision 1.1) and says so. Nothing else here is
+decided by this draft.
 
 ### 7.1 Recovered streams against RFC-0001's non-goals
 
@@ -1145,10 +1146,25 @@ meets them: row 0 passes 1, 1, 2 and 1 of 8 cells on head, `main`, `narrow` and 
 
 ### 7.5 A coverage note on its own
 
-§3.1 says there is no second status wake. frond-ear at `a8e2e5b` pushes the coverage note alone, once,
-when every held record went off air before the hour had room
-`[built+tested: frond-ear@a8e2e5b:src/canticle/delivery.ts:1395 | test/canticle-live-fairness.test.ts:370]`.
-Whether that push is a status wake, and what replaces it if so, is open `[open: §7]`.
+§3.1 says there is no second status wake. frond-ear at `d808392` (`d808392677627d7a030d23946e2d5b0347a85b3c`,
+`main`, the merge of frond-ear#136, after #134) pushes the coverage note alone, once, when every held record
+went off air before the hour had room; the hour after brings no second one
+`[built+tested: frond-ear@d808392:src/canticle/delivery.ts:1374 | test/canticle-live-fairness.test.ts:371]`.
+
+**Decided (🍃 and 🌿, the §3 co-owners, room 2026-11-27 07:52Z, in 🪨's wording from frond-ear#134).** The
+lone coverage note is **not a status wake** in §3.1's sense. It reports on records that were already owed to
+that one session, the same class as the withdrawn note (frond-ear#134). It MAY start a turn on that session
+only, at most once, and it grants no new record or election authority `[proposed: #197]`.
+
+What frond-ear at `d808392` builds of it:
+
+- It carries no record. Naming its batch id echoes nothing and marks no Discord event seen. A push the host
+  never confirmed is given back and the note is owed again; once confirmed, it doesn't come again
+  `[built+tested: frond-ear@d808392:src/canticle/delivery.ts:3451 | test/canticle-live-fairness.test.ts:640]`.
+- It goes out on that ear's own push, to the session holding the ear when it falls due, and waits while none
+  does `[built: frond-ear@d808392:src/canticle/delivery.ts:1992]`. Unlike the withdrawn note
+  (`src/canticle/delivery.ts:1515`), it is bound to the ear, not to a session id: a session that took the ear
+  before the note fell due would get it. A session-id match is not built `[open: §7.5]`.
 
 ### 7.6 What "encountered" means on OpenClaw
 
@@ -1345,14 +1361,15 @@ Standards passages were checked by the bounded helper; access/truncation limits 
 | Rev | Date | By | Changed | Decided earlier and kept |
 |---|---|---|---|---|
 | 0 | 2026-11-23 | all | The draft, shaped from `docs/design/sense-organ.md` (Appendix A) | — |
-| 1 | 2026-11-26, in progress (draft PR) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§2.8** finding the carrier (source / live / proposed kept apart; finding authorizes nothing; four authorities) and **§7.11** registration trust, scoped TSIG or SRP, as a comparison table. **§3.3** searching the guide (metadata first; a search is a look, never an arrival; the index obeys §2.2; churn). **§2.2** withdrawals and retention (on air the PLUCK already closes compaction's ghost; anything retained past wire expiry must keep the PLUCK; which end a full buffer loses). **§3.2** a today-and-proposed table for intake (mute drops and is not hold; hold and release are unbuilt). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. **§0.8** three layers across the capabilities (carrier, programme, intake: 🌫), each with its question, its sections and what it never does. Planned in this revision, each its own commit and row: §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
+| 1 | 2026-11-26, merged as #195 (`8ee80d7`) | 🍃, with 🌿 🪨 🌊 🌫 🌻 | §0.9 *Grounding* and *References* (informative; no normative change). **Appendix C**, 🌻's commissioning appendix, as he wrote it. **§2.8** finding the carrier (source / live / proposed kept apart; finding authorizes nothing; four authorities) and **§7.11** registration trust, scoped TSIG or SRP, as a comparison table. **§3.3** searching the guide (metadata first; a search is a look, never an arrival; the index obeys §2.2; churn). **§2.2** withdrawals and retention (on air the PLUCK already closes compaction's ghost; anything retained past wire expiry must keep the PLUCK; which end a full buffer loses). **§3.2** a today-and-proposed table for intake (mute drops and is not hold; hold and release are unbuilt). **§3.6 the return test** (new, `[proposed: #195]`): the story, a receipt per step in §0.5's layers, loss in §3.1's three kinds of gap with a restart as an unknown tail, and an A/B with usefulness held fixed; §0.1 names it beside §2.7's flood test. **§0.8** three layers across the capabilities (carrier, programme, intake: 🌫), each with its question, its sections and what it never does. Planned in this revision, each its own commit and row: §2.7 the falsifiable acceptance claim and its measured A/B (🪨 🌊 🌫 🌻); Appendix C, 🌻's commissioning appendix; ~~§3.1 loss accounting~~ (not needed: §3.1 already has 🌫's three kinds of gap and the restart rule, and §3.6 uses them); §3.2 the current-to-proposed intake map; §2.2 the two stream shapes; §3.3 search over the guide; §2.8 finding the carrier (🌿 + 🌊 own) and §7.11 SRP as an open alternative. Owners' answers: no sixth "used" receipt layer, because a host can never observe use and §4.3's answer receipt carries a prince's own later act (🌿) | §0.5's five receipt layers (#176 decision 3); #176 decisions 1–7 (§0.7); §0.2's rules |
+| 1.1 | 2026-11-27, #197 | 🍃, with 🌿 🪨 🌫 | **§7.5 decided** by its owners, 🍃 and 🌿 (room 2026-11-27 07:52Z), in 🪨's wording from frond-ear#134: the lone coverage note is not a status wake; it may start a turn on that session only, at most once, and grants no new record or election authority. Its pointers move to frond-ear `d808392`, with what is built (once, no record, given back if unconfirmed) and what isn't (a session-id match, `[open: §7.5]`). §7's preamble and §3.1's pointer say so. **§3.6** the read-row layer cell matches its prose (🌫). Rot an outside reader named: the header's date and pointer SHA, this table's revision 1 row (now merged), and *References*, which promised kept copies under `rfc/refs/` that were never made | §3.1's "no second status wake"; everything in revision 1 |
 
 ## References
 
 Informative only. Every entry was checked against its publisher's record (Crossref, PubMed, rfc-editor.org, or
 the vendor's own page) on 2026-11-26. Where only the abstract or the metadata was read, the entry says so, and §0.9
-claims no more than that. A kept copy goes under `rfc/refs/` where the licence allows; otherwise the URL, a sha256
-of the fetched copy and the access date stand in for it (🌿, revision 1). The working bibliography, with a note
+claims no more than that. Each entry carries its DOI or URL, and 2026-11-26 is its access date (some web pages
+repeat it). No copies are kept in this repository and no sha256 of a fetched copy is recorded. The working bibliography, with a note
 on how §0.9 uses each source and which sources were left out and why, is
 `karmaterminal/frond-gloss:crusade/research/R3-bibliography.md`.
 
