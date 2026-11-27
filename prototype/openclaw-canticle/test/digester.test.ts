@@ -83,6 +83,39 @@ function attestation(overrides: Partial<FixtureRunnerAttestation> = {}): Fixture
   };
 }
 
+function vector1() {
+  return {
+    v: 1,
+    event: {
+      v: 1,
+      kind: "digest.window",
+      refs: {
+        sources: [{
+          key: "src-a", actor: "fixture-actor-a", stream: "fixture:activity",
+          records: ["rec-a-0001", "rec-a-0002"],
+          window: { from_ms: 1764200000000, to_ms: 1764203600000 },
+          consent_ref: "auth:fixture-actor-a",
+        }],
+      },
+    },
+    context: {
+      log_destination: "fixture://logs/smn-fx-0001",
+      attempt: 1,
+      summons_id: "smn-fx-0001",
+      causality: { election: "mark:fixture-quiet", chain: [["mark:fixture-quiet", "smn-fx-0001"]], hop: 1 },
+      deadline_ms: 1764204500000,
+      invoker: { kind: "mark", rule: "mark:fixture-quiet", owner: "fixture-prince" },
+      worker: "fixture-digester",
+      worker_version: "0.0.0-fixture",
+      worker_artifact: "sha256:fixture-digester-0.0.0-fixture",
+      budget: { tokens: 20000, wall_s: 240, result_bytes: 800 },
+      retry: { max_attempts: 3, backoff_base_ms: 30000 },
+      audience: "fixture-room",
+      aspect: "summary.plain",
+    },
+  };
+}
+
 function harness(overrides: {
   summons?: FixtureSummons;
   consents?: FixtureConsent[];
@@ -207,36 +240,7 @@ test("10 iv: worker-written identity fields are refused rather than stamped", as
 });
 
 test("11 i-ii: RFC 8785 projection matches Vector 1 and ignores only attempt-local fields", () => {
-  const vector = {
-    v: 1,
-    event: {
-      v: 1,
-      kind: "digest.window",
-      refs: {
-        sources: [{
-          key: "src-a", actor: "fixture-actor-a", stream: "fixture:activity",
-          records: ["rec-a-0001", "rec-a-0002"],
-          window: { from_ms: 1764200000000, to_ms: 1764203600000 },
-          consent_ref: "auth:fixture-actor-a",
-        }],
-      },
-    },
-    context: {
-      log_destination: "fixture://logs/smn-fx-0001",
-      attempt: 1,
-      summons_id: "smn-fx-0001",
-      causality: { election: "mark:fixture-quiet", chain: [["mark:fixture-quiet", "smn-fx-0001"]], hop: 1 },
-      deadline_ms: 1764204500000,
-      invoker: { kind: "mark", rule: "mark:fixture-quiet", owner: "fixture-prince" },
-      worker: "fixture-digester",
-      worker_version: "0.0.0-fixture",
-      worker_artifact: "sha256:fixture-digester-0.0.0-fixture",
-      budget: { tokens: 20000, wall_s: 240, result_bytes: 800 },
-      retry: { max_attempts: 3, backoff_base_ms: 30000 },
-      audience: "fixture-room",
-      aspect: "summary.plain",
-    },
-  };
+  const vector = vector1();
   const first = bindingOf(vector);
   assert.equal(first, "sha256:88cdc08ee07bc70d0885a726addba1cd40c6abad2ed3a7835cbe17885b067fd9");
   const retry = structuredClone(vector);
@@ -245,15 +249,73 @@ test("11 i-ii: RFC 8785 projection matches Vector 1 and ignores only attempt-loc
   assert.equal(bindingOf(retry), first);
 });
 
-test("11 iii: changed admitted fields conflict instead of inheriting the first receipt", () => {
+test("11 iii: every listed binding field conflicts instead of inheriting the first receipt", () => {
   const slot = new FixtureTerminalSlot();
-  const firstBinding = bindingOf(summons);
+  const original = vector1();
+  const firstBinding = bindingOf(original);
   assert.equal(slot.accept(summons.summonsId, firstBinding, "succeeded").thisSend, "accepted");
   assert.equal(slot.accept(summons.summonsId, firstBinding, "succeeded").thisSend, "duplicate");
-  const changed = { ...summons, audience: "fixture-other-room" };
-  assert.deepEqual(slot.accept(summons.summonsId, bindingOf(changed), "succeeded"), {
-    summonsId: summons.summonsId,
-    thisSend: "conflict",
+
+  const changes: Array<[string, (changed: ReturnType<typeof vector1>) => void]> = [
+    ["record ref", (changed) => { changed.event.refs.sources[0]!.records[0] = "rec-a-other"; }],
+    ["window", (changed) => { changed.event.refs.sources[0]!.window.to_ms += 1; }],
+    ["consent_ref", (changed) => { changed.event.refs.sources[0]!.consent_ref = "auth:other"; }],
+    ["worker", (changed) => { changed.context.worker = "fixture-other-worker"; }],
+    ["worker_version", (changed) => { changed.context.worker_version = "0.0.1-fixture"; }],
+    ["worker_artifact", (changed) => { changed.context.worker_artifact = "sha256:other"; }],
+    ["deadline_ms", (changed) => { changed.context.deadline_ms += 1; }],
+    ["budget", (changed) => { changed.context.budget.tokens += 1; }],
+    ["retry", (changed) => { changed.context.retry.backoff_base_ms += 1; }],
+    ["audience", (changed) => { changed.context.audience = "fixture-other-room"; }],
+  ];
+  for (const [field, change] of changes) {
+    const changed = vector1();
+    change(changed);
+    assert.deepEqual(
+      slot.accept(summons.summonsId, bindingOf(changed), "succeeded"),
+      { summonsId: summons.summonsId, thisSend: "conflict" },
+      field,
+    );
+  }
+});
+
+test("11 retry: a duplicate success returns the first published result, not a new summary", async () => {
+  const slot = new FixtureTerminalSlot();
+  const first = harness({ slot });
+  first.input.workerResult = { summary: "first summary" };
+  const firstResult = await runFixtureDigester(first.input);
+
+  const retry = harness({ slot });
+  retry.input.workerResult = { summary: "different retry summary" };
+  assert.deepEqual(await runFixtureDigester(retry.input), firstResult);
+});
+
+test("11 retry: a losing failure or conflict cannot claim publication", async () => {
+  const slot = new FixtureTerminalSlot();
+  const first = harness({ slot });
+  first.input.workerResult = { summary: "accepted summary" };
+  const firstResult = await runFixtureDigester(first.input);
+
+  const losingFailure = harness({
+    slot,
+    beforeAccept: () => losingFailure.input.consentStore.put(consent({ revoked: true })),
+  });
+  assert.deepEqual(await runFixtureDigester(losingFailure.input), firstResult);
+
+  const changedSummons = { ...summons, audience: "fixture-other-room" };
+  const conflictingFailure = harness({
+    summons: changedSummons,
+    consents: [consent({ audience: changedSummons.audience })],
+    attestation: attestation({ binding: bindingOf(changedSummons) }),
+    slot,
+    beforeAccept: () => conflictingFailure.input.consentStore.put(consent({
+      audience: changedSummons.audience,
+      revoked: true,
+    })),
+  });
+  assert.deepEqual(await runFixtureDigester(conflictingFailure.input), {
+    status: "failed",
+    reason: "refused_result",
   });
 });
 
