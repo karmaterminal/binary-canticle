@@ -50,9 +50,11 @@ against a reference worker on fixtures, never on real logs `[proposed: #199]`.
    false if* a success is accepted whose runner attestation is missing or names another artifact (§8 case
    10), or that read under a `consent_ref` whose record does not grant that read (§4.1, §8 case 8)
    `[proposed: #199]`.
-3. **A sung result can never re-trigger the election that summoned it** (§6.3). *False if* any descendant of
-   a summons issued under election `E` is admitted by `E`, at any depth, while chains are intact
-   `[proposed: #199]`.
+3. **A sung result is never admitted as a trigger by the election that summoned it**, while chains are intact
+   (§6.3). Two named-loss paths are outside this claim: a loop through a prince's own judgement, and a metric
+   whose declared inputs are not its real inputs. Only §3.1's budget bounds those (🌿, overclaim check on
+   #199) `[proposed: #199]`. *False if* any descendant of a summons issued under election `E` is admitted by
+   `E`, at any depth, while chains are intact `[proposed: #199]`.
 4. **A duplicate delivery of one summons produces exactly one sung result** per `summons_id`. The duplicate is
    detected and recorded against the first result in a durable ledger, never sung twice. Uniqueness is
    enforced at the authoritative store (§5.3). *False if* any interleaving of retries, timeouts, races or
@@ -91,9 +93,11 @@ This RFC adds:
 - **Election (summoning):** a standing rule that may issue summonses. It has an **election key** `ek`. This is
   a summoning election, not RFC-0002 §3's listening election, though both are a prince's elective act.
 - **Summons authority layer:** the component that admits a summons, verifies its invoker, assigns its
-  `summons_id`, and stamps its causality chain. No worker can write these fields.
-- **Terminal slot:** the one durable record per `summons_id` at the authoritative store. It is empty, then
-  either `succeeded` or `failed`, never both (§5.3).
+  `summons_id`, and stamps its causality chain. No worker may write these fields (§2.2). Nothing of it is
+  built (🌿, overclaim check on #199) `[proposed: #199]`.
+- **Terminal slot:** the one durable record per `summons_id` at the authoritative store. It is to be empty,
+  then either `succeeded` or `failed`, never both (§5.3). It is not built (🌿, overclaim check on #199)
+  `[proposed: #199]`.
 - **Unconfirmed:** a send whose outcome the sender does not know. It is not a failure.
 - **Digester:** one worker type, owned by 🪨 on #198, that reads princes' session activity under consent and
   sings a bounded summary. This RFC specifies only its interface (§4.4).
@@ -118,9 +122,17 @@ bc#126 and bc#121. Its findings are the baseline here.
 - **The socket takes a narrowed class grant.** It can never be granted `alarm`, `control` or `regulatory`,
   even when the station key holds them. A worker on that socket cannot sing a waking alarm
   `[built+tested: binary-canticle@8ee80d7:prototype/canticle-station/canticle/runner.py:125 | SocketGrantTest.test_socket_never_takes_regulatory_alarm_or_control]`.
-- **A `sing` carries no idempotency key.** A repeat `sing` airs a new item under a new seq. A repeat under the
+- **The station's control-socket `sing` carries no idempotency key.** A repeat `sing` airs a new item under a new seq. A repeat under the
   same `state_key` supersedes the item on air with a new seq; it does not return the first receipt. So
   `state_key` is not a dedupe key `[built: binary-canticle@8ee80d7:prototype/canticle-station/canticle/station.py:316]`.
+- **The OpenClaw binding's outbox declares duplicates** (bc#97; 🌿, overclaim check on #199). It gives the
+  agent-facing `sing` an idempotency key, the caller's or one derived from session and content. A repeat with
+  the same content returns the existing row with `duplicate: true`. A reused key with other content is refused
+  as `key_conflict`. A row is written ahead, durable before the station acts, and sent at most once: a send
+  with no complete reply is `unknown` and never re-sent
+  `[built+tested: binary-canticle@8ee80d7:prototype/openclaw-canticle/src/outbox.ts:237 | prototype/openclaw-canticle/test/outbound.test.ts:89]`.
+  It is local to one binding. It is not an authoritative slot across senders, it has no terminal failure
+  state, and it never replays.
 - **An inference cannot pass for testimony.** On a station's own typed `beacon` stream, only
   `origin: reported` is read. A familiar's `inferred` beacon is not shown as the station's own word (#142)
   `[built+tested: binary-canticle@8ee80d7:prototype/canticle-station/canticle/beacon.py:134 | ReadTest.test_an_inference_cannot_pass_for_testimony]`.
@@ -129,13 +141,14 @@ bc#126 and bc#121. Its findings are the baseline here.
 
 - No trigger, no envelope and no place to run.
 - No authority over who may summon, because nothing summons.
-- No exactly-once delivery and no declared duplicates. bc#126's delivery was at least once: a lost acceptance
-  retried the same batch under a new station seq.
+- No exactly-once delivery. The one path with declared duplicates is the OpenClaw binding's outbox (§1.1): at
+  most once, per binding, with no slot shared across senders (🌿, overclaim check on #199). bc#126's delivery
+  was at least once: a lost acceptance retried the same batch under a new station seq.
 - No consent at scale: one actor, one fixture.
 
 ### 1.3 R4's nine gaps, mapped one to one
 
-| # | R4 gap (§6 there) | Closed by |
+| # | R4 gap (§6 there) | Specified (proposed) in |
 |---|---|---|
 | 1 | A trigger: mark to summons, debounce, cooldown, who may summon | §3 |
 | 2 | An invocation envelope: event and context, a result schema | §2 |
@@ -147,8 +160,9 @@ bc#126 and bc#121. Its findings are the baseline here.
 | 8 | An owner who is not a scribe, or a ruling from figs | the authority note; §4.4 (🪨, #198) |
 | 9 | Rollout: the familiar station's reach and manifest grant | §6.1 states the grant a result needs; rollout itself is out of scope (no deployment) |
 
-Gap 9 is the one this RFC cannot close. It names what a result needs from the manifest and leaves rollout to a
-later go `[open: §9]`.
+Every row is specified, not closed: nothing in the right-hand column is built (🌿, overclaim check on #199)
+`[proposed: #199]`. Gap 9 is the one this RFC does not specify. It names what a result needs from the manifest
+and leaves rollout to a later go `[open: §9]`.
 
 ---
 
@@ -303,9 +317,10 @@ themselves, whether the rule counts them directly or through a metric (§6.3 rul
 
 Quorum sensing lets bacteria change behaviour by population: behaviours "unproductive when undertaken by an
 individual bacterium acting alone but become beneficial when carried out simultaneously by a large number of
-cells" [WatersBassler2005]. The analogy breaks on identity. Bacteria count anonymously, by concentration.
-Canticle records are signed per station, so a canticle quorum can count **distinct signers**, which biology
-cannot.
+cells" [WatersBassler2005]. The analogy breaks on identity. Bacteria sense signal concentration, which tracks
+"the number and/or species present in a community" [WatersBassler2005]: species, but nothing in that abstract
+about telling individual senders apart. Canticle records are signed per station, so a canticle quorum can
+count **distinct signers** (🌿, overclaim check on #199).
 
 - A mark rule that summons on many marks MUST count distinct verified signers (station keys), not records. One
   station repeating itself MUST count once. This matches RFC-0002 §3.5: repetition from one signer is not more
@@ -360,8 +375,9 @@ verified, not only located.
 
 ### 4.2 Revocation is checked at every read
 
-- The worker MUST check the consent record's revocation **at every read** of a source, not only at summons
-  admission. A queued worker can start after a revocation (🪨) `[proposed: #199]`.
+- The read path (§4.1) MUST check the consent record's revocation **at every read** of a source, not only at
+  summons admission. A queued worker can start after a revocation (🪨). The worker may check too, but its check
+  is not the guarantee (🌿, overclaim check on #199) `[proposed: #199]`.
 - A revocation MUST stop that read and every later summons that names it `[proposed: #199]`.
 - A revocation that stops a run mid-way MUST end it in a failure record (§5.2), not a partial success
   `[proposed: #199]`.
@@ -398,7 +414,9 @@ lose a consent before its result is accepted. The read checks above cannot see t
 
 A scribe seat MAY be a source only by its own explicit opt-in, and only for curated content, such as 🌿's entry
 log under its binding on #119 (log lines only, `[quiet]` lines never sung) `[proposed: #199]`. figs's 11-04
-narrowing still holds: scribes do not design, build or review the digestion, but they may contribute content.
+ruling still holds, as he narrowed it that night (recorded on #119, 03:09Z): scribes do not design or build the
+digestion, nor reason about developing it, but they may contribute content. His 11-27 ruling keeps the
+digestion step itself with an OpenClaw prince (the authority note above) (🌿, overclaim check on #199).
 
 No reasoning text and no session text MAY reach a scribe seat's context through a summons, its event or its
 result `[proposed: #199]`.
@@ -489,8 +507,13 @@ After a failed call, "your function's code might have run completely, partially,
   receipt, and it MUST be recorded `[proposed: #199]`.
 - **A pre-read is only an optimisation.** Reading the ledger before re-sending MAY save a send. It is never
   the guarantee, because that read can be stale or race the first send `[proposed: #199]`.
-- **Listener dedupe is not enough.** RFC-0002's receiver dedupe (#176 decision 5) hides a second record from
-  one listener. It does not make publication exactly once, and other listeners, rings and guides still see two
+- **Listener dedupe cannot help at all** (🌿, overclaim check on #199). RFC-0002's receiver dedupe (#176
+  decision 5) drops repeat copies of one frame. It keys on the frame identity `(key_id, epoch, stream, seq)`
+  `[built: binary-canticle@8ee80d7:prototype/canticle-station/canticle/wire.py:155]`, and a re-sing takes a
+  new seq `[built: binary-canticle@8ee80d7:prototype/canticle-station/canticle/station.py:309]`. So a re-sent
+  result is a new identity, and no listener dedupes it, not even one. At most, a shared `state_key` supersedes
+  the older one on air, and every listener has still heard two. Nothing downstream of the station can undo a
+  second publication, which is why uniqueness has to be enforced at the store, before the station signs
   `[proposed: #199]`.
 - **The slot MUST be durable** and outlive the retry horizon and the result's TTL. A slot forgotten while a
   retry can still arrive re-opens claim 4 `[proposed: #199]`.
@@ -564,6 +587,12 @@ carries a second attribute beside its state.
   relay that recovers and replays, and a station slot that outlives the replay horizon. A slot left `pending`
   MUST be shown as pending, never as sung and never as quiet `[proposed: #199]`.
 - Under option A the station's accept is the publication, so a slot is never `pending` `[proposed: #199]`.
+
+**Prior art.** The nearest built piece is the OpenClaw binding's outbox (§1.1, bc#97): written ahead, keyed,
+refusing a changed replay as `key_conflict`, and never re-sending an `unknown`. Those match this section's
+changed-replay conflict and send-then-timeout rules. It is local to one binding, not an authoritative slot, and
+it has no terminal failure state and no replay. Whether the slot reuses it (option B's store, extended) or only
+aligns with its semantics is open (🌿, overclaim check on #199) `[open: §9]`.
 
 **Where the slot lives is open.** Two options, and neither is built `[open: §9]`:
 
@@ -645,10 +674,13 @@ that summoned it. The rule below rules that out.
    authority layer can refuse a rule whose inputs include a result stream `[proposed: #199]`.
 
 **What each rule proves.** Rule 2 is the proof of claim 3. Every descendant of a summons `S` issued under `E`
-inherits `chain(S)` whole (rule 1), and `chain(S)` holds `(ek(E), summons_id(S))`. So `E` refuses every
-descendant, at any depth. That includes a cycle through other elections: when the cycle comes back to `E`,
-`E`'s key is in the chain. The hop count does not prove anything (🪨). It *bounds* cascades through distinct
-elections, which rule 2 does not stop, and it is the backstop if a chain is lost.
+inherits `chain(S)` whole (rule 1), and `chain(S)` holds `(ek(E), summons_id(S))`. So, while chains are
+intact, `E` refuses every descendant, at any depth. That includes a cycle through other elections: when the
+cycle comes back to `E`, `E`'s key is in the chain. The two named losses below are outside this proof. The hop
+count does not prove anything (🪨). It *bounds* cascades through distinct elections, which rule 2 does not stop.
+As a backstop it covers only a chain that lost entries but kept its hop. A missing chain on a record with
+`hop > 0` is refused by rule 3. A record that lost both its chain and its hop reads as an original, and neither
+rule catches it (🌿, overclaim check on #199).
 
 On a metric-backed mark, rule 6 is what keeps the chain whole. Without it, take `E1` issuing `S1` with result
 `R1`, and `E2` firing on a metric that counts `R1`. `E2`'s summons would have no trigger records, its chain
@@ -679,7 +711,7 @@ In the running example, a result of `smn-fx-0001` carries `mark:fixture-quiet` i
 | Consent leaks through a summary | §4.1 audience bound; §4.4 bounded summary; lineage names what was read | whether a summary reveals more than its consent allowed cannot be checked mechanically. It needs a reviewer, or a stricter aspect. `[open: §9]` |
 | Replay of a summons | §5.3: one slot per `summons_id`; a changed replay conflicts; the binding covers the admitted envelope | the slot's place is open (§5.3 A or B). `[open: §9]` |
 | A worker impersonates a station | §6.1: a result is sung on the worker's own station, and an inference is never read as testimony | on silas, station keys are readable by the ear's shared uid, so key custody is host-proof, not seat-proof (RFC-0002 §4.4). `[open: binary-canticle#99]` |
-| A self-retriggering loop | §6.3's exclusion rule; the hop bound | the named loss in §6.3. `[open: §9]` |
+| A self-retriggering loop | §6.3's exclusion rule; the hop bound | the two named losses in §6.3. `[open: §9]` |
 | Digestion lockout | delegation: no scribe reads or digests session or reasoning text; the digester is 🪨's (#198). A seat that pulls session or reasoning text into its own context risks being refused service | none known, if the delegation holds. `[proposed: #198]` |
 
 ---
@@ -774,6 +806,13 @@ Each names who should decide. Nothing here is decided by this draft.
   that maps a `worker_version` to its artifact digest (§5.1, §2.2; 🌊, review on #199) `[open: §9]`.
 - **Read scope fields.** What a `refs.sources` entry's `fields` may name, per source schema, and how a consent
   record states a narrower scope than its whole source (§2.1; 🌫, review on #199) `[open: §9]`.
+- **The slot and the outbox.** Whether §5.3's slot reuses the OpenClaw binding's outbox (bc#97) or only aligns
+  with it (§5.3 prior art; 🌿, overclaim check on #199) `[open: §9]`.
+- **Where causality rides.** Whether `chain` and `hop` live in the programme's lineage or in RFC-0001's wire
+  `hop` (capped at 15), and how `H_max` relates to that cap. Today's control-socket `sing` passes no `hop`, so
+  everything sung through it reads hop 0. Also whether the summons authority layer that stamps lineage (§6.1)
+  is the same component as RFC-0002's host daemon (#176 decision 2) (🌿, overclaim check on #199)
+  `[open: §9]`.
 - **Rollout** of a familiar station and its manifest grant (R4 gap 9). A later go, not this RFC `[open: §9]`.
 
 ---
@@ -785,6 +824,7 @@ Each names who should decide. Nothing here is decided by this draft.
 | 0 | 2026-11-27 | 🍃 | The draft, from the outline at frond-gloss `24c311a`. 🪨's claims audit (room, 2026-11-27, 03:41Z to 03:44Z) made five fixes, all carried here. (1) `summons_id` and `invoker` have no direct Lambda analogue (§2.2): `awsRequestId` is one request, and `identity` is Cognito mobile identity; both fields come from the summons authority layer. (2) Claim 4 is exactly one sung result per `summons_id`, not "at most one, or a declared duplicate" (§0.2). Send-then-timeout is unconfirmed, not failure (§5.3). (3) Revocation is checked at every read, not only at admission (§4.2). (4) The exclusion rule by causality chain proves no self-retrigger; the hop count only bounds (§6.3). Uniqueness lives at the authoritative store, with a conditional accept or a transactional outbox, every retry gets the same receipt, and a pre-read is only an optimisation (§5.3). §8 gained cases 1a i to iv. (5) `summons_id` is the one terminal slot, not `(summons_id, result_kind)`: success and failure are mutually exclusive states of it, and a changed replay conflicts (§5.3). §8 gained cases 1a v and vi. The digester's owner is 🪨 (#198). |
 | 1 | 2026-11-27 | 🍃 | Two reviews at `c5cbbb6b`. **🌊's** (comment on #199): (1) a `consent_ref` is a locator, not a grant. §4.1 now verifies the record behind it at admission and every read (integrity and issuer, actor, exact source, audience, a new grantee field, revocation), by the read path rather than the worker, failing closed; §2.1 says so. (2) Revocation after the last read and before publication: §4.2 re-checks consent at the slot's accept, which is the linearization point. Revoked before it, the slot fills `failed`; after it, the result stays on air until its TTL or a PLUCK. The promise is narrowed to match. (3) `worker`/`worker_version` are backed by a runner's execution attestation against a new `worker_artifact` digest (§2.2, §5.1, §6.1); a mismatch fills the slot `failed`. Claim 2 now reads "the set of consents it read", and its falsifier covers (1) and (3) (§0.2). **🪨's** (review on #199): (a) a metric-backed mark carries the chains of the records it counts, or must not count summons results (§3.1, §3.2, §6.3 rule 6, and a second named loss). (b) Under option B a filled slot is `pending` until the station accepts; a relay replays until it does; claim 4 is split into safety and liveness (§0.2, §5.3). §8 gained cases 1a vii and viii, 2a and 2b, 8, 9 and 10; §9 gained four entries. |
 | 2 | 2026-11-27 | 🍃 | **🌫's** review on #199, at `c5cbbb6b`. (1) Sources and their consents are one typed list, `refs.sources`: one entry per source, each with its scope and exactly one `consent_ref`. There are no parallel arrays. A missing, ambiguous or mismatched association is refused at admission. A read must fall inside both its entry's scope and its consent's (§2.1, §2.2, §4.1, §4.4, the §2.4 example). The context gains `audience` and `attempt`. (2) §5.3 defines the binding exactly: the projection, a closed list of attempt-local fields (`log_destination`, `attempt`) that are left out, RFC 8785 encoding, integers only, duplicate and unknown keys refused, and a pinned Vector 1. `deadline` is `deadline_ms` everywhere. §8 gained cases 11 and 12; §9 gained one entry; References gained RFC 8785. |
+| 3 | 2026-11-27 | 🍃 | **🌿's** overclaim check on #199 (at `f901de72`; all nine items re-checked at `b2599f73`, and all hold). Overclaims: §1.2 no longer says there are no declared duplicates, and §1.1 cites the OpenClaw binding's outbox as built prior art; §5.3 says listener dedupe keys on seq and so hides no re-sent result, not even from one listener, which is why uniqueness lives at the store; §4.3 quotes figs's 11-04 ruling as he gave it (no "review"); claim 3 (§0.2) and §6.3's proof are scoped to intact chains, with the two named losses outside, and §7 counts both; §6.3's hop backstop is narrowed to a chain that kept its hop; §3.3 no longer says biology cannot tell senders apart. Mis-tags: §0.4's authority-layer and terminal-slot definitions are tagged; §1.3's column is "Specified (proposed) in", and gap 9 is "not specified". Also from his notes: §4.2 puts the per-read revocation check on the read path; §5.3 gains a prior-art paragraph; §9 gains two entries (slot vs outbox; where causality rides and who stamps lineage). |
 
 ---
 
