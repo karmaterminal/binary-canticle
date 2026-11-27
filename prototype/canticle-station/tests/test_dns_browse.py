@@ -2,7 +2,10 @@ import base64
 import contextlib
 import io
 import json
+import subprocess
+import sys
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -23,6 +26,14 @@ ELSEWHERE = 'cael._canticle._udp.evilnet.org.'
 
 def k_hint(pub):
     return 'ed25519:' + base64.b64encode(pub).decode()
+
+
+def non_canonical(hint):
+    """The same key, its last base64 character changed only in the bits the decoder drops."""
+    alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    key = base64.b64decode(hint[8:])
+    return next(hint[:-2] + c + hint[-1] for c in alphabet
+                if c != hint[-2] and base64.b64decode(hint[8:-2] + c + hint[-1]) == key)
 
 
 class FakeResolver:
@@ -175,11 +186,46 @@ class FindTests(unittest.TestCase):
         self.assertEqual(self.find('streams=ops')['stations'], [])
         self.assertEqual(self.find('streams=ops.alar')['stations'], [])
 
+    def test_star_may_match_nothing_and_question_matches_exactly_one(self):
+        self.assertEqual(self.names(self.find('streams=hymn*')), ['cael', 'rune'])
+        self.assertEqual(self.names(self.find('streams=*hymn*')), ['cael', 'rune'])
+        self.assertEqual(self.names(self.find('streams=?ymn')), ['cael', 'rune'])
+        self.assertEqual(self.find('streams=hymn?')['stations'], [])
+        self.assertEqual(self.find('streams=??hymn')['stations'], [])
+        hit = self.find('streams=ops.*.watch')['stations']
+        self.assertEqual([(r['station'], r['matched_on'][0]['values']) for r in hit], [('cael', ['ops.night.watch'])])
+        self.assertEqual(self.find('streams=ops.*.alarm')['stations'], [])
+
+    def test_a_glob_that_cannot_match_returns_at_once(self):
+        # A tool may call find() in-process, before any DNS timeout applies, so matching must not backtrack.
+        code = textwrap.dedent('''
+            from canticle.dns_browse import Where
+            from canticle.manifest import StationEntry
+            names = ('ops.night.watch', 'a' * 31 + '.' + 'a' * 30)
+            grant = StationEntry('cael', bytes.fromhex('%s'), frozenset(), streams=names, public_streams=names)
+            for glob in ('*' * 30 + 'z', '*a' * 8 + '*z', '?*' * 20 + 'z'):
+                assert Where.parse('streams=' + glob).values(grant) == [], glob
+            print('ok')
+        ''' % PUB.hex())
+        package = str(Path(dns_browse.__file__).resolve().parents[1])
+        done = subprocess.run([sys.executable, '-c', code], env={'PYTHONPATH': package, 'PYTHONDONTWRITEBYTECODE': '1'},
+                              capture_output=True, text=True, timeout=10)
+        self.assertEqual((done.returncode, done.stdout.strip()), (0, 'ok'), done.stderr)
+
     def test_hit_is_the_browse_row_plus_matched_on(self):
         rows = Browser(FakeResolver(self.answers), self.manifest, 'example.org').browse()['stations']
         hit = dict(self.find('streams=ops.*')['stations'][0])
         hit.pop('matched_on')
         self.assertEqual(hit, rows[0])
+
+    def test_find_output_is_the_browse_output_plus_where_and_refused(self):
+        browse = Browser(FakeResolver(self.answers), self.manifest, 'example.org').browse()
+        found = self.find('streams=ops.*')
+        self.assertEqual(set(found) - set(browse), {'where', 'refused'})
+        self.assertEqual([found[k] for k in ('domain', 'truncated', 'authority')],
+                         ['example.org.', False, 'local unsigned spike manifest; DNS is locator only'])
+        self.assertEqual([browse[k] for k in ('domain', 'truncated', 'authority')],
+                         [found[k] for k in ('domain', 'truncated', 'authority')])
 
     def test_exact_sid_and_k(self):
         rune_sid = self.rune.key_id.hex()
@@ -192,7 +238,8 @@ class FindTests(unittest.TestCase):
         self.assertEqual(self.names(self.find('k=' + k_hint(PUB))), ['cael'])
         self.assertEqual(self.names(self.find('K=' + k_hint(PUB))), ['cael'])
         # Other values are exact: base64 is case-sensitive.
-        self.assertEqual(self.find('k=' + k_hint(PUB).swapcase().replace('ED25519:', 'ed25519:'))['stations'], [])
+        other = k_hint(PUB)[:8] + k_hint(PUB)[8:-2].swapcase() + k_hint(PUB)[-2:]
+        self.assertEqual(self.find('k=' + other)['stations'], [])
 
     def test_predicates_are_anded(self):
         rune_sid = self.rune.key_id.hex()
@@ -272,13 +319,20 @@ class FindTests(unittest.TestCase):
         self.assertEqual(row['matched_on'][0]['values'], ['ops.late'])
         values = self.find('streams=s*')['stations'][0]['matched_on'][0]
         self.assertEqual((len(values['values']), values['values_truncated']), (dns_browse.MAX_PUBLIC_STREAMS, True))
+        values = self.find('streams=s0?')['stations'][0]['matched_on'][0]   # s00..s09: ten
+        self.assertEqual((len(values['values']), values['values_truncated']), (10, False))
+        exactly = tuple(f's{i:02d}' for i in range(dns_browse.MAX_PUBLIC_STREAMS))
+        self.manifest = Manifest([StationEntry('cael', PUB, frozenset(), streams=exactly, public_streams=exactly)])
+        values = self.find('streams=s*')['stations'][0]['matched_on'][0]
+        self.assertEqual((len(values['values']), values['values_truncated']), (dns_browse.MAX_PUBLIC_STREAMS, False))
 
     def test_invalid_predicates_are_refused_before_any_query(self):
         resolver = FakeResolver(self.answers)
         for bad in ('streams', '=ops.*', 'streams=', 'class=alarm', 'mode=lease', 'txtvers=1', 'station=cael',
                     'streams=OPS.*', 'streams=ops.[ab]', 'streams=ops alarm', 'streams=' + 'a' * 65,
                     'sid=xyz', 'sid=' + 'a' * 15, 'sid=*', 'k=ed25519:bogus', 'k=' + k_hint(PUB)[8:],
-                    'k=ed25519:' + base64.b64encode(b'\x00' * 31).decode()):
+                    'k=ed25519:' + base64.b64encode(b'\x00' * 31).decode(), 'k=' + non_canonical(k_hint(PUB)),
+                    '\u212a=' + k_hint(PUB), 'ſtreams=*'):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 self.find(bad, resolver=resolver)
         with self.assertRaises(ValueError):
@@ -288,6 +342,18 @@ class FindTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             dns_browse.find('example.org', 'streams=*', manifest=self.manifest, query=resolver.resolve)
         self.assertEqual(resolver.calls, [])
+
+    def test_a_where_built_directly_is_checked_as_parsed(self):
+        resolver = FakeResolver(self.answers)
+        for bad in (('txtvers', '1'), ('streams', 'OPS.*'), ('sid', 'xyz'), ('k', 'bogus'),
+                    ('k', non_canonical(k_hint(PUB)))):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                dns_browse.find('example.org', [dns_browse.Where(*bad)], manifest=self.manifest,
+                                query=resolver.resolve)
+        self.assertEqual(resolver.calls, [])
+        rune_sid = self.rune.key_id.hex()
+        self.assertEqual(dns_browse.Where('SID', rune_sid.upper()), dns_browse.Where.parse(f'sid={rune_sid}'))
+        self.assertEqual(self.names(self.find(dns_browse.Where('SID', rune_sid.upper()))), ['rune'])
 
     def test_find_keeps_browse_domain_rules(self):
         for domain in ('example.org/evil', 'local', 'lan.local'):
