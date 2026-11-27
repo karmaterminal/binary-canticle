@@ -184,8 +184,14 @@ run is the 3.11 receipt.
 
 ## Registration: what each other station needs to be findable (for 🌊 and 🪨; no action)
 
-For a station to be a `dns-browse` row, and so a possible `dns-find` hit, five things must all hold. Today
-none of them holds for any station except where noted.
+**Corrected after 🍃's review (bc#200, 2026-11-27).** `find` matches on the *reader's manifest grant*, never on
+TXT. A bare row needs only **PTR + SRV**, which `frond-gloss` already has live in the parent zone, plus a reader
+manifest that grants that station public streams. So **today's blocker to being found is item 4, the manifest**:
+only `bellwether-elliott` has `public_streams`, and it has no PTR. The child zone (item 1) and bootstrap#1872's
+trust stages are what a **TXT-cross-checked** row needs, not what being found needs. Nobody should wait on #1872
+for discovery.
+
+The full list, for a row whose TXT is also cross-checked:
 
 1. **The zone.** The dynamic child zone `_canticle._udp.dandelion.cult` exists only in #1868's `next`
    revision. The pair serves `live` (SOA `2026112402` on both, no child SOA, read above). `next` is applied by
